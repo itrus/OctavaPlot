@@ -422,3 +422,5 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
 .info-head { display: flex; align-items: center; gap: 20px; margin-bottom: 8px; }
 .info-head h2 { font-size: 26px; margin: 0; }
 .info-logo { flex: none; display: block; }
+.coffee-btn { display: inline-block; padding: 4px 12px; border: 1px solid #000; border-radius: 6px; background: #FFDD00; color: #000; font-weight: 600; text-decoration: none; }
+.coffee-btn:hover { filter: brightness(0.95); }

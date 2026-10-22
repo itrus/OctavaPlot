@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="https://itrus.github.io/OctavaPlot/"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6%20try%20it-live%20demo-2ea44f?style=for-the-badge"></a>
+  <a href="https://www.buymeacoffee.com/itrus"><img height="28" src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=🎓&slug=itrus&button_colour=FFDD00&font_colour=000000&font_family=Arial&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" /></a>
 </p>
 
 <p align="center">
@@ -140,7 +141,6 @@ The data table has an optional Row title column (undoable, copy and paste aware)
 ## License
 
 Released under the [GNU General Public License v3.0](LICENSE).
-
 ## Compliance note
 
 Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved JSON files. The Business Associate Agreements in place cover Google Workspace and Microsoft 365 only, not this app or the browser. Do not enter patient identifiers (not verified whether sample identifiers are acceptable). There is no autosave off-switch yet.
