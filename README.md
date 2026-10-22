@@ -1,6 +1,6 @@
 # OctavaPlot — prototype v0.1
 
-Local React + TypeScript + Vite + D3 app for editing data tables and the charts drawn from them: bar / scatter / mean±error charts from column tables, and XY scatter / line charts from XY tables. No backend; works offline after `npm install`.
+Local React + TypeScript + Vite + D3 app for editing data tables and the charts drawn from them: bar / scatter / mean±error charts from column tables, and XY scatter / line charts from XY tables. No backend; works offline after `npm install`. Chart colour palettes are from the ggsci R package (Xiao N., https://nanx.me/ggsci/); see [Colour palettes](#colour-palettes).
 
 **Live:** https://itrus.github.io/OctavaPlot/ (deployed from `main` by GitHub Actions; data stays in your browser's `localStorage`, so do not enter patient-linked data).
 
@@ -52,6 +52,12 @@ A table has a **type**, chosen when it is created (Navigator → New Data Table�
 Survival curves use the product-limit estimate (events are counted before censoring at a tied time); censored subjects are marked on the curve. An optional pointwise confidence band uses the Greenwood standard error (log-log by default, or plain, at the level you choose), and an optional at-risk table lists the subjects still under observation at each tick of the time axis. Grouped bars of replicates can show the individual values over the bars. Contingency percentages are shares of each row's own total. Grouped and contingency charts treat a row with a title or any value as a category; empty rows are ignored.
 
 XY charts follow spec §3.1 and §7: symbols and a path layer per series, a numeric X axis with Auto/Manual limits, input-order paths that break at a missing value (never bridged, never zero), and the automatic range including zero only when the data starts near it. `src/model/chartTypes.ts` is the catalogue; adding a chart type means adding it there, a preset in `defaults.ts`, and its drawing.
+
+**New Graph…** shows a gallery per graph family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. Graphs that are not built yet (box and violin, heat maps, parts of a whole, bars at numeric X, fitted curves, and so on: the presets of specification section 3) are shown locked with their thumbnail and their specification preset ID, so the whole range is visible. The catalogue is `src/model/chartGallery.ts`; to make a planned graph available, give its entry a `type`.
+
+## Analyses (Results)
+
+**Results → New Analysis…** adds an analysis of a column, XY or grouped table (counts and event flags have no descriptive statistics). **Descriptive statistics** gives, for every column (each sub-column on its own): the number of values, minimum, quartiles, median, maximum and range, the 10% and 90% percentiles, the exact confidence interval of the median with the coverage it actually reaches, mean, SD, SEM, the t interval of the mean, coefficient of variation, geometric mean, SD factor and interval, skewness, kurtosis and sum. The confidence level (90, 95 or 99%) is a setting of the analysis. Results are never stored: they are recalculated from the table each time, so they follow the data. A statistic that cannot be calculated (too few values, or a geometric mean of values that are not all positive) is left empty. Export CSV and Copy are on the toolbar; the code is in `src/stats/descriptive.ts`.
 
 ## Behaviour notes
 
@@ -144,3 +150,11 @@ Row titles, data-set names and values are stored unencrypted in the browser (`lo
 ## Manual verification checklist
 
 Automated tests cover geometry and SVG text. Check by eye at device pixel ratio 1 and 2, with a tolerance of 0.25 pt (spec 22.3 L1529): bars, error bars, fill patterns, legend keys, right axis, point labels, SVG and PNG export. Only Edge 142 has been verified; Firefox and Safari are not verified.
+
+## Colour palettes
+
+The palettes are taken from the **ggsci** R package (Xiao N. *ggsci: Scientific Journal and Sci-Fi Themed Color Palettes for ggplot2*; <https://nanx.me/ggsci/>, <https://github.com/nanxstats/ggsci>; descriptions follow <https://nanx.me/ggsci/articles/ggsci.html>). Science (AAAS) is first and the default; then Nature (NPG), New England Journal of Medicine, The Lancet, JAMA, BMJ, Journal of Clinical Oncology, D3, Gephi, Observable, Primer, Atlassian, iTerm and IGV. The app's own earlier palettes (Vibrant, Pastel, Colorblind-friendly, Monochrome, Black and White) follow them, so saved charts still open.
+
+Notes: Gephi's engine is generative, so it is a seeded port giving ten fixed colours (R gives other ones each run); iTerm is the Rose Pine scheme only (ggsci has 400+); D3 offers category10 and category20; IGV has 48 colours.
+
+**Info** (toolbar button, beside Settings) shows the version, the credits and the source of the colour palettes. In the palette window (ⓘ beside Color palette) each palette says whether its first six colours stay apart for red-weak, green-weak and blue-weak vision; this is measured by simulation (Machado et al., 2009) in `src/model/colorVision.ts`, not claimed from the palette's name.

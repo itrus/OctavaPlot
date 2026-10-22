@@ -6,7 +6,7 @@ import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '..
 import { sanitizeFillKeys } from '../model/fill';
 import { createRows, sanitizeRowTitle } from '../model/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/summary';
-import type { Chart, ChartLayer, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SpreadKind, SummarySpec } from '../model/types';
+import type { Analysis, Chart, ChartLayer, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SpreadKind, SummarySpec } from '../model/types';
 
 const FORMAT = 'octavaplot-project';
 /** Files and autosave written before the project was renamed from "Scientific Plotter" still load. */
@@ -292,6 +292,11 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
   const tableIds = new Set(dataTables.map((t) => t.id));
   const charts = arr(p.charts, 'project.charts').map((c, i) => parseChart(c, `project.charts[${i}]`, tableIds, notes));
   if (dataTables.length === 0) fail('project.dataTables', 'must contain at least one table');
+  // Analyses refer to tables by ID: one whose table is gone, or that is not recognised, is dropped.
+  const analyses: Analysis[] = (Array.isArray(p.analyses) ? p.analyses : []).flatMap((a): Analysis[] => {
+    if (!isObj(a) || typeof a.id !== 'string' || a.kind !== 'descriptive' || typeof a.dataTableId !== 'string' || !tableIds.has(a.dataTableId)) return [];
+    return [{ id: a.id, name: typeof a.name === 'string' && a.name !== '' ? a.name : 'Descriptive statistics', kind: 'descriptive', dataTableId: a.dataTableId, level: typeof a.level === 'number' && a.level > 0 && a.level < 1 ? a.level : 0.95 }];
+  });
   // A chart type that does not suit its table's type (a hand-edited file) is switched to the table's default chart
   // type, so a graph is never drawn with the wrong reading of the columns.
   for (const c of charts) {
@@ -308,6 +313,7 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
     name: typeof p.name === 'string' ? p.name : 'Untitled project',
     dataTables,
     charts,
+    ...(analyses.length > 0 ? { analyses } : {}),
   };
   return { project, notes };
 }

@@ -274,11 +274,26 @@ export interface Chart {
   annotations: Annotation[];
 }
 
+/** The analyses of the Results section. Only descriptive statistics exist so far. */
+export type AnalysisKind = 'descriptive';
+
+/** An analysis of one data table. Its results are never stored: they are recalculated from the table each time. */
+export interface Analysis {
+  id: Id;
+  name: string;
+  kind: AnalysisKind;
+  dataTableId: Id;
+  /** Confidence level of the intervals, 0 < level < 1. */
+  level: number;
+}
+
 export interface Project {
   id: Id;
   name: string;
   dataTables: DataTable[];
   charts: Chart[];
+  /** Absent in files from before analyses existed. */
+  analyses?: Analysis[];
 }
 
 export type Selection =
@@ -288,4 +303,4 @@ export type Selection =
   | { kind: 'point'; groupId: Id; pointId: Id }
   | { kind: 'annotation'; annotationId: Id };
 
-export type ViewRef = { kind: 'table'; id: Id } | { kind: 'chart'; id: Id };
+export type ViewRef = { kind: 'table'; id: Id } | { kind: 'chart'; id: Id } | { kind: 'analysis'; id: Id };

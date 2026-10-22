@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { displayName } from '../../chart/model';
 import { applyAspect, resizeChart } from '../../model/aspect';
 import { graphSources, type GraphSource } from '../../model/chartTable';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
 import { newId } from '../../model/ids';
+import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../model/colorVision';
+import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../model/palettes';
 import type { Chart, Group, Id } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import {
@@ -229,6 +231,83 @@ export function OnThisGraph({ chart }: { chart: Chart }) {
         </div>
       ))}
       {!multi && ownKind === 'column' && <div className="muted small">Add another column table to plot its data sets on this graph too.</div>}
+    </>
+  );
+}
+
+/** The palette menu entries, in subcategories. */
+export function PaletteOptions() {
+  return (
+    <>
+      {PALETTE_GROUPS.map((g) => (
+        <optgroup key={g} label={g}>
+          {palettesInGroup(g).map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </optgroup>
+      ))}
+    </>
+  );
+}
+
+/** Whether the first colours of a palette stay distinguishable with a colour-vision deficiency (measured, see colorVision.ts). */
+function VisionNote({ colors }: { colors: readonly string[] }) {
+  const r = useMemo(() => visionReport(colors), [colors]);
+  const worst = (Object.keys(DEFICIENCIES) as (keyof typeof DEFICIENCIES)[]).reduce((a, k) => (r.byKind[k] < r.byKind[a] ? k : a), 'protan' as keyof typeof DEFICIENCIES);
+  return r.safe ? (
+    <div className="small vision vision-ok">✓ Colour-vision safe: the first {COMPARED_COLOURS} colours stay apart for red-weak, green-weak and blue-weak vision.</div>
+  ) : (
+    <div className="small muted vision">Not colour-vision safe: two of the first {COMPARED_COLOURS} colours come close with {DEFICIENCIES[worst].label} vision (difference {r.byKind[worst].toFixed(1)}; {MIN_DELTA_E} or more is clear).</div>
+  );
+}
+
+/** An info button beside the palette menu; it opens a window with the colours, what the palette is and its source. */
+export function PaletteInfo({ paletteId }: { paletteId: string | null }) {
+  const [open, setOpen] = useState(false);
+  const palette = paletteById(paletteId);
+  if (!palette) return null;
+  return (
+    <>
+      <button className="icon-btn palette-info" aria-label="About this palette" title="About this palette" onClick={() => setOpen(true)}>i</button>
+      {open && (
+        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
+          <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Colour palettes" tabIndex={-1} ref={(el) => el?.focus()}>
+            <div className="modal-head">
+              <strong>Colour palettes</strong>
+              <button className="icon-btn" onClick={() => setOpen(false)} aria-label="Close">×</button>
+            </div>
+            <div className="modal-body modal-pad palette-about">
+              <p className="muted small">In use: <strong>{palette.name}</strong>, {palette.colors.length} colours, applied to the data sets in order and repeated when there are more data sets than colours. Colour-vision notes are measured on the first {COMPARED_COLOURS} colours of each palette, by simulating red-weak, green-weak and blue-weak vision (Machado et al., 2009) and taking the smallest CIE76 colour difference between any two of them.</p>
+              {PALETTE_GROUPS.map((g) => (
+                <section key={g} className="palette-group">
+                  <h4>{g}</h4>
+                  <p className="muted small">{PALETTE_GROUP_INFO[g]}</p>
+                  {palettesInGroup(g).map((p) => (
+                    <div key={p.id} className={`palette-entry${p.id === palette.id ? ' current' : ''}`}>
+                      <div className="palette-entry-head">
+                        <strong>{p.name}</strong>
+                        <span className="palette-swatches" aria-hidden="true">
+                          {p.colors.slice(0, 12).map((c, i) => (
+                            <i key={i} style={{ background: c }} title={c} />
+                          ))}
+                        </span>
+                      </div>
+                      {p.description && <div className="small">{p.description}</div>}
+                      <VisionNote colors={p.colors} />
+                    </div>
+                  ))}
+                </section>
+              ))}
+              <p className="muted small">
+                Source of the colours (all but the last group): {GGSCI_CITATION.text} <a href={GGSCI_CITATION.url} target="_blank" rel="noreferrer">{GGSCI_CITATION.url}</a>. Descriptions after <a href={GGSCI_CITATION.vignette} target="_blank" rel="noreferrer">the ggsci introduction</a>.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button className="primary" onClick={() => setOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

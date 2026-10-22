@@ -8,14 +8,14 @@ import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../..
 import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from '../../stats/describe';
 import { tooltipFmt } from '../../chart/tooltip';
 import { IntervalFields, LineAtField } from './SummaryControls';
-import { PALETTES, paletteById } from '../../model/palettes';
+import { paletteById } from '../../model/palettes';
 import { isGroupOverridden, resolveStyle } from '../../model/style';
 import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, Id, SummarySpec } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { applyPalette, composeCommands, patchAxis, patchBothAxes, patchChart, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './controls';
 import { SECTIONS, TABS, type AppearanceSection, type InspectorTab } from './nav';
-import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './SharedSections';
+import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, PaletteInfo, PaletteOptions, TextSections } from './SharedSections';
 
 const shapeOptions = [
   { value: 'circle', label: 'Circle' },
@@ -162,9 +162,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                     }}
                   >
                     {chart.paletteId === null && <option value="custom" disabled>Custom colours</option>}
-                    {PALETTES.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
+<PaletteOptions />
                   </select>
                   {paletteById(chart.paletteId) && (
                     <span className="palette-swatches" aria-hidden="true">
@@ -173,6 +171,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                       ))}
                     </span>
                   )}
+                  <PaletteInfo paletteId={chart.paletteId} />
                 </Field>
               </GroupBox>
 

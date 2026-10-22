@@ -1,4 +1,5 @@
 import { createChart, createColumnTable, DEFAULT_SURVIVAL, initialLayerStyle, createContingencyTable, createGroupedTable, createSurvivalTable, defaultSummaryFor, createGroup, createXyTable, DEFAULT_JITTER, DEFAULT_STYLE, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
+import { analysisApplies, analysisTypeInfo } from '../model/analysis';
 import { effectiveTable } from '../model/chartTable';
 import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, xySeries } from '../model/tableLayout';
 
@@ -11,6 +12,8 @@ import { createRows, sanitizeRowTitle } from '../model/rows';
 import { clearGroupSummary, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/summary';
 import { LABEL_STYLE_KEYS, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle } from '../model/style';
 import type {
+  Analysis,
+  AnalysisKind,
   Annotation,
   AxisConfig,
   Chart,
@@ -500,6 +503,24 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
     const rows = createRows(rowCount).map((row, r) => ({ ...row, title: data.titles ? (data.titles[r] ?? '') : (t.rows[r]?.title ?? '') }));
     return { ...t, rowCount, rows, groups };
   });
+
+/** Add an analysis of a table to the Results section. */
+export const addAnalysis = (id: Id, tableId: Id, kind: AnalysisKind = 'descriptive'): Command => (p) => {
+  const table = p.dataTables.find((t) => t.id === tableId);
+  if (!table || !analysisApplies(table.kind)) return p;
+  const existing = p.analyses ?? [];
+  const base = `${analysisTypeInfo(kind).label} of ${table.name}`;
+  let name = base;
+  for (let i = 2; existing.some((a) => a.name === name); i++) name = `${base} (${i})`;
+  return { ...p, analyses: [...existing, { id, name, kind, dataTableId: tableId, level: 0.95 }] };
+};
+
+export const patchAnalysis = (id: Id, patch: Partial<Pick<Analysis, 'name' | 'level'>>): Command => (p) => ({
+  ...p,
+  analyses: (p.analyses ?? []).map((a) => (a.id === id ? { ...a, ...patch } : a)),
+});
+
+export const removeAnalysis = (id: Id): Command => (p) => ({ ...p, analyses: (p.analyses ?? []).filter((a) => a.id !== id) });
 
 export const setProjectName = (name: string): Command => (p) => (p.name === name ? p : { ...p, name });
 

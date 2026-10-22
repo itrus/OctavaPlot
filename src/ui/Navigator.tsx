@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { newId } from '../model/ids';
-import type { ChartType, Id, TableKind, ViewRef } from '../model/types';
+import type { AnalysisKind, ChartType, Id, TableKind, ViewRef } from '../model/types';
 import { useApp } from '../state/AppContext';
-import { addChart, addDataTable, type NewTableOptions } from '../state/commands';
-import { NewGraphDialog } from './NewItemDialogs';
+import { addAnalysis, addChart, addDataTable, type NewTableOptions } from '../state/commands';
+import { NewAnalysisDialog } from './NewAnalysisDialog';
+import { NewGraphDialog } from './NewGraphDialog';
+import { analysesOf } from '../model/analysis';
 import { NewTableDialog } from './NewTableDialog';
 
-type Folder = 'tables' | 'graphs';
+type Folder = 'tables' | 'results' | 'graphs';
 
 /** A short tag beside every table, so its kind is visible in the list. */
 const TABLE_BADGE: Record<TableKind, { text: string; title: string }> = {
@@ -21,17 +23,23 @@ const TABLE_BADGE: Record<TableKind, { text: string; title: string }> = {
 const sameView = (a: ViewRef, b: ViewRef) => a.kind === b.kind && a.id === b.id;
 
 /** Sections that are not finished yet: shown with a lock and not reachable. */
-const LOCKED_SECTIONS = ['Info', 'Results', 'Layouts'] as const;
+const LOCKED_SECTIONS = ['Layouts'] as const;
 
 export function Navigator() {
   const { project, view, setView, run, settings } = useApp();
-  const [open, setOpen] = useState<Record<Folder, boolean>>({ tables: true, graphs: true });
+  const [open, setOpen] = useState<Record<Folder, boolean>>({ tables: true, results: true, graphs: true });
 
   const currentTableId =
     view.kind === 'table' ? view.id : project.charts.find((c) => c.id === view.id)?.dataTableId;
 
   // New items are made in two clear steps: the type of table first, then a chart type that suits that table.
-  const [dialog, setDialog] = useState<'table' | 'graph' | null>(null);
+  const [dialog, setDialog] = useState<'table' | 'graph' | 'analysis' | null>(null);
+  const createAnalysis = (tableId: Id, kind: AnalysisKind) => {
+    const id = newId('analysis');
+    run('New analysis', addAnalysis(id, tableId, kind));
+    setView({ kind: 'analysis', id });
+    setDialog(null);
+  };
   const createTable = (kind: TableKind, options: NewTableOptions) => {
     const id = newId('table');
     run(`New ${kind} table`, addDataTable(id, kind, options));
@@ -73,6 +81,13 @@ export function Navigator() {
               {newItem('New Data Table…', () => setDialog('table'))}
             </>
           )}
+          {folder('results', 'Results')}
+          {open.results && (
+            <>
+              {analysesOf(project).map((a) => item({ kind: 'analysis', id: a.id }, 'Σ', a.name))}
+              {newItem('New Analysis…', () => setDialog('analysis'))}
+            </>
+          )}
           {folder('graphs', 'Graphs')}
           {open.graphs && (
             <>
@@ -89,6 +104,7 @@ export function Navigator() {
       </div>
       {/* In the page body, not in the (sliding) panel, so the dialog is positioned against the window. */}
       {dialog === 'table' && createPortal(<NewTableDialog defaultSample={!settings.newProjectEmpty} onCreate={createTable} onClose={() => setDialog(null)} />, document.body)}
+      {dialog === 'analysis' && createPortal(<NewAnalysisDialog tables={project.dataTables} initialTableId={currentTableId ?? project.dataTables[0].id} onCreate={createAnalysis} onClose={() => setDialog(null)} />, document.body)}
       {dialog === 'graph' && createPortal(<NewGraphDialog tables={project.dataTables} initialTableId={currentTableId ?? project.dataTables[0].id} onCreate={createGraph} onClose={() => setDialog(null)} />, document.body)}
     </nav>
   );

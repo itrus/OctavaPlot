@@ -14,8 +14,12 @@ describe('palettes', () => {
     model.groups.forEach((g, i) => expect(g.style.barFill).toBe(vibrant.colors[i % vibrant.colors.length]));
   });
 
-  it('offers the five required palettes', () => {
-    expect(PALETTES.map((x) => x.name)).toEqual(['Vibrant', 'Pastel', 'Colorblind-friendly', 'Monochrome', 'Black and White']);
+  it('lists the ggsci palettes first with Science first, then the app own ones', () => {
+    const names = PALETTES.map((x) => x.name);
+    expect(names[0]).toBe('Science (AAAS)');
+    expect(names.slice(-5)).toEqual(['Vibrant', 'Pastel', 'Colorblind-friendly', 'Monochrome', 'Black and White']);
+    expect(PALETTES.filter((x) => x.source === 'ggsci')).toHaveLength(15);
+    expect(PALETTES.every((x) => x.colors.every((c) => /^#[0-9a-f]{6}$/i.test(c)))).toBe(true);
   });
 });
 

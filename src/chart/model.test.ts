@@ -247,7 +247,7 @@ describe('summary pipeline (S15)', () => {
 
   it('warns when more data sets than palette colours reuse a fill', () => {
     let p = project;
-    for (let i = 0; i < 3; i++) p = addGroup(p.dataTables[0].id)(p);
+    for (let i = 0; i < 7; i++) p = addGroup(p.dataTables[0].id)(p);
     const m = model(p);
     expect(m.warnings.filter((w) => /palette/.test(w))).toHaveLength(1);
     expect(m.warnings.some((w) => /1 data set reuse/.test(w))).toBe(true);

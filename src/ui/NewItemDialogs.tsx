@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { CHART_TYPES, chartTypesFor, defaultChartTypeFor, tableTypeInfo } from '../model/chartTypes';
-import type { ChartType, DataTable, Id } from '../model/types';
+import { useEffect, useRef, type ReactNode } from 'react';
+import type { ChartType } from '../model/types';
 
 /** A small modal with a title, a body and Cancel / confirm buttons. Focus is taken once, when it opens. */
-export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled, children }: { title: string; confirmLabel: string; onConfirm: () => void; onClose: () => void; confirmDisabled?: boolean; children: ReactNode }) {
+export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled, wide, children }: { title: string; confirmLabel: string; onConfirm: () => void; onClose: () => void; confirmDisabled?: boolean; wide?: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => ref.current?.focus(), []);
   const latest = useRef({ onConfirm, onClose });
@@ -22,7 +21,7 @@ export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled
   }, []);
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
+      <div className={`modal modal-wide${wide ? ' modal-xwide' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
         <div className="modal-head">
           <strong>{title}</strong>
           <button className="icon-btn" onClick={onClose} aria-label="Close">×</button>
@@ -40,7 +39,7 @@ export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled
 const SKETCH = { width: 84, height: 54, viewBox: '0 0 84 54', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, 'aria-hidden': true } as const;
 
 /** A thumbnail of what each chart type looks like. */
-function ChartSketch({ type }: { type: ChartType }) {
+export function ChartSketch({ type }: { type: ChartType }) {
   const axes = <path d="M10 6V46H78" />;
   switch (type) {
     case 'bar':
@@ -149,39 +148,4 @@ function ChartSketch({ type }: { type: ChartType }) {
       );
     }
   }
-}
-
-/** Step 2: a graph of one table, in one of the chart types that suit that table's type. */
-export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { tables: DataTable[]; initialTableId: Id; onCreate: (tableId: Id, type: ChartType) => void; onClose: () => void }) {
-  const [tableId, setTableId] = useState<Id>(tables.some((t) => t.id === initialTableId) ? initialTableId : tables[0].id);
-  const table = tables.find((t) => t.id === tableId) ?? tables[0];
-  const [chosen, setChosen] = useState<ChartType | null>(null);
-  // Changing to a table of another type resets the choice to that type's first chart.
-  const type = chosen && CHART_TYPES.some((c) => c.type === chosen && c.tableKind === table.kind) ? chosen : defaultChartTypeFor(table.kind);
-  return (
-    <Modal title="New graph" confirmLabel="Create graph" onConfirm={() => onCreate(table.id, type)} onClose={onClose}>
-      <label className="choice-label">
-        <span>Graph of table</span>
-        <select value={table.id} onChange={(e) => setTableId(e.target.value)} aria-label="Data table">
-          {tables.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} ({tableTypeInfo(t.kind).label})
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="muted">
-        {tableTypeInfo(table.kind).label}: {tableTypeInfo(table.kind).layout} Choose a chart type for it.
-      </p>
-      <div className="choice-grid" role="radiogroup" aria-label="Chart type">
-        {chartTypesFor(table.kind).map((c) => (
-          <button key={c.type} className={`choice-card${type === c.type ? ' selected' : ''}`} role="radio" aria-checked={type === c.type} onClick={() => setChosen(c.type)} onDoubleClick={() => onCreate(table.id, c.type)}>
-            <ChartSketch type={c.type} />
-            <strong>{c.label}</strong>
-            <span className="muted">{c.description}</span>
-          </button>
-        ))}
-      </div>
-    </Modal>
-  );
 }

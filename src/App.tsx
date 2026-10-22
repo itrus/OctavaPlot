@@ -3,8 +3,9 @@ import { effectiveTable } from './model/chartTable';
 import { AppProvider, useApp } from './state/AppContext';
 import { parseProjectWithNotes, stringifyProject } from './state/serialize';
 import { Navigator } from './ui/Navigator';
-import { NewProjectIcon, OpenProjectIcon, SaveProjectIcon, SettingsIcon } from './ui/icons';
+import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIcon } from './ui/icons';
 import { setProjectName } from './state/commands';
+import { InfoDialog } from './ui/InfoDialog';
 import { SettingsDialog } from './ui/SettingsDialog';
 import { WheelRange } from './ui/WheelRange';
 import { isTextEntryTarget } from './ui/shortcutGuard';
@@ -18,6 +19,7 @@ type SaveFilePicker = (options: {
 
 // Each workspace view is its own chunk, loaded when first opened.
 const DataTableView = lazy(() => import('./ui/DataTableView').then((m) => ({ default: m.DataTableView })));
+const AnalysisView = lazy(() => import('./ui/AnalysisView').then((m) => ({ default: m.AnalysisView })));
 const GraphView = lazy(() => import('./ui/GraphView').then((m) => ({ default: m.GraphView })));
 const Inspector = lazy(() => import('./ui/inspector/Inspector').then((m) => ({ default: m.Inspector })));
 
@@ -38,6 +40,7 @@ function Shell() {
   const [navOpen, setNavOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   // Clicking a chart element brings up its settings, even when the inspector was collapsed.
   useEffect(() => {
     if (inspectorNav.n > 0) setInspectorOpen(true);
@@ -162,6 +165,7 @@ function Shell() {
         />
         <span className="topbar-sep" />
         <button className="icon-text" onClick={() => setSettingsOpen(true)}><SettingsIcon /> Settings</button>
+        <button className="icon-text" onClick={() => setInfoOpen(true)} title="About OctavaPlot and credits"><InfoIcon /> Info</button>
         <button
           className="icon-only topbar-end"
           onClick={() => setInspectorOpen(!inspectorOpen)}
@@ -178,7 +182,8 @@ function Shell() {
         <Suspense fallback={<div className="empty">Loading…</div>}>
           {table && <DataTableView table={table} />}
           {chart && chartTable && <GraphView chart={chart} table={chartTable} />}
-          {!table && !chart && <div className="empty">Select an item in the navigator.</div>}
+          {view.kind === 'analysis' && <AnalysisView analysisId={view.id} />}
+          {!table && !chart && view.kind !== 'analysis' && <div className="empty">Select an item in the navigator.</div>}
         </Suspense>
       </main>
       {chart && chartTable && (
@@ -208,6 +213,7 @@ function Shell() {
           </span>
         )}
       </footer>
+      {infoOpen && <InfoDialog onClose={() => setInfoOpen(false)} />}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </div>
   );

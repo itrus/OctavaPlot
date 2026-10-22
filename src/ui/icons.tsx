@@ -59,3 +59,12 @@ export const ResetIcon = () => (
     <path d="M2.4 1.8v3.3h3.3" />
   </Icon>
 );
+
+/** Circled i. */
+export const InfoIcon = () => (
+  <Icon>
+    <circle cx="8" cy="8" r="6.3" />
+    <path d="M8 7.2V11.2" />
+    <circle cx="8" cy="4.9" r="0.5" fill="currentColor" />
+  </Icon>
+);

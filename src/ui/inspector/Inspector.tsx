@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FILL_PATTERN_OPTIONS, describeBarFillUi } from '../../model/fill';
-import { PALETTES, paletteById } from '../../model/palettes';
+import { paletteById } from '../../model/palettes';
 import { isGroupOverridden, resolveStyle } from '../../model/style';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/summary';
 import type { AxisBinding, Chart, ChartStyle, ChartType, DataTable, Id, SummarySpec } from '../../model/types';
@@ -35,7 +35,7 @@ import {
   patchSummary,
   setChartType,
 } from '../../state/commands';
-import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './SharedSections';
+import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, PaletteInfo, PaletteOptions, TextSections } from './SharedSections';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './controls';
 import {
   backgroundDisplay,
@@ -237,9 +237,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
                 }}
               >
                 {chart.paletteId === null && <option value="custom" disabled>Custom colours</option>}
-                {PALETTES.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+<PaletteOptions />
               </select>
               {paletteById(chart.paletteId) && (
                 <span className="palette-swatches" aria-hidden="true">
@@ -248,6 +246,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
                   ))}
                 </span>
               )}
+              <PaletteInfo paletteId={chart.paletteId} />
             </Field>
           </GroupBox>
 

@@ -122,8 +122,8 @@ describe('zero-height bars', () => {
     expect(per(vBig)).toBeGreaterThan(0.005);
     const tiny = svgOf(setCol0(p, vTiny));
     const big = svgOf(setCol0(p, vBig));
-    expect(count(tiny, /<rect[^>]*fill="#e6194b"/g)).toBe(0);
-    expect(count(big, /<rect[^>]*fill="#e6194b"/g)).toBe(1);
+    expect(count(tiny, /<rect[^>]*fill="#3B4992"/gi)).toBe(0);
+    expect(count(big, /<rect[^>]*fill="#3B4992"/gi)).toBe(1);
   });
 });
 
