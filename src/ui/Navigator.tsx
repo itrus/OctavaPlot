@@ -1,10 +1,22 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { newId } from '../model/ids';
-import type { ViewRef } from '../model/types';
+import type { ChartType, Id, TableKind, ViewRef } from '../model/types';
 import { useApp } from '../state/AppContext';
-import { addChart, addDataTable } from '../state/commands';
+import { addChart, addDataTable, type NewTableOptions } from '../state/commands';
+import { NewGraphDialog } from './NewItemDialogs';
+import { NewTableDialog } from './NewTableDialog';
 
 type Folder = 'tables' | 'graphs';
+
+/** A short tag beside every table, so its kind is visible in the list. */
+const TABLE_BADGE: Record<TableKind, { text: string; title: string }> = {
+  column: { text: 'COL', title: 'Column table' },
+  xy: { text: 'XY', title: 'XY table' },
+  grouped: { text: 'GRP', title: 'Grouped table' },
+  contingency: { text: 'CNT', title: 'Contingency table' },
+  survival: { text: 'SRV', title: 'Survival table' },
+};
 
 const sameView = (a: ViewRef, b: ViewRef) => a.kind === b.kind && a.id === b.id;
 
@@ -18,16 +30,19 @@ export function Navigator() {
   const currentTableId =
     view.kind === 'table' ? view.id : project.charts.find((c) => c.id === view.id)?.dataTableId;
 
-  const newTable = () => {
+  // New items are made in two clear steps: the type of table first, then a chart type that suits that table.
+  const [dialog, setDialog] = useState<'table' | 'graph' | null>(null);
+  const createTable = (kind: TableKind, options: NewTableOptions) => {
     const id = newId('table');
-    run('New data table', addDataTable(id));
+    run(`New ${kind} table`, addDataTable(id, kind, options));
     setView({ kind: 'table', id });
+    setDialog(null);
   };
-  const newGraph = () => {
-    const tableId = currentTableId ?? project.dataTables[0].id;
+  const createGraph = (tableId: Id, type: ChartType) => {
     const id = newId('chart');
-    run('New graph', addChart(id, tableId, { widthPx: settings.defaultChartWidthPx, heightPx: settings.defaultChartHeightPx }));
+    run('New graph', addChart(id, tableId, { widthPx: settings.defaultChartWidthPx, heightPx: settings.defaultChartHeightPx }, type));
     setView({ kind: 'chart', id });
+    setDialog(null);
   };
 
   const folder = (key: Folder, title: string) => (
@@ -35,9 +50,10 @@ export function Navigator() {
       <span className="chev">{open[key] ? '▾' : '▸'}</span> {title}
     </button>
   );
-  const item = (ref: ViewRef, icon: string, name: string) => (
+  const item = (ref: ViewRef, icon: string, name: string, badge?: { text: string; title: string }) => (
     <button key={ref.id} className={`nav-item${sameView(view, ref) ? ' active' : ''}`} onClick={() => setView(ref)}>
       <span className="nav-icon">{icon}</span> {name}
+      {badge && <span className="nav-badge" title={badge.title}>{badge.text}</span>}
     </button>
   );
   const newItem = (label: string, onClick: () => void) => (
@@ -53,15 +69,15 @@ export function Navigator() {
           {folder('tables', 'Data Tables')}
           {open.tables && (
             <>
-              {project.dataTables.map((t) => item({ kind: 'table', id: t.id }, '▦', t.name))}
-              {newItem('New Data Table…', newTable)}
+              {project.dataTables.map((t) => item({ kind: 'table', id: t.id }, '▦', t.name, TABLE_BADGE[t.kind]))}
+              {newItem('New Data Table…', () => setDialog('table'))}
             </>
           )}
           {folder('graphs', 'Graphs')}
           {open.graphs && (
             <>
               {project.charts.map((c) => item({ kind: 'chart', id: c.id }, '▥', c.name))}
-              {newItem('New Graph…', newGraph)}
+              {newItem('New Graph…', () => setDialog('graph'))}
             </>
           )}
           {LOCKED_SECTIONS.map((title) => (
@@ -71,6 +87,9 @@ export function Navigator() {
           ))}
         </div>
       </div>
+      {/* In the page body, not in the (sliding) panel, so the dialog is positioned against the window. */}
+      {dialog === 'table' && createPortal(<NewTableDialog defaultSample={!settings.newProjectEmpty} onCreate={createTable} onClose={() => setDialog(null)} />, document.body)}
+      {dialog === 'graph' && createPortal(<NewGraphDialog tables={project.dataTables} initialTableId={currentTableId ?? project.dataTables[0].id} onCreate={createGraph} onClose={() => setDialog(null)} />, document.body)}
     </nav>
   );
 }

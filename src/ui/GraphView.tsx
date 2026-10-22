@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { ChartSvg } from '../chart/ChartSvg';
+import { buildAnyModel, ChartCanvas } from '../chart/anyModel';
 import { hitFromTarget, pointerToChartPt } from '../chart/hitTest';
-import { buildChartModel } from '../chart/model';
-import { tooltipLines } from '../chart/tooltip';
+import { groupedTooltipLines, tooltipLines, xyTooltipLines } from '../chart/tooltip';
 import type { Chart, DataTable } from '../model/types';
 import { useApp } from '../state/AppContext';
 import { patchAnnotation, resetAllDataSets } from '../state/commands';
@@ -17,7 +16,8 @@ const SCROLLBAR_ROOM = 17;
 
 export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) {
   const { selection, setSelection, run, setStatus, zoom, setZoom, settings, fitRequest, navigateInspector } = useApp();
-  const model = useMemo(() => buildChartModel(chart, table), [chart, table]);
+  const any = useMemo(() => buildAnyModel(chart, table), [chart, table]);
+  const model = any.model;
   const svgRef = useRef<SVGSVGElement>(null);
   const [tip, setTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
   const [drag, setDrag] = useState<{ id: string; xFrac: number; yFrac: number; dx: number; dy: number; moved: boolean } | null>(null);
@@ -85,7 +85,7 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
       return;
     }
     const hit = hitFromTarget(e.target, svg);
-    const lines = tooltipLines(model, table, hit);
+    const lines = any.family === 'category' ? tooltipLines(any.model, table, hit) : any.family === 'grouped' ? groupedTooltipLines(any.model, hit) : xyTooltipLines(any.model, table, hit);
     const box = wrapRef.current?.getBoundingClientRect();
     if (lines && box) setTip({ x: e.clientX - box.left + 14, y: e.clientY - box.top + 14, lines });
     else setTip(null);
@@ -158,14 +158,7 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
             onPointerCancel={endDrag}
             onPointerLeave={() => setTip(null)}
           >
-            <ChartSvg
-              ref={svgRef}
-              chart={chart}
-              model={model}
-              editor={{ selection, dragging: drag }}
-              cssWidth={`${cssW}px`}
-              cssHeight={`${cssH}px`}
-            />
+            <ChartCanvas ref={svgRef} chart={chart} any={any} editor={{ selection, dragging: drag }} cssWidth={`${cssW}px`} cssHeight={`${cssH}px`} />
           </div>
           {tip && (
             <div className="tooltip" style={{ left: tip.x, top: tip.y }}>

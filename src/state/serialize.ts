@@ -1,9 +1,12 @@
-import { createChart, DEFAULT_STYLE } from '../model/defaults';
+import { createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
 import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../chart/labels';
+import { CHART_TYPES, chartTypeInfo, defaultChartTypeFor } from '../model/chartTypes';
+import { leadingColumns } from '../model/chartTypes';
+import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../model/tableLayout';
 import { sanitizeFillKeys } from '../model/fill';
 import { createRows, sanitizeRowTitle } from '../model/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/summary';
-import type { Chart, ChartLayer, DataRow, DataTable, Group, Id, Observation, Project, SpreadKind, SummarySpec } from '../model/types';
+import type { Chart, ChartLayer, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SpreadKind, SummarySpec } from '../model/types';
 
 const FORMAT = 'octavaplot-project';
 /** Files and autosave written before the project was renamed from "Scientific Plotter" still load. */
@@ -43,6 +46,27 @@ function parseRows(raw: unknown, path: string, rowCount: number): DataRow[] {
   });
 }
 
+/** A stored layout; anything unrecognised means a single Y value. */
+function parseLayout(raw: unknown): ReplicateLayout | undefined {
+  if (!isObj(raw)) return undefined;
+  if (raw.kind === 'replicates' && typeof raw.n === 'number' && Number.isInteger(raw.n) && raw.n >= MIN_REPLICATES && raw.n <= MAX_REPLICATES) return { kind: 'replicates', n: raw.n };
+  if (raw.kind === 'summary' && SUMMARY_FORMATS.some((f) => f.id === raw.format)) return { kind: 'summary', format: raw.format as SummaryFormat };
+  return undefined;
+}
+
+/** Stored survival options merged over the defaults; a level outside 0 to 1 or an unknown method falls back. */
+function parseSurvival(raw: unknown): SurvivalOptions {
+  const r = isObj(raw) ? raw : {};
+  return {
+    band: typeof r.band === 'boolean' ? r.band : DEFAULT_SURVIVAL.band,
+    level: typeof r.level === 'number' && r.level > 0 && r.level < 1 ? r.level : DEFAULT_SURVIVAL.level,
+    method: r.method === 'plain' || r.method === 'loglog' ? r.method : DEFAULT_SURVIVAL.method,
+    atRisk: typeof r.atRisk === 'boolean' ? r.atRisk : DEFAULT_SURVIVAL.atRisk,
+  };
+}
+
+const TABLE_KINDS: readonly TableKind[] = ['column', 'xy', 'grouped', 'contingency', 'survival'];
+
 function parseTable(raw: unknown, path: string): DataTable {
   const t = obj(raw, path);
   const rowCount = num(t.rowCount, `${path}.rowCount`);
@@ -68,12 +92,17 @@ function parseTable(raw: unknown, path: string): DataTable {
       observations,
     };
   });
-  return { id: str(t.id, `${path}.id`), name: str(t.name, `${path}.name`), rowCount, rows: parseRows(t.rows, `${path}.rows`, rowCount), groups };
+  const kind: TableKind = TABLE_KINDS.find((k) => k === t.kind) ?? 'column';
+  const lead = leadingColumns(kind);
+  if (groups.length < lead) fail(`${path}.groups`, `a ${kind} table needs its first column (${kind === 'survival' ? 'time' : 'X'})`);
+  const layout = kind === 'xy' || kind === 'grouped' ? parseLayout(t.layout) : undefined;
+  if (layout && (groups.length - lead) % seriesWidth(layout) !== 0) fail(`${path}.groups`, `do not fit the table layout: the columns must come in blocks of ${seriesWidth(layout)}`);
+  return { id: str(t.id, `${path}.id`), name: str(t.name, `${path}.name`), kind, ...(layout ? { layout } : {}), rowCount, rows: parseRows(t.rows, `${path}.rows`, rowCount), groups };
 }
 
 /** Enum-valued style keys; an invalid stored value is dropped (the default applies) and noted. */
 const STYLE_ENUMS: Record<string, readonly string[]> = {
-  symbolShape: ['circle', 'square', 'triangle', 'diamond'],
+  symbolShape: ['circle', 'square', 'triangle', 'diamond', 'plus', 'cross'],
   errorDirection: ['both', 'positive', 'negative'],
   errorCap: ['bar', 'none'],
   axisBinding: ['primary', 'secondary'],
@@ -204,8 +233,8 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
   const c = obj(raw, path);
   const dataTableId = str(c.dataTableId, `${path}.dataTableId`);
   if (!tableIds.has(dataTableId)) fail(`${path}.dataTableId`, 'refers to a missing data table');
-  if (c.type !== 'bar' && c.type !== 'scatter' && c.type !== 'mean') fail(`${path}.type`, 'must be bar, scatter or mean');
-  const base = createChart(dataTableId);
+  if (typeof c.type !== 'string' || !CHART_TYPES.some((t) => t.type === c.type)) fail(`${path}.type`, `must be one of ${CHART_TYPES.map((t) => t.type).join(', ')}`);
+  const base = createChart(dataTableId, undefined, c.type as ChartType);
   // Merge over defaults so files from earlier prototype versions keep working.
   const defaults = cleanStyle(c.defaults, `${path}.defaults`, notes);
   const layers = arr(c.layers, `${path}.layers`).map((rl, i) =>
@@ -222,6 +251,7 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     widthPx: typeof c.widthPx === 'number' ? c.widthPx : (mmToPx(widthMm) ?? base.widthPx),
     heightPx: typeof c.heightPx === 'number' ? c.heightPx : (mmToPx(heightMm) ?? base.heightPx),
     hiddenGroupIds: Array.isArray(c.hiddenGroupIds) ? c.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
+    survival: parseSurvival(c.survival),
     extraGroups: Array.isArray(c.extraGroups)
       ? c.extraGroups.flatMap((e) => (isObj(e) && typeof e.tableId === 'string' && typeof e.groupId === 'string' ? [{ tableId: e.tableId, groupId: e.groupId }] : []))
       : [],
@@ -262,6 +292,17 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
   const tableIds = new Set(dataTables.map((t) => t.id));
   const charts = arr(p.charts, 'project.charts').map((c, i) => parseChart(c, `project.charts[${i}]`, tableIds, notes));
   if (dataTables.length === 0) fail('project.dataTables', 'must contain at least one table');
+  // A chart type that does not suit its table's type (a hand-edited file) is switched to the table's default chart
+  // type, so a graph is never drawn with the wrong reading of the columns.
+  for (const c of charts) {
+    const kind = dataTables.find((t) => t.id === c.dataTableId)?.kind ?? 'column';
+    if (chartTypeInfo(c.type)?.tableKind !== kind) {
+      const fixed = defaultChartTypeFor(kind);
+      notes.push(`Graph "${c.name}" was a ${c.type} chart of a ${kind} table; it was changed to ${fixed}.`);
+      c.type = fixed;
+      c.layers = c.layers.map((l) => ({ ...l, style: { ...l.style, ...TYPE_PRESETS[fixed] } }));
+    }
+  }
   const project: Project = {
     id: str(p.id, 'project.id'),
     name: typeof p.name === 'string' ? p.name : 'Untitled project',

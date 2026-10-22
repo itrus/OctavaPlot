@@ -31,3 +31,17 @@ export function inspectorTargetFor(hit: HitTarget): InspectorTarget | null {
       return null;
   }
 }
+
+export const SECTIONS: Array<{ id: AppearanceSection; label: string }> = [
+  { id: 'style', label: 'Style' },
+  { id: 'axes', label: 'Axes' },
+  { id: 'text', label: 'Text' },
+  { id: 'dimensions', label: 'Dimensions' },
+  { id: 'legend', label: 'Legend' },
+];
+
+export const TABS: Array<{ id: InspectorTab; label: string }> = [
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'datasets', label: 'Data Sets on Graph' },
+  { id: 'annotations', label: 'Annotations' },
+];

@@ -154,7 +154,7 @@ export function staleSpreadNote(centre: CentreKind, spread: SpreadKind): string 
 const CENTRE_PLURAL: Record<CentreKind, string> = { mean: 'means', geometricMean: 'geometric means', median: 'medians' };
 
 /** Group box titles that follow the centre: "Symbols (means)" for the mean chart, "Lines (median)" for the scatter line. */
-export function centreTitles(centre: CentreKind, type: 'bar' | 'scatter' | 'mean'): { symbols: string; lines: string } {
+export function centreTitles(centre: CentreKind, type: string): { symbols: string; lines: string } {
   return {
     symbols: type === 'mean' ? `Symbols (${CENTRE_PLURAL[centre]})` : 'Symbols',
     lines: type === 'scatter' ? `Lines (${centreLower(centre)})` : 'Lines',

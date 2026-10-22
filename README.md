@@ -1,6 +1,6 @@
 # OctavaPlot — prototype v0.1
 
-Local React + TypeScript + Vite + D3 app for editing a replicate data table and a bar / scatter / mean±error chart. No backend; works offline after `npm install`.
+Local React + TypeScript + Vite + D3 app for editing data tables and the charts drawn from them: bar / scatter / mean±error charts from column tables, and XY scatter / line charts from XY tables. No backend; works offline after `npm install`.
 
 **Live:** https://itrus.github.io/OctavaPlot/ (deployed from `main` by GitHub Actions; data stays in your browser's `localStorage`, so do not enter patient-linked data).
 
@@ -23,8 +23,10 @@ npm test         # unit tests (vitest)
 | `src/stats/` | `summary.ts`: per-data-set centre, spread and interval; `special.ts`: gamma, beta and t functions and the exact median CI; independent of presentation |
 | `src/chart/scales.ts` | Y-axis domain and ticks (left and right axes) |
 | `src/chart/layout.ts` | Margins, titles, legend placement |
-| `src/chart/model.ts` | Geometry construction (bars, error bars, points, lines) |
-| `src/chart/ChartSvg.tsx` | Declarative SVG drawing |
+| `src/chart/model.ts` | Geometry construction for category charts (bars, error bars, points, lines) |
+| `src/chart/ChartSvg.tsx` | Declarative SVG drawing of category charts |
+| `src/chart/xyModel.ts`, `XyChartSvg.tsx` | Model and drawing of XY charts (numeric X axis, one series per Y column) |
+| `src/model/chartTypes.ts` | Table types and chart types, and which go together |
 | `src/chart/hatch.ts`, `labels.ts`, `axes.ts`, `errorGeometry.ts` | Fill pattern marks, point-label layout, axis binding, error-bar geometry |
 | `src/chart/hitTest.ts` | Hit testing / selection helpers (editor only) |
 | `src/chart/export.tsx` | SVG / PNG export (rendered without editor state) |
@@ -32,6 +34,24 @@ npm test         # unit tests (vitest)
 | `src/ui/` | Navigator, data table, graph view, formatting inspector |
 
 Style precedence: object override > group override > layer override > (group palette) > chart defaults. Chart internal unit is the point (1 in = 72 pt = 25.4 mm); the SVG viewBox is in pt.
+
+## Table types and chart types
+
+A table has a **type**, chosen when it is created (Navigator → New Data Table…); a graph is then made from a table and has a **chart type** that suits that table (Navigator → New Graph…). The two steps are separate dialogs, so a chart type can never be paired with the wrong kind of table.
+
+| Table type | Layout | Chart types |
+|---|---|---|
+| Column table | Each column is a group; the rows are its replicate values | Bar chart, Scatter dot plot, Mean with error bars |
+| XY table | First column is X (numbers); every other column is a Y series | XY scatter, Line, Line with symbols |
+| Grouped table | Each row is a category; each block of columns is a series (single values, replicates, or values already calculated) | Grouped bars, Lines over categories |
+| Contingency table | Rows are groups of subjects, columns are outcomes, cells are counts | Side-by-side bars, Stacked bars, 100% stacked bars |
+| Survival table | First column is the time; each other column is a group holding 1 (event) or 0 (censored) on the row of each subject | Survival curve (Kaplan-Meier), Cumulative events |
+
+**New Data Table…** opens one dialog, modelled on a familiar "new table" wizard: the table format along the top (XY, Column; Grouped, Contingency and Survival can be previewed but are planned), whether to start empty or with sample data (the default follows Settings → "New projects and tables start empty"), and, for XY tables, how the Y values are entered: a single value, N replicates in side-by-side subcolumns (the chart plots their centre with SD / SEM / CI / range error bars), or values already calculated elsewhere (Mean with SD, SEM, %CV, ± error or upper/lower limits, drawn as entered). A series with subcolumns is one block of columns under a shared series name; `src/model/tableLayout.ts` defines the layouts.
+
+Survival curves use the product-limit estimate (events are counted before censoring at a tied time); censored subjects are marked on the curve. An optional pointwise confidence band uses the Greenwood standard error (log-log by default, or plain, at the level you choose), and an optional at-risk table lists the subjects still under observation at each tick of the time axis. Grouped bars of replicates can show the individual values over the bars. Contingency percentages are shares of each row's own total. Grouped and contingency charts treat a row with a title or any value as a category; empty rows are ignored.
+
+XY charts follow spec §3.1 and §7: symbols and a path layer per series, a numeric X axis with Auto/Manual limits, input-order paths that break at a missing value (never bridged, never zero), and the automatic range including zero only when the data starts near it. `src/model/chartTypes.ts` is the catalogue; adding a chart type means adding it there, a preset in `defaults.ts`, and its drawing.
 
 ## Behaviour notes
 
@@ -51,9 +71,9 @@ Linear axes only; tables and graphs can be added but not deleted or renamed; gro
 
 The screenshots establish available controls and layout, not numeric defaults (spec §23), so chart defaults are unchanged.
 
-- **Navigator:** search box; Data Tables, Info, Results, Graphs and Layouts sections with "New …" rows; Family panel (current table and its graphs). New Data Table and New Graph work; the Info, Results and Layouts rows are disabled placeholders.
-- **Format Graph panel:** tabs Appearance / Data Sets on Graph / Graph Settings / Annotations; Data set selector with `<` `>` stepping (Global = all data sets); Style, Bars, Symbols (now with border colour and thickness), Error bars, Lines and Additional options group boxes with enable checkboxes.
-- **Status bar:** sheet selector, status messages, graph zoom slider.
+- **Navigator:** Data Tables and Graphs sections with "New …" rows that open the table-type and chart-type dialogs; Info, Results and Layouts are locked placeholders.
+- **Graph panel:** tabs Appearance / Data Sets on Graph / Annotations; Appearance has Style, Axes, Text, Dimensions and Legend sections. Clicking a chart element opens its settings. Style has a Data set (or Series) selector with `<` `>` stepping (Global = all).
+- **Status bar:** status messages and the zoom slider with a Fit button (graphs and data tables).
 
 ## Evidence labels
 

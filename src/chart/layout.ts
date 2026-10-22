@@ -42,6 +42,8 @@ export interface Layout {
   xTitle: { x: number; y: number } | null;
   yTitle: { x: number; y: number } | null;
   y2Title: { x: number; y: number } | null;
+  /** Band reserved below the X title (above a bottom legend): top y and height, pt; null when none was asked for. */
+  extraBottom: { y: number; height: number } | null;
   warnings: string[];
 }
 
@@ -58,6 +60,8 @@ export interface LayoutInput {
   /** Right (secondary) value axis; absent or hidden reserves no space. */
   y2Axis?: AxisConfig;
   y2TickLabels?: string[];
+  /** Height in pt to reserve under the X axis title, for a table of numbers under the plot. */
+  extraBottomPt?: number;
 }
 
 const hasText = (s: string): boolean => s.trim().length > 0;
@@ -175,7 +179,8 @@ export function computeLayout(input: LayoutInput): Layout {
   const slot = plotWidthFor() / Math.max(1, input.categoryLabels.length);
   const xTickRotated = xAxis.visible && maxLabelWidth > slot * 0.92;
 
-  bottom += tickLabelBlock(xTickRotated) + xTitleBlock;
+  const extra = input.extraBottomPt && input.extraBottomPt > 0 ? input.extraBottomPt : 0;
+  bottom += tickLabelBlock(xTickRotated) + xTitleBlock + extra;
 
   let plot: Rect = { x: left, y: top, width: W - left - right, height: H - top - bottom };
   if (plot.width < MIN_PLOT || plot.height < MIN_PLOT) {
@@ -186,7 +191,7 @@ export function computeLayout(input: LayoutInput): Layout {
   if (titleLayout) titleLayout.x = plot.x + plot.width / 2;
 
   const xTitle = xTitleVisible
-    ? { x: plot.x + plot.width / 2, y: H - M - (showLegend && legend.position === 'bottom' ? legendHeight + 6 : 0) - xAxis.titleFontSizePt * 0.25 }
+    ? { x: plot.x + plot.width / 2, y: H - M - (showLegend && legend.position === 'bottom' ? legendHeight + 6 : 0) - extra - xAxis.titleFontSizePt * 0.25 }
     : null;
   const yTitle = yTitleVisible ? { x: M + yAxis.titleFontSizePt * 0.9, y: plot.y + plot.height / 2 } : null;
 
@@ -223,7 +228,8 @@ export function computeLayout(input: LayoutInput): Layout {
     legendLayout = { rect, items, fontSizePt: legendFont };
   }
 
-  return { plot, title: titleLayout, legend: legendLayout, xTickRotated, xTitle, yTitle, y2Title, warnings };
+  const extraBottom = extra > 0 ? { y: H - M - (showLegend && legend.position === 'bottom' ? legendHeight + 6 : 0) - extra, height: extra } : null;
+  return { plot, title: titleLayout, legend: legendLayout, xTickRotated, xTitle, yTitle, y2Title, extraBottom, warnings };
 }
 
 export const LEGEND_KEY = { width: LEGEND_KEY_WIDTH, gap: LEGEND_KEY_GAP };

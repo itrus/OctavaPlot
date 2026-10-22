@@ -1,4 +1,5 @@
 import { BAR_PALETTE } from './defaults';
+import { isSurvivalChartType, isXyChartType } from './chartTypes';
 import { paletteById, paletteColor } from './palettes';
 import type { Chart, ChartLayer, ChartStyle, Group, Id } from './types';
 
@@ -18,6 +19,13 @@ export function resolveStyle(
   const palette: Partial<ChartStyle> = {
     barFill: chartPalette ? paletteColor(chartPalette, group.paletteIndex) : BAR_PALETTE[group.paletteIndex % BAR_PALETTE.length],
   };
+  // On an XY chart the series colour is the colour of its symbols and its line.
+  if ((isXyChartType(chart.type) || isSurvivalChartType(chart.type) || chart.type === 'groupedLine') && palette.barFill) {
+    palette.symbolColor = palette.barFill;
+    palette.symbolBorderColor = palette.barFill;
+    palette.lineColor = palette.barFill;
+    palette.errorColor = palette.barFill;
+  }
   return {
     ...chart.defaults,
     ...palette,

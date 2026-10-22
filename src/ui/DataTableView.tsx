@@ -1,11 +1,13 @@
 import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react';
-import type { DataTable } from '../model/types';
+import type { DataTable, TableKind } from '../model/types';
 import { useApp } from '../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../model/rows';
-import { addGroup, addRows, composeCommands, pasteMatrix, removeGroup, renameGroup, replaceTableData, setCells, setRowTitles, type CellEdit } from '../state/commands';
+import { addGroup, addRows, composeCommands, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../util/download';
 import { ExportIcon, ImportIcon } from './icons';
 import { importCsv, isCsvFile, tableToCsv } from './csv';
+import { leadingColumns, usesSeriesBlocks } from '../model/chartTypes';
+import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../model/tableLayout';
 import { UndoRedo } from './UndoRedo';
 import { blockToText, formatCell, parseCell, planPaste, selectionStrings } from './cellText';
 
@@ -87,14 +89,34 @@ const Cell = memo(function Cell(p: CellProps) {
   );
 });
 
+/** What each kind of table calls its parts, for the toolbar, the header and the hint under the grid. */
+const KIND_TEXT: Record<TableKind, { label: string; noun: string; add: string; leadName: string; columnName: string; hint: string; tags: { lead: [string, string]; rest: [string, string] } | null }> = {
+  column: { label: 'Column table', noun: 'groups', add: '+ Add group', leadName: 'Group name', columnName: 'Group name', hint: '', tags: null },
+  xy: { label: 'XY table', noun: 'Y series', add: '+ Add Y series', leadName: 'X column name', columnName: 'Series name', hint: 'First column = X (numbers), every other column is a Y series. ', tags: { lead: ['X', 'The X values'], rest: ['Y', 'A Y series'] } },
+  grouped: { label: 'Grouped table', noun: 'groups', add: '+ Add group', leadName: 'Group name', columnName: 'Group name', hint: 'Each row is a category: type its name in the Row title column. Each group of columns is a series. ', tags: null },
+  contingency: { label: 'Contingency table', noun: 'outcomes', add: '+ Add outcome', leadName: 'Outcome name', columnName: 'Outcome name', hint: 'Each row is a group of subjects (its name in the Row title column); each column is an outcome; the cells are counts. ', tags: null },
+  survival: { label: 'Survival table', noun: 'groups', add: '+ Add group', leadName: 'Time column name', columnName: 'Group name', hint: 'One row per subject: the time in the first column, then 1 (event) or 0 (censored) in the column of the subject\'s group. ', tags: { lead: ['T', 'The time of each subject'], rest: ['G', 'A group: 1 = event, 0 = censored'] } },
+};
+
 export function DataTableView({ table }: { table: DataTable }) {
   const { run, tableZoom: z, settings } = useApp();
+  // Tables other than the column table group their columns into series; XY and survival tables lead with X / time.
+  const isSeries = usesSeriesBlocks(table.kind);
+  const lead = leadingColumns(table.kind);
+  // An XY table whose series have sub-columns (replicates, or values already calculated) gets a second header row
+  // that holds the series name above its sub-columns.
+  const layout = layoutOf(table);
+  const blockWidth = tableSeriesWidth(table);
+  const blocks = isSeries && blockWidth > 1;
+  const subs = subLabels(layout);
+  const seriesList = isSeries ? xySeries(table) : [];
+  const kindText = KIND_TEXT[table.kind];
   const ROW_H = BASE_ROW_H * z;
   const COL_W = BASE_COL_W * z;
   const ROWNUM_W = BASE_ROWNUM_W * z;
   const TITLE_W = BASE_TITLE_W * z;
   const STICKY_W = ROWNUM_W + TITLE_W;
-  const HEADER_H = BASE_HEADER_H * z;
+  const HEADER_H = BASE_HEADER_H * z * (blocks ? 2 : 1);
   const [sel, setSel] = useState<Sel>({ ar: 0, ac: 0, fr: 0, fc: 0 });
   const [editing, setEditing] = useState<Editing | null>(null);
   const editRef = useRef<Editing | null>(null);
@@ -323,6 +345,11 @@ export function DataTableView({ table }: { table: DataTable }) {
       return;
     }
     const { data } = result;
+    // A table of series blocks needs whole blocks: the leading column(s), then k series of the same width.
+    if (isSeries && (data.names.length < lead + blockWidth || (data.names.length - lead) % blockWidth !== 0)) {
+      setMessage({ kind: 'error', text: `Could not import ${file.name}: it has ${data.names.length} columns, but this ${kindText.label.toLowerCase()} needs ${lead > 0 ? `${lead} leading column${lead === 1 ? '' : 's'} plus ` : ''}a whole number of series of ${blockWidth} column${blockWidth === 1 ? '' : 's'} each.` });
+      return;
+    }
     run('Import CSV', replaceTableData(table.id, data));
     setSel({ ar: 0, ac: 0, fr: 0, fc: 0 });
     setMessage({ kind: 'info', text: `Imported ${data.values.length} rows × ${data.names.length} groups from ${file.name}.` });
@@ -440,7 +467,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   return (
     <div className="table-view">
       <div className="toolbar">
-        <button onClick={() => run('Add group', addGroup(table.id))}>+ Add group</button>
+        <button onClick={() => run(kindText.add.replace('+ ', ''), addGroup(table.id))}>{kindText.add}</button>
         <button onClick={() => run('Add rows', addRows(table.id, 20))}>+ Add 20 rows</button>
         <span className="sep" />
         <UndoRedo />
@@ -462,7 +489,9 @@ export function DataTableView({ table }: { table: DataTable }) {
             if (f) void importFile(f);
           }}
         />
-        <span className="toolbar-info">{nCols} groups × {nRows} rows · empty cell = missing value</span>
+        <span className="toolbar-info">
+          {kindText.label} · {isSeries ? `${seriesList.length} ${kindText.noun}${blocks ? ` (${blockWidth} columns each)` : ''}` : `${nCols} groups`} × {nRows} rows · empty cell = missing value
+        </span>
       </div>
       <div
         className="grid-scroller"
@@ -492,20 +521,57 @@ export function DataTableView({ table }: { table: DataTable }) {
             <div className="corner" style={{ width: ROWNUM_W }} onClick={() => setSel({ ar: 0, ac: 0, fr: nRows - 1, fc: nCols - 1 })} title="Select all" />
             <div
               className="title-head"
-              style={{ width: TITLE_W }}
+              style={{ width: TITLE_W, lineHeight: `${HEADER_H}px` }}
               onClick={() => setSel({ ar: 0, ac: -1, fr: nRows - 1, fc: -1 })}
               title="Select the Row title column"
             >
               Row title
             </div>
-            {table.groups.map((g) => (
-              <div className="col-head" style={{ width: COL_W }} key={g.id}>
+            {table.groups.map((g, c) => {
+              const k = c - lead;
+              const series = blocks && c >= lead && k % blockWidth === 0 ? seriesList[k / blockWidth] : undefined;
+              if (blocks && c >= lead) {
+                return (
+                  <div className="col-head two-row" style={{ width: COL_W }} key={g.id}>
+                    {series && (
+                      <div className="series-head" style={{ width: COL_W * blockWidth }}>
+                        <span className="axis-tag" title="A Y series">Y</span>
+                        <input
+                          key={series.name}
+                          className="head-input head-name"
+                          defaultValue={series.name}
+                          aria-label="Series name"
+                          onBlur={(e) => {
+                            const v = e.currentTarget.value.trim();
+                            if (v === series.name) return;
+                            if (v === '') {
+                              e.currentTarget.value = series.name;
+                              setMessage({ kind: 'error', text: 'A series name cannot be empty.' });
+                              return;
+                            }
+                            setMessage(null);
+                            run('Rename series', renameSeries(table.id, series.id, v));
+                          }}
+                          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        />
+                        <button className="icon-btn" title={`Remove ${series.name}`} aria-label={`Remove ${series.name}`} onClick={() => run('Remove series', removeSeries(table.id, series.id))} disabled={seriesList.length <= 1}>
+                          ×
+                        </button>
+                      </div>
+                    )}
+                    <div className="sub-head">{subs[k % blockWidth]}</div>
+                  </div>
+                );
+              }
+              return (
+              <div className={`col-head${blocks ? ' two-row' : ''}`} style={{ width: COL_W }} key={g.id}>
                 <div className="col-head-top">
+                  {kindText.tags && <span className="axis-tag" title={c < lead ? kindText.tags.lead[1] : kindText.tags.rest[1]}>{c < lead ? kindText.tags.lead[0] : kindText.tags.rest[0]}</span>}
                   <input
                     key={g.name}
                     className="head-input head-name"
                     defaultValue={g.name}
-                    aria-label="Group name"
+                    aria-label={c < lead ? kindText.leadName : kindText.columnName}
                     onBlur={(e) => commitName(g.id, e.currentTarget, g.name)}
                     onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   />
@@ -514,13 +580,15 @@ export function DataTableView({ table }: { table: DataTable }) {
                     title={`Remove ${g.name}`}
                     aria-label={`Remove ${g.name}`}
                     onClick={() => run('Remove group', removeGroup(table.id, g.id))}
-                    disabled={nCols <= 1}
+                    disabled={nCols <= 1 || (isSeries && (c < lead || nCols <= lead + 1))}
+                    hidden={c < lead}
                   >
                     ×
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="grid-rows" style={{ top: HEADER_H + first * ROW_H }}>
           {rowIdx.map((r) => (
@@ -577,7 +645,7 @@ export function DataTableView({ table }: { table: DataTable }) {
         </div>
       </div>
       <div className={`table-status${message?.kind === 'error' ? ' error' : ''}`} role="status">
-        {message ? message.text : 'Click a cell, type to edit. Enter ↓, Tab →. Paste tab-separated values from Excel (Ctrl+V); pasting at the Row title column fills titles first, then the value columns.'}
+        {message ? message.text : kindText.hint + 'Click a cell, type to edit. Enter ↓, Tab →. Paste tab-separated values from Excel (Ctrl+V); pasting at the Row title column fills titles first, then the value columns.'}
       </div>
     </div>
   );

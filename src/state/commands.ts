@@ -1,5 +1,10 @@
-import { createChart, createGroup, DEFAULT_JITTER, DEFAULT_STYLE, DEFAULT_SUMMARY, INITIAL_ROWS, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
+import { createChart, createColumnTable, DEFAULT_SURVIVAL, initialLayerStyle, createContingencyTable, createGroupedTable, createSurvivalTable, defaultSummaryFor, createGroup, createXyTable, DEFAULT_JITTER, DEFAULT_STYLE, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
 import { effectiveTable } from '../model/chartTable';
+import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, xySeries } from '../model/tableLayout';
+
+/** Chart types whose series colour is the colour of symbols, lines and error bars (not of filled bars). */
+const isSeriesColourChart = (type: ChartType): boolean => isXyChartType(type) || isSurvivalChartType(type) || type === 'groupedLine';
+import { chartTypeInfo, defaultChartTypeFor, isSurvivalChartType, isXyChartType, leadingColumns, usesSeriesBlocks } from '../model/chartTypes';
 import { newId } from '../model/ids';
 import { DEFAULT_PALETTE_ID, paletteColor, type Palette } from '../model/palettes';
 import { createRows, sanitizeRowTitle } from '../model/rows';
@@ -19,7 +24,10 @@ import type {
   JitterConfig,
   LegendConfig,
   Project,
+  ReplicateLayout,
   SummarySpec,
+  SurvivalOptions,
+  TableKind,
 } from '../model/types';
 
 /** A command is a pure project -> project function; the history reducer applies it. */
@@ -144,9 +152,14 @@ export const pasteMatrix = (
     let t = growRows(t0, Math.max(t0.rowCount, row0 + height));
     if (width > 0 && col0 + width > t.groups.length) {
       const groups = t.groups.slice();
-      let nextPalette = Math.max(-1, ...groups.map((g) => g.paletteIndex)) + 1;
-      while (groups.length < col0 + width) {
-        groups.push(createGroup(nextGroupName(groups.map((g) => g.name)), nextPalette++, t.rowCount));
+      if (usesSeriesBlocks(t.kind)) {
+        // Whole series at a time, so a paste past the last column never leaves half a block.
+        while (groups.length < col0 + width) groups.push(...newSeriesColumns(t, groups));
+      } else {
+        let nextPalette = Math.max(-1, ...groups.map((g) => g.paletteIndex)) + 1;
+        while (groups.length < col0 + width) {
+          groups.push(createGroup(nextGroupName(groups.map((g) => g.name)), nextPalette++, t.rowCount));
+        }
       }
       t = { ...t, groups };
     }
@@ -159,8 +172,32 @@ export const pasteMatrix = (
 export const addRows = (tableId: Id, count: number): Command => (p) =>
   mapTable(p, tableId, (t) => growRows(t, t.rowCount + count));
 
+/**
+ * The columns of one new series of a block table (XY, grouped, contingency, survival): a single column, or a whole
+ * block of replicate / summary sub-columns whose first column carries the series name. `existing` are the columns
+ * already in the table; the name is one no series has yet.
+ */
+function newSeriesColumns(t: DataTable, existing: Group[]): Group[] {
+  const width = tableSeriesWidth(t);
+  const labels = subLabels(layoutOf(t)).slice(0, width);
+  const current = { ...t, groups: existing };
+  const used = new Set(xySeries(current).map((s) => s.name));
+  existing.forEach((g) => used.add(g.name));
+  let i = xySeries(current).length;
+  while (used.has(defaultSeriesName(i, t.kind)) && i < 1000) i++;
+  const name = defaultSeriesName(i, t.kind);
+  const paletteIndex = Math.max(-1, ...existing.map((x) => x.paletteIndex)) + 1;
+  return labels.map((label, k) => {
+    const g = createGroup(width === 1 ? name : label, paletteIndex + k, t.rowCount);
+    if (width > 1 && k === 0) g.title = name;
+    return g;
+  });
+}
+
 export const addGroup = (tableId: Id): Command => (p) =>
   mapTable(p, tableId, (t) => {
+    // A new series: one column, or a whole block of sub-columns.
+    if (usesSeriesBlocks(t.kind)) return { ...t, groups: [...t.groups, ...newSeriesColumns(t, t.groups)] };
     const paletteIndex = Math.max(-1, ...t.groups.map((g) => g.paletteIndex)) + 1;
     return {
       ...t,
@@ -178,6 +215,22 @@ export const renameGroup = (tableId: Id, groupId: Id, name: string): Command => 
 
 export const setGroupTitle = (tableId: Id, groupId: Id, title: string): Command => (p) =>
   mapTable(p, tableId, (t) => mapGroup(t, groupId, (g) => ({ ...g, title })));
+
+/** Remove a Y series of an XY table: all of its columns. The X column and the last series stay. */
+export const removeSeries = (tableId: Id, seriesId: Id): Command => (p) => {
+  const t = p.dataTables.find((x) => x.id === tableId);
+  const series = t && xySeries(t);
+  const target = series?.find((s) => s.id === seriesId);
+  if (!t || !series || !target || series.length <= 1) return p;
+  return target.columns.reduce((acc, g) => removeGroup(tableId, g.id)(acc), p);
+};
+
+/** Rename a Y series: its column when a series is one column, otherwise the title of its first column. */
+export const renameSeries = (tableId: Id, seriesId: Id, name: string): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    const single = seriesWidth(layoutOf(t)) === 1;
+    return mapGroup(t, seriesId, (g) => (single ? { ...g, name } : { ...g, title: name }));
+  });
 
 export const removeGroup = (tableId: Id, groupId: Id): Command => (p) => {
   const removed = p.dataTables.find((t) => t.id === tableId)?.groups.find((g) => g.id === groupId);
@@ -257,13 +310,19 @@ export const applyPalette = (chartId: Id, palette: Palette): Command => (p) => {
     layers: c.layers.map((l, i) =>
       i !== 0
         ? l
-        : table.groups.reduce((layer, g, gi) => {
+        : // An XY table's first column is X, not a data set: the colours go to the Y series (keyed by their first column), in order.
+          (usesSeriesBlocks(table.kind) ? xySeries(table).map((x) => x.columns[0]) : table.groups).reduce((layer, g, gi) => {
             const color = paletteColor(palette, gi);
-            return patchGroup(layer, g.id, { barFill: color, symbolColor: color });
+            // Charts of lines and symbols take the series colour everywhere; bar charts colour the bars.
+            return patchGroup(layer, g.id, isSeriesColourChart(chart.type) ? { barFill: color, symbolColor: color, symbolBorderColor: color, lineColor: color, errorColor: color } : { barFill: color, symbolColor: color });
           }, l),
     ),
   }));
 };
+
+/** Edit the survival options (confidence band, at-risk table) of a survival chart. */
+export const patchSurvival = (chartId: Id, patch: Partial<SurvivalOptions>): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, survival: { ...c.survival, ...patch } }));
 
 export const patchJitter = (chartId: Id, patch: Partial<JitterConfig>): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, jitter: { ...c.jitter, ...patch } }));
@@ -278,6 +337,9 @@ export const setDisplayName = (chartId: Id, groupId: Id, name: string): Command 
  */
 export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
   mapChart(p, chartId, (c) => {
+    // Only a chart type that suits the chart's table type can be chosen.
+    const tableKind = p.dataTables.find((t) => t.id === c.dataTableId)?.kind;
+    if (tableKind !== undefined && chartTypeInfo(type)?.tableKind !== tableKind) return c;
     const strip = (o: Record<Id, Partial<ChartStyle>>) => {
       const out: Record<Id, Partial<ChartStyle>> = {};
       for (const [id, v] of Object.entries(o)) {
@@ -332,8 +394,9 @@ export const resetAllDataSets = (chartId: Id): Command => (p) =>
     layers: c.layers.map((l, i) =>
       i !== 0
         ? l
-        : { ...l, style: { ...TYPE_PRESETS[c.type] }, groupOverrides: {}, objectOverrides: {}, summary: { ...DEFAULT_SUMMARY }, groupSummary: {} },
+        : { ...l, style: initialLayerStyle(c.type), groupOverrides: {}, objectOverrides: {}, summary: { ...defaultSummaryFor(c.type) }, groupSummary: {} },
     ),
+    survival: { ...DEFAULT_SURVIVAL },
   }));
 
 export const resetStyle = (chartId: Id, scope: 'all' | Id, table: DataTable): Command => (p) =>
@@ -378,20 +441,35 @@ export const removeAnnotation = (chartId: Id, annotationId: Id): Command => (p) 
 
 // ---------------------------------------------------------------- project items
 
+/** "Data 1", "Data 2", ... (or "XY 1", ...): the lowest number not yet used with this prefix. */
 const nextName = (prefix: string, existing: string[]): string => {
-  for (let i = existing.length + 1; i < existing.length + 1000; i++) {
-    if (!existing.includes(`${prefix} ${i}`)) return `${prefix} ${i}`;
-  }
-  return `${prefix} ${existing.length + 1}`;
+  const used = new Set(existing);
+  let i = 1;
+  while (used.has(`${prefix} ${i}`)) i++;
+  return `${prefix} ${i}`;
 };
 
 /** New empty data table with the same column count as the first table (min 4). */
-export const addDataTable = (id: Id): Command => (p) => {
-  const cols = Math.max(4, p.dataTables[0]?.groups.length ?? 4);
-  const name = nextName('Data', p.dataTables.map((t) => t.name));
-  const groups: Group[] = [];
-  for (let i = 0; i < cols; i++) groups.push(createGroup(nextGroupName(groups.map((g) => g.name)), i, INITIAL_ROWS));
-  return { ...p, dataTables: [...p.dataTables, { id, name, rowCount: INITIAL_ROWS, rows: createRows(INITIAL_ROWS), groups }] };
+export interface NewTableOptions {
+  /** Start with sample data instead of an empty table. */
+  sample?: boolean;
+  /** XY tables: how each Y series is entered. */
+  layout?: ReplicateLayout;
+}
+
+/** Prefix of the names of new tables of each kind: "Data 1", "XY 1", "Grouped 1", ... */
+const TABLE_NAME_PREFIX: Record<TableKind, string> = { column: 'Data', xy: 'XY', grouped: 'Grouped', contingency: 'Contingency', survival: 'Survival' };
+
+export const addDataTable = (id: Id, kind: TableKind = 'column', options: NewTableOptions = {}): Command => (p) => {
+  const sample = options.sample === true;
+  const name = nextName(TABLE_NAME_PREFIX[kind], p.dataTables.map((t) => t.name));
+  const table =
+    kind === 'xy' ? createXyTable(name, sample, options.layout)
+    : kind === 'grouped' ? createGroupedTable(name, sample, options.layout)
+    : kind === 'contingency' ? createContingencyTable(name, sample)
+    : kind === 'survival' ? createSurvivalTable(name, sample)
+    : createColumnTable(name, sample, Math.max(4, p.dataTables.find((t) => t.kind === 'column')?.groups.length ?? 4));
+  return { ...p, dataTables: [...p.dataTables, { ...table, id }] };
 };
 
 /**
@@ -401,12 +479,20 @@ export const addDataTable = (id: Id): Command => (p) => {
 export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>> }): Command => (p) =>
   mapTable(p, tableId, (t) => {
     const rowCount = Math.max(1, data.values.length);
+    const width = usesSeriesBlocks(t.kind) ? tableSeriesWidth(t) : 1;
+    const lead = leadingColumns(t.kind);
+    const subs = subLabels(layoutOf(t));
     const groups: Group[] = data.names.map((name, i) => {
-      const fresh = createGroup(name, i, rowCount);
       const old = t.groups[i];
+      // In a table of sub-columns the headings (Y1, Mean, SD, ...) and the series names belong to the table, not to the file.
+      const sub = width > 1 && i >= lead;
+      const k = (i - lead) % width;
+      const fresh = createGroup(sub ? subs[k] : name, i, rowCount);
       return {
         ...fresh,
         id: old?.id ?? fresh.id,
+        name: sub ? (old?.name ?? subs[k]) : name,
+        title: sub ? (old?.title ?? (k === 0 ? defaultSeriesName((i - lead) / width, t.kind) : '')) : (old?.title ?? ''),
         paletteIndex: old?.paletteIndex ?? i,
         observations: fresh.observations.map((o, r) => ({ ...o, value: data.values[r]?.[i] ?? null })),
       };
@@ -418,9 +504,11 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
 export const setProjectName = (name: string): Command => (p) => (p.name === name ? p : { ...p, name });
 
 /** New graph of a data table; named after the table, like the original's linked graph. */
-export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; heightPx: number }): Command => (p) => {
+export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; heightPx: number }, type?: ChartType): Command => (p) => {
   const table = p.dataTables.find((t) => t.id === tableId);
   if (!table) return p;
-  const chart = { ...createChart(tableId, size), id: chartId, name: table.name, title: table.name };
+  // A type that does not suit the table's type is ignored: the table's default chart type is used.
+  const suited = type !== undefined && chartTypeInfo(type)?.tableKind === table.kind ? type : defaultChartTypeFor(table.kind);
+  const chart = { ...createChart(tableId, size, suited), id: chartId, name: table.name, title: table.name };
   return { ...p, charts: [...p.charts, chart] };
 };

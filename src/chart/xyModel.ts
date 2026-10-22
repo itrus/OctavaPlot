@@ -1,0 +1,266 @@
+import { isXyChartType } from '../model/chartTypes';
+import { resolveStyle } from '../model/style';
+import { resolveSummary } from '../model/summary';
+import { layoutOf, summaryFormatInfo, xySeries } from '../model/tableLayout';
+import type { Chart, ChartStyle, DataTable, Id, SpreadKind, SummaryFormat } from '../model/types';
+import { chartPx2Pt } from '../model/units';
+import { computeGroupStats, type GroupStats } from '../stats/summary';
+import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
+import { computeLayout, type Layout } from './layout';
+import { displayName } from './model';
+import { resolveYAxis, type YAxisScale } from './scales';
+
+/** One plotted point of an XY series: a single Y value, or the centre of replicate / supplied-summary values. */
+export interface XyPoint {
+  /** Observation ID of the series' first column at this row: the stable identity of the point. */
+  id: Id;
+  row: number;
+  x: number;
+  y: number;
+  /** Position in chart pt. */
+  px: number;
+  py: number;
+  /** The summary behind the point; null for a single Y value. */
+  stats: GroupStats | null;
+}
+
+export interface XySeries {
+  groupId: Id;
+  label: string;
+  style: ChartStyle;
+  points: XyPoint[];
+  /** SVG path data of the connecting line: one subpath per run of consecutive valid rows (a missing value breaks it). */
+  linePath: string;
+  /** Path data of all the error bars of the series (stems and caps); empty when there are none. */
+  errorPath: string;
+  /** What the error bars show, e.g. "SD"; null when there are none. */
+  errorMeaning: string | null;
+  /** Survival charts: the closed polygon of the confidence band; empty when there is none. */
+  bandPath?: string;
+  /** Rows that could not be drawn because X or Y is missing. */
+  skipped: number;
+}
+
+/** The "number at risk" table under a survival plot: one row per group, one column per tick of the time axis. */
+export interface AtRiskTable {
+  /** X position of each column, chart pt. */
+  xs: number[];
+  times: number[];
+  rows: Array<{ label: string; color: string; counts: number[] }>;
+  /** Top of the table and height of a row, chart pt. */
+  y0: number;
+  rowHeight: number;
+  fontSizePt: number;
+}
+
+export interface XyModel {
+  widthPt: number;
+  heightPt: number;
+  layout: Layout;
+  x: YAxisScale;
+  y: YAxisScale;
+  xScale: (v: number) => number;
+  yScale: (v: number) => number;
+  series: XySeries[];
+  /** Index into `series` of each legend entry. */
+  legendSeries: number[];
+  /** Survival charts: the at-risk table, when asked for. */
+  atRisk?: AtRiskTable | null;
+  warnings: string[];
+}
+
+const n2 = (v: number): string => String(Math.round(v * 100) / 100);
+
+/**
+ * Automatic range: include zero when every value is non-negative and the smallest is close to it (within a quarter of
+ * the largest), so a series that starts near 0 is not drawn floating above an axis that starts far below it. Data far
+ * from zero keeps a range fitted to the data (spec 6.1: `axis.includeZero` is auto for XY charts).
+ */
+const nearZero = (values: number[]): boolean => {
+  if (values.length === 0) return false;
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  return lo >= 0 && lo <= 0.25 * hi;
+};
+
+const SUPPLIED_MEANING: Record<string, string> = {
+  sd: 'SD (as entered)',
+  sem: 'SEM (as entered)',
+  cv: 'SD from the %CV entered',
+  plusMinus: '+/- error as entered',
+  limits: 'upper/lower limits as entered',
+};
+
+/**
+ * Stats of one row of a "values already calculated" series: the mean (or median) entered, and an interval built from
+ * the error entered. An error that is missing or negative leaves the point without an error bar.
+ */
+export function suppliedStats(format: SummaryFormat, values: ReadonlyArray<number | null>): { stats: GroupStats; meaning: string } | null {
+  const info = summaryFormatInfo(format);
+  const get = (name: string): number | null => {
+    const i = info.columns.indexOf(name);
+    const v = i >= 0 ? values[i] : null;
+    return v === null || v === undefined || !Number.isFinite(v) ? null : v;
+  };
+  const mean = get('Mean');
+  if (mean === null) return null;
+  let lower: number | null = null;
+  let upper: number | null = null;
+  let spread: SpreadKind = 'none';
+  if (info.error === 'limits') {
+    upper = get('Upper');
+    lower = get('Lower');
+    if (lower !== null && upper !== null && lower <= upper) spread = 'range';
+    else lower = upper = null;
+  } else {
+    const raw = info.error === 'sd' ? get('SD') : info.error === 'sem' ? get('SEM') : info.error === 'cv' ? get('%CV') : get('+/- error');
+    const err = raw === null ? null : info.error === 'cv' ? (Math.abs(mean) * raw) / 100 : raw;
+    if (err !== null && err >= 0) {
+      lower = mean - err;
+      upper = mean + err;
+      spread = info.error === 'sem' ? 'sem' : info.error === 'plusMinus' ? 'range' : 'sd';
+    }
+  }
+  const n = get('N');
+  const stats: GroupStats = {
+    n: n ?? 0,
+    missing: 0,
+    invalid: 0,
+    centreKind: 'mean',
+    spread,
+    effectiveSpread: spread,
+    confidenceLevel: 0.95,
+    centre: mean,
+    interval: { status: spread === 'none' ? 'none' : 'ok', lower, upper, coverage: null, code: null },
+    rejected: false,
+    notices: [],
+  };
+  return { stats, meaning: SUPPLIED_MEANING[info.error] };
+}
+
+/**
+ * Model of an XY chart. The table's first column is X; the other columns form the Y series (one column each, or blocks
+ * of replicate / supplied-summary sub-columns). Rows with a missing X or Y are not drawn (missing is never zero); a
+ * missing Y breaks the connecting line rather than bridging it.
+ */
+export function buildXyModel(chart: Chart, table: DataTable): XyModel {
+  if (!isXyChartType(chart.type) || table.groups.length === 0) throw new Error('buildXyModel needs an XY chart on an XY table');
+  const [W, H] = [chartPx2Pt(chart.widthPx), chartPx2Pt(chart.heightPx)];
+  const layer = chart.layers[0];
+  const layout = layoutOf(table);
+  const warnings: string[] = [];
+  const xs = table.groups[0].observations.map((o) => o.value);
+
+  // 1. Per series and row: the centre and, where there is a spread, its stats.
+  const raw = xySeries(table).map((s, i) => {
+    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: i });
+    const spec = resolveSummary(layer, s.id);
+    const pts: Array<{ id: Id; row: number; x: number; y: number; stats: GroupStats | null }> = [];
+    let skipped = 0;
+    let meaning: string | null = null;
+    let noError = 0;
+    for (let row = 0; row < table.rowCount; row++) {
+      const x = xs[row];
+      const values = s.columns.map((c) => c.observations[row]?.value ?? null);
+      const any = values.some((v) => v !== null);
+      let y: number | null = null;
+      let stats: GroupStats | null = null;
+      if (layout.kind === 'single') y = values[0];
+      else if (layout.kind === 'replicates') {
+        stats = computeGroupStats(values, spec);
+        y = stats.centre;
+        if (y !== null && stats.effectiveSpread !== 'none' && stats.interval.status === 'unavailable') noError++;
+      } else {
+        const supplied = suppliedStats(layout.format, values);
+        if (supplied) {
+          stats = supplied.stats;
+          y = stats.centre;
+          meaning = supplied.meaning;
+          if (stats.interval.status !== 'ok') noError++;
+        }
+      }
+      if (x === null || y === null) {
+        // A row with an X or a value that cannot be drawn is reported; a wholly empty row is just empty.
+        if (x !== null || any) skipped++;
+        continue;
+      }
+      pts.push({ id: s.columns[0].observations[row].id, row, x, y, stats });
+    }
+    if (noError > 0) warnings.push(`${s.name}: ${noError} row${noError === 1 ? ' has' : 's have'} a mean but no usable error, so no error bar is drawn there.`);
+    return { s, style, pts, skipped, meaning, label: displayName(chart, s.id, s.name) };
+  });
+
+  // 2. Scales from every drawn value, error bar ends included, so manual limits clip but never exclude.
+  const allX = raw.flatMap((r) => r.pts.map((p) => p.x));
+  const allY = raw.flatMap((r) => r.pts.flatMap((p) => (p.stats ? rangeValuesFor(p.stats, r.style.showErrorBars, r.style.errorDirection) : [p.y])));
+  const xAxis = resolveYAxis({
+    values: allX,
+    includeZero: nearZero(allX),
+    min: chart.xAxis.min,
+    max: chart.xAxis.max,
+    majorInterval: chart.xAxis.majorInterval,
+    tickCountHint: Math.max(3, Math.min(10, Math.round(W / 60))),
+  });
+  const yAxis = resolveYAxis({
+    values: allY,
+    includeZero: nearZero(allY),
+    min: chart.yAxis.min,
+    max: chart.yAxis.max,
+    majorInterval: chart.yAxis.majorInterval,
+    tickCountHint: Math.max(3, Math.min(10, Math.round(H / 50))),
+  });
+  warnings.push(...xAxis.warnings.map((w) => w.replace(/^Y /, 'X ').replace(/ Y limit/, ' X limit')));
+  warnings.push(...yAxis.warnings);
+
+  // 3. Layout (title, axis titles, legend) with no category labels: the X axis carries numbers.
+  const legendSeries = raw.map((_, i) => i).filter((i) => !chart.legend.hiddenGroupIds.includes(raw[i].s.id));
+  const layoutOut = computeLayout({
+    widthPt: W,
+    heightPt: H,
+    title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
+    xAxis: chart.xAxis,
+    yAxis: chart.yAxis,
+    legend: chart.legend,
+    legendLabels: legendSeries.map((i) => raw[i].label),
+    categoryLabels: [],
+    yTickLabels: yAxis.ticks.map(yAxis.tickLabel),
+  });
+  warnings.push(...layoutOut.warnings);
+
+  const { plot } = layoutOut;
+  const [x0, x1] = xAxis.domain;
+  const [y0, y1] = yAxis.domain;
+  const xScale = (v: number) => plot.x + ((v - x0) / (x1 - x0)) * plot.width;
+  const yScale = (v: number) => plot.y + plot.height - ((v - y0) / (y1 - y0)) * plot.height;
+
+  // 4. Geometry.
+  let clipped = 0;
+  const series: XySeries[] = raw.map((r) => {
+    const points: XyPoint[] = r.pts.map((p) => ({ ...p, px: xScale(p.x), py: yScale(p.y) }));
+    // A run ends where a row between two drawn points is missing (Y or X), so a gap is a gap in the line.
+    let d = '';
+    let prevRow = -2;
+    for (const p of points) {
+      d += `${p.row === prevRow + 1 ? 'L' : 'M'}${n2(p.px)},${n2(p.py)}`;
+      prevRow = p.row;
+    }
+    // Error bars: one stem with caps per point that has an interval, built by the same code as the category charts.
+    let errorPath = '';
+    let errorMeaning: string | null = null;
+    for (const p of points) {
+      if (!p.stats) continue;
+      const bar = buildErrorBar({ groupId: r.s.id, centerX: p.px, stats: p.stats, style: r.style, yScale, domain: yAxis.domain });
+      if (!bar) continue;
+      errorPath += bar.d;
+      errorMeaning = r.meaning ?? bar.meaning;
+      clipped += clippedEndpointCount([bar]);
+    }
+    return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: d, errorPath, errorMeaning, skipped: r.skipped };
+  });
+  if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
+  const skippedTotal = series.reduce((n, s) => n + s.skipped, 0);
+  if (skippedTotal > 0) warnings.push(`${skippedTotal} row${skippedTotal === 1 ? ' has' : 's have'} an X or Y value missing and ${skippedTotal === 1 ? 'is' : 'are'} not drawn.`);
+  if (allX.length === 0) warnings.push('Enter numbers in the X column and in at least one Y column to see the chart.');
+
+  return { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)] };
+}

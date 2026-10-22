@@ -15,6 +15,12 @@ export function symbolPath(shape: SymbolShape, cx: number, cy: number, size: num
       return `M${n2(cx - h)},${n2(cy - h)}h${n2(size)}v${n2(size)}h${n2(-size)}Z`;
     case 'triangle':
       return `M${n2(cx)},${n2(cy - h)}L${n2(cx + h)},${n2(cy + h)}L${n2(cx - h)},${n2(cy + h)}Z`;
+    case 'plus':
+      return `M${n2(cx - h)},${n2(cy)}H${n2(cx + h)}M${n2(cx)},${n2(cy - h)}V${n2(cy + h)}`;
+    case 'cross': {
+      const d = h * 0.78;
+      return `M${n2(cx - d)},${n2(cy - d)}L${n2(cx + d)},${n2(cy + d)}M${n2(cx - d)},${n2(cy + d)}L${n2(cx + d)},${n2(cy - d)}`;
+    }
     case 'diamond':
       return `M${n2(cx)},${n2(cy - h)}L${n2(cx + h)},${n2(cy)}L${n2(cx)},${n2(cy + h)}L${n2(cx - h)},${n2(cy)}Z`;
   }

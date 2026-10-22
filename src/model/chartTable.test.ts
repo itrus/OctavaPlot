@@ -12,6 +12,7 @@ function twoTables(): Project {
   const other = {
     id: newId('table'),
     name: 'Data 2',
+    kind: 'column' as const,
     rowCount: 3,
     rows: createRows(3),
     groups: [createGroup('X', 0, 3, [5, 6, 7]), createGroup('Y', 1, 3, [8, 9, 10])],

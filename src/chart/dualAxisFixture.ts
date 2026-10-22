@@ -25,7 +25,7 @@ export const bindLeft = bindTo('primary');
 /** One table with A to D (three rows), SD error bars, and C and D on the right axis unless told otherwise. */
 export function dualAxisFixture(opts: { bindRight?: boolean } = {}): Project {
   const groups = DUAL_AXIS_DATA.map(([name, values], i) => createGroup(name, i, values.length, [...values]));
-  const table = { id: newId('table'), name: 'Dual axis', rowCount: 3, rows: createRows(3), groups };
+  const table = { id: newId('table'), name: 'Dual axis', kind: 'column' as const, rowCount: 3, rows: createRows(3), groups };
   const chart = createChart(table.id);
   let project: Project = { id: newId('project'), name: 'Dual axis', dataTables: [table], charts: [chart] };
   project = patchSummary(chart.id, 'all', { spread: 'sd' })(project);

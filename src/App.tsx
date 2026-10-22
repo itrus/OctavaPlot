@@ -47,6 +47,7 @@ function Shell() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.isComposing || isTextEntryTarget(e.target)) return;
+      if (document.querySelector('.modal-backdrop')) return; // a dialog is open: its shortcuts are not the project's
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
       if (k === 'z' && !e.shiftKey) {
@@ -135,17 +136,19 @@ function Shell() {
         <strong className="brand">OctavaPlot</strong>
         <span className="app-version" title={`OctavaPlot ${__APP_VERSION__}${__APP_COMMIT__ ? ` (build ${__APP_COMMIT__})` : ''}`}>v{__APP_VERSION__}</span>
         <span className="topbar-sep" />
+        <label className="project-name-field" title="Project name: the suggested file name when saving">
+          <span>Project</span>
+          <input
+            className="project-name"
+            type="text"
+            value={project.name}
+            aria-label="Project name"
+            onChange={(e) => run('Rename project', setProjectName(e.target.value), 'project:name')}
+          />
+        </label>
         <button className="icon-text" onClick={startNewProject}><NewProjectIcon /> New Project</button>
         <button className="icon-text" onClick={() => confirmDiscard('Opening another project') && fileRef.current?.click()}><OpenProjectIcon /> Open Project</button>
         <button className="icon-text" onClick={() => void saveProject()} title="Save the project to a file (you choose the name)"><SaveProjectIcon /> Save Project</button>
-        <input
-          className="project-name"
-          type="text"
-          value={project.name}
-          aria-label="Project name"
-          title="Project name: the suggested file name when saving"
-          onChange={(e) => run('Rename project', setProjectName(e.target.value), 'project:name')}
-        />
         <input
           ref={fileRef}
           type="file"

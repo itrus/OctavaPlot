@@ -34,7 +34,7 @@ export const BAR_FILL_KEY_FRAMES = BAR_FILL_PATTERN_COUNT + 1;
 /** Bar fill fixture. With `opacity` every data set is drawn at 0.5 and the gridlines are on. */
 export function barFillFixture(opts: { opacity?: boolean } = {}): Project {
   const groups = BAR_FILL_FIXTURE_DATA.map(([name, values], i) => createGroup(name, i, values.length, [...values]));
-  const table = { id: newId('table'), name: 'Bar fills', rowCount: 3, rows: createRows(3), groups };
+  const table = { id: newId('table'), name: 'Bar fills', kind: 'column' as const, rowCount: 3, rows: createRows(3), groups };
   const chart = createChart(table.id);
   const project: Project = { id: newId('project'), name: 'Bar fills', dataTables: [table], charts: [chart] };
   const common: Partial<ChartStyle> = opts.opacity ? { barOpacity: 0.5 } : {};

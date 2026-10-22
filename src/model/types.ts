@@ -30,9 +30,30 @@ export interface DataRow {
   title: string;
 }
 
+/**
+ * What the columns of a table mean. Column: each column is a group of replicate values. XY: the first column is the
+ * numeric X coordinate and every other column is a Y series measured at those X values. Grouped: each row is a
+ * category and each block of columns a series. Contingency: rows are groups of subjects, columns are outcomes, cells
+ * are counts. Survival: the first column is the time and every other column a group (1 = event, 0 = censored).
+ */
+export type TableKind = 'column' | 'xy' | 'grouped' | 'contingency' | 'survival';
+
+/** How the values of each Y series of an XY table are entered. */
+export type SummaryFormat = 'mean-sd-n' | 'mean-sem-n' | 'mean-cv-n' | 'mean-sd' | 'mean-sem' | 'mean-cv' | 'mean-pm' | 'mean-limits';
+export type ReplicateLayout =
+  /** One Y value for each point. */
+  | { kind: 'single' }
+  /** `n` replicate values in side-by-side sub-columns; the chart shows their centre and spread. */
+  | { kind: 'replicates'; n: number }
+  /** Centre and error already calculated elsewhere (spec 2.3, supplied summary). */
+  | { kind: 'summary'; format: SummaryFormat };
+
 export interface DataTable {
   id: Id;
   name: string;
+  kind: TableKind;
+  /** XY tables: how each Y series is entered. Absent = a single Y value. */
+  layout?: ReplicateLayout;
   rowCount: number;
   /** Always exactly `rowCount` long. */
   rows: DataRow[];
@@ -40,8 +61,21 @@ export interface DataTable {
 }
 
 export type ChartAspect = 'free' | '4:3' | '1:1';
-export type ChartType = 'bar' | 'scatter' | 'mean';
-export type SymbolShape = 'circle' | 'square' | 'triangle' | 'diamond';
+export type ChartType =
+  | 'bar'
+  | 'scatter'
+  | 'mean'
+  | 'xyScatter'
+  | 'xyLine'
+  | 'xyLineSymbols'
+  | 'groupedBar'
+  | 'groupedLine'
+  | 'contingencyBars'
+  | 'contingencyStacked'
+  | 'contingencyPercent'
+  | 'survival'
+  | 'cumulativeEvent';
+export type SymbolShape = 'circle' | 'square' | 'triangle' | 'diamond' | 'plus' | 'cross';
 export type ErrorDirection = 'both' | 'positive' | 'negative';
 export type ErrorCap = 'bar' | 'none';
 export type LegendPosition = 'right' | 'bottom' | 'top';
@@ -192,6 +226,19 @@ export interface Annotation {
   color: string;
 }
 
+/** How the pointwise interval of a survival estimate is built. Log-log keeps it inside 0 to 1; plain is S +/- z SE. */
+export type SurvivalBandMethod = 'loglog' | 'plain';
+
+export interface SurvivalOptions {
+  /** Draw the confidence band around each curve. */
+  band: boolean;
+  /** Confidence level, 0 < level < 1. */
+  level: number;
+  method: SurvivalBandMethod;
+  /** Show the number of subjects still at risk under the plot, at the ticks of the time axis. */
+  atRisk: boolean;
+}
+
 export interface Chart {
   id: Id;
   name: string;
@@ -204,6 +251,8 @@ export interface Chart {
   hiddenGroupIds: Id[];
   /** Data sets from other tables that are plotted on this graph too. */
   extraGroups: Array<{ tableId: Id; groupId: Id }>;
+  /** Survival and cumulative-event charts: confidence band and at-risk table. */
+  survival: SurvivalOptions;
   /** Shape lock: with 4:3 or square, changing the width or the height moves the other one too. */
   aspect: ChartAspect;
   /** Last palette applied to the data sets (see model/palettes.ts); null = colours set by hand. */

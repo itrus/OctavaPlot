@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FILL_PATTERN_OPTIONS, describeBarFillUi } from '../../model/fill';
-import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
-import { applyAspect, resizeChart } from '../../model/aspect';
-import { graphSources, type GraphSource } from '../../model/chartTable';
 import { PALETTES, paletteById } from '../../model/palettes';
-import { newId } from '../../model/ids';
 import { isGroupOverridden, resolveStyle } from '../../model/style';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/summary';
 import type { AxisBinding, Chart, ChartStyle, ChartType, DataTable, Id, SummarySpec } from '../../model/types';
@@ -26,10 +22,8 @@ import {
 } from '../../stats/describe';
 import { useApp } from '../../state/AppContext';
 import {
-  addAnnotation,
   applyPalette,
   composeCommands,
-  patchAnnotation,
   patchAxis,
   clearPointStyle,
   patchBothAxes,
@@ -39,12 +33,9 @@ import {
   patchPointStyle,
   patchStyle,
   patchSummary,
-  removeAnnotation,
   setChartType,
-  setDisplayName,
-  setGroupOnGraph,
-  setLegendItemVisible,
 } from '../../state/commands';
+import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './SharedSections';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './controls';
 import {
   backgroundDisplay,
@@ -60,7 +51,9 @@ import {
   widthError,
   widthLabel,
 } from './fillRules';
-import type { AppearanceSection, InspectorTab } from './nav';
+import { SECTIONS, TABS, type AppearanceSection, type InspectorTab } from './nav';
+import { XyInspector } from './XyInspector';
+import { chartFamily, chartTypesFor } from '../../model/chartTypes';
 import { PointLabelControls, SelectedPointBox, type PointEdit } from './PointLabelControls';
 import { pointSelectionState } from './pointOverrideUi';
 import { CalculationOptions,IntervalFields, LineAtField } from './SummaryControls';
@@ -70,22 +63,10 @@ const shapeOptions = [
   { value: 'square', label: 'Square' },
   { value: 'triangle', label: 'Triangle' },
   { value: 'diamond', label: 'Diamond' },
+  { value: 'plus', label: 'Plus' },
+  { value: 'cross', label: 'Cross' },
 ] as const;
 
-
-const SECTIONS: Array<{ id: AppearanceSection; label: string }> = [
-  { id: 'style', label: 'Style' },
-  { id: 'axes', label: 'Axes' },
-  { id: 'text', label: 'Text' },
-  { id: 'dimensions', label: 'Dimensions' },
-  { id: 'legend', label: 'Legend' },
-];
-
-const TABS: Array<{ id: InspectorTab; label: string }> = [
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'datasets', label: 'Data Sets on Graph' },
-  { id: 'annotations', label: 'Annotations' },
-];
 
 function DatasetSwatchChip({ style }: { style: ChartStyle }) {
   const sw = datasetSwatch(style);
@@ -98,19 +79,13 @@ function DatasetSwatchChip({ style }: { style: ChartStyle }) {
   );
 }
 
+/** The formatting panel: one for charts on a numeric X axis (XY tables), one for category charts. */
 export function Inspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { selection, setSelection, run, setStatus, project, inspectorNav } = useApp();
-  // Every data set the graph could plot, grouped by table, for the on/off switches.
-  const tablesWithSources = useMemo(() => {
-    const byTable = new Map<string, [string, string, GraphSource[]]>();
-    for (const s of graphSources(project, chart)) {
-      if (!byTable.has(s.tableId)) byTable.set(s.tableId, [s.tableId, s.tableName, []]);
-      byTable.get(s.tableId)![2].push(s);
-    }
-    return [...byTable.values()];
-  }, [project, chart]);
-  const setManyOnGraph = (sources: GraphSource[], on: boolean) =>
-    run(on ? 'Show all data sets' : 'Hide all data sets', composeCommands(...sources.map((s) => setGroupOnGraph(chart.id, s.tableId, s.group.id, on))));
+  return chartFamily(chart.type) === 'category' ? <CategoryInspector chart={chart} table={table} /> : <XyInspector chart={chart} table={table} />;
+}
+
+function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable }) {
+  const { selection, setSelection, run, setStatus, inspectorNav } = useApp();
   const [tab, setTab] = useState<InspectorTab>('appearance');
   const [section, setSection] = useState<AppearanceSection>('style');
   // A click on a chart element sends the inspector to that element's settings.
@@ -178,7 +153,6 @@ export function Inspector({ chart, table }: { chart: Chart; table: DataTable }) 
       coalesceKey,
     );
   const ov = (key: keyof ChartStyle) => scope !== 'all' && isGroupOverridden(layer, scope, key);
-  const setChart = (label: string, patch: Partial<Chart>, key?: string) => run(label, patchChart(chart.id, patch), key);
 
   // "<" / ">" step through the data sets; stepping off either end returns to Global.
   const stepGroup = (dir: 1 | -1) => {
@@ -249,11 +223,7 @@ export function Inspector({ chart, table }: { chart: Chart; table: DataTable }) 
             <Field label="Appearance">
               <SelectInput<ChartType>
                 value={chart.type}
-                options={[
-                  { value: 'bar', label: 'Bar chart' },
-                  { value: 'scatter', label: 'Scatter dot plot' },
-                  { value: 'mean', label: 'Mean with error bars' },
-                ]}
+                options={chartTypesFor('column').map((c) => ({ value: c.type, label: c.label }))}
                 onChange={(t) => run('Change graph type', setChartType(chart.id, t))}
               />
             </Field>
@@ -625,133 +595,16 @@ export function Inspector({ chart, table }: { chart: Chart; table: DataTable }) 
             </div>
           )}
 
-          {section === 'text' && (
-            <div>
-              <Section title="Titles">
-                <Field label="Show chart title">
-                  <Check checked={chart.showTitle} onChange={(v) => setChart('Show chart title', { showTitle: v })} />
-                </Field>
-                <Field label="Chart title">
-                  <TextInput value={chart.title} disabled={!chart.showTitle} onChange={(v) => setChart('Chart title', { title: v }, 'chart:title')} />
-                </Field>
-                <NumField label="Title size" unit="pt" value={chart.titleFontSizePt} min={4} max={72} disabled={!chart.showTitle} onCommit={(v) => setChart('Title size', { titleFontSizePt: v }, 'chart:titlesize')} />
-                <Field label="X axis title">
-                  <TextInput value={chart.xAxis.title} onChange={(v) => run('X axis title', patchAxis(chart.id, 'xAxis', { title: v }), 'axis:xt')} />
-                </Field>
-                <Field label={`${leftName} axis title`}>
-                  <TextInput value={chart.yAxis.title} onChange={(v) => run('Y axis title', patchAxis(chart.id, 'yAxis', { title: v }), 'axis:yt')} />
-                </Field>
-              </Section>
-              <Section title="Font sizes">
-                <NumField label="Tick label size" unit="pt" value={chart.yAxis.tickFontSizePt} min={4} max={48} onCommit={(v) => run('Tick label size', patchBothAxes(chart.id, { tickFontSizePt: v }), 'axis:tfs')} />
-                <NumField label="Axis title size" unit="pt" value={chart.yAxis.titleFontSizePt} min={4} max={48} onCommit={(v) => run('Axis title size', patchBothAxes(chart.id, { titleFontSizePt: v }), 'axis:afs')} />
-                {dual && <div className="muted small">Font sizes apply to both Y axes.</div>}
-              </Section>
-              <Section title="Display names">
-            {table.groups.map((g) => (
-              <Field key={g.id} label={g.name}>
-                <TextInput
-                  value={chart.displayNames[g.id] ?? ''}
-                  placeholder={g.name}
-                  onChange={(v) => run('Display name', setDisplayName(chart.id, g.id, v), `dn:${g.id}`)}
-                />
-              </Field>
-            ))}
-            <div className="muted small">Display names are used by the legend and category labels. Empty = data name.</div>
-              </Section>
-            </div>
-          )}
-
-          {section === 'dimensions' && (
-            <div className="tab-body">
-              <Field label="Shape" hint="Free keeps width and height independent; 4:3 and Square move one when you change the other">
-                <span className="switch-group" role="group" aria-label="Chart shape">
-                  {(
-                    [
-                      ['free', 'Free'],
-                      ['4:3', '4:3'],
-                      ['1:1', 'Square'],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      className={`switch${chart.aspect === value ? ' on' : ''}`}
-                      aria-pressed={chart.aspect === value}
-                      onClick={() => setChart(`Chart shape ${label}`, { aspect: value, ...applyAspect(chart, value) })}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </span>
-              </Field>
-              <NumField label="Chart width" unit="px" value={chart.widthPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => setChart('Chart width', resizeChart(chart, chart.aspect, 'width', v), 'chart:w')} />
-              <NumField label="Chart height" unit="px" value={chart.heightPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => setChart('Chart height', resizeChart(chart, chart.aspect, 'height', v), 'chart:h')} />
-              <div className="muted small">Sizes are in pixels. The default for new charts is set in Settings.</div>
-            </div>
-          )}
-
-          {section === 'legend' && (
-            <div>
-              <Section title="Legend">
-            <Field label="Show legend">
-              <Check checked={chart.legend.visible} onChange={(v) => run('Show legend', patchLegend(chart.id, { visible: v }))} />
-            </Field>
-            <Field label="Position">
-              <SelectInput
-                value={chart.legend.position}
-                disabled={!chart.legend.visible}
-                options={[
-                  { value: 'right', label: 'Right' },
-                  { value: 'bottom', label: 'Bottom' },
-                  { value: 'top', label: 'Top' },
-                ]}
-                onChange={(v) => run('Legend position', patchLegend(chart.id, { position: v }))}
-              />
-            </Field>
-            <SubHeading>Data sets in legend</SubHeading>
-            {table.groups.map((g) => (
-              <Field key={g.id} label={displayName(chart, g.id, g.name)}>
-                <Check
-                  checked={!chart.legend.hiddenGroupIds.includes(g.id)}
-                  disabled={!chart.legend.visible}
-                  ariaLabel={`Show ${displayName(chart, g.id, g.name)} in legend`}
-                  onChange={(v) => run('Legend item', setLegendItemVisible(chart.id, g.id, v))}
-                />
-              </Field>
-            ))}
-              </Section>
-            </div>
-          )}
+          {section === 'text' && <TextSections chart={chart} groups={table.groups} yName={leftName} dual={dual} />}
+          {section === 'dimensions' && <DimensionsSection chart={chart} />}
+          {section === 'legend' && <LegendSection chart={chart} groups={table.groups} />}
         </div>
       )}
 
       {/* ------------------------------------------------ Data sets */}
       {tab === 'datasets' && (
         <div className="tab-body">
-          <SubHeading>On this graph</SubHeading>
-          {tablesWithSources.map(([tableId, tableName, sources]) => (
-            <div key={tableId} className="source-table">
-              <div className="source-table-head">
-                <strong>{tableName}</strong>
-                {tableId === chart.dataTableId && <span className="muted small"> (graph's table)</span>}
-                <span className="source-actions">
-                  <button className="small-btn" onClick={() => setManyOnGraph(sources, true)}>All on</button>
-                  <button className="small-btn" onClick={() => setManyOnGraph(sources, false)}>All off</button>
-                </span>
-              </div>
-              {sources.map((s) => (
-                <label key={s.group.id} className="source-row">
-                  <input
-                    type="checkbox"
-                    checked={s.onGraph}
-                    onChange={(e) => run(e.target.checked ? 'Show data set on graph' : 'Hide data set from graph', setGroupOnGraph(chart.id, s.tableId, s.group.id, e.target.checked))}
-                  />
-                  {s.group.name}
-                </label>
-              ))}
-            </div>
-          ))}
-          {tablesWithSources.length < 2 && <div className="muted small">Add another data table to plot its data sets on this graph too.</div>}
+          <OnThisGraph chart={chart} />
           <SubHeading>Edit a data set</SubHeading>
           <div className="muted small">Select a group to edit its style, or click a bar, symbol or error bar in the chart.</div>
           <ul className="dataset-list">
@@ -778,57 +631,7 @@ export function Inspector({ chart, table }: { chart: Chart; table: DataTable }) 
       )}
 
       {/* ------------------------------------------------ Annotations */}
-      {tab === 'annotations' && (
-        <div className="tab-body">
-          <div className="button-row">
-            <button
-              onClick={() => {
-                const id = newId('ann');
-                run('Add annotation', addAnnotation(chart.id, { id, text: 'Text', xFrac: 0.4, yFrac: 0.08, fontSizePt: 14, color: '#000000' }));
-                setSelection({ kind: 'annotation', annotationId: id });
-              }}
-            >
-              + Add text annotation
-            </button>
-          </div>
-          {chart.annotations.length === 0 && <div className="muted small">No annotations. Added text can be dragged within the chart.</div>}
-          {chart.annotations.map((a) => {
-            const isSel = selection.kind === 'annotation' && selection.annotationId === a.id;
-            return (
-              <div key={a.id} className={`annotation-card${isSel ? ' selected' : ''}`}>
-                <button className="list-item" onClick={() => setSelection({ kind: 'annotation', annotationId: a.id })}>
-                  {a.text.split('\n')[0] || '(empty)'}
-                </button>
-                {isSel && (
-                  <>
-                    <Field label="Text">
-                      <textarea
-                        rows={2}
-                        value={a.text}
-                        onChange={(e) => run('Edit annotation text', patchAnnotation(chart.id, a.id, { text: e.target.value }), `ann:${a.id}:text`)}
-                      />
-                    </Field>
-                    <NumField label="Size" unit="pt" value={a.fontSizePt} min={4} max={96} onCommit={(v) => run('Annotation size', patchAnnotation(chart.id, a.id, { fontSizePt: v }), `ann:${a.id}:size`)} />
-                    <Field label="Colour">
-                      <ColorInput value={a.color} onChange={(v) => run('Annotation colour', patchAnnotation(chart.id, a.id, { color: v }), `ann:${a.id}:color`)} />
-                    </Field>
-                    <div className="button-row">
-                      <button
-                        onClick={() => {
-                          run('Delete annotation', removeAnnotation(chart.id, a.id));
-                          setSelection({ kind: 'chart' });
-                        }}
-                      >
-                        Delete annotation
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {tab === 'annotations' && <AnnotationsTab chart={chart} />}
     </aside>
   );
 }

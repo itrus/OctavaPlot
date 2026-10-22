@@ -1,3 +1,5 @@
+import { usesSeriesBlocks } from './chartTypes';
+import { xySeries } from './tableLayout';
 import type { Chart, DataTable, Group, Id, Project } from './types';
 
 /** One data set a graph can plot, from its own table or from another one. */
@@ -18,9 +20,14 @@ export function graphSources(p: Project, chart: Chart): GraphSource[] {
   const hidden = new Set(chart.hiddenGroupIds);
   const added = new Set(chart.extraGroups.map((e) => e.groupId));
   const own = tableById(p, chart.dataTableId);
-  const out: GraphSource[] = (own?.groups ?? []).map((g) => ({ tableId: chart.dataTableId, tableName: own!.name, group: g, onGraph: !hidden.has(g.id), own: true }));
+  // An XY table's first column is X, not a data set; XY charts plot only the series of their own table. A series
+  // is one column or a block of sub-columns, listed under its own name.
+  const blocks = own !== undefined && usesSeriesBlocks(own.kind);
+  const ownGroups = blocks ? xySeries(own).map((s) => ({ ...s.columns[0], name: s.name })) : (own?.groups ?? []);
+  const out: GraphSource[] = ownGroups.map((g) => ({ tableId: chart.dataTableId, tableName: own!.name, group: g, onGraph: !hidden.has(g.id), own: true }));
+  if (blocks) return out;
   for (const t of p.dataTables) {
-    if (t.id === chart.dataTableId) continue;
+    if (t.id === chart.dataTableId || t.kind !== 'column') continue;
     for (const g of t.groups) out.push({ tableId: t.id, tableName: t.name, group: g, onGraph: added.has(g.id), own: false });
   }
   return out;
@@ -36,10 +43,14 @@ export function effectiveTable(p: Project, chart: Chart): DataTable | undefined 
   if (!own) return undefined;
   if (chart.hiddenGroupIds.length === 0 && chart.extraGroups.length === 0) return own;
   const hidden = new Set(chart.hiddenGroupIds);
-  const picked: Group[] = own.groups.filter((g) => !hidden.has(g.id));
+  // An XY table's first column is its X: it is never switched off; a hidden series takes all of its columns with it.
+  const hiddenColumns = new Set<string>();
+  const blocks = usesSeriesBlocks(own.kind);
+  if (blocks) for (const s of xySeries(own)) if (hidden.has(s.id)) s.columns.forEach((c) => hiddenColumns.add(c.id));
+  const picked: Group[] = blocks ? own.groups.filter((g) => !hiddenColumns.has(g.id)) : own.groups.filter((g) => !hidden.has(g.id));
   for (const e of chart.extraGroups) {
     const g = tableById(p, e.tableId)?.groups.find((x) => x.id === e.groupId);
-    if (g && e.tableId !== chart.dataTableId) {
+    if (g && e.tableId !== chart.dataTableId && !blocks) {
       // Named with its table, so it cannot be mistaken for a data set of the same name in the graph's own table.
       picked.push({ ...g, name: `${tableById(p, e.tableId)!.name}: ${g.name}` });
     }

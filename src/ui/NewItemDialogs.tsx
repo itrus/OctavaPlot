@@ -1,0 +1,187 @@
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { CHART_TYPES, chartTypesFor, defaultChartTypeFor, tableTypeInfo } from '../model/chartTypes';
+import type { ChartType, DataTable, Id } from '../model/types';
+
+/** A small modal with a title, a body and Cancel / confirm buttons. Focus is taken once, when it opens. */
+export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled, children }: { title: string; confirmLabel: string; onConfirm: () => void; onClose: () => void; confirmDisabled?: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  const latest = useRef({ onConfirm, onClose });
+  latest.current = { onConfirm, onClose };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') latest.current.onClose();
+      else if (e.key === 'Enter' && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLButtonElement && e.target.getAttribute('role') !== 'radio')) {
+        // A card is a radio button: Enter on it confirms the choice instead of selecting it again.
+        e.preventDefault();
+        latest.current.onConfirm();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
+        <div className="modal-head">
+          <strong>{title}</strong>
+          <button className="icon-btn" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        <div className="modal-body modal-pad">{children}</div>
+        <div className="modal-foot">
+          <button onClick={onClose}>Cancel</button>
+          <button className="primary" onClick={onConfirm} disabled={confirmDisabled}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const SKETCH = { width: 84, height: 54, viewBox: '0 0 84 54', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, 'aria-hidden': true } as const;
+
+/** A thumbnail of what each chart type looks like. */
+function ChartSketch({ type }: { type: ChartType }) {
+  const axes = <path d="M10 6V46H78" />;
+  switch (type) {
+    case 'bar':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[16, 28], [32, 18], [48, 24], [64, 12]].map(([x, y]) => (
+            <rect key={x} x={x} y={y + 6} width="10" height={40 - y - 6} fill="currentColor" fillOpacity={0.25} />
+          ))}
+        </svg>
+      );
+    case 'scatter':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[21, [34, 30, 36, 28]], [37, [24, 20, 26, 22]], [53, [18, 14, 20, 16]], [69, [12, 10, 15, 8]]].map(([x, ys]) =>
+            (ys as number[]).map((y, i) => <circle key={`${x}-${i}`} cx={(x as number) + (i % 2 ? 3 : -3)} cy={y + 8} r="1.9" fill="currentColor" stroke="none" />),
+          )}
+        </svg>
+      );
+    case 'mean':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[21, 30], [37, 22], [53, 26], [69, 16]].map(([x, y]) => (
+            <g key={x}>
+              <path d={`M${x} ${y - 7}V${y + 9}M${x - 3} ${y - 7}h6M${x - 3} ${y + 9}h6`} />
+              <circle cx={x} cy={y + 1} r="2.6" fill="currentColor" stroke="none" />
+            </g>
+          ))}
+        </svg>
+      );
+    case 'groupedBar':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[14, 26, 18], [46, 34, 12]].map(([x, a, b]) => (
+            <g key={x}>
+              <rect x={x} y={46 - a} width="10" height={a} fill="currentColor" fillOpacity={0.25} />
+              <rect x={x + 10} y={46 - b} width="10" height={b} fill="currentColor" fillOpacity={0.55} />
+              <path d={`M${x + 5} ${46 - a - 4}v8M${x + 15} ${46 - b - 4}v8`} />
+            </g>
+          ))}
+        </svg>
+      );
+    case 'groupedLine':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          <path d="M22 24L56 14" strokeWidth={2} />
+          <path d="M22 34L56 30" strokeWidth={2} strokeOpacity={0.55} />
+          {[[22, 24], [56, 14], [22, 34], [56, 30]].map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="2.4" fill="currentColor" stroke="none" />)}
+        </svg>
+      );
+    case 'contingencyBars':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[14, 30, 12], [46, 18, 28]].map(([x, a, b]) => (
+            <g key={x}>
+              <rect x={x} y={46 - a} width="10" height={a} fill="currentColor" fillOpacity={0.25} />
+              <rect x={x + 10} y={46 - b} width="10" height={b} fill="currentColor" fillOpacity={0.55} />
+            </g>
+          ))}
+        </svg>
+      );
+    case 'contingencyStacked':
+    case 'contingencyPercent': {
+      const full = type === 'contingencyPercent';
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[16, 28], [48, 16]].map(([x, a]) => {
+            const total = full ? 38 : a + 14;
+            const top = full ? 38 * (a / (a + 14)) : a;
+            return (
+              <g key={x}>
+                <rect x={x} y={46 - top} width="18" height={top} fill="currentColor" fillOpacity={0.25} />
+                <rect x={x} y={46 - total} width="18" height={total - top} fill="currentColor" fillOpacity={0.55} />
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+    case 'survival':
+    case 'cumulativeEvent': {
+      const down = type === 'survival';
+      const steps = down ? 'M12 10H26V18H38V26H52V32H64V40H76' : 'M12 40H26V32H38V26H52V18H64V10H76';
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          <path d={steps} strokeWidth={2} />
+          {[[32, down ? 18 : 32], [58, down ? 26 : 26]].map(([x, y]) => <path key={x} d={`M${x} ${y - 3}v6`} />)}
+        </svg>
+      );
+    }
+    default: {
+      const pts: Array<[number, number]> = [[14, 40], [26, 34], [38, 30], [50, 22], [62, 18], [74, 9]];
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {type !== 'xyScatter' && <path d={pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x} ${y}`).join('')} strokeWidth={2} />}
+          {type !== 'xyLine' && pts.map(([x, y]) => <circle key={x} cx={x} cy={y} r="2.4" fill="currentColor" stroke="none" />)}
+        </svg>
+      );
+    }
+  }
+}
+
+/** Step 2: a graph of one table, in one of the chart types that suit that table's type. */
+export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { tables: DataTable[]; initialTableId: Id; onCreate: (tableId: Id, type: ChartType) => void; onClose: () => void }) {
+  const [tableId, setTableId] = useState<Id>(tables.some((t) => t.id === initialTableId) ? initialTableId : tables[0].id);
+  const table = tables.find((t) => t.id === tableId) ?? tables[0];
+  const [chosen, setChosen] = useState<ChartType | null>(null);
+  // Changing to a table of another type resets the choice to that type's first chart.
+  const type = chosen && CHART_TYPES.some((c) => c.type === chosen && c.tableKind === table.kind) ? chosen : defaultChartTypeFor(table.kind);
+  return (
+    <Modal title="New graph" confirmLabel="Create graph" onConfirm={() => onCreate(table.id, type)} onClose={onClose}>
+      <label className="choice-label">
+        <span>Graph of table</span>
+        <select value={table.id} onChange={(e) => setTableId(e.target.value)} aria-label="Data table">
+          {tables.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name} ({tableTypeInfo(t.kind).label})
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="muted">
+        {tableTypeInfo(table.kind).label}: {tableTypeInfo(table.kind).layout} Choose a chart type for it.
+      </p>
+      <div className="choice-grid" role="radiogroup" aria-label="Chart type">
+        {chartTypesFor(table.kind).map((c) => (
+          <button key={c.type} className={`choice-card${type === c.type ? ' selected' : ''}`} role="radio" aria-checked={type === c.type} onClick={() => setChosen(c.type)} onDoubleClick={() => onCreate(table.id, c.type)}>
+            <ChartSketch type={c.type} />
+            <strong>{c.label}</strong>
+            <span className="muted">{c.description}</span>
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}

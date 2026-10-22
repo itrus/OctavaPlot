@@ -35,8 +35,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             >
               <Check checked={settings.autosave} onChange={(v) => updateSettings({ autosave: v })} ariaLabel="Autosave" />
             </Field>
-            <Field label="New project starts empty" hint="Off: a new project begins with the example data. On: it begins with blank tables.">
-              <Check checked={settings.newProjectEmpty} onChange={(v) => updateSettings({ newProjectEmpty: v })} ariaLabel="New project starts empty" />
+            <Field label="New projects and tables start empty" hint="Off: a new project, and the New Data Table dialog, start with sample data. On: they start with blank tables (the dialog still lets you choose).">
+              <Check checked={settings.newProjectEmpty} onChange={(v) => updateSettings({ newProjectEmpty: v })} ariaLabel="New projects and tables start empty" />
             </Field>
           </Section>
           <Section title="Export">

@@ -29,7 +29,7 @@ const AXIS_COLOR = '#000000';
 const GRID_COLOR = '#d0d0d0';
 const SELECT_COLOR = '#2b7fff';
 
-function annotationBox(a: Annotation, x: number, y: number) {
+export function annotationBox(a: Annotation, x: number, y: number) {
   const lines = a.text.split('\n');
   const w = Math.max(...lines.map((l) => measureText(l, a.fontSizePt)), 4);
   const h = lines.length * a.fontSizePt * 1.2;

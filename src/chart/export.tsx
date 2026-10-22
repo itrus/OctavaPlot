@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Chart, DataTable } from '../model/types';
-import { ChartSvg } from './ChartSvg';
-import { buildChartModel } from './model';
+import { buildAnyModel, ChartCanvas } from './anyModel';
 
 /**
  * Export renders the same declarative <ChartSvg> without editor state, so
@@ -9,10 +8,7 @@ import { buildChartModel } from './model';
  * Output stays vector: paths, text and symbols.
  */
 export function chartToSvgString(chart: Chart, table: DataTable): string {
-  const model = buildChartModel(chart, table);
-  const markup = renderToStaticMarkup(
-    <ChartSvg chart={chart} model={model} cssWidth={`${chart.widthPx}px`} cssHeight={`${chart.heightPx}px`} />,
-  );
+  const markup = renderToStaticMarkup(<ChartCanvas chart={chart} any={buildAnyModel(chart, table)} cssWidth={`${chart.widthPx}px`} cssHeight={`${chart.heightPx}px`} />);
   return `<?xml version="1.0" encoding="UTF-8"?>\n${markup}\n`;
 }
 
