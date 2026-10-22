@@ -466,7 +466,7 @@ export function DataTableView({ table }: { table: DataTable }) {
         </div>
       </div>
       <div className={`table-status${message?.kind === 'error' ? ' error' : ''}`} role="status">
-        {message ? message.text : 'Click a cell, type to edit. Enter ↓, Tab →. Paste tab-separated values from Excel (Ctrl+V).'}
+        {message ? message.text : 'Click a cell, type to edit. Enter ↓, Tab →. Paste tab-separated values from Excel (Ctrl+V); pasting at the Row title column fills titles first, then the value columns.'}
       </div>
     </div>
   );

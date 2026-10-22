@@ -2,6 +2,8 @@
 
 Local React + TypeScript + Vite + D3 app for editing a replicate data table and a bar / scatter / mean±error chart. No backend; works offline after `npm install`.
 
+**Live:** https://itrus.github.io/OctavaPlot/ (deployed from `main` by GitHub Actions; data stays in your browser's `localStorage`, so do not enter patient-linked data).
+
 ## Run
 
 Requires Node.js 24 or 26.
