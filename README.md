@@ -1,8 +1,35 @@
-# OctavaPlot — prototype v0.1
+<p align="center">
+  <img src="public/logo.svg" alt="OctavaPlot logo" width="128" height="128">
+</p>
+
+<h1 align="center">OctavaPlot — prototype v0.1</h1>
+
+<p align="center">
+  <a href="https://itrus.github.io/OctavaPlot/"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6%20try%20it-live%20demo-2ea44f?style=for-the-badge"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/itrus/OctavaPlot/actions/workflows/deploy.yml"><img alt="Test, build and deploy" src="https://github.com/itrus/OctavaPlot/actions/workflows/deploy.yml/badge.svg"></a>
+</p>
+
+<p align="center">
+  <b>Tech:</b>
+  <img alt="Node.js 24 | 26" src="https://img.shields.io/badge/node-24%20%7C%2026-339933?logo=nodedotjs&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-646cff?logo=vite&logoColor=white">
+  <img alt="D3" src="https://img.shields.io/badge/D3-7-f9a03c?logo=d3dotjs&logoColor=white">
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue"></a>
+</p>
 
 Local React + TypeScript + Vite + D3 app for editing data tables and the charts drawn from them: bar / scatter / mean±error charts from column tables, and XY scatter / line charts from XY tables. No backend; works offline after `npm install`. Chart colour palettes are from the ggsci R package (Xiao N., https://nanx.me/ggsci/); see [Colour palettes](#colour-palettes).
 
-**Live:** https://itrus.github.io/OctavaPlot/ (deployed from `main` by GitHub Actions; data stays in your browser's `localStorage`, so do not enter patient-linked data).
+<h3 align="center">▶ <a href="https://itrus.github.io/OctavaPlot/">Open OctavaPlot in your browser: itrus.github.io/OctavaPlot</a></h3>
+
+Deployed from `main` by GitHub Actions. Data stays in your browser's `localStorage`, so do not enter patient-linked data.
 
 ## Run
 
@@ -109,6 +136,10 @@ Each data set can be plotted on the left or right Y axis (bar, scatter and mean 
 ## Row titles and point labels
 
 The data table has an optional Row title column (undoable, copy and paste aware). Labels can be drawn on each point from the row title or the value, with placement, collision handling (keep, hide, repel), a leader line (a boolean, P), colour, size and decimals. Labels that cannot be placed are listed in the Inspector. A point can override the data set label settings (Selected point box). Dragging labels is not implemented.
+
+## License
+
+Released under the [GNU General Public License v3.0](LICENSE).
 
 ## Compliance note
 
