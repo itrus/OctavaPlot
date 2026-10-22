@@ -1,7 +1,7 @@
-import { createChart, createGroup, INITIAL_ROWS, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
+import { createChart, createGroup, DEFAULT_JITTER, DEFAULT_STYLE, DEFAULT_SUMMARY, INITIAL_ROWS, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
 import { effectiveTable } from '../model/chartTable';
 import { newId } from '../model/ids';
-import { paletteColor, type Palette } from '../model/palettes';
+import { DEFAULT_PALETTE_ID, paletteColor, type Palette } from '../model/palettes';
 import { createRows, sanitizeRowTitle } from '../model/rows';
 import { clearGroupSummary, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/summary';
 import { LABEL_STYLE_KEYS, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle } from '../model/style';
@@ -319,6 +319,23 @@ export const clearPointStyle = (
   keys: ReadonlyArray<keyof ChartStyle> = LABEL_STYLE_KEYS,
 ): Command => (p) => mapLayer0(p, chartId, (l) => clearObjectKeys(l, pointId, keys));
 
+/**
+ * Put every data set of the graph back to the defaults: the chart-type preset, the default palette, and no
+ * overrides at any level (global, data set or point). Titles, axes, legend and size are not touched.
+ */
+export const resetAllDataSets = (chartId: Id): Command => (p) =>
+  mapChart(p, chartId, (c) => ({
+    ...c,
+    defaults: { ...DEFAULT_STYLE },
+    paletteId: DEFAULT_PALETTE_ID,
+    jitter: { ...DEFAULT_JITTER },
+    layers: c.layers.map((l, i) =>
+      i !== 0
+        ? l
+        : { ...l, style: { ...TYPE_PRESETS[c.type] }, groupOverrides: {}, objectOverrides: {}, summary: { ...DEFAULT_SUMMARY }, groupSummary: {} },
+    ),
+  }));
+
 export const resetStyle = (chartId: Id, scope: 'all' | Id, table: DataTable): Command => (p) =>
   mapChart(p, chartId, (c) => ({
     ...c,
@@ -397,6 +414,8 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
     const rows = createRows(rowCount).map((row, r) => ({ ...row, title: data.titles ? (data.titles[r] ?? '') : (t.rows[r]?.title ?? '') }));
     return { ...t, rowCount, rows, groups };
   });
+
+export const setProjectName = (name: string): Command => (p) => (p.name === name ? p : { ...p, name });
 
 /** New graph of a data table; named after the table, like the original's linked graph. */
 export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; heightPx: number }): Command => (p) => {

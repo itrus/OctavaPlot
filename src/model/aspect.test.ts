@@ -5,6 +5,13 @@ describe('chart shape lock', () => {
   it('leaves free sizes alone', () => {
     expect(resizeChart({ widthPx: 800, heightPx: 300 }, 'free', 'width', 900)).toEqual({ widthPx: 900, heightPx: 300 });
   });
+  it('returns only the two dimensions, so a patch cannot carry other chart fields', () => {
+    const chart = { widthPx: 800, heightPx: 600, aspect: '4:3', title: 'x' };
+    for (const a of ['free', '4:3', '1:1'] as const) {
+      expect(Object.keys(applyAspect(chart, a)).sort()).toEqual(['heightPx', 'widthPx']);
+      expect(Object.keys(resizeChart(chart, a, 'height', 500)).sort()).toEqual(['heightPx', 'widthPx']);
+    }
+  });
   it('keeps 4:3 when either side changes', () => {
     expect(resizeChart({ widthPx: 1280, heightPx: 960 }, '4:3', 'width', 800)).toEqual({ widthPx: 800, heightPx: 600 });
     expect(resizeChart({ widthPx: 1280, heightPx: 960 }, '4:3', 'height', 600)).toEqual({ widthPx: 800, heightPx: 600 });

@@ -18,7 +18,7 @@ describe('SVG export', () => {
     const svg = chartToSvgString(p.charts[0], p.dataTables[0]);
     expect(svg).toMatch(/^<\?xml/);
     expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"');
-    expect(svg).toContain('width="1280px"');
+    expect(svg).toContain('width="1024px"');
     expect(svg).toContain('<rect');
     expect(svg).toContain('<text');
     expect(svg).not.toContain('data-editor-only');

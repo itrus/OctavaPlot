@@ -24,7 +24,13 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultChartHeightPx: DEFAULT_CHART_HEIGHT_PX,
 };
 
-export const SETTINGS_KEY = 'octavaplot:settings:v1';
+/**
+ * Only the settings the user changed are stored (v2). A setting never touched follows the defaults in the code, so a
+ * new default reaches everyone who did not choose otherwise. The v1 key held every setting, defaults included, so
+ * its values for the default chart size cannot be told from choices and are not carried over.
+ */
+export const SETTINGS_KEY = 'octavaplot:settings:v2';
+const LEGACY_SETTINGS_KEY = 'octavaplot:settings:v1';
 
 const px = (v: unknown, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? Math.min(CHART_PX_MAX, Math.max(CHART_PX_MIN, Math.round(v))) : fallback;
@@ -43,15 +49,24 @@ export function sanitizeSettings(raw: unknown): Settings {
   };
 }
 
+/** The settings that differ from the defaults. */
+export function changedSettings(settings: Settings): Partial<Settings> {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(DEFAULT_SETTINGS) as Array<keyof Settings>) {
+    if (settings[key] !== DEFAULT_SETTINGS[key]) out[key] = settings[key];
+  }
+  return out as Partial<Settings>;
+}
+
 export function loadSettings(): Settings {
   try {
-    const text = localStorage.getItem(SETTINGS_KEY);
-    const s = sanitizeSettings(text ? JSON.parse(text) : null);
-    // 640 x 480 was the previous default, not a choice: stored copies of it move to the new default.
-    if (s.defaultChartWidthPx === 640 && s.defaultChartHeightPx === 480) {
-      return { ...s, defaultChartWidthPx: DEFAULT_SETTINGS.defaultChartWidthPx, defaultChartHeightPx: DEFAULT_SETTINGS.defaultChartHeightPx };
-    }
-    return s;
+    const stored = localStorage.getItem(SETTINGS_KEY);
+    if (stored) return sanitizeSettings(JSON.parse(stored));
+    const old = localStorage.getItem(LEGACY_SETTINGS_KEY);
+    if (!old) return DEFAULT_SETTINGS;
+    // Carry over the v1 preferences, but not its default chart size (see above).
+    const { defaultChartWidthPx: _w, defaultChartHeightPx: _h, ...kept } = JSON.parse(old) as Record<string, unknown>;
+    return sanitizeSettings(kept);
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -59,7 +74,7 @@ export function loadSettings(): Settings {
 
 export function saveSettings(settings: Settings): void {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(changedSettings(settings)));
   } catch {
     // Storage unavailable: the settings last for this session only.
   }

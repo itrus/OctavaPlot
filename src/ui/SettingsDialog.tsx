@@ -9,8 +9,11 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { settings, updateSettings, autosaveOk } = useApp();
   const ref = useRef<HTMLDivElement>(null);
 
+  // Focus the dialog once, when it opens. (Doing it in the effect below would pull focus out of a field being edited
+  // every time a setting changed, because onClose is a new function on each render.)
+  useEffect(() => ref.current?.focus(), []);
+
   useEffect(() => {
-    ref.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -52,8 +55,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             </Field>
           </Section>
           <Section title="New charts">
-            <NumField label="Default width" unit="px" value={settings.defaultChartWidthPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => updateSettings({ defaultChartWidthPx: v })} />
-            <NumField label="Default height" unit="px" value={settings.defaultChartHeightPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => updateSettings({ defaultChartHeightPx: v })} />
+            <NumField label="Default width" unit="px" step={10} slider={false} value={settings.defaultChartWidthPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => updateSettings({ defaultChartWidthPx: v })} />
+            <NumField label="Default height" unit="px" step={10} slider={false} value={settings.defaultChartHeightPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => updateSettings({ defaultChartHeightPx: v })} />
             <div className="muted small">Applies to charts created from now on; existing charts keep their size.</div>
           </Section>
         </div>

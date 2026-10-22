@@ -28,7 +28,6 @@ import { useApp } from '../../state/AppContext';
 import {
   addAnnotation,
   applyPalette,
-  clearSummaryOverrides,
   composeCommands,
   patchAnnotation,
   patchAxis,
@@ -41,7 +40,6 @@ import {
   patchStyle,
   patchSummary,
   removeAnnotation,
-  resetStyle,
   setChartType,
   setDisplayName,
   setGroupOnGraph,
@@ -518,17 +516,6 @@ export function Inspector({ chart, table }: { chart: Chart; table: DataTable }) 
               onReset={() => run('Reset point label', clearPointStyle(chart.id, sel.pointId as Id))}
             />
           )}
-
-          <div className="button-row">
-            <button
-              onClick={() => run(
-                scope === 'all' ? 'Reset all group styling' : 'Reset group styling',
-                composeCommands(resetStyle(chart.id, scope, table), clearSummaryOverrides(chart.id, scope)),
-              )}
-            >
-              {scope === 'all' ? 'Reset all data sets to defaults' : 'Reset this data set to defaults'}
-            </button>
-          </div>
         </div>
           )}
 

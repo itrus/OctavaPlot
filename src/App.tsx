@@ -4,10 +4,17 @@ import { AppProvider, useApp } from './state/AppContext';
 import { parseProjectWithNotes, stringifyProject } from './state/serialize';
 import { Navigator } from './ui/Navigator';
 import { NewProjectIcon, OpenProjectIcon, SaveProjectIcon, SettingsIcon } from './ui/icons';
+import { setProjectName } from './state/commands';
 import { SettingsDialog } from './ui/SettingsDialog';
 import { WheelRange } from './ui/WheelRange';
 import { isTextEntryTarget } from './ui/shortcutGuard';
 import { downloadBlob, exportFileName } from './util/download';
+
+/** The browser's save-file dialog (File System Access API; not in every browser). */
+type SaveFilePicker = (options: {
+  suggestedName: string;
+  types: Array<{ description: string; accept: Record<string, string[]> }>;
+}) => Promise<{ name: string; createWritable: () => Promise<{ write: (data: string) => Promise<void>; close: () => Promise<void> }> }>;
 
 // Each workspace view is its own chunk, loaded when first opened.
 const DataTableView = lazy(() => import('./ui/DataTableView').then((m) => ({ default: m.DataTableView })));
@@ -25,7 +32,7 @@ function PanelIcon({ side }: { side: 'left' | 'right' }) {
 }
 
 function Shell() {
-  const { project, view, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, zoom, setZoom, tableZoom, setTableZoom, settings, requestFit, inspectorNav } = useApp();
+  const { project, view, run, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, zoom, setZoom, tableZoom, setTableZoom, settings, requestFit, inspectorNav } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   // Panels are only hidden (never unmounted), so their selections and edits survive a collapse.
   const [navOpen, setNavOpen] = useState(true);
@@ -54,10 +61,28 @@ function Shell() {
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo]);
 
-  const saveProject = () => {
-    downloadBlob(new Blob([stringifyProject(project)], { type: 'application/json' }), exportFileName(project.name, 'json', settings.timestampExports));
+  const saveProject = async () => {
+    const json = stringifyProject(project);
+    const suggested = exportFileName(project.name, 'json', settings.timestampExports);
+    // Browsers with the File System Access API ask where to save and under what name; others download the suggested name.
+    const picker = (window as unknown as { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
+    if (picker) {
+      try {
+        const handle = await picker({ suggestedName: suggested, types: [{ description: 'OctavaPlot project', accept: { 'application/json': ['.json'] } }] });
+        const writable = await handle.createWritable();
+        await writable.write(json);
+        await writable.close();
+        markSaved();
+        setStatus(`Project saved as ${handle.name}.`);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return; // the dialog was cancelled
+        setStatus(`Could not save the project: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return;
+    }
+    downloadBlob(new Blob([json], { type: 'application/json' }), suggested);
     markSaved();
-    setStatus('Project saved to a JSON file.');
+    setStatus(`Project saved to ${suggested}.`);
   };
 
   const confirmDiscard = (what: string) =>
@@ -108,10 +133,19 @@ function Shell() {
         </button>
         <img className="brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width={24} height={24} />
         <strong className="brand">OctavaPlot</strong>
+        <span className="app-version" title={`OctavaPlot ${__APP_VERSION__}${__APP_COMMIT__ ? ` (build ${__APP_COMMIT__})` : ''}`}>v{__APP_VERSION__}</span>
         <span className="topbar-sep" />
         <button className="icon-text" onClick={startNewProject}><NewProjectIcon /> New Project</button>
         <button className="icon-text" onClick={() => confirmDiscard('Opening another project') && fileRef.current?.click()}><OpenProjectIcon /> Open Project</button>
-        <button className="icon-text" onClick={saveProject}><SaveProjectIcon /> Save Project</button>
+        <button className="icon-text" onClick={() => void saveProject()} title="Save the project to a file (you choose the name)"><SaveProjectIcon /> Save Project</button>
+        <input
+          className="project-name"
+          type="text"
+          value={project.name}
+          aria-label="Project name"
+          title="Project name: the suggested file name when saving"
+          onChange={(e) => run('Rename project', setProjectName(e.target.value), 'project:name')}
+        />
         <input
           ref={fileRef}
           type="file"

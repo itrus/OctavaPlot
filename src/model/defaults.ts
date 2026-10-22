@@ -17,14 +17,16 @@ export const FONT_FAMILY = 'Arial, Helvetica, sans-serif';
 export const INITIAL_ROWS = 20;
 
 /** Size of a new chart when the user has not set another default in Settings. */
-export const DEFAULT_CHART_WIDTH_PX = 1280;
-export const DEFAULT_CHART_HEIGHT_PX = 960;
+export const DEFAULT_CHART_WIDTH_PX = 1024;
+export const DEFAULT_CHART_HEIGHT_PX = 768;
 /** Limits for any chart dimension, in CSS pixels. */
 export const CHART_PX_MIN = 100;
 export const CHART_PX_MAX = 3000;
 
 /** Grayscale bar-fill palette, assigned by Group.paletteIndex. */
 export const BAR_PALETTE = ['#d9d9d9', '#a6a6a6', '#737373', '#f2f2f2', '#595959', '#bfbfbf'];
+
+export const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4 };
 
 /** Line weight shared by the axes, bar borders, error bars and connecting lines, so they read as one family. */
 export const AXIS_LINE_PT = 3;
@@ -133,7 +135,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     y2Axis: defaultAxis(''),
     legend: { visible: true, position: 'right', fontSizePt: 11.2, hiddenGroupIds: [] },
     displayNames: {},
-    jitter: { enabled: true, widthFraction: 0.4 },
+    jitter: { ...DEFAULT_JITTER },
     defaults: { ...DEFAULT_STYLE },
     layers: [layer],
     annotations: [],

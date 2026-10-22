@@ -51,3 +51,11 @@ export const SettingsIcon = () => (
     <path d="M8 1.6v1.7M8 12.7v1.7M1.6 8h1.7M12.7 8h1.7M3.5 3.5l1.2 1.2M11.3 11.3l1.2 1.2M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2" />
   </Icon>
 );
+
+/** Counterclockwise circular arrow: put things back as they were. */
+export const ResetIcon = () => (
+  <Icon>
+    <path d="M2.6 8a5.4 5.4 0 1 0 1.7-3.9" />
+    <path d="M2.4 1.8v3.3h3.3" />
+  </Icon>
+);

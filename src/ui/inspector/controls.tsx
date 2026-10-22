@@ -150,8 +150,9 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
     if (!err && v !== value) onCommit(v);
   };
 
+  // Fields with a very wide range (chart sizes in px) pass slider={false}: they are typed, or stepped with the arrow keys.
+  const stepSize = step ?? (min !== undefined && max !== undefined ? sliderStep(min, max) : 1);
   const showSlider = slider && min !== undefined && max !== undefined && max > min;
-  const stepSize = step ?? (showSlider ? sliderStep(min, max) : 1);
   const sliderValue = showSlider ? Math.min(max, Math.max(min, Number.isFinite(Number(text)) && text.trim() !== '' ? Number(text) : value)) : 0;
 
   return (
@@ -186,7 +187,19 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
           }}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+            else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !disabled) {
+              // Arrow keys step the value (Shift: ten steps), clamped to the allowed range.
+              e.preventDefault();
+              const current = Number.isFinite(Number(text)) && text.trim() !== '' ? Number(text) : value;
+              const delta = (e.key === 'ArrowUp' ? 1 : -1) * stepSize * (e.shiftKey ? 10 : 1);
+              const next = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, current + delta));
+              const clean = formatNum(snapToStep(next, stepSize));
+              setText(clean);
+              commit(clean);
+            }
+          }}
         />
         {unit && <span className="unit">{unit}</span>}
       </span>

@@ -5,8 +5,9 @@ import { buildChartModel } from '../chart/model';
 import { tooltipLines } from '../chart/tooltip';
 import type { Chart, DataTable } from '../model/types';
 import { useApp } from '../state/AppContext';
-import { patchAnnotation } from '../state/commands';
+import { patchAnnotation, resetAllDataSets } from '../state/commands';
 import { downloadBlob, exportFileName } from '../util/download';
+import { ResetIcon } from './icons';
 import { inspectorTargetFor } from './inspector/nav';
 import { UndoRedo } from './UndoRedo';
 
@@ -133,6 +134,17 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
             <path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11" />
           </svg>
           Export
+        </button>
+        <button
+          className="icon-text"
+          onClick={() => {
+            run('Reset settings', resetAllDataSets(chart.id));
+            setStatus('Data set settings reset to defaults.');
+          }}
+          title="Reset the data set settings (colours, bars, symbols, lines, summary) to the defaults. Undo restores them."
+        >
+          <ResetIcon />
+          Reset settings
         </button>
         <span className="toolbar-info">{chart.widthPx} × {chart.heightPx} px</span>
       </div>

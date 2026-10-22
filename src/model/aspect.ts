@@ -17,7 +17,8 @@ export function resizeChart(
   value: number,
 ): { widthPx: number; heightPx: number } {
   const ratio = aspectRatio(aspect);
-  if (ratio === null) return which === 'width' ? { ...size, widthPx: value } : { ...size, heightPx: value };
+  // Only the two dimensions are returned: callers spread the result into a chart patch, and `size` may be a whole chart.
+  if (ratio === null) return which === 'width' ? { widthPx: value, heightPx: size.heightPx } : { widthPx: size.widthPx, heightPx: value };
   // Largest and smallest value of the edited dimension for which both dimensions stay in range.
   const lo = which === 'width' ? Math.max(CHART_PX_MIN, CHART_PX_MIN * ratio) : Math.max(CHART_PX_MIN, CHART_PX_MIN / ratio);
   const hi = which === 'width' ? Math.min(CHART_PX_MAX, CHART_PX_MAX * ratio) : Math.min(CHART_PX_MAX, CHART_PX_MAX / ratio);
