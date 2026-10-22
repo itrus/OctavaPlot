@@ -1,0 +1,2 @@
+# LF everywhere, so golden SVG snapshots and Linux CI behave the same as on Windows checkouts.
+* text=auto eol=lf

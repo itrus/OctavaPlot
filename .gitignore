@@ -4,3 +4,5 @@ dist/
 .env.*
 !.env.example
 *.log
+old-repo/
+.claude/settings.local.json

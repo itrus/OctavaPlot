@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // Served from https://itrus.github.io/OctavaPlot/ on GitHub Pages.
+  base: '/OctavaPlot/',
   build: {
     rolldownOptions: {
       output: {
