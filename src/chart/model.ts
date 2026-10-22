@@ -1,11 +1,12 @@
 import { scaleBand, scaleLinear } from 'd3';
 import { BAR_PALETTE } from '../model/defaults';
+import { paletteById } from '../model/palettes';
 import { isPatternInvisible, resolveBarFill, type FillSpec } from '../model/fill';
 import { rowTitleAt } from '../model/rows';
 import { resolveSummary } from '../model/summary';
 import { resolveStyle } from '../model/style';
 import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SymbolShape } from '../model/types';
-import { mmToPt } from '../model/units';
+import { chartPx2Pt } from '../model/units';
 import { statsFor, summarize, type GroupStats, type GroupSummary, type Notice } from '../stats/summary';
 import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, populateAxes, type RangeRow } from './axes';
 import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, type ErrorBarGeom } from './errorGeometry';
@@ -101,6 +102,8 @@ export interface ChartModel {
   /** Bars and points whose value lies strictly outside their axis range (nothing is excluded). */
   clipped: Record<AxisBinding, { bars: number; points: number }>;
   groups: GroupGeom[];
+  /** Index into `groups` of each legend entry, in legend order. */
+  legendGroups: number[];
   /** Point labels; always present, empty while none is requested. They never affect ranges, summaries or layout. */
   labels: PointLabelModel;
   warnings: string[];
@@ -139,8 +142,8 @@ const isSpreadNotice = (n: Notice, stats: GroupStats): boolean =>
   SPREAD_NOTICE_CODES.has(n.code) || (n.code === 'nonfinite' && stats.centre !== null);
 
 export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
-  const widthPt = mmToPt(chart.widthMm);
-  const heightPt = mmToPt(chart.heightMm);
+  const widthPt = chartPx2Pt(chart.widthPx);
+  const heightPt = chartPx2Pt(chart.heightPx);
   const layer = chart.layers[0];
   const warnings: string[] = [];
 
@@ -194,6 +197,11 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
   warnings.push(...y.warnings.map((w) => prefixFor('primary') + w));
   if (y2) warnings.push(...y2.warnings.map((w) => prefixFor('secondary') + w));
 
+  // Data sets listed in the legend: all except those the user hid one by one.
+  const hidden = new Set(chart.legend.hiddenGroupIds);
+  const legendGroups = rows.flatMap((r, i) => (hidden.has(r.group.id) ? [] : [i]));
+  const legendRows = legendGroups.map((i) => rows[i]);
+
   // 3. Layout.
   const layout = computeLayout({
     widthPt,
@@ -203,7 +211,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
     yAxis: chart.yAxis,
     legend: chart.legend,
     // Legend labels only carry the axis tag; category labels and data set names do not.
-    legendLabels: rows.map((r) => r.name + AXIS_TAG[r.binding]),
+    legendLabels: legendRows.map((r) => r.name + AXIS_TAG[r.binding]),
     categoryLabels: rows.map((r) => r.name),
     yTickLabels: y.ticks.map(y.tickLabel),
     y2Axis: y2 ? chart.y2Axis : undefined,
@@ -455,15 +463,16 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
   if (clippedMessage) warnings.push(clippedMessage);
 
   // Visual warning (spec 21.5 L1462, palette exhausted): data sets past the palette reuse a bar colour.
+  const paletteColors = paletteById(chart.paletteId)?.colors ?? BAR_PALETTE;
   const reused = groups.filter((g) => {
     const index = table.groups.find((t) => t.id === g.groupId)?.paletteIndex ?? 0;
-    return g.style.showBars && index >= BAR_PALETTE.length && g.style.barFill === BAR_PALETTE[index % BAR_PALETTE.length];
+    return g.style.showBars && index >= paletteColors.length && g.style.barFill === paletteColors[index % paletteColors.length];
   }).length;
   if (reused > 0) {
     warnings.push(
-      `The bar fill palette has ${BAR_PALETTE.length} colours; ${reused} data set${reused === 1 ? '' : 's'} reuse a colour already in use.`,
+      `The bar fill palette has ${paletteColors.length} colours; ${reused} data set${reused === 1 ? '' : 's'} reuse a colour already in use.`,
     );
   }
 
-  return { widthPt, heightPt, layout, y, yScale, y2, y2Scale, clipped, groups, labels, warnings: [...new Set(warnings)] };
+  return { widthPt, heightPt, layout, y, yScale, y2, y2Scale, clipped, groups, legendGroups, labels, warnings: [...new Set(warnings)] };
 }

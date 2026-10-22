@@ -1,4 +1,5 @@
 import { BAR_PALETTE } from './defaults';
+import { paletteById, paletteColor } from './palettes';
 import type { Chart, ChartLayer, ChartStyle, Group, Id } from './types';
 
 /**
@@ -12,7 +13,11 @@ export function resolveStyle(
   group: Pick<Group, 'id' | 'paletteIndex'>,
   objectId?: Id,
 ): ChartStyle {
-  const palette: Partial<ChartStyle> = { barFill: BAR_PALETTE[group.paletteIndex % BAR_PALETTE.length] };
+  // The chart's palette colours the data sets in order; with none (colours set by hand) the grey default applies.
+  const chartPalette = paletteById(chart.paletteId);
+  const palette: Partial<ChartStyle> = {
+    barFill: chartPalette ? paletteColor(chartPalette, group.paletteIndex) : BAR_PALETTE[group.paletteIndex % BAR_PALETTE.length],
+  };
   return {
     ...chart.defaults,
     ...palette,

@@ -212,20 +212,36 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     parseLayer(obj(rl, `${path}.layers[${i}]`), `${path}.layers[${i}]`, c.defaults, notes),
   );
   if (layers.length === 0) fail(`${path}.layers`, 'must contain at least one layer');
+  // Files from before the switch to pixels stored millimetres (1 mm = 96 / 25.4 px).
+  const { widthMm, heightMm, ...rest } = c;
+  const mmToPx = (mm: unknown): number | undefined => (typeof mm === 'number' && mm > 0 ? Math.round((mm * 96) / 25.4) : undefined);
+  const legendIn = isObj(c.legend) ? c.legend : {};
   const chart: Chart = {
     ...base,
-    ...(c as Partial<Chart>),
+    ...(rest as Partial<Chart>),
+    widthPx: typeof c.widthPx === 'number' ? c.widthPx : (mmToPx(widthMm) ?? base.widthPx),
+    heightPx: typeof c.heightPx === 'number' ? c.heightPx : (mmToPx(heightMm) ?? base.heightPx),
+    hiddenGroupIds: Array.isArray(c.hiddenGroupIds) ? c.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
+    extraGroups: Array.isArray(c.extraGroups)
+      ? c.extraGroups.flatMap((e) => (isObj(e) && typeof e.tableId === 'string' && typeof e.groupId === 'string' ? [{ tableId: e.tableId, groupId: e.groupId }] : []))
+      : [],
+    aspect: c.aspect === '4:3' || c.aspect === '1:1' ? c.aspect : 'free',
+    paletteId: typeof c.paletteId === 'string' ? c.paletteId : null,
     xAxis: { ...base.xAxis, ...(isObj(c.xAxis) ? c.xAxis : {}) },
     yAxis: { ...base.yAxis, ...(isObj(c.yAxis) ? c.yAxis : {}) },
     y2Axis: { ...base.y2Axis, ...(isObj(c.y2Axis) ? c.y2Axis : {}) },
-    legend: { ...base.legend, ...(isObj(c.legend) ? c.legend : {}) },
+    legend: {
+      ...base.legend,
+      ...legendIn,
+      hiddenGroupIds: Array.isArray(legendIn.hiddenGroupIds) ? legendIn.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
+    },
     jitter: { ...base.jitter, ...(isObj(c.jitter) ? c.jitter : {}) },
     defaults: { ...DEFAULT_STYLE, ...defaults },
     displayNames: isObj(c.displayNames) ? (c.displayNames as Record<string, string>) : {},
     annotations: Array.isArray(c.annotations) ? (c.annotations as Chart['annotations']) : [],
     layers,
   };
-  if (!(chart.widthMm > 0) || !(chart.heightMm > 0)) fail(`${path}`, 'must have positive widthMm and heightMm');
+  if (!(chart.widthPx > 0) || !(chart.heightPx > 0)) fail(`${path}`, 'must have positive widthPx and heightPx');
   return chart;
 }
 

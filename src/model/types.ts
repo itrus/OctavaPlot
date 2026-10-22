@@ -39,6 +39,7 @@ export interface DataTable {
   groups: Group[];
 }
 
+export type ChartAspect = 'free' | '4:3' | '1:1';
 export type ChartType = 'bar' | 'scatter' | 'mean';
 export type SymbolShape = 'circle' | 'square' | 'triangle' | 'diamond';
 export type ErrorDirection = 'both' | 'positive' | 'negative';
@@ -171,6 +172,8 @@ export interface LegendConfig {
   visible: boolean;
   position: LegendPosition;
   fontSizePt: number;
+  /** Data sets left out of the legend; the others stay listed. */
+  hiddenGroupIds: Id[];
 }
 
 export interface JitterConfig {
@@ -194,8 +197,17 @@ export interface Chart {
   name: string;
   dataTableId: Id;
   type: ChartType;
-  widthMm: number;
-  heightMm: number;
+  /** Chart size in CSS pixels (1 px = 0.75 pt). */
+  widthPx: number;
+  heightPx: number;
+  /** Data sets of the chart's own table that are switched off on this graph. */
+  hiddenGroupIds: Id[];
+  /** Data sets from other tables that are plotted on this graph too. */
+  extraGroups: Array<{ tableId: Id; groupId: Id }>;
+  /** Shape lock: with 4:3 or square, changing the width or the height moves the other one too. */
+  aspect: ChartAspect;
+  /** Last palette applied to the data sets (see model/palettes.ts); null = colours set by hand. */
+  paletteId: string | null;
   title: string;
   showTitle: boolean;
   titleFontSizePt: number;

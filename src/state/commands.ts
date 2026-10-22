@@ -1,5 +1,7 @@
 import { createChart, createGroup, INITIAL_ROWS, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
+import { effectiveTable } from '../model/chartTable';
 import { newId } from '../model/ids';
+import { paletteColor, type Palette } from '../model/palettes';
 import { createRows, sanitizeRowTitle } from '../model/rows';
 import { clearGroupSummary, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/summary';
 import { LABEL_STYLE_KEYS, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle } from '../model/style';
@@ -220,6 +222,49 @@ export const patchBothAxes = (chartId: Id, patch: Partial<AxisConfig>): Command 
 export const patchLegend = (chartId: Id, patch: Partial<LegendConfig>): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, legend: { ...c.legend, ...patch } }));
 
+/** Show or hide one data set in the legend, leaving the others as they are. */
+export const setLegendItemVisible = (chartId: Id, groupId: Id, visible: boolean): Command => (p) =>
+  mapChart(p, chartId, (c) => {
+    const hidden = c.legend.hiddenGroupIds.filter((id) => id !== groupId);
+    if (!visible) hidden.push(groupId);
+    return { ...c, legend: { ...c.legend, hiddenGroupIds: hidden } };
+  });
+
+/**
+ * Put a data set on the graph or take it off. A data set of the chart's own table is hidden or shown again;
+ * one from another table is added to or removed from the graph.
+ */
+export const setGroupOnGraph = (chartId: Id, tableId: Id, groupId: Id, on: boolean): Command => (p) =>
+  mapChart(p, chartId, (c) => {
+    if (tableId === c.dataTableId) {
+      const hidden = c.hiddenGroupIds.filter((id) => id !== groupId);
+      if (!on) hidden.push(groupId);
+      return { ...c, hiddenGroupIds: hidden };
+    }
+    const extra = c.extraGroups.filter((e) => e.groupId !== groupId);
+    if (on) extra.push({ tableId, groupId });
+    return { ...c, extraGroups: extra };
+  });
+
+/** Give the data sets the palette's colours in order (bar fill and symbol colour); manual colours are replaced. */
+export const applyPalette = (chartId: Id, palette: Palette): Command => (p) => {
+  const chart = p.charts.find((c) => c.id === chartId);
+  const table = chart && effectiveTable(p, chart);
+  if (!chart || !table) return p;
+  return mapChart(p, chartId, (c) => ({
+    ...c,
+    paletteId: palette.id,
+    layers: c.layers.map((l, i) =>
+      i !== 0
+        ? l
+        : table.groups.reduce((layer, g, gi) => {
+            const color = paletteColor(palette, gi);
+            return patchGroup(layer, g.id, { barFill: color, symbolColor: color });
+          }, l),
+    ),
+  }));
+};
+
 export const patchJitter = (chartId: Id, patch: Partial<JitterConfig>): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, jitter: { ...c.jitter, ...patch } }));
 
@@ -332,10 +377,31 @@ export const addDataTable = (id: Id): Command => (p) => {
   return { ...p, dataTables: [...p.dataTables, { id, name, rowCount: INITIAL_ROWS, rows: createRows(INITIAL_ROWS), groups }] };
 };
 
+/**
+ * Replace a table's rows and group values (CSV import) as one command. Groups keep their IDs, and so their chart
+ * styling, by position; extra groups are added and missing ones dropped. Row titles are kept when the file has none.
+ */
+export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>> }): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    const rowCount = Math.max(1, data.values.length);
+    const groups: Group[] = data.names.map((name, i) => {
+      const fresh = createGroup(name, i, rowCount);
+      const old = t.groups[i];
+      return {
+        ...fresh,
+        id: old?.id ?? fresh.id,
+        paletteIndex: old?.paletteIndex ?? i,
+        observations: fresh.observations.map((o, r) => ({ ...o, value: data.values[r]?.[i] ?? null })),
+      };
+    });
+    const rows = createRows(rowCount).map((row, r) => ({ ...row, title: data.titles ? (data.titles[r] ?? '') : (t.rows[r]?.title ?? '') }));
+    return { ...t, rowCount, rows, groups };
+  });
+
 /** New graph of a data table; named after the table, like the original's linked graph. */
-export const addChart = (chartId: Id, tableId: Id): Command => (p) => {
+export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; heightPx: number }): Command => (p) => {
   const table = p.dataTables.find((t) => t.id === tableId);
   if (!table) return p;
-  const chart = { ...createChart(tableId), id: chartId, name: table.name, title: table.name };
+  const chart = { ...createChart(tableId, size), id: chartId, name: table.name, title: table.name };
   return { ...p, charts: [...p.charts, chart] };
 };

@@ -1,18 +1,40 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { effectiveTable } from './model/chartTable';
 import { AppProvider, useApp } from './state/AppContext';
 import { parseProjectWithNotes, stringifyProject } from './state/serialize';
 import { Navigator } from './ui/Navigator';
+import { NewProjectIcon, OpenProjectIcon, SaveProjectIcon, SettingsIcon } from './ui/icons';
+import { SettingsDialog } from './ui/SettingsDialog';
+import { WheelRange } from './ui/WheelRange';
 import { isTextEntryTarget } from './ui/shortcutGuard';
-import { downloadBlob, safeFileName } from './util/download';
+import { downloadBlob, exportFileName } from './util/download';
 
 // Each workspace view is its own chunk, loaded when first opened.
 const DataTableView = lazy(() => import('./ui/DataTableView').then((m) => ({ default: m.DataTableView })));
 const GraphView = lazy(() => import('./ui/GraphView').then((m) => ({ default: m.GraphView })));
 const Inspector = lazy(() => import('./ui/inspector/Inspector').then((m) => ({ default: m.Inspector })));
 
+/** A window outline with the left or right strip filled: the usual "side panel" glyph. */
+function PanelIcon({ side }: { side: 'left' | 'right' }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <rect x="1.7" y="2.7" width="12.6" height="10.6" rx="1.5" />
+      <path d={side === 'left' ? 'M6 2.7v10.6' : 'M10 2.7v10.6'} />
+    </svg>
+  );
+}
+
 function Shell() {
-  const { project, view, setView, undo, redo, canUndo, canRedo, replaceProject, status, setStatus, autosaveOk, zoom, setZoom } = useApp();
+  const { project, view, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, zoom, setZoom, tableZoom, setTableZoom, settings, requestFit, inspectorNav } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
+  // Panels are only hidden (never unmounted), so their selections and edits survive a collapse.
+  const [navOpen, setNavOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Clicking a chart element brings up its settings, even when the inspector was collapsed.
+  useEffect(() => {
+    if (inspectorNav.n > 0) setInspectorOpen(true);
+  }, [inspectorNav.n]);
 
   // Global undo/redo, except while typing in a text field (native text undo applies there).
   useEffect(() => {
@@ -33,8 +55,16 @@ function Shell() {
   }, [undo, redo]);
 
   const saveProject = () => {
-    downloadBlob(new Blob([stringifyProject(project)], { type: 'application/json' }), `${safeFileName(project.name)}.json`);
+    downloadBlob(new Blob([stringifyProject(project)], { type: 'application/json' }), exportFileName(project.name, 'json', settings.timestampExports));
+    markSaved();
     setStatus('Project saved to a JSON file.');
+  };
+
+  const confirmDiscard = (what: string) =>
+    !hasUnsavedChanges() || window.confirm(`The project has unsaved changes. ${what} will discard them.\n\nSave the project first if you want to keep them. Continue?`);
+
+  const startNewProject = () => {
+    if (confirmDiscard('Starting a new project')) newProject();
   };
 
   const openProject = async (file: File) => {
@@ -53,15 +83,35 @@ function Shell() {
 
   const table = view.kind === 'table' ? project.dataTables.find((t) => t.id === view.id) : undefined;
   const chart = view.kind === 'chart' ? project.charts.find((c) => c.id === view.id) : undefined;
-  const chartTable = chart ? project.dataTables.find((t) => t.id === chart.dataTableId) : undefined;
+  // The zoom control belongs to the page on screen: the graph or the data table.
+  const activeZoom = chart ? zoom : tableZoom;
+  const setActiveZoom = chart ? setZoom : setTableZoom;
+  // The chart draws the data sets that are on it, which may include some from other tables.
+  const chartTable = useMemo(() => (chart ? effectiveTable(project, chart) : undefined), [project, chart]);
 
   return (
-    <div className={`app${chart ? ' with-inspector' : ''}`}>
+    <div
+      className="app"
+      data-nav={navOpen ? 'open' : 'closed'}
+      data-insp={chart && inspectorOpen ? 'open' : 'closed'}
+      style={{ '--nav-w': navOpen ? '250px' : '0px', '--insp-w': chart && inspectorOpen ? '360px' : '0px' } as CSSProperties}
+    >
       <header className="topbar">
+        <button
+          className="icon-only"
+          onClick={() => setNavOpen(!navOpen)}
+          aria-pressed={navOpen}
+          aria-label={navOpen ? 'Hide navigation panel' : 'Show navigation panel'}
+          title={navOpen ? 'Hide navigation panel' : 'Show navigation panel'}
+        >
+          <PanelIcon side="left" />
+        </button>
+        <img className="brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width={24} height={24} />
         <strong className="brand">OctavaPlot</strong>
         <span className="topbar-sep" />
-        <button onClick={saveProject}>Save project</button>
-        <button onClick={() => fileRef.current?.click()}>Open project…</button>
+        <button className="icon-text" onClick={startNewProject}><NewProjectIcon /> New Project</button>
+        <button className="icon-text" onClick={() => confirmDiscard('Opening another project') && fileRef.current?.click()}><OpenProjectIcon /> Open Project</button>
+        <button className="icon-text" onClick={saveProject}><SaveProjectIcon /> Save Project</button>
         <input
           ref={fileRef}
           type="file"
@@ -74,9 +124,17 @@ function Shell() {
           }}
         />
         <span className="topbar-sep" />
-        <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">Undo</button>
-        <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)">Redo</button>
-        <span className={`autosave${autosaveOk ? '' : ' bad'}`}>{autosaveOk ? 'Autosave on' : 'Autosave unavailable'}</span>
+        <button className="icon-text" onClick={() => setSettingsOpen(true)}><SettingsIcon /> Settings</button>
+        <button
+          className="icon-only topbar-end"
+          onClick={() => setInspectorOpen(!inspectorOpen)}
+          aria-pressed={inspectorOpen}
+          disabled={!chart}
+          aria-label={inspectorOpen ? 'Hide inspector' : 'Show inspector'}
+          title={!chart ? 'The inspector is available on a graph' : inspectorOpen ? 'Hide inspector' : 'Show inspector'}
+        >
+          <PanelIcon side="right" />
+        </button>
       </header>
       <Navigator />
       <main className="workspace">
@@ -92,44 +150,28 @@ function Shell() {
         </Suspense>
       )}
       <footer className="statusbar">
-        <select
-          className="sheet-select"
-          aria-label="Current sheet"
-          value={`${view.kind}:${view.id}`}
-          onChange={(e) => {
-            const [kind, id] = e.target.value.split(':');
-            setView({ kind: kind === 'chart' ? 'chart' : 'table', id });
-          }}
-        >
-          <optgroup label="Data Tables">
-            {project.dataTables.map((t) => (
-              <option key={t.id} value={`table:${t.id}`}>{t.name}</option>
-            ))}
-          </optgroup>
-          <optgroup label="Graphs">
-            {project.charts.map((c) => (
-              <option key={c.id} value={`chart:${c.id}`}>{c.name}</option>
-            ))}
-          </optgroup>
-        </select>
         <span className="statusbar-message" role="status">{status}</span>
-        {chart && (
+        {(chart || table) && (
           <span className="zoom">
-            <button className="icon-btn" aria-label="Zoom out" onClick={() => setZoom(Math.max(0.25, Math.round((zoom - 0.25) * 100) / 100))}>−</button>
-            <input
-              type="range"
-              min={25}
-              max={400}
-              step={5}
-              value={Math.round(zoom * 100)}
-              aria-label="Zoom"
-              onChange={(e) => setZoom(Number(e.target.value) / 100)}
-            />
-            <button className="icon-btn" aria-label="Zoom in" onClick={() => setZoom(Math.min(4, Math.round((zoom + 0.25) * 100) / 100))}>+</button>
-            <span className="zoom-pct">{Math.round(zoom * 100)}%</span>
+            <button className="icon-btn" aria-label="Zoom out" onClick={() => setActiveZoom(Math.max(0.25, Math.round((activeZoom - 0.25) * 100) / 100))}>−</button>
+            <WheelRange min={25} max={400} step={5} value={Math.round(activeZoom * 100)} ariaLabel="Zoom" onValue={(v) => setActiveZoom(v / 100)} />
+            <button className="icon-btn" aria-label="Zoom in" onClick={() => setActiveZoom(Math.min(4, Math.round((activeZoom + 0.25) * 100) / 100))}>+</button>
+            <span className="zoom-pct">{Math.round(activeZoom * 100)}%</span>
+            <button
+              className="zoom-fit"
+              onClick={() => {
+                setActiveZoom(1);
+                if (chart) requestFit();
+              }}
+              disabled={!chart && activeZoom === 1}
+              title="Fit to the window (100%)"
+            >
+              Fit
+            </button>
           </span>
         )}
       </footer>
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { newId } from './ids';
+import { DEFAULT_PALETTE_ID } from './palettes';
 import { createRows } from './rows';
 import type {
   AxisConfig,
@@ -15,19 +16,29 @@ import type {
 export const FONT_FAMILY = 'Arial, Helvetica, sans-serif';
 export const INITIAL_ROWS = 20;
 
+/** Size of a new chart when the user has not set another default in Settings. */
+export const DEFAULT_CHART_WIDTH_PX = 1280;
+export const DEFAULT_CHART_HEIGHT_PX = 960;
+/** Limits for any chart dimension, in CSS pixels. */
+export const CHART_PX_MIN = 100;
+export const CHART_PX_MAX = 3000;
+
 /** Grayscale bar-fill palette, assigned by Group.paletteIndex. */
 export const BAR_PALETTE = ['#d9d9d9', '#a6a6a6', '#737373', '#f2f2f2', '#595959', '#bfbfbf'];
+
+/** Line weight shared by the axes, bar borders, error bars and connecting lines, so they read as one family. */
+export const AXIS_LINE_PT = 3;
 
 export const DEFAULT_STYLE: ChartStyle = {
   showBars: true,
   barFill: BAR_PALETTE[0],
   barOpacity: 1,
   barBorderColor: '#000000',
-  barBorderWidthPt: 1,
+  barBorderWidthPt: 0,
   barFillMode: 'solid',
   barPattern: 'horizontal',
   barPatternSpacingPt: 4,
-  barPatternWidthPt: 0.5,
+  barPatternWidthPt: 1,
   barPatternColor: null,
   barPatternBackground: '#ffffff',
   showSymbols: false,
@@ -35,17 +46,17 @@ export const DEFAULT_STYLE: ChartStyle = {
   symbolShape: 'circle',
   symbolSizePt: 6,
   symbolBorderColor: '#000000',
-  symbolBorderWidthPt: 0.75,
+  symbolBorderWidthPt: 1.5,
   showErrorBars: true,
   errorDirection: 'both',
   errorCap: 'bar',
   errorCapWidthPt: 5,
-  errorLineWidthPt: 1,
+  errorLineWidthPt: AXIS_LINE_PT,
   errorColor: '#000000',
   showLines: false,
   showMeanLine: false,
   lineColor: '#000000',
-  lineWidthPt: 1.5,
+  lineWidthPt: AXIS_LINE_PT,
   axisBinding: 'primary',
   // Point labels: spec 7.1 L479-485, all P.
   showPointLabels: false,
@@ -75,7 +86,7 @@ export const DEFAULT_SUMMARY: SummarySpec = {
 export const PRESET_KEYS = ['showBars', 'showSymbols', 'showLines', 'showMeanLine'] as const;
 
 export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEYS)[number]>> = {
-  bar: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
+  bar: { showBars: true, showSymbols: true, showLines: false, showMeanLine: false },
   scatter: { showBars: false, showSymbols: true, showLines: false, showMeanLine: true },
   mean: { showBars: false, showSymbols: true, showLines: false, showMeanLine: false },
 };
@@ -83,7 +94,7 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
 const defaultAxis = (title: string): AxisConfig => ({
   title,
   visible: true,
-  lineWidthPt: 2.1,
+  lineWidthPt: AXIS_LINE_PT,
   tickFontSizePt: 13.3,
   titleFontSizePt: 14,
   min: null,
@@ -92,7 +103,7 @@ const defaultAxis = (title: string): AxisConfig => ({
   showGrid: false,
 });
 
-export function createChart(dataTableId: string): Chart {
+export function createChart(dataTableId: string, size?: { widthPx: number; heightPx: number }): Chart {
   const layer: ChartLayer = {
     id: newId('layer'),
     name: 'Data',
@@ -107,16 +118,20 @@ export function createChart(dataTableId: string): Chart {
     name: 'Graph 1',
     dataTableId,
     type: 'bar',
-    widthMm: 160,
-    heightMm: 120,
+    widthPx: size?.widthPx ?? DEFAULT_CHART_WIDTH_PX,
+    heightPx: size?.heightPx ?? DEFAULT_CHART_HEIGHT_PX,
+    hiddenGroupIds: [],
+    extraGroups: [],
+    aspect: 'free',
+    paletteId: DEFAULT_PALETTE_ID,
     title: 'Graph 1',
-    showTitle: false,
+    showTitle: true,
     titleFontSizePt: 16.8,
     xAxis: defaultAxis(''),
     yAxis: defaultAxis('Value'),
     // Sizes 13.3/14 are inherited from the left axis (P, not D).
     y2Axis: defaultAxis(''),
-    legend: { visible: false, position: 'right', fontSizePt: 11.2 },
+    legend: { visible: true, position: 'right', fontSizePt: 11.2, hiddenGroupIds: [] },
     displayNames: {},
     jitter: { enabled: true, widthFraction: 0.4 },
     defaults: { ...DEFAULT_STYLE },
@@ -155,13 +170,21 @@ export function createExampleTable(): DataTable {
   };
 }
 
-export function createExampleProject(): Project {
+/** A blank project: one data table of empty groups and one graph of it. */
+export function createEmptyProject(size?: { widthPx: number; heightPx: number }): Project {
+  const groups: Group[] = [];
+  for (let i = 0; i < 4; i++) groups.push(createGroup(nextGroupName(groups.map((g) => g.name)), i, INITIAL_ROWS));
+  const table: DataTable = { id: newId('table'), name: 'Data 1', rowCount: INITIAL_ROWS, rows: createRows(INITIAL_ROWS), groups };
+  return { id: newId('project'), name: 'Untitled project', dataTables: [table], charts: [createChart(table.id, size)] };
+}
+
+export function createExampleProject(size?: { widthPx: number; heightPx: number }): Project {
   const table = createExampleTable();
   return {
     id: newId('project'),
     name: 'Untitled project',
     dataTables: [table],
-    charts: [createChart(table.id)],
+    charts: [createChart(table.id, size)],
   };
 }
 

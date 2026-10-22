@@ -9,7 +9,9 @@ import { chartToSvgString } from './export';
 import { fillClipId } from './FillMarks';
 import { buildChartModel } from './model';
 
-const base = createExampleProject();
+// These counts are of the bars alone, so the legend (on by default) is switched off.
+const example = createExampleProject();
+const base = { ...example, charts: example.charts.map((c) => ({ ...c, legend: { ...c.legend, visible: false } })) };
 const chartId = base.charts[0].id;
 const svgOf = (p: Project): string => chartToSvgString(p.charts[0], p.dataTables[0]);
 const count = (s: string, re: RegExp): number => (s.match(re) ?? []).length;
@@ -120,8 +122,8 @@ describe('zero-height bars', () => {
     expect(per(vBig)).toBeGreaterThan(0.005);
     const tiny = svgOf(setCol0(p, vTiny));
     const big = svgOf(setCol0(p, vBig));
-    expect(count(tiny, /<rect[^>]*fill="#d9d9d9"/g)).toBe(0);
-    expect(count(big, /<rect[^>]*fill="#d9d9d9"/g)).toBe(1);
+    expect(count(tiny, /<rect[^>]*fill="#e6194b"/g)).toBe(0);
+    expect(count(big, /<rect[^>]*fill="#e6194b"/g)).toBe(1);
   });
 });
 

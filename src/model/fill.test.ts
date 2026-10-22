@@ -27,7 +27,7 @@ describe('defaults and options', () => {
     expect(DEFAULT_STYLE.barFillMode).toBe('solid');
     expect(DEFAULT_STYLE.barPattern).toBe('horizontal');
     expect(DEFAULT_STYLE.barPatternSpacingPt).toBe(4);
-    expect(DEFAULT_STYLE.barPatternWidthPt).toBe(0.5);
+    expect(DEFAULT_STYLE.barPatternWidthPt).toBe(1);
     expect(DEFAULT_STYLE.barPatternColor).toBeNull();
     expect(DEFAULT_STYLE.barPatternBackground).toBe('#ffffff');
   });
@@ -55,8 +55,8 @@ describe('resolveBarFill', () => {
       solidColor: DEFAULT_STYLE.barFill,
       pattern: 'horizontal',
       spacingPt: 4,
-      widthPt: 0.5,
-      markWidthPt: 0.5,
+      widthPt: 1,
+      markWidthPt: 1,
       patternColor: '#000000',
       background: '#ffffff',
       opacity: 1,

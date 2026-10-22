@@ -14,7 +14,7 @@ function input(patch: Partial<LayoutInput> = {}): LayoutInput {
     title: null,
     xAxis: chart.xAxis,
     yAxis: chart.yAxis,
-    legend: { visible: false, position: 'right', fontSizePt: 11.2 },
+    legend: { visible: false, position: 'right', fontSizePt: 11.2, hiddenGroupIds: [] },
     legendLabels: [],
     categoryLabels: [],
     yTickLabels: ['0'],
@@ -76,13 +76,13 @@ describe('computeLayout right axis', () => {
   });
 
   it('sits 10 pt inside a right legend', () => {
-    const legend = { visible: true, position: 'right' as const, fontSizePt: 11.2 };
+    const legend = { visible: true, position: 'right' as const, fontSizePt: 11.2, hiddenGroupIds: [] };
     const l = computeLayout(input({ legend, legendLabels: ['A'], y2Axis: axis(), y2TickLabels: ['100'] }));
     expect(l.legend!.rect.x).toBeCloseTo(l.plot.x + l.plot.width + (TICK_LENGTH + Y_TICK_LABEL_GAP + 23.142) + 10, 3);
   });
 
   it('a top legend adds no right-axis space', () => {
-    const legend = { visible: true, position: 'top' as const, fontSizePt: 11.2 };
+    const legend = { visible: true, position: 'top' as const, fontSizePt: 11.2, hiddenGroupIds: [] };
     const without = computeLayout(input({ legend, legendLabels: ['A'] }));
     const withAxis = computeLayout(input({ legend, legendLabels: ['A'], y2Axis: axis(), y2TickLabels: ['100'] }));
     expect(without.plot.width - withAxis.plot.width).toBeCloseTo(31.742, 3);

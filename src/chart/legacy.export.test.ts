@@ -3,15 +3,26 @@ import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../model/defaults';
 import type { ChartType } from '../model/types';
-import { setChartType } from '../state/commands';
+import { CHART_DRAW_SCALE } from '../model/units';
+import { patchStyle, setChartType } from '../state/commands';
 import { chartToSvgString } from './export';
 
 /**
  * Golden exports of the legacy renderer. Stored files are raw; both sides are
  * compared after rounding every decimal token to 6 places, so last-digit
  * floating-point differences never fail the gate. Never regenerate with -u.
+ *
+ * The goldens predate pixel sizes (they carry width="160mm"). The fixture below keeps their geometry
+ * (160 x 120 mm = 453.54 x 340.16 pt, no chart title); the root element's CSS size attributes, the only
+ * part that changed, are left out of the comparison.
  */
-const normalize = (s: string): string => s.replace(/-?\d+\.\d+(e-?\d+)?/g, (m) => Number(m).toFixed(6));
+const normalize = (s: string): string =>
+  s
+    .replace(/(<svg [^>]*?) width="[^"]*" height="[^"]*"/, '$1')
+    .replace(/-?\d+\.\d+(e-?\d+)?/g, (m) => Number(m).toFixed(6));
+
+// Charts are drawn at CHART_DRAW_SCALE x, so the legacy 160 x 120 mm geometry needs twice its pixel size.
+const legacyPx = (mm: number) => ((mm * 96) / 25.4) * CHART_DRAW_SCALE;
 
 /** Example project with stable ids, assigned by object spread only. */
 function frozenExample(type: ChartType) {
@@ -27,7 +38,25 @@ function frozenExample(type: ChartType) {
       })),
     })),
   };
+  p = {
+    ...p,
+    charts: p.charts.map((c) => ({
+      ...c,
+      widthPx: legacyPx(160),
+      heightPx: legacyPx(120),
+      showTitle: false,
+      legend: { ...c.legend, visible: false },
+      paletteId: 'classic',
+      xAxis: { ...c.xAxis, lineWidthPt: 2.1 },
+      yAxis: { ...c.yAxis, lineWidthPt: 2.1 },
+      y2Axis: { ...c.y2Axis, lineWidthPt: 2.1 },
+      // The line weights and grey palette the goldens were made with, before the weights were harmonised.
+      defaults: { ...c.defaults, barBorderWidthPt: 1, barPatternWidthPt: 0.5, symbolBorderWidthPt: 0.75, errorLineWidthPt: 1, lineWidthPt: 1.5 },
+    })),
+  };
   p = setChartType(p.charts[0].id, type)(p);
+  // The bar golden predates symbols being on by default for bar charts.
+  if (type === 'bar') p = patchStyle(p.charts[0].id, 'all', { showSymbols: false })(p);
   return p;
 }
 

@@ -1,4 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
+import { formatNum, sliderStep, snapToStep } from '../numberFormat';
+import { WheelRange } from '../WheelRange';
 
 export function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -119,16 +121,20 @@ interface NumProps {
   hint?: string;
   overridden?: boolean;
   note?: string | null;
+  /** Slider step; derived from the range when omitted. Bounded fields (min and max set) get a slider. */
+  step?: number;
+  /** Pass false to keep a bounded field as a plain number box. */
+  slider?: boolean;
 }
 
 /** Numeric field: edits stay local until valid; invalid input shows a message and never reaches the chart. */
-export function NumField({ value, onCommit, min, max, disabled, unit, validate, label, hint, overridden, note }: NumProps) {
-  const [text, setText] = useState(String(value));
+export function NumField({ value, onCommit, min, max, disabled, unit, validate, label, hint, overridden, note, step, slider = true }: NumProps) {
+  const [text, setText] = useState(formatNum(value));
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
   useEffect(() => {
     if (!focused) {
-      setText(String(value));
+      setText(formatNum(value));
       setError(null);
     }
   }, [value, focused]);
@@ -144,12 +150,33 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
     if (!err && v !== value) onCommit(v);
   };
 
+  const showSlider = slider && min !== undefined && max !== undefined && max > min;
+  const stepSize = step ?? (showSlider ? sliderStep(min, max) : 1);
+  const sliderValue = showSlider ? Math.min(max, Math.max(min, Number.isFinite(Number(text)) && text.trim() !== '' ? Number(text) : value)) : 0;
+
   return (
     <Field label={label} hint={hint} overridden={overridden} error={error} note={note}>
-      <span className="num-wrap">
+      <span className="num-wrap slider-num">
+        {showSlider && (
+          <WheelRange
+            min={min}
+            max={max}
+            step={stepSize}
+            value={sliderValue}
+            disabled={disabled}
+            ariaLabel={`${label} slider`}
+            onValue={(v) => {
+              // The slider moves in whole steps; text typed in the box keeps whatever precision it has.
+              const clean = formatNum(snapToStep(v, stepSize));
+              setText(clean);
+              commit(clean);
+            }}
+          />
+        )}
         <input
           type="text"
           inputMode="decimal"
+          aria-label={label}
           className={error ? 'invalid' : ''}
           value={text}
           disabled={disabled}
@@ -180,12 +207,12 @@ interface OptNumProps {
 /** "Auto" checkbox + number. */
 export function OptionalNumField({ label, value, onCommit, validate, hint, autoValue }: OptNumProps) {
   const id = useId();
-  const [text, setText] = useState(value === null ? '' : String(value));
+  const [text, setText] = useState(value === null ? '' : formatNum(value));
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
   useEffect(() => {
     if (!focused) {
-      setText(value === null ? '' : String(value));
+      setText(value === null ? '' : formatNum(value));
       setError(null);
     }
   }, [value, focused]);
@@ -232,7 +259,7 @@ export function OptionalNumField({ label, value, onCommit, validate, hint, autoV
               const err = validate ? validate(start) : null;
               setError(err);
               if (!err) {
-                setText(String(start));
+                setText(formatNum(start));
                 onCommit(start);
               }
             }}
@@ -281,6 +308,19 @@ export function TabBar<T extends string>({ tabs, value, onChange }: { tabs: Arra
     <div className="tab-bar" role="tablist">
       {tabs.map((t) => (
         <button key={t.id} role="tab" aria-selected={value === t.id} className={`tab${value === t.id ? ' active' : ''}`} onClick={() => onChange(t.id)}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Second-level navigation inside a tab, as a row of small buttons. */
+export function SectionBar<T extends string>({ sections, value, onChange }: { sections: Array<{ id: T; label: string }>; value: T; onChange: (t: T) => void }) {
+  return (
+    <div className="section-bar" role="tablist" aria-label="Appearance sections">
+      {sections.map((t) => (
+        <button key={t.id} role="tab" aria-selected={value === t.id} className={`section-chip${value === t.id ? ' active' : ''}`} onClick={() => onChange(t.id)}>
           {t.label}
         </button>
       ))}

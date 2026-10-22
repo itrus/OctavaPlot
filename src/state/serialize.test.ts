@@ -272,3 +272,21 @@ describe('OctavaPlot rename', () => {
     expect(loadAutosave()?.id).toBe(p.id);
   });
 });
+
+describe('pixel sizes', () => {
+  it('converts the millimetre sizes of older files to pixels', () => {
+    const p = createExampleProject();
+    const file = JSON.parse(stringifyProject(p));
+    const chart = file.project.charts[0];
+    delete chart.widthPx;
+    delete chart.heightPx;
+    delete chart.legend.hiddenGroupIds;
+    chart.widthMm = 160;
+    chart.heightMm = 120;
+    const back = parseProject(JSON.stringify(file)).charts[0] as unknown as Record<string, unknown>;
+    expect(back.widthPx).toBe(605);
+    expect(back.heightPx).toBe(454);
+    expect('widthMm' in back).toBe(false);
+    expect((back.legend as { hiddenGroupIds: string[] }).hiddenGroupIds).toEqual([]);
+  });
+});

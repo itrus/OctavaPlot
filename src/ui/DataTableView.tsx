@@ -1,18 +1,22 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import type { DataTable } from '../model/types';
 import { useApp } from '../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../model/rows';
-import { addGroup, addRows, composeCommands, pasteMatrix, removeGroup, renameGroup, setCells, setGroupTitle, setRowTitles, type CellEdit } from '../state/commands';
+import { addGroup, addRows, composeCommands, pasteMatrix, removeGroup, renameGroup, replaceTableData, setCells, setRowTitles, type CellEdit } from '../state/commands';
+import { copyText, downloadBlob, exportFileName } from '../util/download';
+import { ExportIcon, ImportIcon } from './icons';
+import { importCsv, isCsvFile, tableToCsv } from './csv';
+import { UndoRedo } from './UndoRedo';
 import { blockToText, formatCell, parseCell, planPaste, selectionStrings } from './cellText';
 
-const ROW_H = 24;
-const COL_W = 112;
-const ROWNUM_W = 52;
-const TITLE_W = 120;
-/** Width of the sticky left part: row number plus Row title. */
-const STICKY_W = ROWNUM_W + TITLE_W;
-const HEADER_H = 58;
-const OVERSCAN = 6;
+// Sizes at 100% zoom, in px; the table multiplies them by its zoom.
+const BASE_ROW_H = 24;
+const BASE_COL_W = 112;
+const BASE_ROWNUM_W = 52;
+const BASE_TITLE_W = 120;
+const BASE_HEADER_H = 34;
+/** Rows rendered beyond the viewport on each side: a fast wheel must not outrun them. */
+const OVERSCAN = 40;
 
 interface Sel {
   ar: number;
@@ -40,6 +44,8 @@ const bounds = (s: Sel) => ({
 interface CellProps {
   row: number;
   col: number;
+  /** Cell width in px at the current zoom. */
+  width: number;
   text: string;
   inRange: boolean;
   active: boolean;
@@ -59,7 +65,7 @@ const Cell = memo(function Cell(p: CellProps) {
   return (
     <div
       className={cls}
-      style={{ width: isTitle ? TITLE_W : COL_W }}
+      style={{ width: p.width }}
       onMouseDown={(e) => p.onDown(p.row, p.col, e)}
       onMouseEnter={() => p.onEnter(p.row, p.col)}
       onDoubleClick={() => p.onDouble(p.row, p.col)}
@@ -82,13 +88,20 @@ const Cell = memo(function Cell(p: CellProps) {
 });
 
 export function DataTableView({ table }: { table: DataTable }) {
-  const { run, undo, redo, canUndo, canRedo } = useApp();
+  const { run, tableZoom: z, settings } = useApp();
+  const ROW_H = BASE_ROW_H * z;
+  const COL_W = BASE_COL_W * z;
+  const ROWNUM_W = BASE_ROWNUM_W * z;
+  const TITLE_W = BASE_TITLE_W * z;
+  const STICKY_W = ROWNUM_W + TITLE_W;
+  const HEADER_H = BASE_HEADER_H * z;
   const [sel, setSel] = useState<Sel>({ ar: 0, ac: 0, fr: 0, fc: 0 });
   const [editing, setEditing] = useState<Editing | null>(null);
   const editRef = useRef<Editing | null>(null);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const csvRef = useRef<HTMLInputElement>(null);
   const dragging = useRef(false);
 
   const nRows = table.rowCount;
@@ -120,6 +133,27 @@ export function DataTableView({ table }: { table: DataTable }) {
     return () => ro.disconnect();
   }, []);
 
+  // Wheel scrolling is applied here: the browser's smooth scrolling over the virtualised rows made the
+  // grid flicker and blank out. Vertical wheel moves through the rows; Shift+wheel moves sideways.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return; // browser zoom
+      const unit = e.deltaMode === 1 ? ROW_H : e.deltaMode === 2 ? el.clientHeight - HEADER_H : 1;
+      const dy = e.deltaY * unit;
+      const dx = e.deltaX * unit;
+      e.preventDefault();
+      if (e.shiftKey && dx === 0) el.scrollLeft += dy;
+      else {
+        el.scrollTop += dy;
+        el.scrollLeft += dx;
+      }
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [ROW_H, HEADER_H]);
+
   const setEdit = (e: Editing | null) => {
     editRef.current = e;
     setEditing(e);
@@ -138,7 +172,7 @@ export function DataTableView({ table }: { table: DataTable }) {
     const colLeft = col * COL_W;
     if (colLeft < el.scrollLeft) el.scrollLeft = colLeft;
     else if (colLeft + COL_W > el.scrollLeft + el.clientWidth - STICKY_W) el.scrollLeft = colLeft + COL_W - (el.clientWidth - STICKY_W);
-  }, []);
+  }, [ROW_H, COL_W, HEADER_H, STICKY_W]);
 
   const moveTo = useCallback(
     (row: number, col: number, extend: boolean) => {
@@ -273,6 +307,27 @@ export function DataTableView({ table }: { table: DataTable }) {
     } else run('Clear cells', setCells(table.id, edits));
   };
 
+  // ---- CSV
+  const exportCsv = () => {
+    downloadBlob(new Blob([tableToCsv(table)], { type: 'text/csv;charset=utf-8' }), exportFileName(table.name, 'csv', settings.timestampExports));
+    setMessage({ kind: 'info', text: `Exported ${table.name} as CSV.` });
+  };
+  const importFile = async (file: File) => {
+    if (!isCsvFile(file)) {
+      setMessage({ kind: 'error', text: `${file.name} is not a CSV file. Choose a .csv file.` });
+      return;
+    }
+    const result = importCsv(await file.text());
+    if (!result.ok) {
+      setMessage({ kind: 'error', text: `Could not import ${file.name}: ${result.message}` });
+      return;
+    }
+    const { data } = result;
+    run('Import CSV', replaceTableData(table.id, data));
+    setSel({ ar: 0, ac: 0, fr: 0, fc: 0 });
+    setMessage({ kind: 'info', text: `Imported ${data.values.length} rows × ${data.names.length} groups from ${file.name}.` });
+  };
+
   // ---- clipboard
   const fromInput = (e: { target: EventTarget }) => e.target instanceof HTMLInputElement;
   const onCopy = (e: ClipboardEvent) => {
@@ -286,10 +341,8 @@ export function DataTableView({ table }: { table: DataTable }) {
     e.clipboardData.setData('text/plain', selectionText());
     clearSelection();
   };
-  const onPaste = (e: ClipboardEvent) => {
-    if (editRef.current || fromInput(e)) return;
-    e.preventDefault();
-    const plan = planPaste(e.clipboardData.getData('text/plain'), bounds(sel));
+  const pasteText = (text: string) => {
+    const plan = planPaste(text, bounds(sel));
     if (!plan.ok) {
       setMessage({ kind: 'error', text: plan.message });
       return;
@@ -298,12 +351,48 @@ export function DataTableView({ table }: { table: DataTable }) {
     setSel(plan.sel);
     setMessage({ kind: 'info', text: plan.message });
   };
+  const onPaste = (e: ClipboardEvent) => {
+    if (editRef.current || fromInput(e)) return;
+    e.preventDefault();
+    pasteText(e.clipboardData.getData('text/plain'));
+  };
+  // Browsers do not reliably send a paste event to a focused element that is not a text field (a selected cell is
+  // not one), so Ctrl+V hands focus to this hidden textarea first; the paste then lands there and is applied to the cells.
+  const catcherRef = useRef<HTMLTextAreaElement>(null);
+  const onCatcherPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    pasteText(e.clipboardData.getData('text/plain'));
+    focusGrid();
+  };
 
   // ---- keyboard (grid, not editing)
   const onKeyDown = (e: KeyboardEvent) => {
     if (editRef.current || fromInput(e)) return;
     const mod = e.ctrlKey || e.metaKey;
     const f = { r: sel.fr, c: sel.fc };
+    if (mod && !e.altKey && !e.shiftKey && e.code === 'KeyV') {
+      catcherRef.current?.focus({ preventScroll: true });
+      // If no paste arrives (empty clipboard, blocked), the grid takes focus back.
+      setTimeout(() => {
+        if (document.activeElement === catcherRef.current) focusGrid();
+      }, 400);
+      return; // no preventDefault: the browser's paste goes to the textarea
+    }
+    // Browsers do not fire a copy event for a focused grid that has no text selected, so Ctrl+C/X are handled here.
+    if (mod && !e.altKey && !e.shiftKey && (e.code === 'KeyC' || e.code === 'KeyX')) {
+      e.preventDefault();
+      const cut = e.code === 'KeyX';
+      const text = selectionText();
+      void copyText(text).then((ok) => {
+        if (!ok) setMessage({ kind: 'error', text: 'The browser did not allow copying to the clipboard.' });
+        else {
+          setMessage({ kind: 'info', text: cut ? 'Cut to the clipboard.' : 'Copied to the clipboard.' });
+          if (cut) clearSelection();
+        }
+      });
+      return;
+    }
     switch (e.key) {
       case 'ArrowDown': e.preventDefault(); moveTo(f.r + 1, f.c, e.shiftKey); return;
       case 'ArrowUp': e.preventDefault(); moveTo(f.r - 1, f.c, e.shiftKey); return;
@@ -336,16 +425,16 @@ export function DataTableView({ table }: { table: DataTable }) {
   const rowIdx = useMemo(() => Array.from({ length: Math.max(0, last - first) }, (_, i) => first + i), [first, last]);
   const invalidCell = message?.kind === 'error' && editing ? editing : null;
 
-  const commitHeader = (kind: 'name' | 'title', groupId: string, el: HTMLInputElement, previous: string) => {
+  const commitName = (groupId: string, el: HTMLInputElement, previous: string) => {
     const v = el.value;
     if (v === previous) return;
-    if (kind === 'name' && v.trim() === '') {
+    if (v.trim() === '') {
       el.value = previous;
       setMessage({ kind: 'error', text: 'A group name cannot be empty.' });
       return;
     }
     setMessage(null);
-    run(kind === 'name' ? 'Rename group' : 'Edit column title', kind === 'name' ? renameGroup(table.id, groupId, v.trim()) : setGroupTitle(table.id, groupId, v));
+    run('Rename group', renameGroup(table.id, groupId, v.trim()));
   };
 
   return (
@@ -354,22 +443,51 @@ export function DataTableView({ table }: { table: DataTable }) {
         <button onClick={() => run('Add group', addGroup(table.id))}>+ Add group</button>
         <button onClick={() => run('Add rows', addRows(table.id, 20))}>+ Add 20 rows</button>
         <span className="sep" />
-        <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">Undo</button>
-        <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)">Redo</button>
+        <UndoRedo />
+        <span className="sep" />
+        <button className="icon-text" onClick={() => csvRef.current?.click()} title="Replace this table with the contents of a .csv file (Undo restores it)">
+          <ImportIcon /> Import CSV
+        </button>
+        <button className="icon-text" onClick={exportCsv} title="Download this table as a .csv file">
+          <ExportIcon /> Export CSV
+        </button>
+        <input
+          ref={csvRef}
+          type="file"
+          accept=".csv,text/csv"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (f) void importFile(f);
+          }}
+        />
         <span className="toolbar-info">{nCols} groups × {nRows} rows · empty cell = missing value</span>
       </div>
       <div
         className="grid-scroller"
+        style={{ '--z': z } as CSSProperties}
         ref={scrollerRef}
         tabIndex={0}
-        onScroll={(e) => setScroll((s) => ({ ...s, top: e.currentTarget.scrollTop }))}
+        onScroll={(e) => {
+          // Read it now: React clears currentTarget before a state updater function runs.
+          const top = e.currentTarget.scrollTop;
+          setScroll((s) => ({ ...s, top }));
+        }}
         onKeyDown={onKeyDown}
         onCopy={onCopy}
         onCut={onCut}
         onPaste={onPaste}
         aria-label="Data table"
       >
-        <div className="grid-inner" style={{ width: STICKY_W + nCols * COL_W }}>
+        <textarea
+          ref={catcherRef}
+          className="paste-catcher"
+          tabIndex={-1}
+          aria-hidden="true"
+          onPaste={onCatcherPaste}
+        />
+        <div className="grid-inner" style={{ width: STICKY_W + nCols * COL_W, height: HEADER_H + nRows * ROW_H }}>
           <div className="grid-header" style={{ height: HEADER_H }}>
             <div className="corner" style={{ width: ROWNUM_W }} onClick={() => setSel({ ar: 0, ac: 0, fr: nRows - 1, fc: nCols - 1 })} title="Select all" />
             <div
@@ -388,7 +506,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                     className="head-input head-name"
                     defaultValue={g.name}
                     aria-label="Group name"
-                    onBlur={(e) => commitHeader('name', g.id, e.currentTarget, g.name)}
+                    onBlur={(e) => commitName(g.id, e.currentTarget, g.name)}
                     onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   />
                   <button
@@ -401,19 +519,10 @@ export function DataTableView({ table }: { table: DataTable }) {
                     ×
                   </button>
                 </div>
-                <input
-                  key={`t-${g.title}`}
-                  className="head-input head-title"
-                  placeholder="Title"
-                  defaultValue={g.title}
-                  aria-label={`Column title for ${g.name}`}
-                  onBlur={(e) => commitHeader('title', g.id, e.currentTarget, g.title)}
-                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                />
               </div>
             ))}
           </div>
-          <div style={{ height: first * ROW_H }} />
+          <div className="grid-rows" style={{ top: HEADER_H + first * ROW_H }}>
           {rowIdx.map((r) => (
             <div className="grid-row" style={{ height: ROW_H }} key={r}>
               <div
@@ -427,6 +536,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                 key="row-title"
                 row={r}
                 col={-1}
+                width={TITLE_W}
                 text={rowTitleAt(table, r)}
                 inRange={r >= r0 && r <= r1 && c0 < 0}
                 active={r === sel.fr && sel.fc === -1}
@@ -446,6 +556,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                     key={g.id}
                     row={r}
                     col={c}
+                    width={COL_W}
                     text={formatCell(g.observations[r].value)}
                     inRange={r >= r0 && r <= r1 && c >= c0 && c <= c1}
                     active={r === sel.fr && c === sel.fc}
@@ -462,7 +573,7 @@ export function DataTableView({ table }: { table: DataTable }) {
               })}
             </div>
           ))}
-          <div style={{ height: Math.max(0, nRows - last) * ROW_H }} />
+          </div>
         </div>
       </div>
       <div className={`table-status${message?.kind === 'error' ? ' error' : ''}`} role="status">

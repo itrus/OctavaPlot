@@ -95,7 +95,7 @@ describe('bar fill geometry', () => {
   it('M9 a too-dense fill falls back to no marks and says how many it needs', () => {
     const chart = base.charts[0];
     const big = buildChartModel(
-      { ...chart, widthMm: 3000, heightMm: 3000, defaults: { ...chart.defaults, barFillMode: 'pattern', barPattern: 'dots', barPatternSpacingPt: 1 } },
+      { ...chart, widthPx: 11340, heightPx: 11340, defaults: { ...chart.defaults, barFillMode: 'pattern', barPattern: 'dots', barPatternSpacingPt: 1 } },
       table,
     );
     expect(big.groups.some((g) => g.bar?.marks?.kind === 'none')).toBe(true);

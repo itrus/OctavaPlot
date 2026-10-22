@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
+import { createExampleProject, DEFAULT_STYLE } from '../model/defaults';
 import { permuteRows } from '../model/rows';
 import type { ChartStyle } from '../model/types';
 import { resolveStyle } from '../model/style';
@@ -40,7 +40,7 @@ describe('style hierarchy and chart model', () => {
     const c = p.charts[0];
     expect(resolveStyle(c, c.layers[0], table.groups[1]).barBorderWidthPt).toBe(3);
     expect(resolveStyle(c, c.layers[0], g).barBorderWidthPt).toBe(5);
-    expect(resolveStyle(chart0, chart0.layers[0], g).barBorderWidthPt).toBe(1);
+    expect(resolveStyle(chart0, chart0.layers[0], g).barBorderWidthPt).toBe(DEFAULT_STYLE.barBorderWidthPt);
   });
 
   it('never draws an error bar for n = 1 and reports a warning', () => {
@@ -174,7 +174,8 @@ describe('summary pipeline (S15)', () => {
   it('auto-range includes the drawn endpoints and respects the direction', () => {
     let p = patchSummary(chartId, 'all', { spread: 'range' })(setGroup(project, 0, [1, 2, 3, 4, 50]));
     expect(model(p).y.domain[1]).toBeGreaterThanOrEqual(50);
-    p = patchStyle(chartId, 'all', { errorDirection: 'negative' })(p);
+    // The raw points (symbols are on by default) also set the range, so they are off to isolate the error bar.
+    p = patchStyle(chartId, 'all', { errorDirection: 'negative', showSymbols: false })(p);
     expect(model(p).y.domain[1]).toBeLessThan(50);
   });
 
@@ -379,7 +380,7 @@ describe('point labels in the chart model', () => {
   });
   it('a custom offset follows the point after a resize', () => {
     const q = labelled(base(), { pointLabelSource: 'value', pointLabelPlacement: 'custom', pointLabelOffsetXPt: 6, pointLabelOffsetYPt: -14 });
-    const wide = { ...q, charts: [{ ...q.charts[0], widthMm: q.charts[0].widthMm + 40 }] };
+    const wide = { ...q, charts: [{ ...q.charts[0], widthPx: q.charts[0].widthPx + 150 }] };
     for (const m of [build(q), build(wide)]) {
       let checked = 0;
       for (const g of m.groups) {

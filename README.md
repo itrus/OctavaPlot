@@ -86,7 +86,7 @@ The data table has an optional Row title column (undoable, copy and paste aware)
 
 ## Compliance note
 
-Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved JSON files. The Business Associate Agreements in place cover Google Workspace (sagemedic.info) and Microsoft 365 (sagemedic.com) only, not this app or the browser. Do not enter patient identifiers (not verified whether sample identifiers are acceptable). There is no autosave off-switch yet.
+Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved JSON files. The Business Associate Agreements in place cover Google Workspace and Microsoft 365 only, not this app or the browser. Do not enter patient identifiers (not verified whether sample identifiers are acceptable). There is no autosave off-switch yet.
 
 ## Not yet implemented
 

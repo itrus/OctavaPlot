@@ -18,7 +18,7 @@ describe('SVG export', () => {
     const svg = chartToSvgString(p.charts[0], p.dataTables[0]);
     expect(svg).toMatch(/^<\?xml/);
     expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"');
-    expect(svg).toContain('width="160mm"');
+    expect(svg).toContain('width="1280px"');
     expect(svg).toContain('<rect');
     expect(svg).toContain('<text');
     expect(svg).not.toContain('data-editor-only');
@@ -34,6 +34,7 @@ describe('SVG export', () => {
 
   it('draws one symbol path per observation in scatter mode', () => {
     let p = createExampleProject();
+    p = { ...p, charts: p.charts.map((c) => ({ ...c, legend: { ...c.legend, visible: false } })) };
     p = setChartType(p.charts[0].id, 'scatter')(p);
     const svg = chartToSvgString(p.charts[0], p.dataTables[0]);
     expect((svg.match(/<path d="M[\d.]+,[\d.]+a/g) ?? []).length).toBe(20);

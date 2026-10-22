@@ -1,6 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Chart, DataTable } from '../model/types';
-import { mmToPx } from '../model/units';
 import { ChartSvg } from './ChartSvg';
 import { buildChartModel } from './model';
 
@@ -12,7 +11,7 @@ import { buildChartModel } from './model';
 export function chartToSvgString(chart: Chart, table: DataTable): string {
   const model = buildChartModel(chart, table);
   const markup = renderToStaticMarkup(
-    <ChartSvg chart={chart} model={model} cssWidth={`${chart.widthMm}mm`} cssHeight={`${chart.heightMm}mm`} />,
+    <ChartSvg chart={chart} model={model} cssWidth={`${chart.widthPx}px`} cssHeight={`${chart.heightPx}px`} />,
   );
   return `<?xml version="1.0" encoding="UTF-8"?>\n${markup}\n`;
 }
@@ -20,8 +19,8 @@ export function chartToSvgString(chart: Chart, table: DataTable): string {
 /** Rasterise at `scale` x the chart's nominal CSS pixel size (96 px/in). */
 export async function chartToPngBlob(chart: Chart, table: DataTable, scale: number): Promise<Blob> {
   const svg = chartToSvgString(chart, table);
-  const width = Math.max(1, Math.round(mmToPx(chart.widthMm) * scale));
-  const height = Math.max(1, Math.round(mmToPx(chart.heightMm) * scale));
+  const width = Math.max(1, Math.round(chart.widthPx * scale));
+  const height = Math.max(1, Math.round(chart.heightPx * scale));
   const img = new Image();
   const loaded = new Promise<void>((resolve, reject) => {
     img.onload = () => resolve();

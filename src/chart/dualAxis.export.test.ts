@@ -178,14 +178,15 @@ describe('right axis rendering', () => {
     const t = m.layout.y2Title!;
     expect(svgOf(p)).toMatch(new RegExp(`transform="rotate\\(-90 ${n2(t.x)} ${n2(t.y)}\\)"[^>]*>Right title</text>`));
   });
-  it('leaks no editor attributes into export, and the editor adds none on the right axis', () => {
+  it('leaks no editor attributes into export, and only the editor marks the axes as clickable', () => {
     const p = withY2(dualAxisFixture(), { title: 'Right title', showGrid: true });
     const svg = svgOf(p);
     expect(svg).not.toContain('data-');
     const html = renderToStaticMarkup(
       createElement(ChartSvg, { chart: p.charts[0], model: modelOf(p), editor: { selection: { kind: 'chart' } as never }, cssWidth: '1px', cssHeight: '1px' }),
     );
-    expect(html.match(/data-hit="[a-z]+"/g)?.every((h) => h !== 'data-hit="axis"')).toBe(true);
+    // Axes are clickable in the editor (they open the axis settings); only the editor render carries the attribute.
+    expect(html).toContain('data-hit="axis"');
     const right = n2(modelOf(p).layout.plot.x + modelOf(p).layout.plot.width);
     expect(html).toContain(`d="M${right},`);
   });
@@ -193,7 +194,9 @@ describe('right axis rendering', () => {
     const p = createExampleProject();
     const q = withY2(p, { title: 'Right', showGrid: true, visible: true });
     expect(svgOf(q)).toBe(svgOf(p));
-    expect(svgOf(withY2(dualAxisFixture({ bindRight: false }), { title: 'R' }))).toBe(svgOf(dualAxisFixture({ bindRight: false })));
+    // One fixture: its symbols (on by default) are jittered from their ids, which differ between fixtures.
+    const f = dualAxisFixture({ bindRight: false });
+    expect(svgOf(withY2(f, { title: 'R' }))).toBe(svgOf(f));
   });
   it('a hidden right axis draws no line, ticks, labels, title or grid', () => {
     const p = dualAxisFixture();

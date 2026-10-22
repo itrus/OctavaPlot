@@ -141,8 +141,9 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
 
       {/* Axes. */}
       {ya.visible && (
-        <g stroke={AXIS_COLOR} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square">
+        <g stroke={AXIS_COLOR} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y')}>
           <path d={`M${n2(plot.x)},${n2(plot.y)}V${n2(plotBottom)}`} />
+          {ed && <path d={`M${n2(plot.x)},${n2(plot.y)}V${n2(plotBottom)}`} stroke="transparent" strokeWidth={14} />}
           {y.ticks.map((t) => (
             <path key={t} d={`M${n2(plot.x)},${n2(model.yScale(t))}h${-TICK_LENGTH}`} strokeLinecap="butt" />
           ))}
@@ -159,13 +160,15 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
             fontSize={ya.tickFontSizePt}
             fontWeight="bold"
             fill={AXIS_COLOR}
+            {...hit('axis', undefined, 'y')}
           >
             {y.tickLabel(t)}
           </text>
         ))}
       {y2R && (
-        <g stroke={AXIS_COLOR} strokeWidth={y2a.lineWidthPt} fill="none" strokeLinecap="square">
+        <g stroke={AXIS_COLOR} strokeWidth={y2a.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y2')}>
           <path d={`M${n2(plotRight)},${n2(plot.y)}V${n2(plotBottom)}`} />
+          {ed && <path d={`M${n2(plotRight)},${n2(plot.y)}V${n2(plotBottom)}`} stroke="transparent" strokeWidth={14} />}
           {y2R.ticks.map((t) => (
             <path key={t} d={`M${n2(plotRight)},${n2(y2Scale(t))}h${TICK_LENGTH}`} strokeLinecap="butt" />
           ))}
@@ -182,13 +185,15 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
             fontSize={y2a.tickFontSizePt}
             fontWeight="bold"
             fill={AXIS_COLOR}
+            {...hit('axis', undefined, 'y2')}
           >
             {y2R.tickLabel(t)}
           </text>
         ))}
       {xa.visible && (
-        <g stroke={AXIS_COLOR} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square">
+        <g stroke={AXIS_COLOR} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'x')}>
           <path d={`M${n2(plot.x)},${n2(plotBottom)}H${n2(plot.x + plot.width)}`} />
+          {ed && <path d={`M${n2(plot.x)},${n2(plotBottom)}H${n2(plot.x + plot.width)}`} stroke="transparent" strokeWidth={14} />}
           {groups.map((g) => (
             <path key={g.groupId} d={`M${n2(g.centerX)},${n2(plotBottom)}v${TICK_LENGTH}`} strokeLinecap="butt" />
           ))}
@@ -197,7 +202,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
       {xa.visible &&
         groups.map((g) => {
           const ty = plotBottom + TICK_LENGTH + X_TICK_LABEL_GAP + xa.tickFontSizePt * 0.8;
-          const common = { fontSize: xa.tickFontSizePt, fontWeight: 'bold' as const, fill: AXIS_COLOR };
+          const common = { fontSize: xa.tickFontSizePt, fontWeight: 'bold' as const, fill: AXIS_COLOR, ...hit('axis', undefined, 'x') };
           return layout.xTickRotated ? (
             <text key={g.groupId} x={n2(g.centerX)} y={n2(ty - xa.tickFontSizePt * 0.4)} textAnchor="end" transform={`rotate(-45 ${n2(g.centerX)} ${n2(ty - xa.tickFontSizePt * 0.4)})`} {...common}>
               {g.label}
@@ -211,12 +216,12 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
 
       {/* Titles. */}
       {layout.title && (
-        <text x={n2(layout.title.x)} y={n2(layout.title.y)} textAnchor="middle" fontSize={layout.title.fontSizePt} fontWeight="bold" fill={AXIS_COLOR}>
+        <text x={n2(layout.title.x)} y={n2(layout.title.y)} textAnchor="middle" fontSize={layout.title.fontSizePt} fontWeight="bold" fill={AXIS_COLOR} {...hit('title')}>
           {chart.title}
         </text>
       )}
       {layout.xTitle && (
-        <text x={n2(layout.xTitle.x)} y={n2(layout.xTitle.y)} textAnchor="middle" fontSize={xa.titleFontSizePt} fontWeight="bold" fill={AXIS_COLOR}>
+        <text x={n2(layout.xTitle.x)} y={n2(layout.xTitle.y)} textAnchor="middle" fontSize={xa.titleFontSizePt} fontWeight="bold" fill={AXIS_COLOR} {...hit('title')}>
           {xa.title}
         </text>
       )}
@@ -229,6 +234,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
           fontSize={ya.titleFontSizePt}
           fontWeight="bold"
           fill={AXIS_COLOR}
+          {...hit('title')}
         >
           {ya.title}
         </text>
@@ -243,6 +249,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
           fontSize={y2a.titleFontSizePt}
           fontWeight="bold"
           fill={AXIS_COLOR}
+          {...hit('title')}
         >
           {y2a.title}
         </text>
@@ -252,7 +259,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
       {layout.legend && (
         <g>
           {layout.legend.items.map((it) => {
-            const g = groups[it.index];
+            const g = groups[model.legendGroups[it.index]];
             return (
               <g key={g.groupId} {...hit('legend', g.groupId)}>
                 <LegendSwatch g={g} x={it.x} y={it.y} chartId={chart.id} editor={ed} />

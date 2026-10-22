@@ -1,29 +1,61 @@
-import { useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { ChartSvg } from '../chart/ChartSvg';
 import { hitFromTarget, pointerToChartPt } from '../chart/hitTest';
 import { buildChartModel } from '../chart/model';
 import { tooltipLines } from '../chart/tooltip';
 import type { Chart, DataTable } from '../model/types';
-import { mmToPx } from '../model/units';
 import { useApp } from '../state/AppContext';
 import { patchAnnotation } from '../state/commands';
-import { downloadBlob, safeFileName } from '../util/download';
+import { downloadBlob, exportFileName } from '../util/download';
+import { inspectorTargetFor } from './inspector/nav';
+import { UndoRedo } from './UndoRedo';
+
+/** Space kept around the chart inside the canvas, in px. */
+const CANVAS_PAD = 24;
+const SCROLLBAR_ROOM = 17;
 
 export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { selection, setSelection, run, setStatus, undo, redo, canUndo, canRedo, zoom } = useApp();
+  const { selection, setSelection, run, setStatus, zoom, setZoom, settings, fitRequest, navigateInspector } = useApp();
   const model = useMemo(() => buildChartModel(chart, table), [chart, table]);
   const svgRef = useRef<SVGSVGElement>(null);
-  const [pngScale, setPngScale] = useState(3);
   const [tip, setTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
   const [drag, setDrag] = useState<{ id: string; xFrac: number; yFrac: number; dx: number; dy: number; moved: boolean } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  const cssW = mmToPx(chart.widthMm) * zoom;
-  const cssH = mmToPx(chart.heightMm) * zoom;
+  // Zoom 100% means the whole chart fits the window; the slider zooms relative to that.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [avail, setAvail] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    // Outer size less room for the scrollbars: it must not change when a scrollbar appears, or the chart would refit and rescale.
+    const measure = () => setAvail({ w: el.offsetWidth - SCROLLBAR_ROOM, h: el.offsetHeight - SCROLLBAR_ROOM });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // A chart opens at "fit".
+  useEffect(() => setZoom(1), [chart.id, setZoom]);
+  // The fit scale (screen px per chart px) is taken when a chart opens, when the window is resized and when Fit is
+  // pressed, not when the chart's size is edited: changing the dimensions resizes the page, never the elements on it.
+  const sizeRef = useRef({ w: chart.widthPx, h: chart.heightPx });
+  sizeRef.current = { w: chart.widthPx, h: chart.heightPx };
+  const [fit, setFit] = useState(1);
+  useEffect(() => {
+    if (avail.w <= 0 || avail.h <= 0) return;
+    const { w, h } = sizeRef.current;
+    setFit(Math.max(0.05, Math.min((avail.w - 2 * CANVAS_PAD) / w, (avail.h - 2 * CANVAS_PAD) / h)));
+  }, [chart.id, avail.w, avail.h, fitRequest]);
+  const cssW = chart.widthPx * fit * zoom;
+  const cssH = chart.heightPx * fit * zoom;
 
   const onPointerDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
     const hit = hitFromTarget(e.target, svgRef.current);
+    // The inspector goes to the settings of whatever was clicked.
+    const target = inspectorTargetFor(hit);
+    if (target) navigateInspector(target);
     if (hit.kind === 'annotation' && hit.annotationId && svgRef.current) {
       const a = chart.annotations.find((x) => x.id === hit.annotationId);
       if (!a) return;
@@ -69,17 +101,19 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
   const exportSvg = async () => {
     try {
       const { chartToSvgString } = await import('../chart/export');
-      downloadBlob(new Blob([chartToSvgString(chart, table)], { type: 'image/svg+xml' }), `${safeFileName(chart.name)}.svg`);
+      downloadBlob(new Blob([chartToSvgString(chart, table)], { type: 'image/svg+xml' }), exportFileName(chart.name, 'svg', settings.timestampExports));
       setStatus('Exported SVG.');
     } catch (err) {
       setStatus(`SVG export failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
   const exportPng = async () => {
+    // PNG pixels match the chart size in px.
+    const scale = 1;
     try {
       const { chartToPngBlob } = await import('../chart/export');
-      downloadBlob(await chartToPngBlob(chart, table, pngScale), `${safeFileName(chart.name)}@${pngScale}x.png`);
-      setStatus(`Exported PNG at ${pngScale}×.`);
+      downloadBlob(await chartToPngBlob(chart, table, scale), exportFileName(chart.name, 'png', settings.timestampExports));
+      setStatus(`Exported PNG, ${chart.widthPx} × ${chart.heightPx} px.`);
     } catch (err) {
       setStatus(`PNG export failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -88,22 +122,21 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
   return (
     <div className="graph-view">
       <div className="toolbar">
-        <button onClick={undo} disabled={!canUndo}>Undo</button>
-        <button onClick={redo} disabled={!canRedo}>Redo</button>
+        <UndoRedo />
         <span className="sep" />
-        <button onClick={exportSvg}>Export SVG</button>
-        <button onClick={exportPng}>Export PNG</button>
-        <label className="inline-label">
-          Scale
-          <select value={pngScale} onChange={(e) => setPngScale(Number(e.target.value))}>
-            {[1, 2, 3, 4, 6, 8].map((s) => (
-              <option key={s} value={s}>{s}×</option>
-            ))}
-          </select>
-        </label>
-        <span className="toolbar-info">{chart.widthMm} × {chart.heightMm} mm</span>
+        <button
+          className="icon-text"
+          onClick={() => void (settings.exportFormat === 'svg' ? exportSvg() : exportPng())}
+          title={`Export as ${settings.exportFormat.toUpperCase()} (change the format in Settings)`}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11" />
+          </svg>
+          Export
+        </button>
+        <span className="toolbar-info">{chart.widthPx} × {chart.heightPx} px</span>
       </div>
-      <div className="chart-scroller">
+      <div className="chart-scroller" ref={scrollerRef}>
         <div className="chart-wrap" ref={wrapRef} style={{ width: cssW }}>
           <div
             className="chart-surface"
