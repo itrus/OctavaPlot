@@ -11,7 +11,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { n2 } from '../model/units';
 import { ChartSvg } from './ChartSvg';
 import { buildChartModel } from './model';
-import { bindLeft, bindRight, DUAL_AXIS_DATA, dualAxisFixture } from './dualAxisFixture';
+import { bindLeft, bindRight, DUAL_AXIS_DATA, dualAxisFixture } from '../testing/dualAxisFixture';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = Record<string, any>;

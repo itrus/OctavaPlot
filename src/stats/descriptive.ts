@@ -148,7 +148,7 @@ export function describeValues(values: ReadonlyArray<number | null | undefined>,
 }
 
 /** One line of the results sheet. */
-export interface DescriptiveRow {
+interface DescriptiveRow {
   key: string;
   label: string;
   /** Shown a little to the right, as a part of the block above it. */

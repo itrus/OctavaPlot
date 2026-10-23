@@ -2,7 +2,7 @@ import { CHART_PX_MAX, CHART_PX_MIN } from './defaults';
 import type { ChartAspect } from './types';
 
 /** Width divided by height of a locked shape; null while free. */
-export const aspectRatio = (aspect: ChartAspect): number | null => (aspect === '4:3' ? 4 / 3 : aspect === '1:1' ? 1 : null);
+const aspectRatio = (aspect: ChartAspect): number | null => (aspect === '4:3' ? 4 / 3 : aspect === '1:1' ? 1 : null);
 
 const clampPx = (v: number) => Math.min(CHART_PX_MAX, Math.max(CHART_PX_MIN, Math.round(v)));
 

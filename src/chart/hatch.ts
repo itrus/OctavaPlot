@@ -12,9 +12,9 @@ import { n2 } from '../model/units';
 /** Maximum marks per fill; beyond this nothing is generated (P). */
 export const MAX_PATTERN_MARKS = 20000;
 /** Lattice phase in spacings: marks sit at (k + PATTERN_PHASE) * spacing from the anchor. */
-export const PATTERN_PHASE = 0.5;
+const PATTERN_PHASE = 0.5;
 /** Diagonal segments shorter than this (corner touches) are dropped. */
-export const MIN_SEGMENT_PT = 0.01;
+const MIN_SEGMENT_PT = 0.01;
 
 /** Same names as the model's FillPattern; local because that type is added later. */
 export type HatchKind =

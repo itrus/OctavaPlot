@@ -17,10 +17,10 @@ function getCtx(): CanvasRenderingContext2D | null {
  * given in pt and the canvas is told the same number in "px", so the result is
  * already in pt units). Falls back to an average-glyph estimate in tests.
  */
-export function measureText(text: string, fontSizePt: number, bold = false, italic = false): number {
+export function measureText(text: string, fontSizePt: number, bold = false, italic = false, family: string = FONT_FAMILY): number {
   const c = getCtx();
   if (c) {
-    c.font = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSizePt}px ${FONT_FAMILY}`;
+    c.font = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSizePt}px ${family}`;
     return c.measureText(text).width;
   }
   return text.length * fontSizePt * (bold ? 0.58 : 0.54);

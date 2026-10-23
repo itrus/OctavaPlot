@@ -9,7 +9,7 @@ import { LEGEND_KEY } from './layout';
 import type { BarGeom } from './model';
 
 /** Extra half-height (pt) of the editor-only hit rect over a bar that renders with no height. */
-export const ZERO_BAR_HIT_PAD_PT = 4;
+const ZERO_BAR_HIT_PAD_PT = 4;
 
 /** Deterministic, XML-safe clip id for one fill: no randomness, no characters outside [A-Za-z0-9_-]. */
 export function fillClipId(chartId: string, markId: string): string {
@@ -154,15 +154,18 @@ export function KeyMark({
   chartId,
   groupId,
   editor,
+  width = LEGEND_KEY.width,
 }: {
   style: ChartStyle;
   x: number;
   y: number;
+  /** Width of the key, pt (a square key is narrower). */
+  width?: number;
   chartId: string;
   groupId: string;
   editor: boolean;
 }): ReactElement {
-  const w = LEGEND_KEY.width;
+  const w = width;
   const fill = resolveBarFill(style);
   if (fill.mode === 'solid') {
     return (

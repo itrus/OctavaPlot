@@ -320,7 +320,6 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
   overflow-y: auto;
   min-height: 0;
 }
-.inspector-head { display: flex; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--panel); z-index: 5; }
 .insp-section { border-bottom: 1px solid var(--border); }
 .insp-section-head { width: 100%; text-align: left; border: 0; border-radius: 0; background: #eceff2; font-weight: 600; padding: 6px 10px; }
 .insp-section-body { padding: 6px 12px 10px; }
@@ -424,3 +423,11 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
 .info-logo { flex: none; display: block; }
 .coffee-btn { display: inline-block; padding: 4px 12px; border: 1px solid #000; border-radius: 6px; background: #FFDD00; color: #000; font-weight: 600; text-decoration: none; }
 .coffee-btn:hover { filter: brightness(0.95); }
+.inline-controls { display: inline-flex; align-items: center; gap: 8px; }
+.inline-check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.order-actions { display: flex; gap: 6px; margin: 4px 0 6px; }
+.order-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.order-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.order-buttons { display: inline-flex; gap: 2px; }
+
+.nav-rename { flex: 1; min-width: 0; font: inherit; padding: 0 3px; }

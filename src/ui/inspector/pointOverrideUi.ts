@@ -4,7 +4,7 @@ import { LABEL_STYLE_KEYS } from '../../model/style';
 import { describePointLabelUi, placementPatch, type PointLabelUi } from './pointLabelUi';
 
 /** What the Inspector edits for the current selection, and the selection to fall back to when it is stale. */
-export interface PointSelectionState {
+interface PointSelectionState {
   /** 'all' (Global) or the data set the controls edit. */
   scope: 'all' | Id;
   groupId: Id | null;
@@ -35,7 +35,7 @@ export function pointSelectionState(table: DataTable, selection: Selection, type
   return { ...inGroup, pointId: selection.pointId, row, rowTitle: table.rows[row]?.title ?? '' };
 }
 
-export type PointLabelMode = 'inherit' | 'show' | 'hide';
+type PointLabelMode = 'inherit' | 'show' | 'hide';
 
 export const LABEL_MODE_OPTIONS: Array<{ value: PointLabelMode; label: string }> = [
   { value: 'inherit', label: 'Inherit' },
@@ -47,7 +47,7 @@ export const MEAN_POINT_REASON = 'Mean markers are labelled per data set, not pe
 export const MISSING_ROW_REASON = 'This point is no longer in the data table.';
 export const NO_TITLE_NOTE = 'This row has no title, so this label is not drawn.';
 
-export interface PointOverrideCtx {
+interface PointOverrideCtx {
   type: ChartType;
   /** The point's own overrides (object level only); decides Inherit and the override dots. */
   overrides: Partial<ChartStyle>;
@@ -55,7 +55,7 @@ export interface PointOverrideCtx {
   rowTitle: string | null;
 }
 
-export interface PointOverrideUi extends Omit<PointLabelUi, 'placements'> {
+interface PointOverrideUi extends Omit<PointLabelUi, 'placements'> {
   /** The point can carry label overrides at all. */
   available: boolean;
   reason: string | null;
@@ -157,7 +157,7 @@ const CODE_TEXT: Record<PlacementCode, string> = {
   moved: 'Label drawn, moved to avoid overlap.',
 };
 
-export interface PointStatus {
+interface PointStatus {
   text: string;
   /** The label was hidden because it overlaps another one, so Keep this label applies. */
   canKeep: boolean;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Project } from '../model/types';
 import { patchStyle, setRowTitles } from '../state/commands';
-import { bindLeft, bindRight, dualAxisFixture } from './dualAxisFixture';
+import { bindLeft, bindRight, dualAxisFixture } from '../testing/dualAxisFixture';
 import type { HitTarget } from './hitTest';
 import { buildChartModel } from './model';
 import { tooltipLines } from './tooltip';

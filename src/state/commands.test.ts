@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject, INITIAL_ROWS } from '../model/defaults';
-import { assertTableInvariants, MAX_ROW_TITLE_CHARS, permuteRows } from '../model/rows';
+import { MAX_ROW_TITLE_CHARS } from '../model/rows';
+import { assertTableInvariants, permuteRows } from '../testing/tableChecks';
 import { groupObjectIds, resetGroupStyle } from '../model/style';
 import type { Project } from '../model/types';
 import {
@@ -193,5 +194,15 @@ describe('invariants after a sequence', () => {
     const rev = permuteRows(table(q), order);
     expect(() => assertTableInvariants(rev)).not.toThrow();
     expect([rev.rows[0].title, rev.rows[1].title]).toEqual(['q', 'p']);
+  });
+});
+
+describe('renaming from the navigator', () => {
+  it('renames a table and a graph, trims the name, and ignores a blank one', async () => {
+    const { renameItem } = await import('./commands');
+    const p = createExampleProject();
+    expect(renameItem('table', p.dataTables[0].id, '  Dose response ')(p).dataTables[0].name).toBe('Dose response');
+    expect(renameItem('chart', p.charts[0].id, 'Figure 1')(p).charts[0].name).toBe('Figure 1');
+    expect(renameItem('table', p.dataTables[0].id, '   ')(p)).toBe(p);
   });
 });

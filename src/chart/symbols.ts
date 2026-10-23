@@ -25,3 +25,13 @@ export function symbolPath(shape: SymbolShape, cx: number, cy: number, size: num
       return `M${n2(cx)},${n2(cy - h)}L${n2(cx + h)},${n2(cy)}L${n2(cx)},${n2(cy + h)}L${n2(cx - h)},${n2(cy)}Z`;
   }
 }
+
+/** The symbol shapes the inspector offers. */
+export const SYMBOL_SHAPE_OPTIONS = [
+  { value: 'circle', label: 'Circle' },
+  { value: 'square', label: 'Square' },
+  { value: 'triangle', label: 'Triangle' },
+  { value: 'diamond', label: 'Diamond' },
+  { value: 'plus', label: 'Plus' },
+  { value: 'cross', label: 'Cross' },
+] as const;

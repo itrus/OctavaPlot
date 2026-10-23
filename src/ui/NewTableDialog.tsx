@@ -155,7 +155,7 @@ function FormatSketch({ id, layout }: { id: FormatId; layout: ReplicateLayout })
 type XyMode = 'single' | 'replicates' | 'summary';
 
 /**
- * New data table. The format is chosen in the menu along the top (XY, Column, and the planned Grouped, Contingency and
+ * New data table. The format is chosen in the menu along the top (XY, Column, Grouped, Contingency and
  * Survival), then whether to start empty or with sample data, then how the values are entered.
  */
 export function NewTableDialog({ defaultSample, onCreate, onClose }: { defaultSample: boolean; onCreate: (kind: TableKind, options: NewTableOptions) => void; onClose: () => void }) {

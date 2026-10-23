@@ -3,7 +3,7 @@ import { sanitizeRowTitle } from '../model/rows';
 import { parseCell } from './cellText';
 
 /** First header cell that marks the row title column in an exported file. */
-export const ROW_TITLE_HEADER = 'Row title';
+const ROW_TITLE_HEADER = 'Row title';
 
 const quote = (s: string) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
@@ -65,14 +65,14 @@ export function parseCsv(text: string): string[][] {
   return records.filter((r) => !(r.length === 1 && r[0].trim() === ''));
 }
 
-export interface ImportedTable {
+interface ImportedTable {
   names: string[];
   /** One title per row, or null when the file has no row title column. */
   titles: string[] | null;
   values: Array<Array<number | null>>;
 }
 
-export type CsvImport = { ok: true; data: ImportedTable } | { ok: false; message: string };
+type CsvImport = { ok: true; data: ImportedTable } | { ok: false; message: string };
 
 /** Column label for messages: the group name, else its position. */
 const colLabel = (name: string, c: number) => (name.trim() !== '' ? `"${name.trim()}"` : `column ${c + 1}`);

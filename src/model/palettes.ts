@@ -11,7 +11,7 @@ export interface Palette {
   group: PaletteGroup;
 }
 
-export type PaletteGroup = 'Journals' | 'Software and design systems' | 'Genomics' | 'Other';
+type PaletteGroup = 'Journals' | 'Software and design systems' | 'Genomics' | 'Other';
 export const PALETTE_GROUPS: readonly PaletteGroup[] = ['Journals', 'Software and design systems', 'Genomics', 'Other'];
 
 /** Where the ggsci palettes come from. */

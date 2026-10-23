@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject, createExampleTable, INITIAL_ROWS } from './defaults';
-import { assertTableInvariants, createRows, MAX_ROW_TITLE_CHARS, permuteRows, rowTitleAt, sanitizeRowTitle } from './rows';
+import { assertTableInvariants, permuteRows } from '../testing/tableChecks';
+import { createRows, MAX_ROW_TITLE_CHARS, rowTitleAt, sanitizeRowTitle } from './rows';
 import type { DataTable } from './types';
 
 /** Example table with titles p, q, r in rows 0..2. */

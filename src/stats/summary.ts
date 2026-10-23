@@ -4,6 +4,7 @@
  */
 
 import type { CentreKind, Observation, SpreadKind, SummarySpec } from '../model/types';
+import { memoFor } from './memo';
 import { medianCiRank, studentTQuantileUpper } from './special';
 
 export interface GroupSummary {
@@ -17,9 +18,9 @@ export interface GroupSummary {
   sem: number | null;
 }
 
-export type ErrorKind = 'sd' | 'sem';
+type ErrorKind = 'sd' | 'sem';
 
-export function validValues(values: ReadonlyArray<number | null | undefined>): number[] {
+function validValues(values: ReadonlyArray<number | null | undefined>): number[] {
   const out: number[] = [];
   for (const v of values) {
     if (typeof v === 'number' && Number.isFinite(v)) out.push(v);
@@ -77,9 +78,9 @@ export const SPREADS_BY_CENTRE: Record<CentreKind, readonly SpreadKind[]> = {
 };
 
 /** Warning classes of spec 21.5 L1460-1463. */
-export type Severity = 'informational' | 'visual' | 'blocking';
+type Severity = 'informational' | 'visual' | 'blocking';
 
-export type UnavailableCode =
+type UnavailableCode =
   | 'n-too-small'
   | 'coverage'
   | 'too-large'
@@ -94,13 +95,7 @@ export interface Notice {
   message: string;
 }
 
-export interface CentreResult {
-  value: number | null;
-  /** Set when the centre could not be computed. */
-  notice: Notice | null;
-}
-
-export interface IntervalResult {
+interface IntervalResult {
   /** none = no spread chosen; unavailable = chosen but not computable (or not allowed for the centre). */
   status: 'none' | 'ok' | 'unavailable';
   lower: number | null;
@@ -424,14 +419,11 @@ export function computeGroupStats(
   return result(centre, { status: 'ok', lower, upper, coverage, code: null });
 }
 
-// One cache per observation array (commands replace arrays, never mutate them).
-const STATS_CACHE_LIMIT = 32;
-const statsCache = new WeakMap<ReadonlyArray<Observation>, Map<string, GroupStats>>();
-
 /** Cached computeGroupStats keyed by only the settings that affect the result. */
 export function statsFor(observations: ReadonlyArray<Observation>, spec: SummarySpec): GroupStats {
   const effective = effectiveSpreadOf(spec.centre, spec.spread);
   const key = JSON.stringify([
+    'stats',
     SUMMARY_ALGORITHM_VERSION,
     spec.centre,
     spec.spread,
@@ -439,21 +431,10 @@ export function statsFor(observations: ReadonlyArray<Observation>, spec: Summary
     effective === 'none' ? null : spec.smallSamplePolicy,
     effective === 'ci' ? spec.confidenceLevel : null,
   ]);
-  let byKey = statsCache.get(observations);
-  if (!byKey) {
-    byKey = new Map();
-    statsCache.set(observations, byKey);
-  }
-  const hit = byKey.get(key);
-  if (hit) return hit;
-  const stats = computeGroupStats(
-    observations.map((o) => o.value),
-    spec,
+  return memoFor(observations, key, () =>
+    computeGroupStats(
+      observations.map((o) => o.value),
+      spec,
+    ),
   );
-  if (byKey.size >= STATS_CACHE_LIMIT) {
-    const k = byKey.keys().next();
-    if (!k.done) byKey.delete(k.value);
-  }
-  byKey.set(key, stats);
-  return stats;
 }

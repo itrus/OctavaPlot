@@ -6,7 +6,7 @@ import type { DataTable } from '../model/types';
 const NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 const COMMA_DECIMAL_RE = /^[+-]?\d+,\d+$/;
 
-export type CellParse = { ok: true; value: number | null } | { ok: false; message: string };
+type CellParse = { ok: true; value: number | null } | { ok: false; message: string };
 
 /** Empty text = missing observation (null). Anything else must be a finite number. */
 export function parseCell(text: string): CellParse {
@@ -19,7 +19,7 @@ export function parseCell(text: string): CellParse {
   return { ok: true, value };
 }
 
-export type PasteParse =
+type PasteParse =
   | { ok: true; matrix: Array<Array<number | null>> }
   | { ok: false; message: string };
 
@@ -78,7 +78,7 @@ export function splitTsv(text: string): string[][] {
   return rows;
 }
 
-export type BlockParse =
+type BlockParse =
   | { ok: true; titles: string[]; matrix: Array<Array<number | null>> }
   | { ok: false; message: string };
 
@@ -138,7 +138,7 @@ export function blockToText(titles: string[] | null, matrix: Array<Array<number 
 }
 
 /** Inclusive cell range; c0 = -1 includes the Row title column. */
-export interface CellBounds {
+interface CellBounds {
   r0: number;
   r1: number;
   c0: number;
@@ -158,7 +158,7 @@ export function selectionStrings(table: DataTable, b: CellBounds): { titles: str
   return { titles: b.c0 < 0 ? titles : null, matrix };
 }
 
-export interface PastePlan {
+interface PastePlan {
   row0: number;
   col0: number;
   /** Row titles for rows row0 onwards; null for a values-only paste. */
@@ -170,7 +170,7 @@ export interface PastePlan {
   sel: { ar: number; ac: number; fr: number; fc: number };
 }
 
-export type PasteResult = ({ ok: true } & PastePlan) | { ok: false; message: string };
+type PasteResult = ({ ok: true } & PastePlan) | { ok: false; message: string };
 
 /**
  * Decide what a paste does. A selection in the Row title column pastes titles (the first field of

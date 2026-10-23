@@ -17,9 +17,20 @@ export interface YAxisScale {
   ticks: number[];
   tickLabel: (v: number) => string;
   warnings: string[];
+  /** Minor tick positions (never the same as a major tick). */
+  minorTicks?: number[];
+  /** Base of a log scale (positions follow the logarithm); null or absent = linear. */
+  log?: number | null;
+  /** The axis is drawn the other way round: the largest value where the smallest was. */
+  reverse?: boolean;
+  /** Breaks: the stretches of the domain that are shown, from low to high; absent = one stretch. */
+  segments?: Array<{ lo: number; hi: number }>;
+  /** Room between two stretches of a broken axis, pt: at least the height of a number, so the numbers either side of a gap do not touch. */
+  gapPt?: number;
 }
 
-const clean = (v: number): number => Number(v.toPrecision(12));
+/** A value rounded to 12 significant digits, so ticks do not carry floating point dust. */
+export const clean = (v: number): number => Number(v.toPrecision(12));
 
 function autoDomain(input: YAxisInput): [number, number] {
   const { values, includeZero } = input;
@@ -145,17 +156,21 @@ export interface AxisEditContext {
    * warnings remain the authority.
    */
   domain: readonly [number, number];
+  /** A log axis: the limits must be above 0 and the interval is a whole number of powers. */
+  log?: number | null;
 }
 
 const fmtLimit = (v: number): string => String(Number(v.toPrecision(6)));
 
 export function validateAxisMin(v: number, ctx: AxisEditContext): string | null {
+  if (ctx.log && !(v > 0)) return 'Must be above 0 on a log axis.';
   const upper = ctx.max ?? ctx.domain[1];
   if (v < upper) return null;
   return `Must be below the ${ctx.max === null ? 'automatic ' : ''}maximum (${fmtLimit(upper)}).`;
 }
 
 export function validateAxisMax(v: number, ctx: AxisEditContext): string | null {
+  if (ctx.log && !(v > 0)) return 'Must be above 0 on a log axis.';
   const lower = ctx.min ?? ctx.domain[0];
   if (v > lower) return null;
   return `Must be above the ${ctx.min === null ? 'automatic ' : ''}minimum (${fmtLimit(lower)}).`;
@@ -163,9 +178,18 @@ export function validateAxisMax(v: number, ctx: AxisEditContext): string | null 
 
 export function validateAxisInterval(v: number, ctx: AxisEditContext): string | null {
   if (!(v > 0)) return 'Must be greater than 0.';
+  if (ctx.log) return Number.isInteger(v) ? null : 'On a log axis the interval is a whole number of powers (1, 2, 3...).';
   const span = ctx.domain[1] - ctx.domain[0];
   if (tickCountFor(span, v) > MAX_TICKS_PER_AXIS) {
     return `Too small for this range: it would draw more than ${MAX_TICKS_PER_AXIS} ticks.`;
   }
   return null;
+}
+
+/** The distance between the first two major ticks: in powers of the base on a log axis, in data units otherwise. */
+export function majorStepOf(scale: Pick<YAxisScale, 'ticks' | 'log'>): number {
+  const t = scale.ticks;
+  if (t.length < 2) return 1;
+  if (scale.log) return Math.max(1, Math.round(Math.log(t[1] / t[0]) / Math.log(scale.log)));
+  return t[1] - t[0];
 }

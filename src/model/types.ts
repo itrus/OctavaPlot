@@ -65,20 +65,30 @@ export type ChartType =
   | 'bar'
   | 'scatter'
   | 'mean'
+  | 'box'
+  | 'violin'
+  | 'floating'
+  | 'paired'
+  | 'histogram'
+  | 'ecdf'
   | 'xyScatter'
   | 'xyLine'
   | 'xyLineSymbols'
   | 'groupedBar'
   | 'groupedLine'
+  | 'heatmap'
+  | 'groupedStacked'
   | 'contingencyBars'
+  | 'pie'
+  | 'doughnut'
   | 'contingencyStacked'
   | 'contingencyPercent'
   | 'survival'
   | 'cumulativeEvent';
 export type SymbolShape = 'circle' | 'square' | 'triangle' | 'diamond' | 'plus' | 'cross';
 export type ErrorDirection = 'both' | 'positive' | 'negative';
-export type ErrorCap = 'bar' | 'none';
-export type LegendPosition = 'right' | 'bottom' | 'top';
+type ErrorCap = 'bar' | 'none';
+type LegendPosition = 'right' | 'bottom' | 'top';
 /** Data set to Y axis binding (spec 5.3 L322); Cartesian chart types only. */
 export type AxisBinding = 'primary' | 'secondary';
 
@@ -189,8 +199,179 @@ export interface ChartLayer {
   groupSummary: Record<Id, Partial<SummarySpec>>;
 }
 
+/** How an axis maps values to positions (spec 6.1). The log scales need positive values. */
+export type AxisScaleKind = 'linear' | 'log10' | 'log2' | 'ln';
+/** Which side of the axis line the tick marks point to (spec 6.3). */
+export type TickDirection = 'out' | 'in' | 'both' | 'none';
+/** How numbers on the axis are written (spec 6.4). */
+export type NumberFormatKind = 'auto' | 'fixed' | 'scientific';
+
+/** What the slices of a pie or doughnut say: nothing, the part's name, its count, its share, or two of these. */
+export type PieLabelMode = 'none' | 'name' | 'value' | 'percent' | 'name-percent' | 'value-percent';
+
+/** Settings of pies and doughnuts (spec 14), one set for the whole chart. */
+export interface PieOptions {
+  /** Where the first part starts, in degrees from the top, clockwise. */
+  startAngle: number;
+  direction: 'clockwise' | 'counterclockwise';
+  /** Doughnut: the hole as a fraction of the radius. */
+  hole: number;
+  labels: PieLabelMode;
+  percentDigits: number;
+  /** The total of each pie, written under it (and in the hole of a doughnut). */
+  showTotal: boolean;
+  totalPrefix: string;
+}
+
+/** Which way the columns of a column chart run: up from the category axis, or across from it. */
+export type ChartOrientation = 'vertical' | 'horizontal';
+
+/** How a box plot ends its whiskers (spec 10.1), and how smooth a violin is (spec 10.2). */
+export type WhiskerRuleKind = 'minmax' | 'tukey' | 'p10_90' | 'p5_95' | 'p2_5_97_5' | 'p1_99';
+export type SmoothingLevel = 'light' | 'medium' | 'heavy';
+export type ViolinNormalisationKind = 'width' | 'area' | 'count';
+/** Which observations are drawn as dots over a box or a violin. */
+export type DistributionPoints = 'none' | 'outside' | 'all';
+
+/** Settings of box plots and violins, one set for the whole chart; the colours come from each data set's style. */
+export interface DistributionOptions {
+  whisker: WhiskerRuleKind;
+  /** Multiplier of the interquartile range of the Tukey rule. */
+  tukeyK: number;
+  /** Width of a box and of a violin, as a fraction of the column's slot. */
+  boxWidth: number;
+  violinWidth: number;
+  showMedian: boolean;
+  showMean: boolean;
+  /** Box: none, outside the whiskers or all; violin: none or all. */
+  points: DistributionPoints;
+  smoothing: SmoothingLevel;
+  /** Violin bandwidth in data units; null = the automatic one of the smoothing level. */
+  bandwidth: number | null;
+  /** Violin ends: at the smallest and largest value, or following the tails of the kernel. */
+  trim: 'sample' | 'tails';
+  normalisation: ViolinNormalisationKind;
+  showQuartiles: boolean;
+}
+
+/** Paired plots: the rows of a column table are subjects, joined by a line across the columns (spec 7.2, 8.3). */
+interface PairOptions {
+  /** A subject with a missing value: join the values either side of it (never invent one), or break the line there. */
+  bridge: boolean;
+}
+
+/** Colour scales of a heat map (spec 13.1). */
+export type HeatPalette = 'viridis' | 'magma' | 'blue' | 'greenred' | 'grayscale';
+
+/** Settings of heat maps, one set for the whole chart: colours, normalising, labels (spec 13). */
+export interface HeatmapOptions {
+  palette: HeatPalette;
+  reverse: boolean;
+  /** The range the colours cover; null = the smallest and largest value. */
+  min: number | null;
+  max: number | null;
+  /** Diverging scale (green, black, red): the value that is black; null = the middle of the range. */
+  centre: number | null;
+  normalise: 'none' | 'row' | 'column';
+  method: 'zscore' | 'minmax' | 'centre';
+  /** A cell of replicates shows their mean or their median. */
+  summary: 'mean' | 'median';
+  showValues: boolean;
+  /** Digits after the decimal point of the numbers in the cells; null = automatic. */
+  decimals: number | null;
+  /** Space between cells, pt. */
+  cellGapPt: number;
+  /** Swap rows and columns. */
+  transpose: boolean;
+  colourbar: boolean;
+  missingColour: string;
+}
+
+/** Settings of fitted curves on an XY chart (spec 17), one set for the whole chart: each data set gets its own fit. */
+export interface FitSettings {
+  /** 'none' draws no curve. */
+  model: 'none' | 'linear' | 'polynomial' | 'exp_decay' | 'exp_association' | 'exp_two_phase' | 'gaussian_peak' | 'hyperbola' | 'hill_4pl' | 'asymmetric_5pl';
+  /** Polynomial only. */
+  degree: number;
+  band: 'none' | 'confidence' | 'prediction';
+  /** Confidence level of the band and of the parameter intervals, as a fraction. */
+  level: number;
+  /** Carry the curve over the whole X axis rather than over the data. */
+  extend: boolean;
+  /** Write the fitted parameters on the chart. */
+  showParameters: boolean;
+}
+
+/** Settings of histograms and cumulative distributions (spec 11), one set for the whole chart. */
+export interface HistogramOptions {
+  /** Automatic bins, or equal bins of `binWidth`. */
+  binning: 'auto' | 'width';
+  binWidth: number | null;
+  /** An edge the bins line up with; null = multiples of the width. */
+  firstEdge: number | null;
+  frequency: 'count' | 'fraction' | 'percent' | 'density';
+  cumulative: 'off' | 'ascending' | 'descending';
+  /** Several data sets: bars over each other, or side by side in each bin. */
+  arrangement: 'overlay' | 'side';
+  /** Space between bars as a percentage of a bin's width. */
+  gapPct: number;
+  ecdfDirection: 'atOrBelow' | 'above';
+  ecdfUnits: 'fraction' | 'percent' | 'count';
+  /** A symbol at each step of the cumulative distribution. */
+  ecdfSymbols: boolean;
+  /** Carry the curve to both ends of the axis. */
+  ecdfExtend: boolean;
+}
+
+/** What a label on a bar says: nothing, the plotted value (mean, median...) or the sample size. */
+export type BarLabelMode = 'none' | 'value' | 'n';
+
+/** Labels above the bars (spec 19.2 bound values); one setting for the whole chart. */
+export interface BarLabels {
+  show: BarLabelMode;
+  /** Digits after the decimal point of a value; null = automatic (6 significant digits). */
+  decimals: number | null;
+  thousands: boolean;
+  prefix: string;
+  suffix: string;
+  sizePt: number;
+  /** null = the text colour of the chart. */
+  color: string | null;
+}
+
+/** Pattern of a line: solid, dashed or dotted. */
+export type LineStyle = 'solid' | 'dashed' | 'dotted';
+/** The frame round the plotting region: none, or a box (spec 6.2 frame.mode). */
+export type FrameStyle = 'none' | 'box';
+
+/** Colour, thickness and pattern of the major and the minor gridlines (spec 6.5); shared by the axes. */
+export interface GridStyle {
+  color: string;
+  widthPt: number;
+  style: LineStyle;
+  minorColor: string;
+  minorWidthPt: number;
+  minorStyle: LineStyle;
+}
+
+/** A range of values left out of a numeric axis: the axis shows what is below and above it, with a gap between. */
+export interface AxisBreak {
+  from: number;
+  to: number;
+}
+
+/** The mark on the axis line at a break (spec 6.6). */
+export type BreakMark = 'none' | 'slash' | 'doubleSlash';
+
 export interface AxisConfig {
   title: string;
+  /** Show the title text; switching it off keeps the text. */
+  titleVisible: boolean;
+  titleBold: boolean;
+  tickBold: boolean;
+  /** Extra distance of the title, and of the tick numbers, from the axis, pt. */
+  titleOffsetPt: number;
+  tickLabelOffsetPt: number;
   visible: boolean;
   lineWidthPt: number;
   tickFontSizePt: number;
@@ -198,16 +379,56 @@ export interface AxisConfig {
   /** null = automatic. */
   min: number | null;
   max: number | null;
+  /** Linear axes: the step between major ticks. Log axes: the step in powers of the base (whole numbers). */
   majorInterval: number | null;
   showGrid: boolean;
+  /** Minor gridlines, at the minor ticks (which have to be switched on). */
+  showMinorGrid: boolean;
+  /** At most two ranges left out of a linear, not reversed axis; ignored on a log axis and on a reversed one. */
+  breaks: AxisBreak[];
+  breakMark: BreakMark;
+  /** While the axis is hidden: a short bar the length of one major tick interval takes its place (spec 6.6). */
+  scaleBar: boolean;
+  /** Numeric axes only; the category axis has no scale. */
+  scale: AxisScaleKind;
+  /** Draw the axis the other way round: the largest value where the smallest was (spec 6.1 axis.reverse). */
+  reverse: boolean;
+  /** Minor ticks between two major ticks: 0 = none. On a log10 axis any number above 0 means 2 to 9 times the power. */
+  minorTicks: number;
+  tickDirection: TickDirection;
+  /** Length of a major tick, pt; minor ticks are half of it. */
+  tickLengthPt: number;
+  numberFormat: NumberFormatKind;
+  /** Digits after the decimal point; null = automatic. */
+  decimals: number | null;
+  /** Group the digits of large numbers by thousands. */
+  thousands: boolean;
+  prefix: string;
+  suffix: string;
 }
+
+/** Shape of the colour key in the legend: a wide rectangle or a square. */
+export type LegendKeyShape = 'rectangle' | 'square';
 
 export interface LegendConfig {
   visible: boolean;
+  keyShape: LegendKeyShape;
   position: LegendPosition;
   fontSizePt: number;
   /** Data sets left out of the legend; the others stay listed. */
   hiddenGroupIds: Id[];
+}
+
+/**
+ * Where the columns of a column chart sit (percent of a column's width): the space between two columns, before the
+ * first and after the last; null = automatic (the layout the charts always had). The baseline is where the bars begin.
+ */
+export interface BarLayout {
+  gapPct: number | null;
+  beforePct: number | null;
+  afterPct: number | null;
+  /** Bars begin at this value instead of 0 (null = automatic: 0, or the nearest edge of the axis). */
+  baseline: number | null;
 }
 
 export interface JitterConfig {
@@ -249,6 +470,10 @@ export interface Chart {
   heightPx: number;
   /** Data sets of the chart's own table that are switched off on this graph. */
   hiddenGroupIds: Id[];
+  /** Order of the data sets on the graph (column charts): those listed come first, in this order. */
+  groupOrder: Id[];
+  /** Space before a data set as a percentage of the normal space between columns; absent = 100. */
+  groupGaps: Record<Id, number>;
   /** Data sets from other tables that are plotted on this graph too. */
   extraGroups: Array<{ tableId: Id; groupId: Id }>;
   /** Survival and cumulative-event charts: confidence band and at-risk table. */
@@ -260,6 +485,31 @@ export interface Chart {
   title: string;
   showTitle: boolean;
   titleFontSizePt: number;
+  /** Font of every text in the chart (one of FONT_FAMILIES) and the colour of the text. */
+  fontFamily: string;
+  textColor: string;
+  titleBold: boolean;
+  /** Extra distance of the chart title from the top edge, pt. */
+  titleOffsetPt: number;
+  /** Colour of the axis lines, ticks and the frame. */
+  axisColor: string;
+  /** Fill of the plotting region and of the whole chart; null = none (transparent). */
+  plotColor: string | null;
+  pageColor: string | null;
+  frame: FrameStyle;
+  grid: GridStyle;
+  /** Column charts only: horizontal puts the categories on the left and the value axis along the bottom. */
+  orientation: ChartOrientation;
+  /** Where the axis lines cross, as values on the other axis (null = the low edge): the Y axis at this X, the X axis at this Y. */
+  origin: { x: number | null; y: number | null };
+  bars: BarLayout;
+  barLabels: BarLabels;
+  distribution: DistributionOptions;
+  pairs: PairOptions;
+  heatmap: HeatmapOptions;
+  histogram: HistogramOptions;
+  fit: FitSettings;
+  pie: PieOptions;
   xAxis: AxisConfig;
   yAxis: AxisConfig;
   /** Right Y axis; used only while a data set is bound to it (spec 6.2 L363). */

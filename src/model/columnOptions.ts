@@ -1,0 +1,61 @@
+import { bool, clamp, clampOrNull, numberOrNull, oneOf, optionalHex, record, text, valuesOf } from './sanitize';
+import type { BarLabelMode, BarLabels, BarLayout } from './types';
+
+/** Settings of the columns of a column chart: the space between them, their baseline and the labels above them. */
+
+export const BAR_LIMITS = { spacingPct: { min: 0, max: 500 } } as const;
+
+/** The automatic spacing in percent of a column's width: gap between columns 3/7 and the outer margins 2/7 (the old band padding 0.3 and 0.2). */
+export const AUTO_BAR_GAP_PCT = 300 / 7;
+export const AUTO_BAR_OUTER_PCT = 200 / 7;
+
+/** Column spacing and baseline from a file or a patch: a value that is not valid falls back to the one in `base`. */
+export function sanitizeBars(raw: unknown, base: BarLayout): BarLayout {
+  const b = record(raw);
+  const { min, max } = BAR_LIMITS.spacingPct;
+  return {
+    gapPct: clampOrNull(b.gapPct, min, max, base.gapPct),
+    beforePct: clampOrNull(b.beforePct, min, max, base.beforePct),
+    afterPct: clampOrNull(b.afterPct, min, max, base.afterPct),
+    baseline: numberOrNull(b.baseline, base.baseline),
+  };
+}
+
+/**
+ * The d3 band padding that gives these spacings (percent of a column's width): the share of a step between two columns,
+ * the outer padding on each side, and how it is shared between the left and the right. All automatic = the old look exactly.
+ */
+export function bandPadding(bars: BarLayout): { inner: number; outer: number; align: number } {
+  if (bars.gapPct === null && bars.beforePct === null && bars.afterPct === null) return { inner: 0.3, outer: 0.2, align: 0.5 };
+  const g = bars.gapPct ?? AUTO_BAR_GAP_PCT;
+  const before = bars.beforePct ?? AUTO_BAR_OUTER_PCT;
+  const after = bars.afterPct ?? AUTO_BAR_OUTER_PCT;
+  const round = (v: number) => Number(v.toPrecision(12));
+  return {
+    inner: round(g / (100 + g)),
+    outer: round((before + after) / (2 * (100 + g))),
+    align: before + after > 0 ? round(before / (before + after)) : 0.5,
+  };
+}
+
+export const BAR_LABEL_MODES: ReadonlyArray<{ value: BarLabelMode; label: string }> = [
+  { value: 'none', label: 'Nothing' },
+  { value: 'value', label: 'Plotted value' },
+  { value: 'n', label: 'Sample size' },
+];
+
+const LABEL_MODES = valuesOf(BAR_LABEL_MODES);
+
+/** Labels on bars from a file or a patch: a value that is not valid falls back to the one in `base`. */
+export function sanitizeBarLabels(raw: unknown, base: BarLabels): BarLabels {
+  const b = record(raw);
+  return {
+    show: oneOf(LABEL_MODES, b.show, base.show),
+    decimals: b.decimals === null ? null : typeof b.decimals === 'number' && Number.isFinite(b.decimals) ? Math.round(clamp(b.decimals, 0, 10, 0)) : base.decimals,
+    thousands: bool(b.thousands, base.thousands),
+    prefix: text(b.prefix, 24, base.prefix),
+    suffix: text(b.suffix, 24, base.suffix),
+    sizePt: clamp(b.sizePt, 4, 48, base.sizePt),
+    color: optionalHex(b.color, base.color),
+  };
+}

@@ -30,8 +30,8 @@ export async function chartToPngBlob(chart: Chart, table: DataTable, scale: numb
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D context is unavailable.');
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, width, height);
+  // The page colour is part of the SVG; with none chosen the PNG stays transparent.
+  ctx.clearRect(0, 0, width, height);
   ctx.drawImage(img, 0, 0, width, height);
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encoding failed.'))), 'image/png'),

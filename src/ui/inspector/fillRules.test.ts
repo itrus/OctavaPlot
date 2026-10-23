@@ -112,9 +112,9 @@ describe('legacy and placement', () => {
     expect(datasetSwatch(s)).toMatchObject({ background: s.barFill, backgroundImage: null });
     expect(patternColorDisplay(s)).toBe(s.barBorderColor);
   });
-  it('keeps the pattern controls in the Bars box only', () => {
+  it('keeps the pattern controls in the Bars (box, violin) box only', () => {
     const src = readFileSync(new URL('./Inspector.tsx', import.meta.url), 'utf8');
-    const start = src.indexOf('<GroupBox title="Bars"');
+    const start = src.indexOf('<GroupBox title={bodyTitle}');
     const end = src.indexOf('<GroupBox', start + 1);
     expect(start).toBeGreaterThan(0);
     const outside = (src.slice(0, start) + src.slice(end)).replace(/^import[\s\S]*?from '[^']+';$/gm, '');

@@ -1,4 +1,5 @@
 import { usesSeriesBlocks } from './chartTypes';
+import { applyOrder } from './groupOrder';
 import { xySeries } from './tableLayout';
 import type { Chart, DataTable, Group, Id, Project } from './types';
 
@@ -41,7 +42,7 @@ export function graphSources(p: Project, chart: Chart): GraphSource[] {
 export function effectiveTable(p: Project, chart: Chart): DataTable | undefined {
   const own = tableById(p, chart.dataTableId);
   if (!own) return undefined;
-  if (chart.hiddenGroupIds.length === 0 && chart.extraGroups.length === 0) return own;
+  if (chart.hiddenGroupIds.length === 0 && chart.extraGroups.length === 0 && chart.groupOrder.length === 0) return own;
   const hidden = new Set(chart.hiddenGroupIds);
   // An XY table's first column is its X: it is never switched off; a hidden series takes all of its columns with it.
   const hiddenColumns = new Set<string>();
@@ -56,7 +57,7 @@ export function effectiveTable(p: Project, chart: Chart): DataTable | undefined 
     }
   }
   const rowCount = Math.max(own.rowCount, ...picked.map((g) => g.observations.length));
-  const groups = picked.map((g, i) => ({
+  const unordered = picked.map((g, i) => ({
     ...g,
     // Colours follow position on this graph, so data sets from different tables do not share a colour by accident.
     paletteIndex: i,
@@ -65,6 +66,8 @@ export function effectiveTable(p: Project, chart: Chart): DataTable | undefined 
         ? g.observations
         : [...g.observations, ...Array.from({ length: rowCount - g.observations.length }, (_, k) => ({ id: `${g.id}:pad${k}`, value: null }))],
   }));
+  // Column charts can put the data sets in another order; colours stay with their data set (paletteIndex above).
+  const groups = blocks ? unordered : applyOrder(unordered, chart.groupOrder);
   const rows =
     own.rows.length === rowCount
       ? own.rows

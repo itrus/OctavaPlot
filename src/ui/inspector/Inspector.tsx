@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
+import { SYMBOL_SHAPE_OPTIONS } from '../../chart/symbols';
+import { supportsHorizontal } from '../../model/chartTypes';
 import { FILL_PATTERN_OPTIONS, describeBarFillUi } from '../../model/fill';
-import { paletteById } from '../../model/palettes';
 import { isGroupOverridden, resolveStyle } from '../../model/style';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/summary';
 import type { AxisBinding, Chart, ChartStyle, ChartType, DataTable, Id, SummarySpec } from '../../model/types';
 import { AXIS_SHORT, AXIS_TAG, bindingOf, bindingSelectState } from '../../chart/axes';
 import { clippedEndpointCount, clippedEndpointMessage } from '../../chart/errorGeometry';
 import { buildChartModel, displayName } from '../../chart/model';
-import { validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext } from '../../chart/scales';
+import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext } from '../../chart/scales';
 import { tooltipFmt } from '../../chart/tooltip';
 import {
   DIRECTION_HINT,
@@ -22,11 +23,9 @@ import {
 } from '../../stats/describe';
 import { useApp } from '../../state/AppContext';
 import {
-  applyPalette,
   composeCommands,
   patchAxis,
   clearPointStyle,
-  patchBothAxes,
   patchChart,
   patchJitter,
   patchLegend,
@@ -34,8 +33,16 @@ import {
   patchStyle,
   patchSummary,
   setChartType,
+  patchLook,
 } from '../../state/commands';
-import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, PaletteInfo, PaletteOptions, TextSections } from './SharedSections';
+import { HeatInspector } from './HeatInspector';
+import { HistInspector } from './HistInspector';
+import { PieInspector } from './PieInspector';
+import { DistributionControls } from './DistributionControls';
+import { ColumnLayoutSection, DirectionSection, FrameSection } from './LookControls';
+import { AxisStyleControls, TickFields } from './AxisStyleControls';
+import { DataSetOrder } from './DataSetOrder';
+import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './SharedSections';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './controls';
 import {
   backgroundDisplay,
@@ -58,15 +65,6 @@ import { PointLabelControls, SelectedPointBox, type PointEdit } from './PointLab
 import { pointSelectionState } from './pointOverrideUi';
 import { CalculationOptions,IntervalFields, LineAtField } from './SummaryControls';
 
-const shapeOptions = [
-  { value: 'circle', label: 'Circle' },
-  { value: 'square', label: 'Square' },
-  { value: 'triangle', label: 'Triangle' },
-  { value: 'diamond', label: 'Diamond' },
-  { value: 'plus', label: 'Plus' },
-  { value: 'cross', label: 'Cross' },
-] as const;
-
 
 function DatasetSwatchChip({ style }: { style: ChartStyle }) {
   const sw = datasetSwatch(style);
@@ -81,7 +79,11 @@ function DatasetSwatchChip({ style }: { style: ChartStyle }) {
 
 /** The formatting panel: one for charts on a numeric X axis (XY tables), one for category charts. */
 export function Inspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  return chartFamily(chart.type) === 'category' ? <CategoryInspector chart={chart} table={table} /> : <XyInspector chart={chart} table={table} />;
+  const family = chartFamily(chart.type);
+  if (family === 'whole') return <PieInspector chart={chart} table={table} />;
+  if (family === 'hist') return <HistInspector chart={chart} table={table} />;
+  if (family === 'heat') return <HeatInspector chart={chart} table={table} />;
+  return family === 'category' ? <CategoryInspector chart={chart} table={table} /> : <XyInspector chart={chart} table={table} />;
 }
 
 function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable }) {
@@ -171,17 +173,21 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
   const mixedBinding = scope === 'all' && groupBindings.some((b) => b !== groupBindings[0]);
   const setBinding = (axisBinding: AxisBinding) =>
     run(axisBinding === 'secondary' ? 'Plot data on right Y axis' : 'Plot data on left Y axis', patchStyle(chart.id, scope, { axisBinding }));
-  const axisCtx = (axis: Chart['yAxis'], scale: { domain: [number, number] }): AxisEditContext => ({
+  const axisCtx = (axis: Chart['yAxis'], scale: { domain: [number, number]; log?: number | null }): AxisEditContext => ({
     min: axis.min,
     max: axis.max,
     majorInterval: axis.majorInterval,
     domain: scale.domain,
+    log: scale.log,
   });
   const yCtx = axisCtx(chart.yAxis, model.y);
-  const yAuto = (scale: { ticks: number[] }) => (scale.ticks.length > 1 ? scale.ticks[1] - scale.ticks[0] : 1);
+  const yAuto = majorStepOf;
   const leftName = dual ? 'Left Y' : 'Y';
   const errorOff = describeSummaryControls({ showErrorBars: st.showErrorBars, centre: spec.centre, spread: spec.spread }).errorOff;
   const titles = centreTitles(spec.centre, chart.type);
+  const isDist = chart.type === 'box' || chart.type === 'violin' || chart.type === 'floating';
+  // The body of a column: a bar, a box or a violin.
+  const bodyTitle = chart.type === 'box' ? 'Box' : chart.type === 'violin' ? 'Violin' : chart.type === 'floating' ? 'Floating bars' : 'Bars';
   const fillUi = describeBarFillUi(st);
   const isPattern = fillUi.mode === 'pattern';
   const widthName = widthLabel(st.barPattern);
@@ -227,29 +233,10 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
                 onChange={(t) => run('Change graph type', setChartType(chart.id, t))}
               />
             </Field>
-            <Field label="Color palette" hint="Gives the data sets coordinated colours in order. Per-data-set and all-bar colours below still apply on top.">
-              <select
-                value={chart.paletteId ?? 'custom'}
-                aria-label="Color palette"
-                onChange={(e) => {
-                  const palette = paletteById(e.target.value);
-                  if (palette) run(`Apply ${palette.name} palette`, applyPalette(chart.id, palette));
-                }}
-              >
-                {chart.paletteId === null && <option value="custom" disabled>Custom colours</option>}
-<PaletteOptions />
-              </select>
-              {paletteById(chart.paletteId) && (
-                <span className="palette-swatches" aria-hidden="true">
-                  {paletteById(chart.paletteId)!.colors.slice(0, 5).map((c) => (
-                    <i key={c} style={{ background: c }} />
-                  ))}
-                </span>
-              )}
-              <PaletteInfo paletteId={chart.paletteId} />
-            </Field>
+            <PaletteField chart={chart} hint="Gives the data sets coordinated colours in order. Per-data-set and all-bar colours below still apply on top." />
           </GroupBox>
 
+          {(!isDist || chart.type === 'floating') && (
           <GroupBox title="Summary">
             <LineAtField centre={spec.centre} overridden={ovSum('centre')} onChange={setCentre} />
             <div className="muted small">{summaryCaption(spec, st.showErrorBars)}</div>
@@ -257,8 +244,11 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
               <div key={line} className="muted small">{line}</div>
             ))}
           </GroupBox>
+          )}
 
-          <GroupBox title="Bars" checked={st.showBars} onCheckedChange={(v) => setStyle({ showBars: v })} overridden={ov('showBars')}>
+          {isDist && <DistributionControls chart={chart} lineColor={st.lineColor} lineWidthPt={st.lineWidthPt} onLine={(patch) => setStyle(patch)} />}
+
+          <GroupBox title={bodyTitle} checked={st.showBars} onCheckedChange={(v) => setStyle({ showBars: v })} overridden={ov('showBars')}>
             {isPattern ? (
               <Field label="Background" overridden={ov('barPatternBackground')} note={fillRowNote(st)}>
                 <ColorInput
@@ -343,7 +333,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
           </GroupBox>
 
           <GroupBox
-            title={titles.symbols}
+            title={isDist ? 'Points' : titles.symbols}
             checked={st.showSymbols}
             onCheckedChange={(v) => setStyle({ showSymbols: v })}
             overridden={ov('showSymbols')}
@@ -352,7 +342,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
               <ColorInput value={st.symbolColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolColor: v })} />
             </Field>
             <Field label="Shape" overridden={ov('symbolShape')}>
-              <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...shapeOptions]} onChange={(v) => setStyle({ symbolShape: v })} />
+              <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...SYMBOL_SHAPE_OPTIONS]} onChange={(v) => setStyle({ symbolShape: v })} />
             </Field>
             <NumField label="Size" unit="pt" value={st.symbolSizePt} min={1} max={40} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
             <Field label="Border color" overridden={ov('symbolBorderColor')}>
@@ -369,6 +359,8 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
             )}
           </GroupBox>
 
+          {!isDist && (
+          <>
           <GroupBox title="Error bars" checked={st.showErrorBars} onCheckedChange={(v) => setStyle({ showErrorBars: v })} overridden={ov('showErrorBars')}>
             <IntervalFields
               centre={spec.centre}
@@ -424,16 +416,23 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
             invalidOverridden={ovSum('invalidPolicy')}
             onChange={(patch) => setSummary(patch, 'Change calculation option')}
           />
+          </>
+          )}
 
-          {chart.type === 'mean' && (
-            <GroupBox title="Lines" checked={st.showLines} onCheckedChange={(v) => setStyle({ showLines: v })} overridden={ov('showLines')}>
+          {(chart.type === 'mean' || chart.type === 'paired') && (
+            <GroupBox title={chart.type === 'paired' ? 'Lines joining the rows' : 'Lines'} checked={st.showLines} onCheckedChange={(v) => setStyle({ showLines: v })} overridden={ov('showLines')}>
               <Field label="Color" overridden={ov('lineColor')}>
                 <ColorInput value={st.lineColor} disabled={!st.showLines} onChange={(v) => setStyle({ lineColor: v })} />
               </Field>
               <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.1} max={20} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+              {chart.type === 'paired' && (
+                <Field label="Join across a missing value" hint="A row with a missing value: join the values either side of it. Nothing is made up for the missing one.">
+                  <Check checked={chart.pairs.bridge} disabled={!st.showLines} onChange={(v) => run('Join across missing values', patchLook(chart.id, { pairs: { bridge: v } }))} />
+                </Field>
+              )}
             </GroupBox>
           )}
-          {chart.type === 'scatter' && (
+          {(chart.type === 'scatter' || chart.type === 'paired') && (
             <GroupBox title={titles.lines} checked={st.showMeanLine} onCheckedChange={(v) => setStyle({ showMeanLine: v })} overridden={ov('showMeanLine')}>
               <Field label="Color" overridden={ov('lineColor')}>
                 <ColorInput value={st.lineColor} disabled={!st.showMeanLine} onChange={(v) => setStyle({ lineColor: v })} />
@@ -443,7 +442,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
           )}
 
           <GroupBox title="Additional options">
-            {bindingUi.offered && (
+            {bindingUi.offered && chart.orientation === 'vertical' && (
               <Field
                 label="Plot data on"
                 hint="Which Y axis this data set is drawn against"
@@ -494,6 +493,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
                 <Field label="Show X axis">
                   <Check checked={chart.xAxis.visible} onChange={(v) => run('Show X axis', patchAxis(chart.id, 'xAxis', { visible: v }))} />
                 </Field>
+                <TickFields chart={chart} which="xAxis" name="X" />
                 <div className="muted small">The X axis lists the data sets, so it has no numeric limits to set.</div>
               </Section>
               <Section title={dual ? 'Left Y axis' : 'Y axis'}>
@@ -536,10 +536,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
                 <Field label={dual ? 'Left major gridlines' : 'Major gridlines'}>
                   <Check checked={chart.yAxis.showGrid} onChange={(v) => run('Gridlines', patchAxis(chart.id, 'yAxis', { showGrid: v }))} />
                 </Field>
-              </Section>
-              <Section title="Axis lines">
-                <NumField label="Axis line thickness" unit="pt" value={chart.yAxis.lineWidthPt} min={0} max={10} onCommit={(v) => run('Axis line thickness', patchBothAxes(chart.id, { lineWidthPt: v }), 'axis:lw')} />
-                {dual && <div className="muted small">Line thickness applies to both Y axes.</div>}
+                <AxisStyleControls chart={chart} which="yAxis" scale={model.y} name={leftName} canScale canReverse />
               </Section>
           {dual && model.y2 && (
             <Section title="Right Y axis">
@@ -588,6 +585,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
               >
                 <Check checked={chart.y2Axis.showGrid} onChange={(v) => run('Right gridlines', patchAxis(chart.id, 'y2Axis', { showGrid: v }))} />
               </Field>
+              <AxisStyleControls chart={chart} which="y2Axis" scale={model.y2} name="Right Y" canScale canReverse />
             </Section>
           )}
 
@@ -595,7 +593,14 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
           )}
 
           {section === 'text' && <TextSections chart={chart} groups={table.groups} yName={leftName} dual={dual} />}
-          {section === 'dimensions' && <DimensionsSection chart={chart} />}
+          {section === 'frame' && <FrameSection chart={chart} dual={dual} origin="y" />}
+          {section === 'layout' && (
+            <div>
+              <DimensionsSection chart={chart} />
+              {supportsHorizontal(chart.type) && <DirectionSection chart={chart} />}
+              <ColumnLayoutSection chart={chart} spacing baseline={chart.type === 'bar'} />
+            </div>
+          )}
           {section === 'legend' && <LegendSection chart={chart} groups={table.groups} />}
         </div>
       )}
@@ -604,6 +609,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
       {tab === 'datasets' && (
         <div className="tab-body">
           <OnThisGraph chart={chart} />
+          <DataSetOrder chart={chart} groups={model.groups.map((g) => ({ id: g.groupId, label: g.label }))} />
           <SubHeading>Edit a data set</SubHeading>
           <div className="muted small">Select a group to edit its style, or click a bar, symbol or error bar in the chart.</div>
           <ul className="dataset-list">

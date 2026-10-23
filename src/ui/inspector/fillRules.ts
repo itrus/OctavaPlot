@@ -12,7 +12,7 @@ type PatternStyle = Pick<ChartStyle, 'barPattern' | 'barBorderColor' | 'barPatte
 /** The colour a "Background: None" switch restores (the default, P). */
 export const DEFAULT_PATTERN_BACKGROUND = '#ffffff';
 
-export const isDotPattern = (pattern: FillPattern): boolean => pattern === 'dots';
+const isDotPattern = (pattern: FillPattern): boolean => pattern === 'dots';
 
 /** Label of the width control: dots have a diameter, lines a width. */
 export const widthLabel = (pattern: FillPattern): string => (isDotPattern(pattern) ? 'Dot diameter' : 'Line width');
@@ -81,7 +81,7 @@ function baseFill(style: PatternStyle) {
   };
 }
 
-export const patternLabel = (pattern: FillPattern): string => FILL_PATTERN_OPTIONS.find((o) => o.value === pattern)?.label ?? pattern;
+const patternLabel = (pattern: FillPattern): string => FILL_PATTERN_OPTIONS.find((o) => o.value === pattern)?.label ?? pattern;
 
 type NoteStyle = Parameters<typeof describeBarFillUi>[0];
 
@@ -99,7 +99,7 @@ export function opacityNote(style: Pick<ChartStyle, 'showBars' | 'barFillMode'>)
   return null;
 }
 
-export interface DatasetSwatch {
+interface DatasetSwatch {
   background: string;
   /** CSS image drawn over the background for pattern fills, else null. */
   backgroundImage: string | null;

@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { newId } from '../model/ids';
 import type { AnalysisKind, ChartType, Id, TableKind, ViewRef } from '../model/types';
+import type { ChartVariant } from '../model/chartVariant';
 import { useApp } from '../state/AppContext';
-import { addAnalysis, addChart, addDataTable, type NewTableOptions } from '../state/commands';
+import { addAnalysis, addChart, addDataTable, renameItem, type NewTableOptions } from '../state/commands';
 import { NewAnalysisDialog } from './NewAnalysisDialog';
 import { NewGraphDialog } from './NewGraphDialog';
 import { analysesOf } from '../model/analysis';
@@ -26,6 +27,7 @@ const sameView = (a: ViewRef, b: ViewRef) => a.kind === b.kind && a.id === b.id;
 const LOCKED_SECTIONS = ['Layouts'] as const;
 
 export function Navigator() {
+  const [renaming, setRenaming] = useState<string | null>(null);
   const { project, view, setView, run, settings } = useApp();
   const [open, setOpen] = useState<Record<Folder, boolean>>({ tables: true, results: true, graphs: true });
 
@@ -46,9 +48,9 @@ export function Navigator() {
     setView({ kind: 'table', id });
     setDialog(null);
   };
-  const createGraph = (tableId: Id, type: ChartType) => {
+  const createGraph = (tableId: Id, type: ChartType, variant?: ChartVariant) => {
     const id = newId('chart');
-    run('New graph', addChart(id, tableId, { widthPx: settings.defaultChartWidthPx, heightPx: settings.defaultChartHeightPx }, type));
+    run('New graph', addChart(id, tableId, { widthPx: settings.defaultChartWidthPx, heightPx: settings.defaultChartHeightPx }, type, variant));
     setView({ kind: 'chart', id });
     setDialog(null);
   };
@@ -58,12 +60,33 @@ export function Navigator() {
       <span className="chev">{open[key] ? '▾' : '▸'}</span> {title}
     </button>
   );
-  const item = (ref: ViewRef, icon: string, name: string, badge?: { text: string; title: string }) => (
-    <button key={ref.id} className={`nav-item${sameView(view, ref) ? ' active' : ''}`} onClick={() => setView(ref)}>
-      <span className="nav-icon">{icon}</span> {name}
-      {badge && <span className="nav-badge" title={badge.title}>{badge.text}</span>}
-    </button>
-  );
+  const finishRename = (ref: ViewRef, name: string) => {
+    setRenaming(null);
+    run('Rename', renameItem(ref.kind, ref.id, name));
+  };
+  const item = (ref: ViewRef, icon: string, name: string, badge?: { text: string; title: string }) =>
+    renaming === ref.id ? (
+      <div key={ref.id} className="nav-item active">
+        <span className="nav-icon">{icon}</span>
+        <input
+          className="nav-rename"
+          aria-label="Name"
+          autoFocus
+          defaultValue={name}
+          onFocus={(e) => e.target.select()}
+          onBlur={(e) => finishRename(ref, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+            else if (e.key === 'Escape') setRenaming(null);
+          }}
+        />
+      </div>
+    ) : (
+      <button key={ref.id} className={`nav-item${sameView(view, ref) ? ' active' : ''}`} onClick={() => setView(ref)} onDoubleClick={() => setRenaming(ref.id)} onKeyDown={(e) => e.key === 'F2' && setRenaming(ref.id)} title="Double-click or press F2 to rename">
+        <span className="nav-icon">{icon}</span> {name}
+        {badge && <span className="nav-badge" title={badge.title}>{badge.text}</span>}
+      </button>
+    );
   const newItem = (label: string, onClick: () => void) => (
     <button className="nav-item nav-new" onClick={onClick}>
       <span className="nav-icon">⊕</span> {label}

@@ -13,13 +13,18 @@ describe('graph gallery', () => {
     }
   });
 
-  it('offers every chart type that can be made, once, under its own table type', () => {
+  it('offers every chart type that can be made under its own table type (a horizontal or coloured version is another entry of the same type)', () => {
     for (const k of KINDS) {
-      const made = availableItems(k).map((i) => i.type);
+      const made = [...new Set(availableItems(k).map((i) => i.type))];
       expect(made.slice().sort()).toEqual(chartTypesFor(k).map((c) => c.type).sort());
     }
     const all = KINDS.flatMap((k) => availableItems(k).map((i) => i.type));
     expect(new Set(all).size).toBe(CHART_TYPES.length);
+  });
+
+  it('offers the horizontal versions of the column charts', () => {
+    const horizontal = availableItems('column').filter((i) => i.variant?.orientation === 'horizontal').map((i) => i.type);
+    expect(horizontal.sort()).toEqual(['bar', 'box', 'violin']);
   });
 
   it('keys are unique within a table type, and the first graph of each is available', () => {

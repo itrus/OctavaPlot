@@ -1,19 +1,16 @@
-import { forwardRef, type ReactElement } from 'react';
-import { FONT_FAMILY } from '../model/defaults';
-import type { Annotation, Chart, Selection } from '../model/types';
+import { forwardRef, type ReactElement, type ReactNode } from 'react';
+import type { Chart } from '../model/types';
 import { n2 } from '../model/units';
+import { BarLabelText } from './BarLabelText';
+import { axisGaps, axisPieces } from './axisScale';
+import { AnnotationLayer, axisLineD, Backgrounds, BreakMarks, ChartTitles, type EditorState, FrameBox, PlotClip, ScaleBar, SELECT_COLOR } from './ChartParts';
 import { BarMark, KeyMark } from './FillMarks';
+import { GridLines } from './GridLines';
 import { hitAttrs } from './hitTest';
-import { LEGEND_KEY, TICK_LENGTH, X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP } from './layout';
+import { crossingPosition, tickPath, tickPaths, labelOffset } from './axisTicks';
+import { keyWidthOf, LEGEND_KEY, X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP } from './layout';
 import type { ChartModel, GroupGeom } from './model';
 import { symbolPath } from './symbols';
-import { measureText } from './text';
-
-export interface EditorState {
-  selection: Selection;
-  /** Annotation being dragged: its live position (fractions) overrides the stored one. */
-  dragging?: { id: string; xFrac: number; yFrac: number } | null;
-}
 
 interface Props {
   chart: Chart;
@@ -25,21 +22,15 @@ interface Props {
   cssHeight: string;
 }
 
-const AXIS_COLOR = '#000000';
-const GRID_COLOR = '#d0d0d0';
-const SELECT_COLOR = '#2b7fff';
 
-export function annotationBox(a: Annotation, x: number, y: number) {
-  const lines = a.text.split('\n');
-  const w = Math.max(...lines.map((l) => measureText(l, a.fontSizePt)), 4);
-  const h = lines.length * a.fontSizePt * 1.2;
-  return { x, y, w, h, lines };
+/** Shapes of a horizontal chart, turned into place by the model's matrix; a vertical chart draws them as they are. */
+function Turned({ matrix, children }: { matrix: string | null; children: ReactNode }) {
+  return matrix ? <g transform={matrix}>{children}</g> : <>{children}</>;
 }
 
-function LegendSwatch({ g, x, y, chartId, editor }: { g: GroupGeom; x: number; y: number; chartId: string; editor: boolean }): ReactElement {
+function LegendSwatch({ g, x, y, chartId, editor, w }: { g: GroupGeom; x: number; y: number; chartId: string; editor: boolean; w: number }): ReactElement {
   const s = g.style;
-  const w = LEGEND_KEY.width;
-  if (s.showBars) return <KeyMark style={s} x={x} y={y} chartId={chartId} groupId={g.groupId} editor={editor} />;
+  if (s.showBars) return <KeyMark style={s} x={x} y={y} chartId={chartId} groupId={g.groupId} editor={editor} width={w} />;
   return (
     <g>
       {s.showLines && <path d={`M${n2(x)},${n2(y)}H${n2(x + w)}`} stroke={s.lineColor} strokeWidth={s.lineWidthPt} fill="none" />}
@@ -60,6 +51,26 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
   const plotBottom = plot.y + plot.height;
   const plotRight = plot.x + plot.width;
   const y2a = chart.y2Axis;
+  // Horizontal columns: the geometry of the model is the vertical drawing; marks are turned into place by one matrix,
+  // symbols and text stay upright at their turned positions (see Orientation in model.ts).
+  const { orient } = model;
+  const horizontal = orient.horizontal;
+  const valueX = (t: number) => orient.toScreen(0, model.yScale(t)).x;
+  const categoryY = (cx: number) => orient.toScreen(cx, 0).y;
+  // The axis drawn along the bottom and the one down the left, whichever of the two settings they are.
+  const bottomAxis = horizontal ? ya : xa;
+  // A broken value axis: the pieces of axis that are drawn, and where the gaps are, on the page.
+  const valueOrigin = orient.horizontal ? orient.virtual.y + orient.virtual.height : plot.y + plot.height;
+  const valueSpan = orient.horizontal ? -orient.virtual.height : -plot.height;
+  const valuePieces = axisPieces(y, valueOrigin, valueSpan);
+  const valueGaps = axisGaps(y, valueOrigin, valueSpan);
+  const onPage = (ranges: Array<[number, number]>): Array<[number, number]> => (horizontal ? ranges.map(([a, b]) => [orient.toScreen(0, b).x, orient.toScreen(0, a).x] as [number, number]) : ranges);
+  const clipX = horizontal ? (valuePieces ? onPage(valuePieces) : null) : null;
+  const clipY = !horizontal ? valuePieces : null;
+  // Where the category axis crosses the value axis (default: the low end); the numbers stay where they are.
+  const categoryAxisY = crossingPosition(chart.origin.y, model.y, model.yScale, plotBottom);
+  const categoryAxisX = crossingPosition(chart.origin.y, model.y, valueX, plot.x);
+  const leftAxis = horizontal ? xa : ya;
   // model.y2 is null while no data set is bound to the right axis; a hidden right axis draws nothing.
   const y2R = model.y2 && model.y2Scale && y2a.visible ? model.y2 : null;
   const y2Scale = model.y2Scale as (v: number) => number;
@@ -70,7 +81,6 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
 
   const selectedGroup = editor?.selection.kind === 'group' ? editor.selection.groupId : null;
   const selectedPoint = editor?.selection.kind === 'point' ? editor.selection.pointId : null;
-  const selectedAnnotation = editor?.selection.kind === 'annotation' ? editor.selection.annotationId : null;
 
   return (
     <svg
@@ -79,40 +89,43 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
       width={cssWidth}
       height={cssHeight}
       viewBox={`0 0 ${n2(W)} ${n2(H)}`}
-      fontFamily={FONT_FAMILY}
-      style={{ background: '#ffffff' }}
+      fontFamily={chart.fontFamily}
+      style={{ background: chart.pageColor ?? 'transparent' }}
     >
-      <defs>
-        <clipPath id="plot-clip">
-          <rect x={n2(plot.x)} y={n2(plot.y)} width={n2(plot.width)} height={n2(plot.height)} />
-        </clipPath>
-      </defs>
+      <PlotClip plot={plot} xPieces={clipX} yPieces={clipY} />
 
-      {/* Backgrounds. The chart background is the hit target for "chart-level" selection. */}
-      <rect x={0} y={0} width={n2(W)} height={n2(H)} fill="#ffffff" {...hit('background')} />
-      <rect x={n2(plot.x)} y={n2(plot.y)} width={n2(plot.width)} height={n2(plot.height)} fill="#ffffff" {...hit('background')} />
+      <Backgrounds chart={chart} width={W} height={H} plot={plot} hit={hit} />
 
       {/* Gridlines (behind data). */}
-      {ya.visible && ya.showGrid && (
-        <g stroke={GRID_COLOR} strokeWidth={0.5} fill="none">
-          {y.ticks.map((t) => (
-            <path key={t} d={`M${n2(plot.x)},${n2(model.yScale(t))}H${n2(plot.x + plot.width)}`} />
-          ))}
-        </g>
-      )}
+      {ya.visible &&
+        (horizontal ? (
+          <GridLines dir="v" grid={chart.grid} major={y.ticks} minor={y.minorTicks ?? []} showMajor={ya.showGrid} showMinor={ya.showMinorGrid} at={valueX} from={plot.y} to={plot.y + plot.height} />
+        ) : (
+          <GridLines dir="h" grid={chart.grid} major={y.ticks} minor={y.minorTicks ?? []} showMajor={ya.showGrid} showMinor={ya.showMinorGrid} at={model.yScale} from={plot.x} to={plot.x + plot.width} />
+        ))}
 
       {/* Right gridlines: dashed when the left grid is also drawn, so the two sets stay distinguishable. */}
-      {y2R && y2a.showGrid && (
-        <g stroke={GRID_COLOR} strokeWidth={0.5} fill="none" strokeDasharray={ya.visible && ya.showGrid ? '3 3' : undefined}>
-          {y2R.ticks.map((t) => (
-            <path key={t} d={`M${n2(plot.x)},${n2(y2Scale(t))}H${n2(plot.x + plot.width)}`} />
-          ))}
-        </g>
-      )}
+      {y2R && <GridLines dir="h" grid={chart.grid} major={y2R.ticks} minor={y2R.minorTicks ?? []} showMajor={y2a.showGrid} showMinor={y2a.showMinorGrid} at={y2Scale} from={plot.x} to={plot.x + plot.width} fallbackDash={ya.visible && ya.showGrid ? '3 3' : undefined} />}
 
       {/* Data marks, clipped to the plotting region. Error bars are independent of bars and symbols. */}
       <g clipPath="url(#plot-clip)">
+        <Turned matrix={orient.matrix}>
         {groups.map((g) => g.bar && <BarMark key={g.bar.id} bar={g.bar} chartId={chart.id} editor={ed} />)}
+        {groups.map((g) =>
+          g.dist && (
+            <g key={`${g.groupId}:dist`} fill="none">
+              {g.dist.outline && g.style.showBars && (
+                <path d={g.dist.outline} fill={g.style.barFill} fillOpacity={g.style.barOpacity} stroke={g.style.barBorderColor} strokeWidth={g.style.barBorderWidthPt} strokeLinejoin="round" {...hit('bar', g.groupId, `${g.groupId}:bar`)} />
+              )}
+              {g.dist.lines.map((l) => (
+                <path key={l.id} d={l.d} stroke={l.color} strokeWidth={l.strokeWidth} strokeDasharray={l.dash} strokeLinecap="butt" {...hit('bar', g.groupId, `${g.groupId}:bar`)} />
+              ))}
+            </g>
+          ),
+        )}
+        {model.pairLines.map((l) => (
+          <path key={l.id} d={l.d} fill="none" stroke={l.color} strokeWidth={l.strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+        ))}
         {groups.map((g) => g.connector && (
           <path key={g.connector.id} d={g.connector.d} fill="none" stroke={g.connector.color} strokeWidth={g.connector.strokeWidth} strokeLinecap="round" {...hit('line', g.groupId, g.connector.id)} />
         ))}
@@ -125,11 +138,12 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
         {groups.map((g) => g.meanLine && (
           <path key={g.meanLine.id} d={g.meanLine.d} fill="none" stroke={g.meanLine.color} strokeWidth={g.meanLine.strokeWidth} strokeLinecap="butt" {...hit('meanLine', g.groupId, g.meanLine.id)} />
         ))}
+        </Turned>
         {groups.map((g) =>
           g.points.map((p) => (
             <path
               key={p.id}
-              d={symbolPath(p.shape, p.cx, p.cy, p.size)}
+              d={symbolPath(p.shape, orient.toScreen(p.cx, p.cy).x, orient.toScreen(p.cx, p.cy).y, p.size)}
               fill={p.color}
               stroke={p.borderColor}
               strokeWidth={p.borderWidth}
@@ -139,13 +153,19 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
         )}
       </g>
 
+      {/* Labels above the bars. */}
+      {chart.barLabels.show !== 'none' && groups.map((g) => g.barLabel && <BarLabelText key={g.barLabel.id} label={g.barLabel} cfg={chart.barLabels} textColor={chart.textColor} orient={orient} />)}
+
       {/* Axes. */}
+      {!horizontal && (
+        <>
       {ya.visible && (
-        <g stroke={AXIS_COLOR} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y')}>
-          <path d={`M${n2(plot.x)},${n2(plot.y)}V${n2(plotBottom)}`} />
-          {ed && <path d={`M${n2(plot.x)},${n2(plot.y)}V${n2(plotBottom)}`} stroke="transparent" strokeWidth={14} />}
-          {y.ticks.map((t) => (
-            <path key={t} d={`M${n2(plot.x)},${n2(model.yScale(t))}h${-TICK_LENGTH}`} strokeLinecap="butt" />
+        <g stroke={chart.axisColor} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y')}>
+          <path d={axisLineD('y', plot.x, plot.y, plotBottom, valuePieces)} />
+          {ed && <path d={axisLineD('y', plot.x, plot.y, plotBottom, valuePieces)} stroke="transparent" strokeWidth={14} />}
+          <BreakMarks along="y" fixed={plot.x} gaps={valueGaps} mark={ya.breakMark} color={chart.axisColor} width={ya.lineWidthPt} />
+          {tickPaths('left', plot.x, ya, y.ticks, y.minorTicks ?? [], model.yScale).map((p) => (
+            <path key={p.key} d={p.d} strokeLinecap="butt" />
           ))}
         </g>
       )}
@@ -153,24 +173,24 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
         y.ticks.map((t) => (
           <text
             key={t}
-            x={n2(plot.x - TICK_LENGTH - Y_TICK_LABEL_GAP)}
+            x={n2(plot.x - labelOffset(ya) - Y_TICK_LABEL_GAP)}
             y={n2(model.yScale(t))}
             dy="0.35em"
             textAnchor="end"
             fontSize={ya.tickFontSizePt}
-            fontWeight="bold"
-            fill={AXIS_COLOR}
+            fontWeight={ya.tickBold ? 'bold' : undefined}
+            fill={chart.textColor}
             {...hit('axis', undefined, 'y')}
           >
             {y.tickLabel(t)}
           </text>
         ))}
       {y2R && (
-        <g stroke={AXIS_COLOR} strokeWidth={y2a.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y2')}>
+        <g stroke={chart.axisColor} strokeWidth={y2a.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y2')}>
           <path d={`M${n2(plotRight)},${n2(plot.y)}V${n2(plotBottom)}`} />
           {ed && <path d={`M${n2(plotRight)},${n2(plot.y)}V${n2(plotBottom)}`} stroke="transparent" strokeWidth={14} />}
-          {y2R.ticks.map((t) => (
-            <path key={t} d={`M${n2(plotRight)},${n2(y2Scale(t))}h${TICK_LENGTH}`} strokeLinecap="butt" />
+          {tickPaths('right', plotRight, y2a, y2R.ticks, y2R.minorTicks ?? [], y2Scale).map((p) => (
+            <path key={p.key} d={p.d} strokeLinecap="butt" />
           ))}
         </g>
       )}
@@ -178,31 +198,31 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
         y2R.ticks.map((t) => (
           <text
             key={t}
-            x={n2(plotRight + TICK_LENGTH + Y_TICK_LABEL_GAP)}
+            x={n2(plotRight + labelOffset(y2a) + Y_TICK_LABEL_GAP)}
             y={n2(y2Scale(t))}
             dy="0.35em"
             textAnchor="start"
             fontSize={y2a.tickFontSizePt}
-            fontWeight="bold"
-            fill={AXIS_COLOR}
+            fontWeight={y2a.tickBold ? 'bold' : undefined}
+            fill={chart.textColor}
             {...hit('axis', undefined, 'y2')}
           >
             {y2R.tickLabel(t)}
           </text>
         ))}
       {xa.visible && (
-        <g stroke={AXIS_COLOR} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'x')}>
-          <path d={`M${n2(plot.x)},${n2(plotBottom)}H${n2(plot.x + plot.width)}`} />
-          {ed && <path d={`M${n2(plot.x)},${n2(plotBottom)}H${n2(plot.x + plot.width)}`} stroke="transparent" strokeWidth={14} />}
+        <g stroke={chart.axisColor} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'x')}>
+          <path d={`M${n2(plot.x)},${n2(categoryAxisY)}H${n2(plot.x + plot.width)}`} />
+          {ed && <path d={`M${n2(plot.x)},${n2(categoryAxisY)}H${n2(plot.x + plot.width)}`} stroke="transparent" strokeWidth={14} />}
           {groups.map((g) => (
-            <path key={g.groupId} d={`M${n2(g.centerX)},${n2(plotBottom)}v${TICK_LENGTH}`} strokeLinecap="butt" />
+            <path key={g.groupId} d={tickPath('bottom', g.centerX, categoryAxisY, xa)} strokeLinecap="butt" />
           ))}
         </g>
       )}
       {xa.visible &&
         groups.map((g) => {
-          const ty = plotBottom + TICK_LENGTH + X_TICK_LABEL_GAP + xa.tickFontSizePt * 0.8;
-          const common = { fontSize: xa.tickFontSizePt, fontWeight: 'bold' as const, fill: AXIS_COLOR, ...hit('axis', undefined, 'x') };
+          const ty = plotBottom + labelOffset(xa) + X_TICK_LABEL_GAP + xa.tickFontSizePt * 0.8;
+          const common = { fontSize: xa.tickFontSizePt, ...(xa.tickBold ? { fontWeight: 'bold' as const } : {}), fill: chart.textColor, ...hit('axis', undefined, 'x') };
           return layout.xTickRotated ? (
             <text key={g.groupId} x={n2(g.centerX)} y={n2(ty - xa.tickFontSizePt * 0.4)} textAnchor="end" transform={`rotate(-45 ${n2(g.centerX)} ${n2(ty - xa.tickFontSizePt * 0.4)})`} {...common}>
               {g.label}
@@ -214,46 +234,67 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
           );
         })}
 
-      {/* Titles. */}
-      {layout.title && (
-        <text x={n2(layout.title.x)} y={n2(layout.title.y)} textAnchor="middle" fontSize={layout.title.fontSizePt} fontWeight="bold" fill={AXIS_COLOR} {...hit('title')}>
-          {chart.title}
-        </text>
+        </>
       )}
-      {layout.xTitle && (
-        <text x={n2(layout.xTitle.x)} y={n2(layout.xTitle.y)} textAnchor="middle" fontSize={xa.titleFontSizePt} fontWeight="bold" fill={AXIS_COLOR} {...hit('title')}>
-          {xa.title}
-        </text>
-      )}
-      {layout.yTitle && (
-        <text
-          x={n2(layout.yTitle.x)}
-          y={n2(layout.yTitle.y)}
-          textAnchor="middle"
-          transform={`rotate(-90 ${n2(layout.yTitle.x)} ${n2(layout.yTitle.y)})`}
-          fontSize={ya.titleFontSizePt}
-          fontWeight="bold"
-          fill={AXIS_COLOR}
-          {...hit('title')}
-        >
-          {ya.title}
-        </text>
+      {horizontal && (
+        <>
+          {ya.visible && (
+            <g stroke={chart.axisColor} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y')}>
+              <path d={axisLineD('x', plotBottom, plot.x, plotRight, clipX)} />
+              {ed && <path d={axisLineD('x', plotBottom, plot.x, plotRight, clipX)} stroke="transparent" strokeWidth={14} />}
+              <BreakMarks along="x" fixed={plotBottom} gaps={onPage(valueGaps)} mark={ya.breakMark} color={chart.axisColor} width={ya.lineWidthPt} />
+              {tickPaths('bottom', plotBottom, ya, y.ticks, y.minorTicks ?? [], valueX).map((p) => (
+                <path key={p.key} d={p.d} strokeLinecap="butt" />
+              ))}
+            </g>
+          )}
+          {ya.visible &&
+            y.ticks.map((t) => (
+              <text
+                key={t}
+                x={n2(valueX(t))}
+                y={n2(plotBottom + labelOffset(ya) + X_TICK_LABEL_GAP + ya.tickFontSizePt * 0.8)}
+                textAnchor="middle"
+                fontSize={ya.tickFontSizePt}
+                fontWeight={ya.tickBold ? 'bold' : undefined}
+                fill={chart.textColor}
+                {...hit('axis', undefined, 'y')}
+              >
+                {y.tickLabel(t)}
+              </text>
+            ))}
+          {xa.visible && (
+            <g stroke={chart.axisColor} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'x')}>
+              <path d={`M${n2(categoryAxisX)},${n2(plot.y)}V${n2(plotBottom)}`} />
+              {ed && <path d={`M${n2(categoryAxisX)},${n2(plot.y)}V${n2(plotBottom)}`} stroke="transparent" strokeWidth={14} />}
+              {groups.map((g) => (
+                <path key={g.groupId} d={tickPath('left', categoryY(g.centerX), categoryAxisX, xa)} strokeLinecap="butt" />
+              ))}
+            </g>
+          )}
+          {xa.visible &&
+            groups.map((g) => (
+              <text
+                key={g.groupId}
+                x={n2(plot.x - labelOffset(xa) - Y_TICK_LABEL_GAP)}
+                y={n2(categoryY(g.centerX))}
+                dy="0.35em"
+                textAnchor="end"
+                fontSize={xa.tickFontSizePt}
+                fontWeight={xa.tickBold ? 'bold' : undefined}
+                fill={chart.textColor}
+                {...hit('axis', undefined, 'x')}
+              >
+                {g.label}
+              </text>
+            ))}
+        </>
       )}
 
-      {y2R && layout.y2Title && (
-        <text
-          x={n2(layout.y2Title.x)}
-          y={n2(layout.y2Title.y)}
-          textAnchor="middle"
-          transform={`rotate(-90 ${n2(layout.y2Title.x)} ${n2(layout.y2Title.y)})`}
-          fontSize={y2a.titleFontSizePt}
-          fontWeight="bold"
-          fill={AXIS_COLOR}
-          {...hit('title')}
-        >
-          {y2a.title}
-        </text>
-      )}
+      <FrameBox chart={chart} plot={plot} lineWidthPt={ya.lineWidthPt} />
+
+      <ScaleBar chart={chart} axis={ya} along={horizontal ? 'x' : 'y'} scale={y} map={horizontal ? valueX : model.yScale} plot={plot} />
+      <ChartTitles chart={chart} layout={layout} bottom={bottomAxis} left={leftAxis} right={y2R ? y2a : null} hit={hit} />
 
       {/* Legend. */}
       {layout.legend && (
@@ -262,8 +303,8 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
             const g = groups[model.legendGroups[it.index]];
             return (
               <g key={g.groupId} {...hit('legend', g.groupId)}>
-                <LegendSwatch g={g} x={it.x} y={it.y} chartId={chart.id} editor={ed} />
-                <text x={n2(it.x + LEGEND_KEY.width + LEGEND_KEY.gap)} y={n2(it.y)} dy="0.35em" fontSize={layout.legend!.fontSizePt} fill={AXIS_COLOR}>
+                <LegendSwatch g={g} x={it.x} y={it.y} chartId={chart.id} editor={ed} w={keyWidthOf(chart.legend)} />
+                <text x={n2(it.x + keyWidthOf(chart.legend) + LEGEND_KEY.gap)} y={n2(it.y)} dy="0.35em" fontSize={layout.legend!.fontSizePt} fill={chart.textColor}>
                   {it.label}
                 </text>
               </g>
@@ -276,14 +317,14 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
       {model.labels.items.length > 0 && (
         <g>
           {model.labels.items.map((it) => {
-            const color = it.color ?? AXIS_COLOR;
+            const color = it.color ?? chart.textColor;
             return it.leader ? (
               <path key={`leader-${it.id}`} d={`M${n2(it.leader.x1)},${n2(it.leader.y1)}L${n2(it.leader.x2)},${n2(it.leader.y2)}`} fill="none" stroke={color} strokeWidth={0.5} />
             ) : null;
           })}
           {model.labels.items.map((it) => {
             const owner = labelOwner.get(it.id);
-            const color = it.color ?? AXIS_COLOR;
+            const color = it.color ?? chart.textColor;
             return (
               <g key={`label-${it.id}`} {...hit('label', owner?.groupId, it.id)}>
                 {ed && <rect x={n2(it.box.x0)} y={n2(it.box.y0)} width={n2(it.box.x1 - it.box.x0)} height={n2(it.box.y1 - it.box.y0)} fill="transparent" />}
@@ -303,28 +344,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
         </g>
       )}
 
-      {/* Annotations. */}
-      {chart.annotations.map((a) => {
-        const drag = editor?.dragging?.id === a.id ? editor.dragging : null;
-        const x = (drag ? drag.xFrac : a.xFrac) * W;
-        const y0 = (drag ? drag.yFrac : a.yFrac) * H;
-        const box = annotationBox(a, x, y0);
-        return (
-          <g key={a.id} {...hit('annotation', undefined, undefined, a.id)}>
-            {ed && <rect x={n2(box.x - 3)} y={n2(box.y - 3)} width={n2(box.w + 6)} height={n2(box.h + 6)} fill="transparent" />}
-            <text x={n2(x)} fontSize={a.fontSizePt} fill={a.color}>
-              {box.lines.map((line, i) => (
-                <tspan key={i} x={n2(x)} y={n2(y0 + a.fontSizePt * 0.9 + i * a.fontSizePt * 1.2)}>
-                  {line === '' ? ' ' : line}
-                </tspan>
-              ))}
-            </text>
-            {selectedAnnotation === a.id && (
-              <rect data-editor-only x={n2(box.x - 3)} y={n2(box.y - 3)} width={n2(box.w + 6)} height={n2(box.h + 6)} fill="none" stroke={SELECT_COLOR} strokeWidth={1} strokeDasharray="3 2" pointerEvents="none" />
-            )}
-          </g>
-        );
-      })}
+      <AnnotationLayer chart={chart} editor={editor} width={W} height={H} hit={hit} />
 
       {/* Editor-only selection overlay: never rendered in export. */}
       {ed && selectedPoint &&
@@ -358,3 +378,5 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
     </svg>
   );
 });
+
+export type { EditorState };

@@ -10,7 +10,7 @@ import {
   BAR_FILL_NEGATIVE_INDEX,
   BAR_FILL_PATTERN_COUNT,
   barFillFixture,
-} from './barFill.fixture';
+} from '../testing/barFillFixture';
 import { ChartSvg } from './ChartSvg';
 import { chartToSvgString } from './export';
 import { buildChartModel } from './model';

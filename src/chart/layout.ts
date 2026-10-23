@@ -1,13 +1,15 @@
+import { legendKeyWidthPt } from '../model/look';
+import { numberStartPt } from '../model/axis';
+import { FONT_FAMILY } from '../model/defaults';
 import type { AxisConfig, LegendConfig } from '../model/types';
 import { measureText } from './text';
 
 /** Layout constants in pt (spec section 20 starting tokens). */
-export const OUTER_MARGIN = 7;
-export const TICK_LENGTH = 5.6;
+const OUTER_MARGIN = 7;
 export const X_TICK_LABEL_GAP = 2.8;
 export const Y_TICK_LABEL_GAP = 3;
 export const AXIS_TITLE_GAP = 8.4;
-export const LEGEND_KEY_WIDTH = 18;
+const LEGEND_KEY_WIDTH = 18;
 const LEGEND_KEY_GAP = 5;
 const LEGEND_ITEM_GAP = 14;
 const MIN_PLOT = 24;
@@ -19,7 +21,7 @@ export interface Rect {
   height: number;
 }
 
-export interface LegendItemLayout {
+interface LegendItemLayout {
   index: number;
   x: number;
   /** Vertical centre of the row. */
@@ -27,7 +29,7 @@ export interface LegendItemLayout {
   label: string;
 }
 
-export interface LegendLayout {
+interface LegendLayout {
   rect: Rect;
   items: LegendItemLayout[];
   fontSizePt: number;
@@ -62,16 +64,21 @@ export interface LayoutInput {
   y2TickLabels?: string[];
   /** Height in pt to reserve under the X axis title, for a table of numbers under the plot. */
   extraBottomPt?: number;
+  /** Font of the chart's text (for measuring) and the extra distance of the chart title from the top edge. */
+  fontFamily?: string;
+  titleOffsetPt?: number;
 }
 
 const hasText = (s: string): boolean => s.trim().length > 0;
 
 function layoutLegendRows(
+  keyWidth: number,
   labels: string[],
   fontSize: number,
   availableWidth: number,
+  family: string,
 ): { rows: number[][]; rowHeight: number; widths: number[] } {
-  const widths = labels.map((l) => LEGEND_KEY_WIDTH + LEGEND_KEY_GAP + measureText(l, fontSize));
+  const widths = labels.map((l) => keyWidth + LEGEND_KEY_GAP + measureText(l, fontSize, false, false, family));
   const rows: number[][] = [];
   let current: number[] = [];
   let used = 0;
@@ -94,6 +101,8 @@ export function computeLayout(input: LayoutInput): Layout {
   const { widthPt: W, heightPt: H, xAxis, yAxis, legend } = input;
   const warnings: string[] = [];
   const M = OUTER_MARGIN;
+  const ff = input.fontFamily ?? FONT_FAMILY;
+  const keyWidth = legendKeyWidthPt(legend.keyShape);
 
   const showLegend = legend.visible && input.legendLabels.length > 0;
   const legendFont = legend.fontSizePt;
@@ -103,6 +112,7 @@ export function computeLayout(input: LayoutInput): Layout {
   let titleLayout: Layout['title'] = null;
   if (input.title && hasText(input.title.text)) {
     const fs = input.title.fontSizePt;
+    top += input.titleOffsetPt ?? 0;
     titleLayout = { x: 0, y: top + fs * 0.9, fontSizePt: fs };
     top += fs * 1.2 + 6;
   }
@@ -116,12 +126,12 @@ export function computeLayout(input: LayoutInput): Layout {
       legendRows = {
         rows: input.legendLabels.map((_, i) => [i]),
         rowHeight: legendFont * 1.55,
-        widths: input.legendLabels.map((l) => LEGEND_KEY_WIDTH + LEGEND_KEY_GAP + measureText(l, legendFont)),
+        widths: input.legendLabels.map((l) => keyWidth + LEGEND_KEY_GAP + measureText(l, legendFont, false, false, ff)),
       };
       legendWidth = Math.max(...legendRows.widths);
       legendHeight = legendRows.rows.length * legendRows.rowHeight;
     } else {
-      legendRows = layoutLegendRows(input.legendLabels, legendFont, W - 2 * M);
+      legendRows = layoutLegendRows(keyWidth, input.legendLabels, legendFont, W - 2 * M, ff);
       legendHeight = legendRows.rows.length * legendRows.rowHeight;
       legendWidth = Math.max(
         ...legendRows.rows.map((r) => r.reduce((a, i) => a + legendRows!.widths[i], 0) + LEGEND_ITEM_GAP * (r.length - 1)),
@@ -144,33 +154,33 @@ export function computeLayout(input: LayoutInput): Layout {
 
   // ---- Right: secondary Y axis ticks, tick labels and title, outside the legend.
   const y2Visible = !!input.y2Axis && input.y2Axis.visible;
-  const y2TitleVisible = y2Visible && hasText(input.y2Axis!.title);
+  const y2TitleVisible = y2Visible && input.y2Axis!.titleVisible && hasText(input.y2Axis!.title);
   let y2Block = 0;
   if (y2Visible) {
     const y2 = input.y2Axis!;
-    const widest = Math.max(0, ...(input.y2TickLabels ?? []).map((l) => measureText(l, y2.tickFontSizePt, true)));
-    y2Block = TICK_LENGTH + Y_TICK_LABEL_GAP + widest;
-    if (y2TitleVisible) y2Block += AXIS_TITLE_GAP + y2.titleFontSizePt * 1.2;
+    const widest = Math.max(0, ...(input.y2TickLabels ?? []).map((l) => measureText(l, y2.tickFontSizePt, y2.tickBold, false, ff)));
+    y2Block = numberStartPt(y2) + Y_TICK_LABEL_GAP + widest;
+    if (y2TitleVisible) y2Block += AXIS_TITLE_GAP + y2.titleOffsetPt + y2.titleFontSizePt * 1.2;
   }
   right += y2Block;
 
   // ---- Left: Y axis title, tick labels, ticks.
   let left = M;
-  const yTitleVisible = yAxis.visible && hasText(yAxis.title);
-  if (yTitleVisible) left += yAxis.titleFontSizePt * 1.2 + AXIS_TITLE_GAP;
+  const yTitleVisible = yAxis.visible && yAxis.titleVisible && hasText(yAxis.title);
+  if (yTitleVisible) left += yAxis.titleFontSizePt * 1.2 + AXIS_TITLE_GAP + yAxis.titleOffsetPt;
   if (yAxis.visible) {
-    const widest = Math.max(0, ...input.yTickLabels.map((l) => measureText(l, yAxis.tickFontSizePt, true)));
-    left += widest + Y_TICK_LABEL_GAP + TICK_LENGTH;
+    const widest = Math.max(0, ...input.yTickLabels.map((l) => measureText(l, yAxis.tickFontSizePt, yAxis.tickBold, false, ff)));
+    left += widest + Y_TICK_LABEL_GAP + numberStartPt(yAxis);
   }
 
   // ---- Bottom: X tick labels, ticks, X title. Rotation decided after plot width is known.
-  const xTitleVisible = xAxis.visible && hasText(xAxis.title);
-  const xTitleBlock = xTitleVisible ? xAxis.titleFontSizePt * 1.2 + AXIS_TITLE_GAP : 0;
-  const labelWidths = input.categoryLabels.map((l) => measureText(l, xAxis.tickFontSizePt, true));
+  const xTitleVisible = xAxis.visible && xAxis.titleVisible && hasText(xAxis.title);
+  const xTitleBlock = xTitleVisible ? xAxis.titleFontSizePt * 1.2 + AXIS_TITLE_GAP + xAxis.titleOffsetPt : 0;
+  const labelWidths = input.categoryLabels.map((l) => measureText(l, xAxis.tickFontSizePt, xAxis.tickBold, false, ff));
   const maxLabelWidth = Math.max(0, ...labelWidths);
   const tickLabelBlock = (rotated: boolean): number =>
     xAxis.visible
-      ? TICK_LENGTH +
+      ? numberStartPt(xAxis) +
         X_TICK_LABEL_GAP +
         (rotated ? maxLabelWidth * Math.SQRT1_2 + xAxis.tickFontSizePt * Math.SQRT1_2 : xAxis.tickFontSizePt * 1.1)
       : 0;
@@ -233,3 +243,6 @@ export function computeLayout(input: LayoutInput): Layout {
 }
 
 export const LEGEND_KEY = { width: LEGEND_KEY_WIDTH, gap: LEGEND_KEY_GAP };
+
+/** Width of a legend colour key: 18 pt for a rectangle, 10 pt for a square. */
+export const keyWidthOf = (legend: Pick<LegendConfig, 'keyShape'>): number => legendKeyWidthPt(legend.keyShape);

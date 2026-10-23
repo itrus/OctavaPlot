@@ -128,7 +128,7 @@ export function staleSpread(centre: CentreKind, spread: SpreadKind): boolean {
   return effectiveSpreadOf(centre, spread) !== spread;
 }
 
-export interface SpreadSelectModel {
+interface SpreadSelectModel {
   value: SpreadKind;
   stale: boolean;
   options: { value: SpreadKind; label: string; disabled: boolean }[];
@@ -157,11 +157,11 @@ const CENTRE_PLURAL: Record<CentreKind, string> = { mean: 'means', geometricMean
 export function centreTitles(centre: CentreKind, type: string): { symbols: string; lines: string } {
   return {
     symbols: type === 'mean' ? `Symbols (${CENTRE_PLURAL[centre]})` : 'Symbols',
-    lines: type === 'scatter' ? `Lines (${centreLower(centre)})` : 'Lines',
+    lines: type === 'scatter' || type === 'paired' ? `Lines (${centreLower(centre)})` : 'Lines',
   };
 }
 
-export interface SummaryControlsState {
+interface SummaryControlsState {
   effectiveSpread: SpreadKind;
   stale: boolean;
   /** True when no error bar can be drawn: switched off, or no active spread. */
@@ -206,7 +206,7 @@ export function describeSummaryControls(input: {
   };
 }
 
-export type ConfidenceParse =
+type ConfidenceParse =
   | { ok: true; level: number; hint: string | null }
   | { ok: false; error: string };
 

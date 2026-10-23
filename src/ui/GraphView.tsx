@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { buildAnyModel, ChartCanvas } from '../chart/anyModel';
 import { hitFromTarget, pointerToChartPt } from '../chart/hitTest';
-import { groupedTooltipLines, tooltipLines, xyTooltipLines } from '../chart/tooltip';
+import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../chart/tooltip';
 import type { Chart, DataTable } from '../model/types';
 import { useApp } from '../state/AppContext';
 import { patchAnnotation, resetAllDataSets } from '../state/commands';
@@ -85,7 +85,7 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
       return;
     }
     const hit = hitFromTarget(e.target, svg);
-    const lines = any.family === 'category' ? tooltipLines(any.model, table, hit) : any.family === 'grouped' ? groupedTooltipLines(any.model, hit) : xyTooltipLines(any.model, table, hit);
+    const lines = any.family === 'category' ? tooltipLines(any.model, table, hit) : any.family === 'grouped' ? groupedTooltipLines(any.model, hit) : any.family === 'whole' ? pieTooltipLines(any.model, hit) : any.family === 'hist' ? histTooltipLines(any.model, hit) : any.family === 'heat' ? heatTooltipLines(any.model, hit) : xyTooltipLines(any.model, table, hit);
     const box = wrapRef.current?.getBoundingClientRect();
     if (lines && box) setTip({ x: e.clientX - box.left + 14, y: e.clientY - box.top + 14, lines });
     else setTip(null);

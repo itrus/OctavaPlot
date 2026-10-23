@@ -4,18 +4,20 @@ import { resolveStyle } from '../model/style';
 import { resolveSummary } from '../model/summary';
 import { layoutOf, xySeries } from '../model/tableLayout';
 import type { Chart, ChartStyle, DataTable, Id } from '../model/types';
-import { chartPx2Pt } from '../model/units';
+import { chartPx2Pt, n2 } from '../model/units';
 import { computeGroupStats, type GroupStats } from '../stats/summary';
 import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
 import { computeLayout, type Layout } from './layout';
 import { displayName, hash01 } from './model';
-import { resolveYAxis, type YAxisScale } from './scales';
+import { barLabelText, placeBarLabel, type BarLabelGeom } from './barLabels';
+import { axisMapper, onAxis, resolveAxis } from './axisScale';
+import type { YAxisScale } from './scales';
 import { suppliedStats } from './xyModel';
 
 /** How the bars of a cluster are arranged: side by side, stacked as counts, or stacked as shares of the row total. */
-export type Arrangement = 'side' | 'stacked' | 'percent';
+type Arrangement = 'side' | 'stacked' | 'percent';
 
-export interface GroupedCategory {
+interface GroupedCategory {
   /** Table row of the category. */
   row: number;
   label: string;
@@ -23,7 +25,7 @@ export interface GroupedCategory {
   centerX: number;
 }
 
-export interface GroupedBar {
+interface GroupedBar {
   /** Stable identity: the series and the table row. */
   id: Id;
   row: number;
@@ -39,9 +41,11 @@ export interface GroupedBar {
   stats: GroupStats | null;
   /** Counts of a contingency row: the share this bar is of its row. */
   count?: number;
+  /** Value or sample size written above the bar, when the chart asks for it (side by side bars only). */
+  label?: BarLabelGeom | null;
 }
 
-export interface GroupedPoint {
+interface GroupedPoint {
   id: Id;
   row: number;
   px: number;
@@ -50,7 +54,7 @@ export interface GroupedPoint {
   stats: GroupStats | null;
 }
 
-export interface GroupedSeries {
+interface GroupedSeries {
   groupId: Id;
   label: string;
   style: ChartStyle;
@@ -81,9 +85,8 @@ export interface GroupedModel {
 
 /** Share of a category's slot taken by its cluster of bars. */
 const CLUSTER_FRACTION = 0.8;
-const n2 = (v: number): string => String(Math.round(v * 100) / 100);
 
-const arrangementOf = (type: Chart['type']): Arrangement => (type === 'contingencyStacked' ? 'stacked' : type === 'contingencyPercent' ? 'percent' : 'side');
+const arrangementOf = (type: Chart['type']): Arrangement => (type === 'contingencyStacked' || type === 'groupedStacked' ? 'stacked' : type === 'contingencyPercent' ? 'percent' : 'side');
 
 /**
  * Model of grouped and contingency charts. The categories are the rows of the table that hold something; the series
@@ -150,7 +153,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   if (negative > 0) warnings.push(`${negative} count${negative === 1 ? ' is' : 's are'} negative and not drawn: counts cannot be below zero.`);
 
   // 3. The value axis: bars start at zero; stacked values are summed; percent is 0 to 100 unless set by hand.
-  const stackedTotals = categoryRows.map((_, ci) => raw.reduce((sum, r) => sum + (r.cells[ci].value ?? 0), 0));
+  // Positive parts pile up above the baseline and negative ones below it (spec 8.4); the axis shows both piles.
+  const stackedTotals = categoryRows.flatMap((_, ci) => [raw.reduce((sum, r) => sum + Math.max(0, r.cells[ci].value ?? 0), 0), raw.reduce((sum, r) => sum + Math.min(0, r.cells[ci].value ?? 0), 0)]);
   // Individual values are shown over bars of replicates, not over lines or counts.
   const showDots = (style: ChartStyle) => chart.type === 'groupedBar' && layout.kind === 'replicates' && style.showSymbols;
   const allY =
@@ -158,20 +162,24 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       ? raw.flatMap((r) => r.cells.flatMap((c) => (c.value === null ? [] : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars, r.style.errorDirection) : [c.value]), ...(showDots(r.style) ? c.reps.map((x) => x.value) : [])])))
       : stackedTotals;
   const tickCountHint = Math.max(3, Math.min(10, Math.round(H / 50)));
-  const yAxis = resolveYAxis({
+  // Log scales suit values side by side or on lines, not stacked parts or percentages, so those stay linear.
+  const axisCfg = arrangement === 'side' ? chart.yAxis : { ...chart.yAxis, scale: 'linear' as const, reverse: false };
+  const yAxis = resolveAxis({
     values: arrangement === 'percent' ? [0, 100] : allY,
-    includeZero: !asLines || allY.every((v) => v >= 0),
+    includeZero: axisCfg.scale === 'linear' && (!asLines || allY.every((v) => v >= 0)),
     min: chart.yAxis.min ?? (arrangement === 'percent' ? 0 : null),
     max: chart.yAxis.max ?? (arrangement === 'percent' ? 100 : null),
     majorInterval: chart.yAxis.majorInterval,
     tickCountHint,
-  });
+  }, axisCfg);
   warnings.push(...yAxis.warnings);
 
   // 4. Layout with the category labels along the X axis.
   const legendSeries = raw.map((_, i) => i).filter((i) => !chart.legend.hiddenGroupIds.includes(raw[i].s.id));
   const labels = categoryRows.map((r) => rowTitleAt(table, r).trim() || `Row ${r + 1}`);
   const lay = computeLayout({
+    fontFamily: chart.fontFamily,
+    titleOffsetPt: chart.titleOffsetPt,
     widthPt: W,
     heightPt: H,
     title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
@@ -185,7 +193,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   warnings.push(...lay.warnings);
   const { plot } = lay;
   const [y0, y1] = yAxis.domain;
-  const yScale = (v: number) => plot.y + plot.height - ((v - y0) / (y1 - y0)) * plot.height;
+  const yScale = axisMapper(yAxis, plot.y + plot.height, -plot.height);
   const slot = plot.width / Math.max(1, categoryRows.length);
   const categories: GroupedCategory[] = categoryRows.map((row, i) => ({ row, label: labels[i], centerX: plot.x + slot * (i + 0.5) }));
   if (categoryRows.length === 0) warnings.push('Enter a category name or values in the table to see the chart.');
@@ -193,9 +201,11 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   // 5. Geometry.
   const nSeries = Math.max(1, raw.length);
   const cluster = slot * CLUSTER_FRACTION;
-  const baseline = Math.min(Math.max(0, y0), y1);
-  const stackBase = new Array<number>(categoryRows.length).fill(0);
+  const baseline = Math.min(Math.max(yAxis.log ? 0 : (chart.bars.baseline ?? 0), y0), y1);
+  const stackUp = new Array<number>(categoryRows.length).fill(0);
+  const stackDown = new Array<number>(categoryRows.length).fill(0);
   let clipped = 0;
+  let offAxis = 0;
   const series: GroupedSeries[] = raw.map((r, si) => {
     const bars: GroupedBar[] = [];
     const points: GroupedPoint[] = [];
@@ -206,6 +216,11 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     let prevCi = -2;
     for (const cell of r.cells) {
       if (cell.value === null) continue;
+      // A value with no position on a log axis (0 or less) is left out and counted.
+      if (!onAxis(yAxis, cell.value)) {
+        offAxis++;
+        continue;
+      }
       const cat = categories[cell.ci];
       const id = `${r.s.id}:${cell.row}`;
       if (asLines) {
@@ -215,7 +230,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         linePath += `${cell.ci === prevCi + 1 ? 'L' : 'M'}${n2(px)},${n2(py)}`;
         prevCi = cell.ci;
         if (cell.stats) {
-          const bar = buildErrorBar({ groupId: r.s.id, centerX: px, stats: cell.stats, style: r.style, yScale, domain: yAxis.domain });
+          const bar = buildErrorBar({ groupId: r.s.id, centerX: px, stats: cell.stats, style: r.style, yScale, domain: yAxis.domain, log: !!yAxis.log });
           if (bar) {
             errorPath += bar.d;
             errorMeaning = r.meaning ?? bar.meaning;
@@ -230,29 +245,47 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       let from = baseline;
       let to = cell.value;
       if (stacked) {
-        from = stackBase[cell.ci];
+        // A part is as high as its own value; positive values pile up from the baseline, negative ones down from it.
+        const pile = cell.value < 0 ? stackDown : stackUp;
+        from = pile[cell.ci];
         to = from + cell.value;
-        stackBase[cell.ci] = to;
+        pile[cell.ci] = to;
       }
-      const yTop = yScale(Math.max(from, to));
-      const yBottom = yScale(Math.min(from, to));
-      bars.push({ id, row: cell.row, categoryIndex: cell.ci, value: cell.value, x, y: yTop, width: bw, height: Math.max(0, yBottom - yTop), stats: cell.stats, count: cell.count });
+      const pa = yScale(from);
+      const pb = yScale(to);
+      const yTop = Math.min(pa, pb);
+      const yBottom = Math.max(pa, pb);
+      const gbar: GroupedBar = { id, row: cell.row, categoryIndex: cell.ci, value: cell.value, x, y: yTop, width: bw, height: Math.max(0, yBottom - yTop), stats: cell.stats, count: cell.count };
+      bars.push(gbar);
       if (showDots(r.style)) {
         // Spread across the bar's width by a fixed hash of the observation, so the picture is the same every time.
         const spread = chart.jitter.enabled ? bw * chart.jitter.widthFraction : 0;
-        for (const rep of cell.reps) dots.push({ id: rep.id, row: cell.row, px: x + bw / 2 + (hash01(rep.id) - 0.5) * spread, py: yScale(rep.value), value: rep.value, stats: null });
+        for (const rep of cell.reps) if (onAxis(yAxis, rep.value)) dots.push({ id: rep.id, row: cell.row, px: x + bw / 2 + (hash01(rep.id) - 0.5) * spread, py: yScale(rep.value), value: rep.value, stats: null });
       }
+      let errTop: number | null = null;
+      let errBottom: number | null = null;
       if (cell.stats && !stacked) {
-        const bar = buildErrorBar({ groupId: r.s.id, centerX: x + bw / 2, stats: cell.stats, style: r.style, yScale, domain: yAxis.domain });
+        const bar = buildErrorBar({ groupId: r.s.id, centerX: x + bw / 2, stats: cell.stats, style: r.style, yScale, domain: yAxis.domain, log: !!yAxis.log });
         if (bar) {
           errorPath += bar.d;
           errorMeaning = r.meaning ?? bar.meaning;
           clipped += clippedEndpointCount([bar]);
+          errTop = bar.top;
+          errBottom = bar.bottom;
+        }
+      }
+      if (arrangement === 'side') {
+        const text = barLabelText(chart.barLabels, cell.value, cell.count ?? cell.stats?.n ?? null);
+        const yBase = yScale(baseline);
+        if (text !== null && Number.isFinite(pb) && Number.isFinite(yBase)) {
+          const far = pb <= yBase ? (errTop ?? pb) : (errBottom ?? pb);
+          gbar.label = { id: `${id}:label`, ...placeBarLabel(chart.barLabels, x + bw / 2, pb, far, yBase), text };
         }
       }
     }
     return { groupId: r.s.id, label: r.label, style: r.style, bars, points, dots, linePath, errorPath, errorMeaning };
   });
+  if (offAxis > 0) warnings.push(`${offAxis} value${offAxis === 1 ? ' is' : 's are'} 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
 
   return { widthPt: W, heightPt: H, layout: lay, arrangement, asLines, categories, y: yAxis, yScale, series, legendSeries, warnings: [...new Set(warnings)] };

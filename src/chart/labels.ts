@@ -2,20 +2,19 @@ import type { Chart, ChartStyle, ChartType, PointLabelCollision, PointLabelPlace
 import { measureText } from './text';
 
 /** Point-label constants (P: spec 23 L1539 leaves label behaviour unspecified). */
-export const LABEL_BOUNDS_INSET_PT = 2;
-export const LABEL_LINE_HEIGHT = 1.2;
-export const LABEL_BASELINE = 0.9;
-export const LABEL_EPS = 1e-6;
-export const REPEL_MAX_RING = 6;
-export const LEADER_WIDTH_PT = 0.5;
-export const LEADER_MIN_GAP_PT = 1;
+const LABEL_BOUNDS_INSET_PT = 2;
+const LABEL_LINE_HEIGHT = 1.2;
+const LABEL_BASELINE = 0.9;
+const LABEL_EPS = 1e-6;
+const REPEL_MAX_RING = 6;
+const LEADER_MIN_GAP_PT = 1;
 export const MAX_LABELS = 5000;
 export const LABEL_FONT_LIMITS = { min: 4, max: 72 } as const;
 export const LABEL_OFFSET_LIMITS = { min: -200, max: 200 } as const;
 export const LABEL_DECIMALS_LIMITS = { min: 0, max: 10 } as const;
 export const LABEL_AUTO_COLOR = '#000000';
 
-export const LABEL_REASONS = {
+const LABEL_REASONS = {
   needsSymbols: 'Point labels need Symbols to be shown.',
   meanRowTitle: 'Mean markers have no single row; they are labelled with their value.',
 } as const;
@@ -40,13 +39,13 @@ export function formatLabelValue(value: number, decimals: number | null): string
   return /^-0(\.0*)?$/.test(text) ? text.slice(1) : text;
 }
 
-export interface LabelSourceState {
+interface LabelSourceState {
   value: PointLabelSource;
   enabled: boolean;
   reason: string | null;
 }
 
-export interface LabelAvailability {
+interface LabelAvailability {
   available: boolean;
   reason: string | null;
   sources: LabelSourceState[];
@@ -95,7 +94,7 @@ export function sanitizeLabelStyle<T extends ChartStyle>(style: T): T {
 }
 
 /** Extra gap between neighbouring slots when a repelled label steps outwards (P). */
-export const LABEL_REPEL_GAP_PT = 2;
+const LABEL_REPEL_GAP_PT = 2;
 
 /** Axis-aligned box in pt: x0 <= x1 (left, right), y0 <= y1 (top, bottom). */
 export interface Box {
@@ -123,7 +122,7 @@ export interface LabelAnchor {
   leader: boolean;
 }
 
-export interface LabelSymbol {
+interface LabelSymbol {
   id: string;
   box: Box;
 }
@@ -578,7 +577,7 @@ export function layoutLabels(anchors: readonly LabelAnchor[], options: LabelLayo
 }
 
 /** One drawn symbol; every point takes part as an obstacle, labelled or not. */
-export interface LabelPointInput {
+interface LabelPointInput {
   id: string;
   /** Displayed symbol centre (jitter and the data set's own axis included). */
   cx: number;
@@ -593,12 +592,12 @@ export interface LabelPointInput {
   style: ChartStyle;
 }
 
-export interface LabelGroupInput {
+interface LabelGroupInput {
   groupId: string;
   points: LabelPointInput[];
 }
 
-export interface BuildPointLabelsInput {
+interface BuildPointLabelsInput {
   type: ChartType;
   groups: readonly LabelGroupInput[];
   plot: { x: number; y: number; width: number; height: number };

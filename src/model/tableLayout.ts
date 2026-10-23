@@ -2,9 +2,9 @@ import { leadingColumns } from './chartTypes';
 import type { DataTable, Group, Id, ReplicateLayout, SummaryFormat, TableKind } from './types';
 
 /** How the error was entered when a table holds values "already calculated elsewhere". */
-export type SuppliedError = 'sd' | 'sem' | 'cv' | 'plusMinus' | 'limits';
+type SuppliedError = 'sd' | 'sem' | 'cv' | 'plusMinus' | 'limits';
 
-export interface SummaryFormatInfo {
+interface SummaryFormatInfo {
   id: SummaryFormat;
   label: string;
   /** Sub-column headings of one series, in order. */
@@ -26,7 +26,7 @@ export const SUMMARY_FORMATS: readonly SummaryFormatInfo[] = [
 
 export const summaryFormatInfo = (id: SummaryFormat): SummaryFormatInfo => SUMMARY_FORMATS.find((f) => f.id === id) ?? SUMMARY_FORMATS[0];
 
-export const SINGLE_LAYOUT: ReplicateLayout = { kind: 'single' };
+const SINGLE_LAYOUT: ReplicateLayout = { kind: 'single' };
 export const MIN_REPLICATES = 2;
 export const MAX_REPLICATES = 10;
 
@@ -46,14 +46,8 @@ export function subLabels(layout: ReplicateLayout): string[] {
   return ['Y'];
 }
 
-export function describeLayout(layout: ReplicateLayout): string {
-  if (layout.kind === 'replicates') return `${layout.n} replicate values in side-by-side subcolumns`;
-  if (layout.kind === 'summary') return `values already calculated: ${summaryFormatInfo(layout.format).label}`;
-  return 'a single Y value for each point';
-}
-
 /** A Y series of an XY table: one column, or a block of replicate / summary sub-columns. */
-export interface XySeriesDef {
+interface XySeriesDef {
   /** The first column's ID: the stable identity of the series (styles, legend and selection are keyed by it). */
   id: Id;
   name: string;

@@ -4,6 +4,9 @@ import { CHART_TYPES, chartTypeInfo, defaultChartTypeFor } from '../model/chartT
 import { leadingColumns } from '../model/chartTypes';
 import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../model/tableLayout';
 import { sanitizeFillKeys } from '../model/fill';
+import { sanitizeAxis } from '../model/axis';
+import { sanitizeLook } from '../model/look';
+import { sanitizeGaps, sanitizeOrder } from '../model/groupOrder';
 import { createRows, sanitizeRowTitle } from '../model/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/summary';
 import type { Analysis, Chart, ChartLayer, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SpreadKind, SummarySpec } from '../model/types';
@@ -250,6 +253,8 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     ...(rest as Partial<Chart>),
     widthPx: typeof c.widthPx === 'number' ? c.widthPx : (mmToPx(widthMm) ?? base.widthPx),
     heightPx: typeof c.heightPx === 'number' ? c.heightPx : (mmToPx(heightMm) ?? base.heightPx),
+    groupOrder: sanitizeOrder(c.groupOrder),
+    groupGaps: sanitizeGaps(c.groupGaps),
     hiddenGroupIds: Array.isArray(c.hiddenGroupIds) ? c.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
     survival: parseSurvival(c.survival),
     extraGroups: Array.isArray(c.extraGroups)
@@ -257,12 +262,14 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
       : [],
     aspect: c.aspect === '4:3' || c.aspect === '1:1' ? c.aspect : 'free',
     paletteId: typeof c.paletteId === 'string' ? c.paletteId : null,
-    xAxis: { ...base.xAxis, ...(isObj(c.xAxis) ? c.xAxis : {}) },
-    yAxis: { ...base.yAxis, ...(isObj(c.yAxis) ? c.yAxis : {}) },
-    y2Axis: { ...base.y2Axis, ...(isObj(c.y2Axis) ? c.y2Axis : {}) },
+    ...sanitizeLook(c, base),
+    xAxis: sanitizeAxis({ ...base.xAxis, ...(isObj(c.xAxis) ? c.xAxis : {}) }, base.xAxis),
+    yAxis: sanitizeAxis({ ...base.yAxis, ...(isObj(c.yAxis) ? c.yAxis : {}) }, base.yAxis),
+    y2Axis: sanitizeAxis({ ...base.y2Axis, ...(isObj(c.y2Axis) ? c.y2Axis : {}) }, base.y2Axis),
     legend: {
       ...base.legend,
       ...legendIn,
+      keyShape: legendIn.keyShape === 'square' ? 'square' : 'rectangle',
       hiddenGroupIds: Array.isArray(legendIn.hiddenGroupIds) ? legendIn.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
     },
     jitter: { ...base.jitter, ...(isObj(c.jitter) ? c.jitter : {}) },

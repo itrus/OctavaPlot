@@ -1,11 +1,11 @@
-import type { ChartType, DataTable, TableKind } from './types';
+import type { ChartType, TableKind } from './types';
 
 /**
  * What the user picks from when starting work. A data table has a TYPE, chosen when it is created, and a graph
  * has a CHART TYPE chosen from those that suit its table (spec section 2.3: input modes and the charts built from
  * them).
  */
-export interface TableTypeInfo {
+interface TableTypeInfo {
   kind: TableKind;
   label: string;
   /** What the columns mean. */
@@ -14,7 +14,7 @@ export interface TableTypeInfo {
   useFor: string;
 }
 
-export const TABLE_TYPES: readonly TableTypeInfo[] = [
+const TABLE_TYPES: readonly TableTypeInfo[] = [
   {
     kind: 'column',
     label: 'Column table',
@@ -47,7 +47,7 @@ export const TABLE_TYPES: readonly TableTypeInfo[] = [
   },
 ];
 
-export interface ChartTypeInfo {
+interface ChartTypeInfo {
   type: ChartType;
   /** The table type it is drawn from. */
   tableKind: TableKind;
@@ -59,11 +59,21 @@ export const CHART_TYPES: readonly ChartTypeInfo[] = [
   { type: 'bar', tableKind: 'column', label: 'Bar chart', description: 'One bar per group, with optional points and error bars.' },
   { type: 'scatter', tableKind: 'column', label: 'Scatter dot plot', description: 'Every value as a dot, grouped by column.' },
   { type: 'mean', tableKind: 'column', label: 'Mean with error bars', description: 'A mean marker per group with its spread.' },
+  { type: 'box', tableKind: 'column', label: 'Box and whiskers', description: 'Quartiles, median and whiskers of each column.' },
+  { type: 'floating', tableKind: 'column', label: 'Floating bars (min to max)', description: 'A bar from the smallest to the largest value of each column, with a line at the mean or median.' },
+  { type: 'paired', tableKind: 'column', label: 'Before and after', description: 'The values of each row joined by a line across the columns.' },
+  { type: 'histogram', tableKind: 'column', label: 'Histogram', description: 'How many values fall in each bin of the value axis.' },
+  { type: 'ecdf', tableKind: 'column', label: 'Cumulative distribution', description: 'The share of the values at or below each value, as steps.' },
+  { type: 'violin', tableKind: 'column', label: 'Violin plot', description: 'The distribution of each column as a smoothed density.' },
   { type: 'xyScatter', tableKind: 'xy', label: 'XY scatter', description: 'Symbols at (X, Y); no connecting line.' },
   { type: 'xyLine', tableKind: 'xy', label: 'Line', description: 'Points joined in X order; no symbols.' },
   { type: 'xyLineSymbols', tableKind: 'xy', label: 'Line with symbols', description: 'Points joined in X order, each marked.' },
   { type: 'groupedBar', tableKind: 'grouped', label: 'Grouped bars', description: 'Bars side by side within each category, with error bars.' },
+  { type: 'groupedStacked', tableKind: 'grouped', label: 'Stacked bars', description: 'The series stacked in one bar per category: the value of each is its own height.' },
+  { type: 'heatmap', tableKind: 'grouped', label: 'Heat map', description: 'Each cell coloured by its value: rows are the categories, columns the series.' },
   { type: 'groupedLine', tableKind: 'grouped', label: 'Lines over categories', description: 'One line per series joining its means across the categories.' },
+  { type: 'pie', tableKind: 'contingency', label: 'Pie charts', description: 'The outcomes of each row as parts of a circle.' },
+  { type: 'doughnut', tableKind: 'contingency', label: 'Doughnut charts', description: 'Pie charts with a hole, and the total of each row in it.' },
   { type: 'contingencyBars', tableKind: 'contingency', label: 'Side-by-side bars', description: 'Counts: one bar per outcome within each row.' },
   { type: 'contingencyStacked', tableKind: 'contingency', label: 'Stacked bars', description: 'Counts: the outcomes stacked in one bar per row.' },
   { type: 'contingencyPercent', tableKind: 'contingency', label: '100% stacked bars', description: 'Each row\'s outcomes as a share of its own total.' },
@@ -77,7 +87,10 @@ export const defaultChartTypeFor = (kind: TableKind): ChartType => chartTypesFor
 export const tableTypeInfo = (kind: TableKind): TableTypeInfo => TABLE_TYPES.find((t) => t.kind === kind) ?? TABLE_TYPES[0];
 
 /** How a chart type is drawn: which model and drawing it uses, and so which inspector. */
-export type ChartFamily = 'category' | 'xy' | 'grouped' | 'survival';
+/** Chart types that can run horizontally: the column charts (bars, dots, means, boxes and violins). */
+export const supportsHorizontal = (type: ChartType): boolean => type === 'bar' || type === 'scatter' || type === 'mean' || type === 'box' || type === 'violin' || type === 'floating' || type === 'paired';
+
+type ChartFamily = 'category' | 'xy' | 'grouped' | 'survival' | 'whole' | 'hist' | 'heat';
 
 export function chartFamily(type: ChartType): ChartFamily {
   switch (type) {
@@ -86,6 +99,7 @@ export function chartFamily(type: ChartType): ChartFamily {
     case 'xyLineSymbols':
       return 'xy';
     case 'groupedBar':
+    case 'groupedStacked':
     case 'groupedLine':
     case 'contingencyBars':
     case 'contingencyStacked':
@@ -94,6 +108,14 @@ export function chartFamily(type: ChartType): ChartFamily {
     case 'survival':
     case 'cumulativeEvent':
       return 'survival';
+    case 'pie':
+    case 'doughnut':
+      return 'whole';
+    case 'histogram':
+    case 'ecdf':
+      return 'hist';
+    case 'heatmap':
+      return 'heat';
     default:
       return 'category';
   }
@@ -103,13 +125,10 @@ export function chartFamily(type: ChartType): ChartFamily {
 export const isXyChartType = (type: ChartType): boolean => chartFamily(type) === 'xy';
 /** Bars (or lines) over categories that are the rows of a grouped or contingency table. */
 export const isGroupedChartType = (type: ChartType): boolean => chartFamily(type) === 'grouped';
+/** Charts whose series colour is the colour of its symbols, lines and error bars (not of a filled bar). */
+export const isSeriesColourType = (type: ChartType): boolean => chartFamily(type) === 'xy' || chartFamily(type) === 'survival' || type === 'groupedLine' || type === 'ecdf';
 export const isSurvivalChartType = (type: ChartType): boolean => chartFamily(type) === 'survival';
-/** Charts with one data set per series of sub-columns, rather than per column: everything but the column table's. */
-export const isSeriesChartType = (type: ChartType): boolean => chartFamily(type) !== 'category';
-
 /** Number of leading table columns that are not data sets: the X (or time) column of XY and survival tables. */
 export const leadingColumns = (kind: TableKind): number => (kind === 'xy' || kind === 'survival' ? 1 : 0);
 /** Tables whose columns are grouped into series (blocks); the column table's columns are data sets one by one. */
 export const usesSeriesBlocks = (kind: TableKind): boolean => kind !== 'column';
-
-export const tableKindOf = (table: Pick<DataTable, 'kind'>): TableKind => table.kind;

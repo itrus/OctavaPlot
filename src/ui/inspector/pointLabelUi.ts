@@ -16,7 +16,7 @@ import {
   type SuppressedLabel,
 } from '../../chart/labels';
 
-export const PLACEMENT_OPTIONS: Array<{ value: PointLabelPlacement; label: string }> = [
+const PLACEMENT_OPTIONS: Array<{ value: PointLabelPlacement; label: string }> = [
   { value: 'above-right', label: 'Above right' },
   { value: 'above', label: 'Above' },
   { value: 'below', label: 'Below' },
@@ -37,14 +37,14 @@ const SOURCES: PointLabelSource[] = ['rowTitle', 'value'];
 const PLACEMENTS: PointLabelPlacement[] = PLACEMENT_OPTIONS.map((o) => o.value);
 const COLLISIONS: PointLabelCollision[] = ['keep', 'hide', 'repel'];
 
-export const CUSTOM_PLACEMENT_REASON = 'Custom is set for a single point, not for a whole data set.';
+const CUSTOM_PLACEMENT_REASON = 'Custom is set for a single point, not for a whole data set.';
 export const CENTRE_OFFSET_REASON = 'Centred labels ignore the offsets.';
 export const NAMED_OFFSET_NOTE = 'Gap from the symbol edge. Negative values count as 0.';
 export const CUSTOM_OFFSET_NOTE = 'Signed distance from the point to the top-left corner of the label.';
 /** Row titles are stored in the project file and the autosave, outside any BAA-covered system (P). */
 export const IDENTIFIER_NOTE =
   'Row titles are saved in the project file and in this browser. Do not use patient identifiers.';
-export const DEFAULT_DECIMALS = 2;
+const DEFAULT_DECIMALS = 2;
 
 export interface PointLabelUi {
   checkboxEnabled: boolean;

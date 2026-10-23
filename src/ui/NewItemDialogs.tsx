@@ -72,6 +72,72 @@ export function ChartSketch({ type }: { type: ChartType }) {
           ))}
         </svg>
       );
+    case 'box':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[21, 24, 36], [37, 16, 30], [53, 20, 34], [69, 10, 24]].map(([x, top, bottom]) => (
+            <g key={x}>
+              <path d={`M${x} ${top - 6}V${top}M${x} ${bottom}V${bottom + 6}M${x - 3} ${top - 6}h6M${x - 3} ${bottom + 6}h6`} />
+              <rect x={x - 6} y={top} width="12" height={bottom - top} fill="currentColor" fillOpacity={0.25} />
+              <path d={`M${x - 6} ${(top + bottom) / 2}h12`} strokeWidth={2} />
+            </g>
+          ))}
+        </svg>
+      );
+    case 'paired':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[34, 22], [26, 30], [38, 18], [20, 36]].map(([a, b], i) => (
+            <g key={i}>
+              <path d={`M26 ${a}L62 ${b}`} />
+              <circle cx="26" cy={a} r="2.2" fill="currentColor" stroke="none" />
+              <circle cx="62" cy={b} r="2.2" fill="currentColor" stroke="none" />
+            </g>
+          ))}
+        </svg>
+      );
+    case 'histogram':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[14, 14], [26, 26], [38, 36], [50, 30], [62, 16]].map(([x, h]) => (
+            <rect key={x} x={x} y={46 - h} width="12" height={h} fill="currentColor" fillOpacity={0.25} />
+          ))}
+        </svg>
+      );
+    case 'ecdf':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          <path d="M10 44H20V38H30V30H40V24H50V14H62V9H78" strokeWidth={2} />
+        </svg>
+      );
+    case 'floating':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[21, 26, 38], [37, 14, 30], [53, 20, 36], [69, 8, 26]].map(([x, top, bottom]) => (
+            <g key={x}>
+              <rect x={x - 7} y={top} width="14" height={bottom - top} fill="currentColor" fillOpacity={0.25} />
+              <path d={`M${x - 7} ${(top + bottom) / 2}h14`} strokeWidth={2} />
+            </g>
+          ))}
+        </svg>
+      );
+    case 'violin':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[21, 30, 8], [37, 22, 10], [53, 26, 7], [69, 16, 9]].map(([x, mid, half]) => (
+            <g key={x}>
+              <path d={`M${x} ${mid - 14}C${x + half} ${mid - 8} ${x + half} ${mid + 4} ${x} ${mid + 12}C${x - half} ${mid + 4} ${x - half} ${mid - 8} ${x} ${mid - 14}Z`} fill="currentColor" fillOpacity={0.25} />
+              <path d={`M${x - 4} ${mid}h8`} strokeWidth={2} />
+            </g>
+          ))}
+        </svg>
+      );
     case 'groupedBar':
       return (
         <svg {...SKETCH}>
@@ -106,6 +172,7 @@ export function ChartSketch({ type }: { type: ChartType }) {
           ))}
         </svg>
       );
+    case 'groupedStacked':
     case 'contingencyStacked':
     case 'contingencyPercent': {
       const full = type === 'contingencyPercent';

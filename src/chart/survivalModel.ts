@@ -2,14 +2,14 @@ import { isSurvivalChartType } from '../model/chartTypes';
 import { resolveStyle } from '../model/style';
 import { xySeries } from '../model/tableLayout';
 import type { Chart, DataTable, SurvivalBandMethod } from '../model/types';
-import { chartPx2Pt } from '../model/units';
+import { chartPx2Pt, n2 } from '../model/units';
 import { normalQuantile } from '../stats/special';
 import { computeLayout } from './layout';
 import { displayName } from './model';
-import { resolveYAxis } from './scales';
+import { resolveAxis } from './axisScale';
 import type { AtRiskTable, XyModel, XyPoint, XySeries } from './xyModel';
 
-export interface SurvivalStep {
+interface SurvivalStep {
   /** Time of an event (the estimate drops here). */
   time: number;
   /** Estimate after the events at this time. */
@@ -21,14 +21,14 @@ export interface SurvivalStep {
   greenwood: number;
 }
 
-export interface CensorMark {
+interface CensorMark {
   time: number;
   /** Estimate at the censoring time. */
   survival: number;
   row: number;
 }
 
-export interface KaplanMeier {
+interface KaplanMeier {
   steps: SurvivalStep[];
   marks: CensorMark[];
   /** Subjects counted (events + censored). */
@@ -100,7 +100,6 @@ export function survivalInterval(step: Pick<SurvivalStep, 'survival' | 'greenwoo
   return [s ** Math.exp(z * se), s ** Math.exp(-z * se)];
 }
 
-const n2 = (v: number): string => String(Math.round(v * 100) / 100);
 
 /** Share of the series colour the confidence band is drawn at (spec 5.2: bands use 0.20). */
 export const BAND_OPACITY = 0.2;
@@ -146,8 +145,9 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
 
   // 2. Scales: time from 0, fraction 0 to 1.
   const allT = raw.flatMap((r) => [...r.km.steps.map((x) => x.time), ...r.km.marks.map((m) => m.time)]);
-  const xAxis = resolveYAxis({ values: allT.length ? [0, ...allT] : [], includeZero: true, min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 60))) });
-  const yAxis = resolveYAxis({ values: [0, 1], includeZero: true, min: chart.yAxis.min ?? 0, max: chart.yAxis.max ?? 1, majorInterval: chart.yAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(H / 50))) });
+  const linear = { scale: 'linear' as const, reverse: false };
+  const xAxis = resolveAxis({ values: allT.length ? [0, ...allT] : [], includeZero: true, min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 60))) }, { ...chart.xAxis, ...linear });
+  const yAxis = resolveAxis({ values: [0, 1], includeZero: true, min: chart.yAxis.min ?? 0, max: chart.yAxis.max ?? 1, majorInterval: chart.yAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(H / 50))) }, { ...chart.yAxis, ...linear });
   warnings.push(...xAxis.warnings.map((w) => w.replace(/^Y /, 'X ').replace(/ Y limit/, ' X limit')), ...yAxis.warnings);
 
   // The at-risk table sits under the plot: one row per group and a heading, at the ticks of the time axis.
@@ -157,6 +157,8 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   const rowHeight = atRiskFont * 1.3;
   const showAtRisk = opts.atRisk && raw.length > 0 && atRiskTimes.length > 0;
   const layout = computeLayout({
+    fontFamily: chart.fontFamily,
+    titleOffsetPt: chart.titleOffsetPt,
     widthPt: W,
     heightPt: H,
     title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,

@@ -6,27 +6,24 @@
 
 <p align="center">
   <a href="https://itrus.github.io/OctavaPlot/"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6%20try%20it-live%20demo-2ea44f?style=for-the-badge"></a>
-  <a href="https://www.buymeacoffee.com/itrus"><img height="28" src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=🎓&slug=itrus&button_colour=FFDD00&font_colour=000000&font_family=Arial&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" /></a>
+  <a href="https://www.buymeacoffee.com/itrus"><img height="28" src="branding/buymeacoffee.svg" alt="Buy me a coffee"></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/itrus/OctavaPlot/actions/workflows/deploy.yml"><img alt="Test, build and deploy" src="https://github.com/itrus/OctavaPlot/actions/workflows/deploy.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue"></a>
 </p>
 
 <p align="center">
   <b>Tech:</b>
-  <img alt="Node.js 24 | 26" src="https://img.shields.io/badge/node-24%20%7C%2026-339933?logo=nodedotjs&logoColor=white">
+  <img alt="Node.js 26" src="https://img.shields.io/badge/node-26-339933?logo=nodedotjs&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
   <img alt="Vite" src="https://img.shields.io/badge/Vite-646cff?logo=vite&logoColor=white">
   <img alt="D3" src="https://img.shields.io/badge/D3-7-f9a03c?logo=d3dotjs&logoColor=white">
 </p>
 
-<p align="center">
-  <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue"></a>
-</p>
-
-Local React + TypeScript + Vite + D3 app for editing data tables and the charts drawn from them: bar / scatter / mean±error charts from column tables, and XY scatter / line charts from XY tables. No backend; works offline after `npm install`. Chart colour palettes are from the ggsci R package (Xiao N., https://nanx.me/ggsci/); see [Colour palettes](#colour-palettes).
+Local React + TypeScript + Vite + D3 app for editing data tables and the charts drawn from them: bar / scatter / mean±error charts from column tables, and XY scatter / line charts from XY tables. No backend; works offline after `npm install`.
 
 <h3 align="center">▶ <a href="https://itrus.github.io/OctavaPlot/">Open OctavaPlot in your browser: itrus.github.io/OctavaPlot</a></h3>
 
@@ -34,7 +31,7 @@ Deployed from `main` by GitHub Actions. Data stays in your browser's `localStora
 
 ## Run
 
-Requires Node.js 24 or 26.
+Requires Node.js 26.
 
 ```bash
 npm install
@@ -47,19 +44,19 @@ npm test         # unit tests (vitest)
 
 | Path | Concern |
 |---|---|
-| `src/model/` | Typed project model, defaults, style hierarchy, unit helpers (pt/mm/px) |
-| `src/stats/` | `summary.ts`: per-data-set centre, spread and interval; `special.ts`: gamma, beta and t functions and the exact median CI; independent of presentation |
-| `src/chart/scales.ts` | Y-axis domain and ticks (left and right axes) |
+| `src/model/` | Typed project model (`types.ts`), defaults, style hierarchy, units (pt/mm/px), table and chart types (`chartTypes.ts`, `chartGallery.ts`) |
+| `src/model/axis.ts`, `look.ts`, `columnOptions.ts`, `distributionOptions.ts` | Settings of axes, of the look of a chart (fonts, colours, frame, gridlines, direction), of columns and bar labels, of box plots and violins; each with its limits and a `sanitize*` function that checks what a file or a patch holds (`sanitize.ts` has the shared checks) |
+| `src/stats/` | `summary.ts`: per-data-set centre, spread and interval; `distribution.ts`: quartiles, whiskers, density; `special.ts`: gamma, beta and t functions and the exact median CI; `memo.ts`: results kept per observation array; independent of presentation |
+| `src/chart/scales.ts`, `axisScale.ts` | Value-axis domain and ticks: linear, log, reversed, minor ticks, number format |
 | `src/chart/layout.ts` | Margins, titles, legend placement |
-| `src/chart/model.ts` | Geometry construction for category charts (bars, error bars, points, lines) |
-| `src/chart/ChartSvg.tsx` | Declarative SVG drawing of category charts |
-| `src/chart/xyModel.ts`, `XyChartSvg.tsx` | Model and drawing of XY charts (numeric X axis, one series per Y column) |
-| `src/model/chartTypes.ts` | Table types and chart types, and which go together |
-| `src/chart/hatch.ts`, `labels.ts`, `axes.ts`, `errorGeometry.ts` | Fill pattern marks, point-label layout, axis binding, error-bar geometry |
+| `src/chart/model.ts`, `groupedModel.ts`, `xyModel.ts`, `survivalModel.ts` | Geometry of the four families of chart (column, grouped and contingency, XY, survival) |
+| `src/chart/ChartSvg.tsx`, `GroupedChartSvg.tsx`, `XyChartSvg.tsx` | Declarative SVG drawing of each family; `ChartParts.tsx`, `GridLines.tsx`, `axisTicks.ts` are the pieces they share |
+| `src/chart/hatch.ts`, `labels.ts`, `axes.ts`, `errorGeometry.ts`, `distributionGeom.ts`, `columns.ts`, `barLabels.ts` | Fill pattern marks, point-label layout, axis binding, error-bar geometry, box and violin shapes, column positions, labels above bars |
 | `src/chart/hitTest.ts` | Hit testing / selection helpers (editor only) |
 | `src/chart/export.tsx` | SVG / PNG export (rendered without editor state) |
-| `src/state/` | Commands, undo/redo history, JSON save/load, autosave |
-| `src/ui/` | Navigator, data table, graph view, formatting inspector |
+| `src/state/` | Commands, undo/redo history, JSON save/load, autosave, settings |
+| `src/ui/` | Navigator, data table, graph view, formatting inspector (`ui/inspector/`) |
+| `src/testing/` | Fixtures and checks used by the tests only; nothing in the app imports them |
 
 Style precedence: object override > group override > layer override > (group palette) > chart defaults. Chart internal unit is the point (1 in = 72 pt = 25.4 mm); the SVG viewBox is in pt.
 
@@ -69,19 +66,43 @@ A table has a **type**, chosen when it is created (Navigator → New Data Table�
 
 | Table type | Layout | Chart types |
 |---|---|---|
-| Column table | Each column is a group; the rows are its replicate values | Bar chart, Scatter dot plot, Mean with error bars |
+| Column table | Each column is a group; the rows are its replicate values | Bar chart, Scatter dot plot, Mean with error bars, Floating bars, Box and whiskers, Violin plot, Before and after (these can also run horizontally); Histogram, Cumulative distribution |
 | XY table | First column is X (numbers); every other column is a Y series | XY scatter, Line, Line with symbols |
-| Grouped table | Each row is a category; each block of columns is a series (single values, replicates, or values already calculated) | Grouped bars, Lines over categories |
-| Contingency table | Rows are groups of subjects, columns are outcomes, cells are counts | Side-by-side bars, Stacked bars, 100% stacked bars |
+| Grouped table | Each row is a category; each block of columns is a series (single values, replicates, or values already calculated) | Grouped bars, Stacked bars, Lines over categories, Heat map |
+| Contingency table | Rows are groups of subjects, columns are outcomes, cells are counts | Side-by-side bars, Stacked bars, 100% stacked bars, Pie charts, Doughnut charts |
 | Survival table | First column is the time; each other column is a group holding 1 (event) or 0 (censored) on the row of each subject | Survival curve (Kaplan-Meier), Cumulative events |
 
-**New Data Table…** opens one dialog, modelled on a familiar "new table" wizard: the table format along the top (XY, Column; Grouped, Contingency and Survival can be previewed but are planned), whether to start empty or with sample data (the default follows Settings → "New projects and tables start empty"), and, for XY tables, how the Y values are entered: a single value, N replicates in side-by-side subcolumns (the chart plots their centre with SD / SEM / CI / range error bars), or values already calculated elsewhere (Mean with SD, SEM, %CV, ± error or upper/lower limits, drawn as entered). A series with subcolumns is one block of columns under a shared series name; `src/model/tableLayout.ts` defines the layouts.
+**New Data Table…** opens one dialog, modelled on a familiar "new table" wizard: the table format along the top (XY, Column, Grouped, Contingency or Survival), whether to start empty or with sample data (the default follows Settings → "New projects and tables start empty"), and, for XY tables, how the Y values are entered: a single value, N replicates in side-by-side subcolumns (the chart plots their centre with SD / SEM / CI / range error bars), or values already calculated elsewhere (Mean with SD, SEM, %CV, ± error or upper/lower limits, drawn as entered). A series with subcolumns is one block of columns under a shared series name; `src/model/tableLayout.ts` defines the layouts.
 
 Survival curves use the product-limit estimate (events are counted before censoring at a tied time); censored subjects are marked on the curve. An optional pointwise confidence band uses the Greenwood standard error (log-log by default, or plain, at the level you choose), and an optional at-risk table lists the subjects still under observation at each tick of the time axis. Grouped bars of replicates can show the individual values over the bars. Contingency percentages are shares of each row's own total. Grouped and contingency charts treat a row with a title or any value as a category; empty rows are ignored.
 
 XY charts follow spec §3.1 and §7: symbols and a path layer per series, a numeric X axis with Auto/Manual limits, input-order paths that break at a missing value (never bridged, never zero), and the automatic range including zero only when the data starts near it. `src/model/chartTypes.ts` is the catalogue; adding a chart type means adding it there, a preset in `defaults.ts`, and its drawing.
 
 **New Graph…** shows a gallery per graph family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. Graphs that are not built yet (box and violin, heat maps, parts of a whole, bars at numeric X, fitted curves, and so on: the presets of specification section 3) are shown locked with their thumbnail and their specification preset ID, so the whole range is visible. The catalogue is `src/model/chartGallery.ts`; to make a planned graph available, give its entry a `type`.
+
+## Box plots, violins, columns and axes
+
+**Box and whiskers** draw the quartiles (type 6 rule), the median and whiskers from the raw values; the whiskers end at the minimum and maximum, at the Tukey fences (the most extreme values inside Q1 - k IQR and Q3 + k IQR) or at a percentile pair (10-90, 5-95, 2.5-97.5, 1-99). Dots can show the values outside the whiskers or all of them; with fewer than 4 values only the range and the median are drawn. **Violins** use a Gaussian kernel with bandwidth 0.9 min(SD, IQR/1.34) n^(-1/5) times 0.5, 1 or 2 (light, medium, heavy) or a bandwidth you set; the ends are cut at the smallest and largest value or follow the tails, and the widths are scaled to equal maximum width, equal area or sample size. Values that are all equal, or fewer than 3, have no density and are shown as dots with a notice. Code: `src/stats/distribution.ts`, `src/chart/distributionGeom.ts`.
+
+**Direction.** A column chart (bars, dots, means, boxes, violins) can run horizontally: Layout → Direction, or the "Horizontal" graphs of the New Graph gallery. The chart is built vertically in a "virtual" plotting region and turned a quarter by one SVG matrix (`Orientation` in `src/chart/model.ts`); symbols and text stay upright. The numbers then run along the bottom with the value axis (Y) settings, and the data set names down the left. Horizontal charts have no right axis and no point labels yet.
+
+**Columns.** Layout → Columns sets the space between columns, before the first and after the last (percent of a column's width, Auto = the usual layout) and where bars begin. Data Sets on Graph orders the data sets of a column chart and gives each one its own space before it. Labels above the bars (Annotations tab) show the plotted value or the sample size with decimals, thousands separator, prefix and suffix.
+
+**Axes.** Each numeric axis has a scale (linear, log 10, log 2, natural log; values of 0 or less are left out and counted), reverse, major and minor ticks (direction and length, 2 to 9 times the power on a base 10 log axis), minor gridlines and number format (automatic, decimal, scientific, decimals, thousands, prefix, suffix). The Frame section sets axis, plotting area and page colours (no page colour gives a transparent PNG), a box frame and the colour, thickness and pattern of the gridlines; Text sets font, text colour, bold, and the distances of titles and numbers from the axis. Survival curves and stacked or percentage bars keep a plain linear axis.
+
+## More charts and axis settings
+
+**Floating bars** run from the smallest to the largest value of a column, with a line at the mean or median (the summary setting). **Stacked bars** of a grouped table pile the series on each other, each as high as its own value; negative values pile downwards from the baseline; the parts have no error bars (an error of a part is not an error of the total). **Before and after** joins the values of each row across the columns; a row with a missing value breaks its line unless you choose to join across it, and no value is made up.
+
+**Pie and doughnut charts** make one pie for each row of a contingency table, the parts being its columns. Labels (name, count, percent), start angle, direction, hole and totals are in the Style section. A row with a negative count, or counts that add up to zero, is not drawn and a notice says so. **Histograms** put the values of each column into bins (automatic: about log2(n) + 1 bins of a round width; or a width you set), as counts, fractions, percents or densities of all the values, optionally cumulative; several data sets share the same bins. **Cumulative distributions** step up at each different value (ties are one jump), at-or-below or above, as a fraction, percent or count. Code: `src/stats/histogram.ts`, `src/chart/histModel.ts`.
+
+**Heat maps** colour the cells of a grouped table (the centre of replicates, or the entered value) by a scale (viridis, magma, blue, diverging green-black-red, grayscale), with a colour bar. Each row or column can be normalised (z-score, min-max, or centred); a row without spread has no z-score and its cells are shown as missing. Code: `src/stats/matrix.ts`, `src/chart/heatmapModel.ts`.
+
+**Axis origin, breaks and scale bars.** Frame → Origin moves the axis lines to a value of the other axis (the numbers stay at the edge). An axis can have up to two **breaks**: a range of values left out, with a gap and a mark on the axis; what is drawn across the gap is cut off by the clip, never joined. Breaks are for linear, not reversed, axes (the left axis, and either axis of an XY chart). A hidden axis can have a **scale bar** instead: a bar one major interval long, with that interval written beside it. Code: `src/chart/axisScale.ts`.
+
+## Fitted curves
+
+XY charts can draw a fitted curve for each data set (Format graph, Fitted curve): straight line, polynomial (degree 2 to 6), one- and two-phase exponential, Gaussian peak, hyperbola, and 4- and 5-parameter logistic. Every replicate is a point. Parameters come with standard errors and confidence intervals, and a confidence or prediction band can be drawn. A fit that cannot be made says why instead of drawing a curve. Tables, graphs and analyses are renamed by double-clicking them in the navigator (or F2).
 
 ## Analyses (Results)
 
@@ -99,20 +120,11 @@ XY charts follow spec §3.1 and §7: symbols and a path layer per series, a nume
 
 ## Limitations
 
-Linear axes only; tables and graphs can be added but not deleted or renamed; group colours default to grayscale; values display as stored (typed `1.10` shows `1.1`).
-
-## UI layout (from reference screenshots)
-
-The screenshots establish available controls and layout, not numeric defaults (spec §23), so chart defaults are unchanged.
-
-- **Navigator:** Data Tables and Graphs sections with "New …" rows that open the table-type and chart-type dialogs; Info, Results and Layouts are locked placeholders.
-- **Graph panel:** tabs Appearance / Data Sets on Graph / Annotations; Appearance has Style, Axes, Text, Dimensions and Legend sections. Clicking a chart element opens its settings. Style has a Data set (or Series) selector with `<` `>` stepping (Global = all).
-- **Status bar:** status messages and the zoom slider with a Fit button (graphs and data tables).
+Reference lines at chosen values and cm units are not built; tables and graphs can be added but not deleted or renamed; group colours default to grayscale; values display as stored (typed `1.10` shows `1.1`).
 
 ## Evidence labels
 
-D = stated in the specification (`scientific_plotting_specification.md`). P = proposal made here because the specification gives no value. U = unverified. Every P item is listed in the P-items table below.
-
+D = stated in the specification (`scientific_plotting_specification.md`). P = proposal made here because the specification gives no value. U = unverified.
 ## Calculation settings
 
 Summary settings (centre, spread, confidence level, small-sample policy, invalid-value policy) are calculation settings, stored in `summary` and `groupSummary`, not in the style hierarchy. Appearance (colour, cap, direction) stays in style.
@@ -151,32 +163,6 @@ Row titles, data-set names and values are stored unencrypted in the browser (`lo
 - Dragging labels to custom positions.
 - Chart description for informational notices.
 - Autosave off-switch.
-- Reference-screenshot controls that are placeholders: Info, Results and Layouts rows in the Navigator.
-
-## Known deviations from the specification
-
-| Item | Spec | Here |
-|---|---|---|
-| Y tick label gap | 1.75 pt (L1373) | 3 pt |
-| Legend key size | 25.2 pt (L1376) | 18 pt |
-| Axis stroke | 2.1 pt (L1377) | see code constants |
-| Error bars shown by default | 9.2 L664 | default on with spread none |
-| Hidden error bars in auto-range | 6.1 L355 | excluded |
-| Informational chart description | 21.5 L1463 (MUST) | not built, requirement not met |
-| Pattern line on the clip edge | full width | half width visible |
-| Spread not allowed for the centre | not offered | shown as a disabled option (22.2 L1500) |
-
-## P-items
-
-| Item | Proposal |
-|---|---|
-| Reject policy | "Hide summary" maps to small-sample policy reject |
-| Fill limits | spacing 1 to 50 pt, width 0.1 to 5 pt |
-| Pattern colour source | pattern uses the background, not the bar fill colour |
-| Label leader | boolean on or off, no style options |
-| Label sources | row title and value only |
-| Right-axis sizes | margins and title sizes |
-| Confidence level | default 0.95 |
 
 ## Manual verification checklist
 

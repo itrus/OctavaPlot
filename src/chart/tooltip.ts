@@ -6,6 +6,8 @@ import { AXIS_NAME } from './axes';
 import type { HitTarget } from './hitTest';
 import type { ChartModel } from './model';
 import type { GroupedModel } from './groupedModel';
+import type { HeatModel } from './heatmapModel';
+import { percentText, type PieModel } from './pieModel';
 import type { XyModel } from './xyModel';
 
 export const tooltipFmt = format('.4~g');
@@ -64,11 +66,48 @@ export function groupedTooltipLines(model: GroupedModel, hit: HitTarget): string
     const value = 'value' in target ? target.value : 0;
     const count = 'count' in target ? target.count : undefined;
     if (model.arrangement === 'percent') lines.push(`${tooltipFmt(value)}%${count !== undefined ? ` (count ${tooltipFmt(count)})` : ''}`);
-    else lines.push(`${target.stats ? 'Centre' : model.arrangement === 'side' && count === undefined ? 'Value' : 'Count'}: ${tooltipFmt(value)}`);
+    else lines.push(`${target.stats ? 'Centre' : count === undefined ? 'Value' : 'Count'}: ${tooltipFmt(value)}`);
     if ('value' in target && s.dots.includes(target as never)) lines.push('One replicate value');
     const st = target.stats;
     if (st && st.interval.status === 'ok' && st.interval.lower !== null && st.interval.upper !== null) lines.push(`${s.errorMeaning ?? 'Interval'}: ${tooltipFmt(st.interval.lower)} to ${tooltipFmt(st.interval.upper)}`);
     if (st && st.n > 0) lines.push(`n = ${st.n}`);
+  }
+  return lines;
+}
+
+/** Tooltip lines for a hit on a pie or doughnut: the part, the row, its count and its share. */
+export function pieTooltipLines(model: PieModel, hit: HitTarget): string[] | null {
+  if (!hit.groupId || (hit.kind !== 'bar' && hit.kind !== 'legend')) return null;
+  const part = model.parts.find((p) => p.groupId === hit.groupId);
+  if (!part) return null;
+  const lines = [part.label];
+  const found = model.pies.flatMap((pie) => pie.slices.map((slice) => ({ pie, slice }))).find(({ slice }) => slice.id === hit.objectId);
+  if (found) lines.push(found.pie.title, `Count: ${tooltipFmt(found.slice.value)}`, `Share: ${percentText(found.slice.fraction, 1)} of ${tooltipFmt(found.pie.total)}`);
+  return lines;
+}
+
+/** Tooltip lines for a hit on a histogram (a bar: its bin, count and height) or a cumulative distribution (a step). */
+export function histTooltipLines(model: XyModel, hit: HitTarget): string[] | null {
+  if (!hit.groupId || (hit.kind !== 'bar' && hit.kind !== 'point' && hit.kind !== 'line' && hit.kind !== 'legend')) return null;
+  const s = model.series.find((x) => x.groupId === hit.groupId);
+  if (!s) return null;
+  const lines = [s.label];
+  const bar = s.bars?.find((b) => b.id === hit.objectId);
+  if (bar) lines.push(`Bin: ${tooltipFmt(bar.bin[0])} to ${tooltipFmt(bar.bin[1])}`, `Count: ${tooltipFmt(bar.count)}`, `Plotted: ${tooltipFmt(bar.value)}`);
+  const step = s.points.find((p) => p.id === hit.objectId);
+  if (step) lines.push(`Value: ${tooltipFmt(step.x)}`, `Cumulative: ${tooltipFmt(step.y)}`);
+  return lines;
+}
+
+/** Tooltip lines for a hit on a heat map cell: its row, its column and its value (and the value before normalising). */
+export function heatTooltipLines(model: HeatModel, hit: HitTarget): string[] | null {
+  const cell = model.cells.find((c) => c.id === hit.objectId);
+  if (!cell) return null;
+  const lines = [cell.colLabel, cell.rowLabel];
+  if (cell.value === null) lines.push('No value');
+  else {
+    lines.push(`Value: ${tooltipFmt(cell.value)}`);
+    if (cell.original !== null && cell.original !== cell.value) lines.push(`Before normalising: ${tooltipFmt(cell.original)}`);
   }
   return lines;
 }

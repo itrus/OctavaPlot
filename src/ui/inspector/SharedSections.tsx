@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { displayName } from '../../chart/model';
 import { applyAspect, resizeChart } from '../../model/aspect';
 import { graphSources, type GraphSource } from '../../model/chartTable';
+import { AXIS_LIMITS } from '../../model/axis';
+import { FONT_FAMILIES } from '../../model/look';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
 import { newId } from '../../model/ids';
 import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../model/colorVision';
@@ -10,18 +12,21 @@ import type { Chart, Group, Id } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import {
   addAnnotation,
+  applyPalette,
   composeCommands,
   patchAnnotation,
   patchAxis,
   patchBothAxes,
   patchChart,
   patchLegend,
+  patchLook,
   removeAnnotation,
   setDisplayName,
   setGroupOnGraph,
   setLegendItemVisible,
 } from '../../state/commands';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, SubHeading, TextInput } from './controls';
+import { BarLabelSection, hasBarLabels } from './LookControls';
 
 /**
  * Inspector pieces that do not depend on the kind of chart: titles and fonts, size and shape, legend, annotations and
@@ -29,12 +34,12 @@ import { Check, ColorInput, Field, NumField, Section, SelectInput, SubHeading, T
  */
 
 /** Edit a chart property as one undoable step (`key` merges rapid edits). */
-export function useChartSetter(chart: Chart) {
+function useChartSetter(chart: Chart) {
   const { run } = useApp();
   return (label: string, patch: Partial<Chart>, key?: string) => run(label, patchChart(chart.id, patch), key);
 }
 
-export function TextSections({ chart, groups, yName, dual }: { chart: Chart; groups: Group[]; yName: string; dual: boolean }) {
+export function TextSections({ chart, groups, yName, dual, axes = true }: { chart: Chart; groups: Group[]; yName: string; dual: boolean; axes?: boolean }) {
   const { run } = useApp();
   const setChart = useChartSetter(chart);
   return (
@@ -47,18 +52,69 @@ export function TextSections({ chart, groups, yName, dual }: { chart: Chart; gro
           <TextInput value={chart.title} disabled={!chart.showTitle} onChange={(v) => setChart('Chart title', { title: v }, 'chart:title')} />
         </Field>
         <NumField label="Title size" unit="pt" value={chart.titleFontSizePt} min={4} max={72} disabled={!chart.showTitle} onCommit={(v) => setChart('Title size', { titleFontSizePt: v }, 'chart:titlesize')} />
+        {axes && (
+          <>
         <Field label="X axis title">
           <TextInput value={chart.xAxis.title} onChange={(v) => run('X axis title', patchAxis(chart.id, 'xAxis', { title: v }), 'axis:xt')} />
         </Field>
         <Field label={`${yName} axis title`}>
           <TextInput value={chart.yAxis.title} onChange={(v) => run('Y axis title', patchAxis(chart.id, 'yAxis', { title: v }), 'axis:yt')} />
         </Field>
+          </>
+        )}
       </Section>
-      <Section title="Font sizes">
-        <NumField label="Tick label size" unit="pt" value={chart.yAxis.tickFontSizePt} min={4} max={48} onCommit={(v) => run('Tick label size', patchBothAxes(chart.id, { tickFontSizePt: v }), 'axis:tfs')} />
-        <NumField label="Axis title size" unit="pt" value={chart.yAxis.titleFontSizePt} min={4} max={48} onCommit={(v) => run('Axis title size', patchBothAxes(chart.id, { titleFontSizePt: v }), 'axis:afs')} />
-        {dual && <div className="muted small">Font sizes apply to both Y axes.</div>}
+      {axes && (
+      <Section title="Axis titles">
+        <Field label={`Show X axis title`}>
+          <Check checked={chart.xAxis.titleVisible} onChange={(v) => run('Show X axis title', patchAxis(chart.id, 'xAxis', { titleVisible: v }))} />
+        </Field>
+        <Field label={`Show ${yName} axis title`}>
+          <Check checked={chart.yAxis.titleVisible} onChange={(v) => run('Show Y axis title', patchAxis(chart.id, 'yAxis', { titleVisible: v }))} />
+        </Field>
+        {dual && (
+          <>
+            <Field label="Show right Y axis title">
+              <Check checked={chart.y2Axis.titleVisible} onChange={(v) => run('Show right Y axis title', patchAxis(chart.id, 'y2Axis', { titleVisible: v }))} />
+            </Field>
+          </>
+        )}
       </Section>
+      )}
+      <Section title="Fonts">
+        <Field label="Font">
+          <SelectInput<string> value={chart.fontFamily} options={FONT_FAMILIES.map((f) => ({ value: f.value, label: f.label }))} onChange={(v) => run('Font', patchLook(chart.id, { fontFamily: v }))} />
+        </Field>
+        <Field label="Text colour">
+          <ColorInput value={chart.textColor} ariaLabel="Text colour" onChange={(v) => run('Text colour', patchLook(chart.id, { textColor: v }))} />
+        </Field>
+        <NumField label="Tick label size" unit="pt" value={chart.yAxis.tickFontSizePt} min={4} max={48} onCommit={(v) => run('Tick label size', patchBothAxes(chart.id, { tickFontSizePt: v }), 'axis:tf')} />
+        <NumField label="Axis title size" unit="pt" value={chart.yAxis.titleFontSizePt} min={4} max={48} onCommit={(v) => run('Axis title size', patchBothAxes(chart.id, { titleFontSizePt: v }), 'axis:ts')} />
+        <Field label="Bold chart title">
+          <Check checked={chart.titleBold} onChange={(v) => run('Bold chart title', patchLook(chart.id, { titleBold: v }))} />
+        </Field>
+        <Field label="Bold axis titles">
+          <Check checked={chart.yAxis.titleBold} onChange={(v) => run('Bold axis titles', patchBothAxes(chart.id, { titleBold: v }))} />
+        </Field>
+        <Field label="Bold tick numbers">
+          <Check checked={chart.yAxis.tickBold} onChange={(v) => run('Bold tick numbers', patchBothAxes(chart.id, { tickBold: v }))} />
+        </Field>
+        {dual && <div className="muted small">Sizes and weights apply to both Y axes.</div>}
+      </Section>
+      {axes && (
+      <Section title="Distances" defaultOpen={false}>
+        <NumField label="Chart title from the top" unit="pt" value={chart.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} disabled={!chart.showTitle} onCommit={(v) => run('Title distance', patchLook(chart.id, { titleOffsetPt: v }), 'chart:titleoff')} />
+        <NumField label="X title from the axis" unit="pt" value={chart.xAxis.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('X title distance', patchAxis(chart.id, 'xAxis', { titleOffsetPt: v }), 'axis:xto')} />
+        <NumField label={`${yName} title from the axis`} unit="pt" value={chart.yAxis.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Y title distance', patchAxis(chart.id, 'yAxis', { titleOffsetPt: v }), 'axis:yto')} />
+        <NumField label="X numbers from the axis" unit="pt" value={chart.xAxis.tickLabelOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('X numbers distance', patchAxis(chart.id, 'xAxis', { tickLabelOffsetPt: v }), 'axis:xno')} />
+        <NumField label={`${yName} numbers from the axis`} unit="pt" value={chart.yAxis.tickLabelOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Y numbers distance', patchAxis(chart.id, 'yAxis', { tickLabelOffsetPt: v }), 'axis:yno')} />
+        {dual && (
+          <>
+            <NumField label="Right Y title from the axis" unit="pt" value={chart.y2Axis.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Right Y title distance', patchAxis(chart.id, 'y2Axis', { titleOffsetPt: v }), 'axis:y2to')} />
+            <NumField label="Right Y numbers from the axis" unit="pt" value={chart.y2Axis.tickLabelOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Right Y numbers distance', patchAxis(chart.id, 'y2Axis', { tickLabelOffsetPt: v }), 'axis:y2no')} />
+          </>
+        )}
+      </Section>
+      )}
       <Section title="Display names">
         {groups.map((g) => (
           <Field key={g.id} label={g.name}>
@@ -122,6 +178,17 @@ export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[]
             onChange={(v) => run('Legend position', patchLegend(chart.id, { position: v }))}
           />
         </Field>
+        <Field label="Key shape" hint="The colour key of bars: a wide rectangle or a square">
+          <SelectInput<'rectangle' | 'square'>
+            value={chart.legend.keyShape}
+            disabled={!chart.legend.visible}
+            options={[
+              { value: 'rectangle', label: 'Rectangle' },
+              { value: 'square', label: 'Square' },
+            ]}
+            onChange={(v) => run('Legend key shape', patchLegend(chart.id, { keyShape: v }))}
+          />
+        </Field>
         <SubHeading>Data sets in legend</SubHeading>
         {groups.map((g) => (
           <Field key={g.id} label={displayName(chart, g.id, g.name)}>
@@ -142,6 +209,7 @@ export function AnnotationsTab({ chart }: { chart: Chart }) {
   const { run, selection, setSelection } = useApp();
   return (
     <div className="tab-body">
+      {hasBarLabels(chart.type) && <BarLabelSection chart={chart} />}
       <div className="button-row">
         <button
           onClick={() => {
@@ -236,7 +304,7 @@ export function OnThisGraph({ chart }: { chart: Chart }) {
 }
 
 /** The palette menu entries, in subcategories. */
-export function PaletteOptions() {
+function PaletteOptions() {
   return (
     <>
       {PALETTE_GROUPS.map((g) => (
@@ -262,7 +330,7 @@ function VisionNote({ colors }: { colors: readonly string[] }) {
 }
 
 /** An info button beside the palette menu; it opens a window with the colours, what the palette is and its source. */
-export function PaletteInfo({ paletteId }: { paletteId: string | null }) {
+function PaletteInfo({ paletteId }: { paletteId: string | null }) {
   const [open, setOpen] = useState(false);
   const palette = paletteById(paletteId);
   if (!palette) return null;
@@ -309,5 +377,38 @@ export function PaletteInfo({ paletteId }: { paletteId: string | null }) {
         </div>
       )}
     </>
+  );
+}
+
+/** The colour palette of the data sets: choosing one gives them coordinated colours in order. */
+export function PaletteField({ chart, hint }: { chart: Chart; hint: string }) {
+  const { run } = useApp();
+  const palette = paletteById(chart.paletteId);
+  return (
+    <Field label="Color palette" hint={hint}>
+      <select
+        value={chart.paletteId ?? 'custom'}
+        aria-label="Color palette"
+        onChange={(e) => {
+          const chosen = paletteById(e.target.value);
+          if (chosen) run(`Apply ${chosen.name} palette`, applyPalette(chart.id, chosen));
+        }}
+      >
+        {chart.paletteId === null && (
+          <option value="custom" disabled>
+            Custom colours
+          </option>
+        )}
+        <PaletteOptions />
+      </select>
+      {palette && (
+        <span className="palette-swatches" aria-hidden="true">
+          {palette.colors.slice(0, 5).map((c) => (
+            <i key={c} style={{ background: c }} />
+          ))}
+        </span>
+      )}
+      <PaletteInfo paletteId={chart.paletteId} />
+    </Field>
   );
 }

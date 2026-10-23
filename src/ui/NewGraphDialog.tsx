@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { buildAnyModel, ChartCanvas } from '../chart/anyModel';
 
+import { applyVariant, type ChartVariant } from '../model/chartVariant';
 import { GALLERY, availableItems, type GalleryItem } from '../model/chartGallery';
 import { tableTypeInfo } from '../model/chartTypes';
 import { createChart } from '../model/defaults';
@@ -13,16 +14,15 @@ const FAMILY_LABEL: Record<TableKind, string> = { xy: 'XY', column: 'Column', gr
 const FAMILY_ORDER: TableKind[] = ['xy', 'column', 'grouped', 'contingency', 'survival'];
 
 /** A live preview of the chosen graph with the data of the table, drawn by the same code as the graph itself. */
-function Preview({ table, type }: { table: DataTable; type: ChartType }) {
+function Preview({ table, type, variant }: { table: DataTable; type: ChartType; variant?: ChartVariant }) {
   const drawn = useMemo(() => {
     try {
-      const chart = createChart(table.id, { widthPx: 1024, heightPx: 768 }, type);
-      chart.title = table.name;
+      const chart = applyVariant({ ...createChart(table.id, { widthPx: 1024, heightPx: 768 }, type), title: table.name }, variant);
       return { chart, any: buildAnyModel(chart, table) };
     } catch {
       return null;
     }
-  }, [table, type]);
+  }, [table, type, variant]);
   if (!drawn) return <div className="gallery-preview-empty muted">No preview available.</div>;
   return <ChartCanvas chart={drawn.chart} any={drawn.any} cssWidth="100%" cssHeight="100%" />;
 }
@@ -32,7 +32,7 @@ function Preview({ table, type }: { table: DataTable; type: ChartType }) {
  * graph of that family in tabs, with a live preview. Graphs that cannot be made yet are shown locked, so the whole
  * range is visible.
  */
-export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { tables: DataTable[]; initialTableId: Id; onCreate: (tableId: Id, type: ChartType) => void; onClose: () => void }) {
+export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { tables: DataTable[]; initialTableId: Id; onCreate: (tableId: Id, type: ChartType, variant?: ChartVariant) => void; onClose: () => void }) {
   const firstTable = tables.find((t) => t.id === initialTableId) ?? tables[0];
   const [tableId, setTableId] = useState<Id>(firstTable.id);
   const table = tables.find((t) => t.id === tableId) ?? firstTable;
@@ -67,7 +67,7 @@ export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { 
   };
 
   return (
-    <Modal title="New graph" confirmLabel="Create graph" onConfirm={() => selected.type && onCreate(table.id, selected.type)} onClose={onClose} confirmDisabled={!canCreate} wide>
+    <Modal title="New graph" confirmLabel="Create graph" onConfirm={() => selected.type && onCreate(table.id, selected.type, selected.variant)} onClose={onClose} confirmDisabled={!canCreate} wide>
       <div className="gallery-top">
         <label className="choice-label">
           <span>Graph family</span>
@@ -113,7 +113,7 @@ export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { 
             aria-checked={selected.id === it.id}
             title={it.type === null ? `${it.label}: planned, not available yet` : it.label}
             onClick={() => setChosen(it.id)}
-            onDoubleClick={() => it.type && onCreate(table.id, it.type)}
+            onDoubleClick={() => it.type && onCreate(table.id, it.type, it.variant)}
           >
             <GallerySketch item={it} />
             {it.type === null && <span className="gallery-lock" aria-hidden="true">🔒</span>}
@@ -134,7 +134,7 @@ export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { 
       <div className="gallery-preview-box">
         <div className="gallery-preview-title">Preview</div>
         <div className="gallery-preview">
-          {selected.type ? <Preview table={table} type={selected.type} /> : <div className="gallery-preview-empty muted">🔒 Planned: no preview yet.</div>}
+          {selected.type ? <Preview table={table} type={selected.type} variant={selected.variant} /> : <div className="gallery-preview-empty muted">🔒 Planned: no preview yet.</div>}
         </div>
       </div>
     </Modal>

@@ -1,3 +1,4 @@
+import type { ChartVariant } from './chartVariant';
 import type { ChartType, TableKind } from './types';
 
 /**
@@ -13,15 +14,17 @@ export interface GalleryItem {
   type: ChartType | null;
   /** The specification's preset ID, for planned graphs. */
   spec?: string;
+  /** How the chart is set up beyond its type. */
+  variant?: ChartVariant;
 }
 
-export interface GalleryTab {
+interface GalleryTab {
   id: string;
   label: string;
   items: GalleryItem[];
 }
 
-const item = (id: string, label: string, description: string, type: ChartType | null, spec?: string): GalleryItem => ({ id, label, description, type, spec });
+const item = (id: string, label: string, description: string, type: ChartType | null, spec?: string, variant?: ChartVariant): GalleryItem => ({ id, label, description, type, spec, ...(variant ? { variant } : {}) });
 
 export const GALLERY: Record<TableKind, GalleryTab[]> = {
   xy: [
@@ -39,7 +42,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('xy.bubble', 'Bubbles', 'Symbols sized or coloured by another column.', null, 'xy.bubble'),
         item('xy.trajectory', 'Repeated measures', 'One line per subject, for example before and after.', null, 'xy.trajectory'),
         item('xy.offset', 'Offset traces', 'Several series stacked with a fixed offset and a scale bar.', null, 'xy.offset_traces'),
-        item('curve.fit', 'Points with a fitted curve', 'A regression or model curve with its confidence band.', null, 'curve.fit'),
+        item('curve.fit', 'Points with a fitted curve', 'A fitted line with its confidence band; choose another model in the panel.', 'xyScatter', 'curve.fit', { fit: { model: 'linear', band: 'confidence' } }),
         item('curve.smooth', 'Smooth curve', 'A spline or LOWESS curve through the points.', null, 'curve.smooth'),
       ],
     },
@@ -51,19 +54,27 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       items: [
         item('scatter', 'Scatter dot plot', 'Every value as a dot, grouped by column, with an optional line at the mean.', 'scatter'),
         item('cat.aligned', 'Aligned dots', 'Dots in a column without spreading them sideways.', null, 'category.aligned'),
-        item('cat.paired', 'Before and after', 'The values of each subject joined by a line.', null, 'category.paired'),
+        item('paired', 'Before and after', 'The values of each subject joined by a line.', 'paired', 'category.paired'),
         item('cat.nested', 'Nested dots', 'Technical repeats inside each independent unit.', null, 'category.nested'),
+      ],
+    },
+    {
+      id: 'frequency',
+      label: 'Histogram and distribution',
+      items: [
+        item('histogram', 'Histogram', 'How many values fall in each bin of the value axis.', 'histogram'),
+        item('ecdf', 'Cumulative distribution', 'The share of the values at or below each value, as steps.', 'ecdf'),
       ],
     },
     {
       id: 'box',
       label: 'Box and violin',
       items: [
-        item('box', 'Box and whiskers', 'Quartiles, median and whiskers of each column.', null, 'distribution.box'),
-        item('floating', 'Floating bars (min to max)', 'A bar from the smallest to the largest value, with a line at the mean or median.', null, 'category.range'),
-        item('violin', 'Violin plot', 'The distribution of each column as a smoothed density.', null, 'distribution.violin'),
-        item('boxH', 'Horizontal box', 'The box plot turned on its side.', null, 'distribution.box'),
-        item('violinH', 'Horizontal violin', 'The violin plot turned on its side.', null, 'distribution.violin'),
+        item('box', 'Box and whiskers', 'Quartiles, median and whiskers of each column.', 'box', 'distribution.box'),
+        item('floating', 'Floating bars (min to max)', 'A bar from the smallest to the largest value, with a line at the mean or median.', 'floating', 'category.range'),
+        item('violin', 'Violin plot', 'The distribution of each column as a smoothed density.', 'violin', 'distribution.violin'),
+        item('boxH', 'Horizontal box', 'The box plot turned on its side.', 'box', 'distribution.box', { orientation: 'horizontal' }),
+        item('violinH', 'Horizontal violin', 'The violin plot turned on its side.', 'violin', 'distribution.violin', { orientation: 'horizontal' }),
       ],
     },
     {
@@ -72,7 +83,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       items: [
         item('bar', 'Bar chart', 'One bar per column, with optional points and error bars.', 'bar'),
         item('mean', 'Mean with error bars', 'A mean marker per column with its spread.', 'mean'),
-        item('barsH', 'Horizontal bars', 'The bar chart turned on its side.', null, 'category.bar'),
+        item('barsH', 'Horizontal bars', 'The bar chart turned on its side.', 'bar', 'category.bar', { orientation: 'horizontal' }),
         item('range', 'Floating range bars', 'A bar between a lower and an upper value.', null, 'category.range'),
       ],
     },
@@ -93,7 +104,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       items: [
         item('groupedBar', 'Interleaved bars', 'Bars side by side within each category, with error bars.', 'groupedBar'),
         item('groupedLine', 'Lines over categories', 'One line per series joining its means across the categories.', 'groupedLine'),
-        item('grp.stacked', 'Stacked bars', 'The series stacked in one bar per category.', null, 'category.stacked'),
+        item('groupedStacked', 'Stacked bars', 'The series stacked in one bar per category.', 'groupedStacked', 'category.stacked'),
         item('grp.barsH', 'Horizontal interleaved bars', 'Interleaved bars turned on their side.', null, 'category.grouped'),
         item('grp.stackedH', 'Horizontal stacked bars', 'Stacked bars turned on their side.', null, 'category.stacked'),
         item('grp.floating', 'Floating bars', 'Bars between a lower and an upper value.', null, 'category.range'),
@@ -103,10 +114,10 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'heat',
       label: 'Heat map',
       items: [
-        item('heat.viridis', 'Viridis heat map', 'Each cell coloured by its value, dark purple to yellow.', null, 'matrix.heatmap'),
-        item('heat.magma', 'Magma heat map', 'Each cell coloured by its value, black to pale yellow.', null, 'matrix.heatmap'),
-        item('heat.blue', 'Blue-white heat map', 'A single-hue scale for values that are all positive.', null, 'matrix.heatmap'),
-        item('heat.greenred', 'Green-black-red heat map', 'A diverging scale around a middle value.', null, 'matrix.heatmap'),
+        item('heat.viridis', 'Viridis heat map', 'Each cell coloured by its value, dark purple to yellow.', 'heatmap', 'matrix.heatmap', { heatPalette: 'viridis' }),
+        item('heat.magma', 'Magma heat map', 'Each cell coloured by its value, black to pale yellow.', 'heatmap', 'matrix.heatmap', { heatPalette: 'magma' }),
+        item('heat.blue', 'Blue-white heat map', 'A single-hue scale for values that are all positive.', 'heatmap', 'matrix.heatmap', { heatPalette: 'blue' }),
+        item('heat.greenred', 'Green-black-red heat map', 'A diverging scale around a middle value.', 'heatmap', 'matrix.heatmap', { heatPalette: 'greenred' }),
       ],
     },
     {
@@ -137,8 +148,8 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('cont.sideH', 'Horizontal side-by-side bars', 'Side-by-side bars turned on their side.', null, 'category.counts'),
         item('cont.stackH', 'Horizontal stacked bars', 'Stacked bars turned on their side.', null, 'category.stacked'),
         item('cont.pctH', 'Horizontal 100% bars', '100% stacked bars turned on their side.', null, 'category.normalised_stack'),
-        item('pie', 'Pie charts', 'The outcomes of each row as parts of a circle.', null, 'whole.pie'),
-        item('doughnut', 'Doughnut charts', 'Pie charts with a hole and a total in the middle.', null, 'whole.doughnut'),
+        item('pie', 'Pie charts', 'The outcomes of each row as parts of a circle.', 'pie', 'whole.pie'),
+        item('doughnut', 'Doughnut charts', 'Pie charts with a hole and a total in the middle.', 'doughnut', 'whole.doughnut'),
       ],
     },
   ],

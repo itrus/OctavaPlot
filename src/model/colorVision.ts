@@ -10,7 +10,7 @@ export const DEFICIENCIES = {
   deutan: { label: 'green-weak (deuteranopia)', matrix: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.01182, 0.04294, 0.968881]] },
   tritan: { label: 'blue-weak (tritanopia)', matrix: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.3039]] },
 } as const satisfies Record<string, { label: string; matrix: Matrix }>;
-export type Deficiency = keyof typeof DEFICIENCIES;
+type Deficiency = keyof typeof DEFICIENCIES;
 
 /** Two colours closer than this (CIE76 ΔE) are hard to tell apart in a chart; about 10 is a clear difference. */
 export const MIN_DELTA_E = 10;
@@ -39,17 +39,17 @@ export function lab(lin: number[]): number[] {
   return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
 }
 
-export const deltaE = (a: number[], b: number[]): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+const deltaE = (a: number[], b: number[]): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 /** The smallest difference between two of the first `count` colours, as seen with the deficiency (or normally). */
-export function minDistance(colors: readonly string[], kind: Deficiency | null, count = COMPARED_COLOURS): number {
+function minDistance(colors: readonly string[], kind: Deficiency | null, count = COMPARED_COLOURS): number {
   const seen = colors.slice(0, count).map((c) => lab(simulate(c, kind)));
   let min = Infinity;
   for (let i = 0; i < seen.length; i++) for (let j = i + 1; j < seen.length; j++) min = Math.min(min, deltaE(seen[i], seen[j]));
   return min;
 }
 
-export interface VisionReport {
+interface VisionReport {
   /** Smallest difference per deficiency, and for normal vision. */
   normal: number;
   byKind: Record<Deficiency, number>;

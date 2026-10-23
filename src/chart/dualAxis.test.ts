@@ -4,7 +4,7 @@ import { resolveSummary } from '../model/summary';
 import type { Project } from '../model/types';
 import { patchAxis, patchLegend, patchStyle, setChartType } from '../state/commands';
 import { statsFor } from '../stats/summary';
-import { bindLeft, bindRight, dualAxisFixture } from './dualAxisFixture';
+import { bindLeft, bindRight, dualAxisFixture } from '../testing/dualAxisFixture';
 import { buildChartModel } from './model';
 
 const modelOf = (p: Project) => buildChartModel(p.charts[0], p.dataTables[0]);

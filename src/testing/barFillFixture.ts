@@ -10,7 +10,7 @@ import { composeCommands, patchAxis, patchStyle } from '../state/commands';
  * Nine data sets, in order: the seven patterns, then one solid, then one none.
  * Data set 2 is negative. The Y range is manual, -2 to 3, so zero is inside it.
  */
-export const BAR_FILL_FIXTURE_DATA: ReadonlyArray<readonly [string, readonly number[]]> = [
+const BAR_FILL_FIXTURE_DATA: ReadonlyArray<readonly [string, readonly number[]]> = [
   ['Horizontal', [1.0, 1.2, 1.4]],
   ['Vertical', [1.6, 1.8, 2.0]],
   ['Rising', [-1.4, -1.2, -1.0]],

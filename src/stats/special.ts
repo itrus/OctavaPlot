@@ -115,7 +115,7 @@ export function studentTQuantileUpper(q: number, df: number): number {
 /** P engineering limit for the exact BigInt median interval (not a spec value). */
 export const MEDIAN_CI_EXACT_MAX_N = 20000;
 
-export type MedianCiRank =
+type MedianCiRank =
   | { available: true; k: number; coverage: number }
   | { available: false; reason: 'coverage' | 'too-large' | 'invalid-level'; widestCoverage: number | null };
 

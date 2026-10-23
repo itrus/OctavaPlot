@@ -1,0 +1,188 @@
+import { describe, expect, it } from 'vitest';
+import { fitCurve, fitModelById, FIT_MODELS, isFailure, type FitResult } from './fit';
+import { studentTQuantileUpper } from './special';
+
+const pts = (xs: number[], f: (x: number) => number) => xs.map((x) => ({ x, y: f(x) }));
+const ok = (r: ReturnType<typeof fitCurve>): FitResult => {
+  if (isFailure(r)) throw new Error(r.message);
+  return r;
+};
+const value = (r: FitResult, i: number) => r.params[i].value;
+
+describe('straight line', () => {
+  it('fits X = 0, 1, 2 and Y = 1, 3, 5 exactly (spec 22.1)', () => {
+    const r = ok(fitCurve([{ x: 0, y: 1 }, { x: 1, y: 3 }, { x: 2, y: 5 }], { model: 'linear' }));
+    expect(value(r, 0)).toBeCloseTo(1, 10);
+    expect(value(r, 1)).toBeCloseTo(2, 10);
+    expect(r.rss).toBeLessThan(1e-20);
+    expect(r.df).toBe(1);
+    expect(r.rSquared).toBeCloseTo(1, 12);
+    expect(r.predict(10)).toBeCloseTo(21, 9);
+  });
+  it('gives the classical standard errors and pointwise intervals (spec 17.3)', () => {
+    const xs = [1, 2, 3, 4, 5];
+    const ys = [2.1, 3.9, 6.2, 7.8, 10.1];
+    const r = ok(fitCurve(xs.map((x, i) => ({ x, y: ys[i] })), { model: 'linear' }));
+    const n = 5;
+    const mx = 3;
+    const my = ys.reduce((a, b) => a + b, 0) / n;
+    const sxx = xs.reduce((s, x) => s + (x - mx) ** 2, 0);
+    const sxy = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+    const b = sxy / sxx;
+    const a = my - b * mx;
+    const rss = xs.reduce((s, x, i) => s + (ys[i] - a - b * x) ** 2, 0);
+    const s2 = rss / (n - 2);
+    expect(value(r, 1)).toBeCloseTo(b, 10);
+    expect(value(r, 0)).toBeCloseTo(a, 10);
+    expect(r.sigma).toBeCloseTo(Math.sqrt(s2), 10);
+    expect(r.params[1].se).toBeCloseTo(Math.sqrt(s2 / sxx), 10);
+    expect(r.params[0].se).toBeCloseTo(Math.sqrt(s2 * (1 / n + (mx * mx) / sxx)), 10);
+    const t = studentTQuantileUpper(0.025, 3);
+    for (const x0 of [1, 3, 4.5, 7]) {
+      const lev = 1 / n + (x0 - mx) ** 2 / sxx;
+      expect(r.halfWidth(x0, 'confidence', 0.95)!).toBeCloseTo(t * Math.sqrt(s2 * lev), 9);
+      expect(r.halfWidth(x0, 'prediction', 0.95)!).toBeCloseTo(t * Math.sqrt(s2 * (1 + lev)), 9);
+    }
+    // A prediction interval is wider than the interval of the curve, and both widen away from the middle.
+    expect(r.halfWidth(3, 'prediction', 0.95)!).toBeGreaterThan(r.halfWidth(3, 'confidence', 0.95)!);
+    expect(r.halfWidth(9, 'confidence', 0.95)!).toBeGreaterThan(r.halfWidth(3, 'confidence', 0.95)!);
+    expect(r.halfWidth(3, 'confidence', 0.99)!).toBeGreaterThan(r.halfWidth(3, 'confidence', 0.9)!);
+    expect(r.halfWidth(3, 'confidence', 1.5)).toBeNull();
+  });
+  it('is not fitted to X that does not vary, or to too few points', () => {
+    expect(isFailure(fitCurve([{ x: 2, y: 1 }, { x: 2, y: 3 }, { x: 2, y: 5 }], { model: 'linear' }))).toBe(true);
+    const few = fitCurve([{ x: 1, y: 1 }], { model: 'linear' });
+    expect(isFailure(few) && few.message).toMatch(/needs at least 2 points/);
+  });
+  it('gives a line through two points, with no error or band to give', () => {
+    const r = ok(fitCurve([{ x: 0, y: 1 }, { x: 2, y: 5 }], { model: 'linear' }));
+    expect(r.df).toBe(0);
+    expect(r.params.every((p) => p.se === null)).toBe(true);
+    expect(r.halfWidth(1, 'confidence', 0.95)).toBeNull();
+    expect(r.message).toMatch(/no degrees of freedom/);
+  });
+});
+
+describe('polynomial', () => {
+  it('recovers a quadratic exactly', () => {
+    const r = ok(fitCurve(pts([0, 1, 2, 3, 4, 5, 6], (x) => 1 - 2 * x + 0.5 * x * x), { model: 'polynomial', degree: 2 }));
+    expect([value(r, 0), value(r, 1), value(r, 2)].map((v) => Number(v.toFixed(8)))).toEqual([1, -2, 0.5]);
+    expect(r.params.map((p) => p.name)).toEqual(['a0', 'a1', 'a2']);
+  });
+  it('recovers a cubic with a large X range', () => {
+    const r = ok(fitCurve(pts([0, 10, 20, 30, 40, 50, 60, 70], (x) => 3 + 0.1 * x - 0.002 * x ** 2 + 1e-5 * x ** 3), { model: 'polynomial', degree: 3 }));
+    expect(value(r, 0)).toBeCloseTo(3, 6);
+    expect(value(r, 3)).toBeCloseTo(1e-5, 10);
+  });
+  it('keeps the degree between 2 and 6, and needs more points than its degree', () => {
+    expect(ok(fitCurve(pts([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], (x) => x), { model: 'polynomial', degree: 99 })).degree).toBe(6);
+    expect(ok(fitCurve(pts([0, 1, 2, 3, 4], (x) => x), { model: 'polynomial', degree: 1 })).degree).toBe(2);
+    expect(isFailure(fitCurve(pts([0, 1, 2], (x) => x), { model: 'polynomial', degree: 3 }))).toBe(true);
+  });
+});
+
+describe('nonlinear models', () => {
+  const dose = [0.1, 0.3, 1, 3, 10, 30, 100, 300, 1000];
+  it('finds the four parameters of a rising logistic curve (Hill)', () => {
+    const f = (x: number) => 10 + 90 / (1 + (50 / x) ** 1.2);
+    const r = ok(fitCurve(pts(dose, f), { model: 'hill_4pl' }));
+    expect(r.converged).toBe(true);
+    expect(value(r, 0)).toBeCloseTo(10, 3);
+    expect(value(r, 1)).toBeCloseTo(100, 3);
+    expect(value(r, 2)).toBeCloseTo(50, 2);
+    expect(value(r, 3)).toBeCloseTo(1.2, 4);
+    expect(r.predict(50)).toBeCloseTo(55, 4);
+  });
+  it('finds a falling one (a negative slope), the case of a dose that kills', () => {
+    const f = (x: number) => 5 + 95 / (1 + (2 / x) ** -1.5);
+    const r = ok(fitCurve(pts(dose, f), { model: 'hill_4pl' }));
+    expect(r.converged).toBe(true);
+    expect(value(r, 2)).toBeCloseTo(2, 3);
+    expect(value(r, 3)).toBeCloseTo(-1.5, 3);
+  });
+  it('fits noisy data and gives errors, with a prediction interval wider than the interval of the curve', () => {
+    const noise = [0.8, -1.1, 0.6, -0.4, 1.3, -0.9, 0.5, -0.7, 0.2];
+    const f = (x: number) => 8 + 92 / (1 + (30 / x) ** 1.0);
+    const r = ok(fitCurve(dose.map((x, i) => ({ x, y: f(x) + noise[i] * 2 })), { model: 'hill_4pl' }));
+    expect(r.converged).toBe(true);
+    expect(value(r, 2)).toBeGreaterThan(20);
+    expect(value(r, 2)).toBeLessThan(45);
+    expect(r.params.every((p) => p.se !== null && p.lower! < p.value && p.upper! > p.value)).toBe(true);
+    const ci = r.halfWidth(30, 'confidence', 0.95)!;
+    const pi = r.halfWidth(30, 'prediction', 0.95)!;
+    expect(ci).toBeGreaterThan(0);
+    expect(pi).toBeGreaterThan(ci);
+    expect(r.df).toBe(5);
+  });
+  it('leaves out points whose X is not above 0, and says so', () => {
+    const r = ok(fitCurve([{ x: 0, y: 1 }, { x: -1, y: 2 }, ...pts(dose, (x) => 10 + 90 / (1 + (50 / x) ** 1.2))], { model: 'hill_4pl' }));
+    expect(r.n).toBe(9);
+    expect(r.message).toMatch(/2 points were left out/);
+  });
+  it('recovers the other models', () => {
+    const xs = [0, 0.5, 1, 1.5, 2, 3, 4, 6, 8, 10];
+    const decay = ok(fitCurve(pts(xs, (x) => 2 + 8 * Math.exp(-0.4 * x)), { model: 'exp_decay' }));
+    expect([value(decay, 0), value(decay, 1), value(decay, 2)].map((v) => Number(v.toFixed(5)))).toEqual([2, 8, 0.4]);
+    const assoc = ok(fitCurve(pts(xs, (x) => 1 + 6 * (1 - Math.exp(-0.5 * x))), { model: 'exp_association' }));
+    expect([value(assoc, 0), value(assoc, 1), value(assoc, 2)].map((v) => Number(v.toFixed(5)))).toEqual([1, 6, 0.5]);
+    const peak = ok(fitCurve(pts([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6], (x) => 1 + 9 * Math.exp(-0.5 * ((x - 1) / 1.5) ** 2)), { model: 'gaussian_peak' }));
+    expect([value(peak, 0), value(peak, 1), value(peak, 2), value(peak, 3)].map((v) => Number(v.toFixed(4)))).toEqual([1, 9, 1, 1.5]);
+    const mm = ok(fitCurve(pts([0.5, 1, 2, 4, 8, 16, 32, 64], (x) => (12 * x) / (5 + x)), { model: 'hyperbola' }));
+    expect(value(mm, 1)).toBeCloseTo(12, 4);
+    expect(value(mm, 2)).toBeCloseTo(5, 4);
+  });
+  it('fits two phases of decay with separated rates', () => {
+    const xs = Array.from({ length: 24 }, (_, i) => i * 0.5);
+    const r = ok(fitCurve(pts(xs, (x) => 1 + 6 * Math.exp(-2.5 * x) + 4 * Math.exp(-0.15 * x)), { model: 'exp_two_phase' }));
+    expect(r.converged).toBe(true);
+    expect(r.rss).toBeLessThan(1e-6);
+    expect(r.params.map((p) => p.name)).toHaveLength(5);
+  });
+  it('keeps a rate from going negative', () => {
+    const r = ok(fitCurve(pts([0, 1, 2, 3, 4, 5], (x) => 3 + 2 * x), { model: 'exp_decay' }));
+    expect(value(r, 2)).toBeGreaterThanOrEqual(0);
+  });
+  it('is reproducible', () => {
+    const data = pts([0.1, 1, 10, 100, 1000], (x) => 4 + 60 / (1 + (20 / x) ** 0.9) + Math.sin(x));
+    const a = ok(fitCurve(data, { model: 'hill_4pl' }));
+    const b = ok(fitCurve(data, { model: 'hill_4pl' }));
+    expect(a.params.map((p) => p.value)).toEqual(b.params.map((p) => p.value));
+  });
+  it('says so when the points do not fix the parameters, and never invents a band', () => {
+    // As many points as parameters: nothing left to estimate the error from.
+    const r = fitCurve(pts([1, 10, 100, 1000], (x) => 10 + 90 / (1 + (50 / x) ** 1.2)), { model: 'hill_4pl' });
+    const fit = ok(r);
+    expect(fit.df).toBe(0);
+    expect(fit.halfWidth(50, 'confidence', 0.95)).toBeNull();
+    expect(fit.params.every((p) => p.se === null)).toBe(true);
+  });
+  it('gives nothing wrong for flat data: either a curve with no NaN, or a reason', () => {
+    const r = fitCurve(pts(dose, () => 5), { model: 'hill_4pl' });
+    if (isFailure(r)) expect(r.message.length).toBeGreaterThan(0);
+    else for (const x of [1, 10, 100]) expect(Number.isFinite(r.predict(x))).toBe(true);
+  });
+});
+
+describe('the models', () => {
+  it('each has a name, a formula, and parameter names that match its function', () => {
+    for (const m of FIT_MODELS) {
+      const d = m.id === 'polynomial' ? 3 : m.id === 'linear' ? 1 : 0;
+      const names = m.paramNames(d);
+      expect(m.label.length).toBeGreaterThan(3);
+      expect(m.formula.length).toBeGreaterThan(3);
+      const p = m.linear ? names.map(() => 1) : m.init([1, 2, 3, 4, 5, 6], [1, 2, 3, 3, 2, 1], d);
+      expect(p).toHaveLength(names.length);
+      expect(Number.isFinite(m.fn(2, p))).toBe(true);
+    }
+    expect(fitModelById('hill_4pl').positiveX).toBe(true);
+    expect(fitModelById('linear').positiveX).toBeUndefined();
+  });
+  it('evaluate the formulas of the spec', () => {
+    expect(fitModelById('exp_decay').fn(0, [2, 8, 0.4])).toBe(10);
+    expect(fitModelById('hill_4pl').fn(50, [10, 100, 50, 2])).toBeCloseTo(55, 12);
+    expect(fitModelById('asymmetric_5pl').fn(50, [10, 100, 50, 1, 2])).toBeCloseTo(10 + 90 / 4, 12);
+    expect(fitModelById('hyperbola').fn(5, [0, 12, 5])).toBe(6);
+    expect(fitModelById('gaussian_peak').fn(1, [1, 9, 1, 1.5])).toBe(10);
+    expect(fitModelById('polynomial').fn(2, [1, 2, 3])).toBe(17);
+  });
+});

@@ -19,6 +19,9 @@ export interface ErrorBarGeom {
   /** True when a drawn end lies strictly outside the axis domain. */
   clippedUpper: boolean;
   clippedLower: boolean;
+  /** Highest and lowest drawn point of the bar in chart pt (y grows downwards): where a label can sit beyond it. */
+  top: number;
+  bottom: number;
 }
 
 export type ErrorBarStyle = Pick<
@@ -34,6 +37,8 @@ export interface ErrorBarInput {
   yScale: (v: number) => number;
   /** Axis domain in data units; either order. */
   domain: readonly [number, number];
+  /** A log axis: an end at or below 0 has no position, so it is drawn at the low end of the domain and counted as clipped. */
+  log?: boolean;
 }
 
 /** Spreads whose interval is built around the centre; range, IQR and median CI are not. */
@@ -86,10 +91,13 @@ export function rangeValuesFor(stats: GroupStats, shown: boolean, direction: Err
 
 /** Null when the bar is hidden, has no centre or interval, fails the consistency guard, or maps to non-finite pixels. */
 export function buildErrorBar(input: ErrorBarInput): ErrorBarGeom | null {
-  const { groupId, centerX, stats, style, yScale, domain } = input;
+  const { groupId, centerX, stats, style, yScale: mapY, domain, log } = input;
   if (!style.showErrorBars) return null;
   const ends = usableEnds(stats);
   if (!ends) return null;
+  if (log && !(ends.centre > 0)) return null;
+  const floor = Math.min(domain[0], domain[1]);
+  const yScale = log ? (v: number) => mapY(v > 0 ? v : floor) : mapY;
 
   const drawUpper = style.errorDirection !== 'negative';
   const drawLower = style.errorDirection !== 'positive';
@@ -120,6 +128,8 @@ export function buildErrorBar(input: ErrorBarInput): ErrorBarGeom | null {
     meaning: `${describeSpread(stats.effectiveSpread, stats.confidenceLevel, stats.centreKind)}${side}`,
     clippedUpper: drawUpper && outside(ends.upper),
     clippedLower: drawLower && outside(ends.lower),
+    top: Math.min(hi, lo, yCentre),
+    bottom: Math.max(hi, lo, yCentre),
   };
 }
 

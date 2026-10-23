@@ -2,7 +2,7 @@ import { layoutOf, subLabels, tableSeriesWidth, xySeries } from './tableLayout';
 import { leadingColumns } from './chartTypes';
 import type { Analysis, AnalysisKind, DataTable, Id, Project, TableKind } from './types';
 
-export interface AnalysisTypeInfo {
+interface AnalysisTypeInfo {
   kind: AnalysisKind;
   label: string;
   description: string;
@@ -25,7 +25,7 @@ export const analysisApplies = (kind: TableKind): boolean => kind === 'column' |
 export const analysesOf = (p: Pick<Project, 'analyses'>): Analysis[] => p.analyses ?? [];
 
 /** One column of a table as analysed: its label and its values (null = empty cell). */
-export interface AnalysisColumn {
+interface AnalysisColumn {
   id: Id;
   label: string;
   values: Array<number | null>;

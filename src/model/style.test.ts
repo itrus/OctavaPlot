@@ -3,8 +3,8 @@ import { buildChartModel } from '../chart/model';
 import { historyReducer, initialHistory } from '../state/history';
 import { clearPointStyle, patchPointStyle, setChartType } from '../state/commands';
 import { createExampleProject } from './defaults';
-import { permuteRows } from './rows';
-import { LABEL_STYLE_KEYS, clearObjectKeys, isObjectOverridden, patchAllGroups, patchObject, resetGroupStyle, resolveStyle } from './style';
+import { permuteRows } from '../testing/tableChecks';
+import { LABEL_STYLE_KEYS, clearObjectKeys, patchAllGroups, patchObject, resetGroupStyle, resolveStyle } from './style';
 import type { ChartLayer } from './types';
 
 const setup = () => {
@@ -15,14 +15,13 @@ const setup = () => {
 };
 const withLabels = (layer: ChartLayer): ChartLayer => ({ ...layer, objectOverrides: { o1: { showPointLabels: true, pointLabelBold: true, symbolSizePt: 5 } } });
 
-describe('patchObject, clearObjectKeys and isObjectOverridden', () => {
+describe('patchObject and clearObjectKeys', () => {
   it('sets keys on the object override', () => {
     const { layer } = setup();
     const next = patchObject(layer, 'o1', { showPointLabels: true });
     expect(next.objectOverrides.o1).toEqual({ showPointLabels: true });
-    expect(isObjectOverridden(next, 'o1', 'showPointLabels')).toBe(true);
-    expect(isObjectOverridden(next, 'o1', 'pointLabelBold')).toBe(false);
-    expect(isObjectOverridden(layer, 'o1', 'showPointLabels')).toBe(false);
+    expect(next.objectOverrides.o1.pointLabelBold).toBeUndefined();
+    expect(layer.objectOverrides.o1).toBeUndefined();
   });
   it('returns the same layer on a no-op', () => {
     const { layer } = setup();
@@ -34,7 +33,7 @@ describe('patchObject, clearObjectKeys and isObjectOverridden', () => {
   it('stores null as an override (Auto colour)', () => {
     const { layer } = setup();
     const next = patchObject(layer, 'o1', { pointLabelColor: null });
-    expect(isObjectOverridden(next, 'o1', 'pointLabelColor')).toBe(true);
+    expect(next.objectOverrides.o1.pointLabelColor).toBeNull();
     expect(patchObject(next, 'o1', { pointLabelColor: null })).toBe(next);
   });
   it('clears keys, drops an emptied entry and keeps the others', () => {

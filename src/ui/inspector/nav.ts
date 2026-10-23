@@ -1,7 +1,7 @@
 import type { HitTarget } from '../../chart/hitTest';
 
 export type InspectorTab = 'appearance' | 'datasets' | 'annotations';
-export type AppearanceSection = 'style' | 'axes' | 'text' | 'dimensions' | 'legend';
+export type AppearanceSection = 'style' | 'axes' | 'frame' | 'text' | 'layout' | 'legend';
 
 /** A place in the inspector: a tab and, for Appearance, one of its sections. */
 export interface InspectorTarget {
@@ -35,8 +35,9 @@ export function inspectorTargetFor(hit: HitTarget): InspectorTarget | null {
 export const SECTIONS: Array<{ id: AppearanceSection; label: string }> = [
   { id: 'style', label: 'Style' },
   { id: 'axes', label: 'Axes' },
+  { id: 'frame', label: 'Frame' },
   { id: 'text', label: 'Text' },
-  { id: 'dimensions', label: 'Dimensions' },
+  { id: 'layout', label: 'Layout' },
   { id: 'legend', label: 'Legend' },
 ];
 

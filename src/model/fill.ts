@@ -146,7 +146,7 @@ export function sanitizeFillKeys(raw: Record<string, unknown>): { style: Record<
 }
 
 /** Inspector state of the fill controls. */
-export interface BarFillUi {
+interface BarFillUi {
   mode: FillMode;
   /** Solid colour control: usable in solid mode only. */
   solidColorEnabled: boolean;

@@ -18,9 +18,9 @@ const project = (type: ChartType): { p: Project; table: DataTable; chart: Chart 
 
 describe('chart types and table types', () => {
   it('offers the chart types of each table type', () => {
-    expect(chartTypesFor('column').map((c) => c.type)).toEqual(['bar', 'scatter', 'mean']);
+    expect(chartTypesFor('column').map((c) => c.type)).toEqual(['bar', 'scatter', 'mean', 'box', 'floating', 'paired', 'histogram', 'ecdf', 'violin']);
     expect(chartTypesFor('xy').map((c) => c.type)).toEqual(['xyScatter', 'xyLine', 'xyLineSymbols']);
-    expect(CHART_TYPES).toHaveLength(13);
+    expect(CHART_TYPES).toHaveLength(23);
   });
   it('the presets decide symbols and lines', () => {
     const s = (t: ChartType) => createChart('t', undefined, t).layers[0].style;

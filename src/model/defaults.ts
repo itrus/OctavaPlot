@@ -5,6 +5,14 @@ import { defaultSeriesName, subLabels, summaryFormatInfo } from './tableLayout';
 import { createRows } from './rows';
 import type {
   AxisConfig,
+  BarLabels,
+  BarLayout,
+  DistributionOptions,
+  HeatmapOptions,
+  FitSettings,
+  HistogramOptions,
+  PieOptions,
+  GridStyle,
   Chart,
   ChartLayer,
   ChartStyle,
@@ -35,7 +43,7 @@ export const initialLayerStyle = (type: ChartType): Partial<ChartStyle> =>
   type === 'survival' || type === 'cumulativeEvent' ? { ...TYPE_PRESETS[type], symbolShape: 'plus', symbolSizePt: 9, symbolBorderWidthPt: 2 } : { ...TYPE_PRESETS[type] };
 
 /** Axis titles a new chart of this type starts with. */
-export function axisTitlesFor(type: ChartType): { x: string; y: string } {
+function axisTitlesFor(type: ChartType): { x: string; y: string } {
   switch (type) {
     case 'xyScatter':
     case 'xyLine':
@@ -46,6 +54,12 @@ export function axisTitlesFor(type: ChartType): { x: string; y: string } {
       return { x: '', y: 'Count' };
     case 'contingencyPercent':
       return { x: '', y: 'Percent' };
+    case 'histogram':
+      return { x: 'Value', y: 'Count' };
+    case 'ecdf':
+      return { x: 'Value', y: 'Cumulative fraction' };
+    case 'heatmap':
+      return { x: '', y: '' };
     case 'survival':
       return { x: 'Time', y: 'Fraction surviving' };
     case 'cumulativeEvent':
@@ -63,7 +77,39 @@ export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, met
 export const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4 };
 
 /** Line weight shared by the axes, bar borders, error bars and connecting lines, so they read as one family. */
-export const AXIS_LINE_PT = 3;
+const AXIS_LINE_PT = 2.6;
+/** Box plots and violins (spec 10): min-max whiskers, medium smoothing, equal maximum width. */
+const DEFAULT_DISTRIBUTION: DistributionOptions = {
+  whisker: 'minmax',
+  tukeyK: 1.5,
+  boxWidth: 0.65,
+  violinWidth: 0.8,
+  showMedian: true,
+  showMean: false,
+  points: 'none',
+  smoothing: 'medium',
+  bandwidth: null,
+  trim: 'sample',
+  normalisation: 'width',
+  showQuartiles: true,
+};
+/** Heat maps (spec 13.1): a single gradient, the range of the values, nothing normalised, no numbers in the cells. */
+const DEFAULT_HEATMAP: HeatmapOptions = { palette: 'viridis', reverse: false, min: null, max: null, centre: null, normalise: 'none', method: 'zscore', summary: 'mean', showValues: false, decimals: null, cellGapPt: 0, transpose: false, colourbar: true, missingColour: '#d9d9d9' };
+/** No fitted curve until one is chosen; a band, when asked for, is the 95% interval of the curve. */
+const DEFAULT_FIT: FitSettings = { model: 'none', degree: 2, band: 'none', level: 0.95, extend: false, showParameters: false };
+
+/** Histograms (spec 11.1): automatic bins, counts, bars touching; the cumulative distribution steps up at each value. */
+const DEFAULT_HISTOGRAM: HistogramOptions = { binning: 'auto', binWidth: null, firstEdge: null, frequency: 'count', cumulative: 'off', arrangement: 'overlay', gapPct: 0, ecdfDirection: 'atOrBelow', ecdfUnits: 'fraction', ecdfSymbols: false, ecdfExtend: true };
+/** Pies and doughnuts (spec 14): the first part starts at the top, clockwise, labels with the share to one decimal. */
+const DEFAULT_PIE: PieOptions = { startAngle: 0, direction: 'clockwise', hole: 0.5, labels: 'percent', percentDigits: 1, showTotal: false, totalPrefix: 'Total = ' };
+/** Labels on bars are off until asked for. */
+export const DEFAULT_BAR_LABELS: BarLabels = { show: 'none', decimals: null, thousands: false, prefix: '', suffix: '', sizePt: 11.2, color: null };
+/** Automatic column layout: the spacing the column charts always had. */
+const DEFAULT_BARS: BarLayout = { gapPct: null, beforePct: null, afterPct: null, baseline: null };
+/** Gridlines: thin and light, and lighter still for the minor ones (P). */
+const DEFAULT_GRID: GridStyle = { color: '#d0d0d0', widthPt: 0.5, style: 'solid', minorColor: '#e6e6e6', minorWidthPt: 0.25, minorStyle: 'solid' };
+/** Major tick length, pt (spec 20.2); the layout constant has the same value. */
+export const TICK_LENGTH_PT = 5.6;
 
 export const DEFAULT_STYLE: ChartStyle = {
   showBars: true,
@@ -125,11 +171,23 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
   bar: { showBars: true, showSymbols: true, showLines: false, showMeanLine: false },
   scatter: { showBars: false, showSymbols: true, showLines: false, showMeanLine: true },
   mean: { showBars: false, showSymbols: true, showLines: false, showMeanLine: false },
+  // Box plots and violins: showBars is the body (box or violin) and showSymbols the dots over it (which ones: the distribution options).
+  box: { showBars: true, showSymbols: true, showLines: false, showMeanLine: false },
+  violin: { showBars: true, showSymbols: true, showLines: false, showMeanLine: false },
+  floating: { showBars: true, showSymbols: true, showLines: false, showMeanLine: false },
+  // Paired plots: the dots are the values, the lines join each subject's, the mean line is optional.
+  paired: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
+  histogram: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
+  ecdf: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   xyScatter: { showBars: false, showSymbols: true, showLines: false, showMeanLine: false },
   xyLine: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   xyLineSymbols: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
   groupedBar: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
+  groupedStacked: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
+  heatmap: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedLine: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
+  pie: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
+  doughnut: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   contingencyBars: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   contingencyStacked: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   contingencyPercent: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
@@ -140,6 +198,11 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
 
 const defaultAxis = (title: string): AxisConfig => ({
   title,
+  titleVisible: true,
+  titleBold: true,
+  tickBold: true,
+  titleOffsetPt: 0,
+  tickLabelOffsetPt: 0,
   visible: true,
   lineWidthPt: AXIS_LINE_PT,
   tickFontSizePt: 13.3,
@@ -148,6 +211,20 @@ const defaultAxis = (title: string): AxisConfig => ({
   max: null,
   majorInterval: null,
   showGrid: false,
+  showMinorGrid: false,
+  breaks: [],
+  breakMark: 'doubleSlash',
+  scaleBar: false,
+  scale: 'linear',
+  reverse: false,
+  minorTicks: 0,
+  tickDirection: 'out',
+  tickLengthPt: TICK_LENGTH_PT,
+  numberFormat: 'auto',
+  decimals: null,
+  thousands: false,
+  prefix: '',
+  suffix: '',
 });
 
 export function createChart(dataTableId: string, size?: { widthPx: number; heightPx: number }, type: ChartType = 'bar'): Chart {
@@ -169,6 +246,8 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     widthPx: size?.widthPx ?? DEFAULT_CHART_WIDTH_PX,
     heightPx: size?.heightPx ?? DEFAULT_CHART_HEIGHT_PX,
     hiddenGroupIds: [],
+    groupOrder: [],
+    groupGaps: {},
     extraGroups: [],
     survival: { ...DEFAULT_SURVIVAL },
     aspect: 'free',
@@ -176,11 +255,30 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     title: 'Graph 1',
     showTitle: true,
     titleFontSizePt: 16.8,
+    fontFamily: FONT_FAMILY,
+    textColor: '#000000',
+    titleBold: true,
+    titleOffsetPt: 0,
+    axisColor: '#000000',
+    plotColor: '#ffffff',
+    pageColor: '#ffffff',
+    frame: 'none',
+    grid: { ...DEFAULT_GRID },
+    orientation: 'vertical',
+    origin: { x: null, y: null },
+    bars: { ...DEFAULT_BARS },
+    barLabels: { ...DEFAULT_BAR_LABELS },
+    distribution: { ...DEFAULT_DISTRIBUTION },
+    pairs: { bridge: false },
+    heatmap: { ...DEFAULT_HEATMAP },
+    histogram: { ...DEFAULT_HISTOGRAM },
+    fit: { ...DEFAULT_FIT },
+    pie: { ...DEFAULT_PIE },
     xAxis: defaultAxis(titles.x),
     yAxis: defaultAxis(titles.y),
     // Sizes 13.3/14 are inherited from the left axis (P, not D).
     y2Axis: defaultAxis(''),
-    legend: { visible: true, position: 'right', fontSizePt: 11.2, hiddenGroupIds: [] },
+    legend: { visible: true, keyShape: 'rectangle', position: 'right', fontSizePt: 11.2, hiddenGroupIds: [] },
     displayNames: {},
     jitter: { ...DEFAULT_JITTER },
     defaults: { ...DEFAULT_STYLE },
@@ -189,7 +287,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
   };
 }
 
-export const EXAMPLE_DATA: Array<[string, number[]]> = [
+const EXAMPLE_DATA: Array<[string, number[]]> = [
   ['Group A', [1.1, 1.2, 1.3, 1.2, 1.4]],
   ['Group B', [1.4, 1.7, 1.6, 1.8, 1.5]],
   ['Group C', [1.8, 2.0, 1.9, 2.1, 2.2]],
@@ -228,15 +326,6 @@ export function createExampleTable(): DataTable {
   };
 }
 
-/** Names of the Y series of a new XY table: "Series A", "Series B", ... */
-export function nextSeriesName(existing: string[]): string {
-  for (let i = 0; i < existing.length + 1000; i++) {
-    const letter = i < 26 ? String.fromCharCode(65 + i) : String(i + 1);
-    const name = `Series ${letter}`;
-    if (!existing.includes(name)) return name;
-  }
-  return `Series ${existing.length + 1}`;
-}
 
 const XY_EXAMPLE_X = [1, 2, 3, 4, 5, 6, 7, 8];
 const XY_EXAMPLE_Y: Array<[string, number[]]> = [
@@ -248,7 +337,7 @@ const XY_EXAMPLE_Y: Array<[string, number[]]> = [
  * Sample values of one series, one array per sub-column, around the central values `base`. Replicates scatter
  * around the centre in a fixed pattern; supplied-summary tables get an SD / SEM / %CV / +/- error / limits to match.
  */
-export function sampleSeriesColumns(layout: ReplicateLayout, base: number[]): number[][] {
+function sampleSeriesColumns(layout: ReplicateLayout, base: number[]): number[][] {
   if (layout.kind === 'single') return [base];
   if (layout.kind === 'replicates') {
     const offsets = [-0.12, 0.08, 0.15, -0.06, 0.1, -0.14, 0.04, 0.12, -0.09, 0.02];
@@ -291,7 +380,7 @@ export function createXyTable(name: string, example: boolean, layout: ReplicateL
 }
 
 /** Rows of a grouped or contingency table: categories are few, so it starts with a handful rather than twenty. */
-export const CATEGORY_ROWS = 6;
+const CATEGORY_ROWS = 6;
 
 /**
  * A grouped table: each row is a category (Male, Female), each block of columns a series (Control, Treated) laid out as

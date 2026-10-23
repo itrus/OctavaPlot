@@ -1,11 +1,16 @@
+import { sanitizeAxis } from '../model/axis';
+import { sanitizeBarLabels, sanitizeBars } from '../model/columnOptions';
+import { sanitizeDistribution } from '../model/distributionOptions';
+import { sanitizeLook } from '../model/look';
+import { GROUP_GAP_LIMITS, sanitizeGaps, sanitizeOrder } from '../model/groupOrder';
 import { createChart, createColumnTable, DEFAULT_SURVIVAL, initialLayerStyle, createContingencyTable, createGroupedTable, createSurvivalTable, defaultSummaryFor, createGroup, createXyTable, DEFAULT_JITTER, DEFAULT_STYLE, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
 import { analysisApplies, analysisTypeInfo } from '../model/analysis';
 import { effectiveTable } from '../model/chartTable';
 import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, xySeries } from '../model/tableLayout';
 
 /** Chart types whose series colour is the colour of symbols, lines and error bars (not of filled bars). */
-const isSeriesColourChart = (type: ChartType): boolean => isXyChartType(type) || isSurvivalChartType(type) || type === 'groupedLine';
-import { chartTypeInfo, defaultChartTypeFor, isSurvivalChartType, isXyChartType, leadingColumns, usesSeriesBlocks } from '../model/chartTypes';
+import { applyVariant, type ChartVariant } from '../model/chartVariant';
+import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns, usesSeriesBlocks } from '../model/chartTypes';
 import { newId } from '../model/ids';
 import { DEFAULT_PALETTE_ID, paletteColor, type Palette } from '../model/palettes';
 import { createRows, sanitizeRowTitle } from '../model/rows';
@@ -16,6 +21,10 @@ import type {
   AnalysisKind,
   Annotation,
   AxisConfig,
+  BarLabels,
+  BarLayout,
+  DistributionOptions,
+  GridStyle,
   Chart,
   ChartLayer,
   ChartStyle,
@@ -117,7 +126,7 @@ function applyEdits(table: DataTable, edits: CellEdit[]): DataTable {
 export const setCells = (tableId: Id, edits: CellEdit[]): Command => (p) =>
   mapTable(p, tableId, (t) => applyEdits(t, edits));
 
-export interface RowTitleEdit {
+interface RowTitleEdit {
   row: number;
   title: string;
 }
@@ -216,9 +225,6 @@ const mapGroup = (t: DataTable, groupId: Id, fn: (g: Group) => Group): DataTable
 export const renameGroup = (tableId: Id, groupId: Id, name: string): Command => (p) =>
   mapTable(p, tableId, (t) => mapGroup(t, groupId, (g) => ({ ...g, name })));
 
-export const setGroupTitle = (tableId: Id, groupId: Id, title: string): Command => (p) =>
-  mapTable(p, tableId, (t) => mapGroup(t, groupId, (g) => ({ ...g, title })));
-
 /** Remove a Y series of an XY table: all of its columns. The X column and the last series stay. */
 export const removeSeries = (tableId: Id, seriesId: Id): Command => (p) => {
   const t = p.dataTables.find((x) => x.id === tableId);
@@ -269,7 +275,7 @@ export const patchChart = (chartId: Id, patch: Partial<Chart>): Command => (p) =
 export type AxisKey = 'xAxis' | 'yAxis' | 'y2Axis';
 
 export const patchAxis = (chartId: Id, which: AxisKey, patch: Partial<AxisConfig>): Command => (p) =>
-  mapChart(p, chartId, (c) => ({ ...c, [which]: { ...c[which], ...patch } }));
+  mapChart(p, chartId, (c) => ({ ...c, [which]: sanitizeAxis({ ...c[which], ...patch }, c[which]) }));
 
 /** Apply to all axes (shared line width and font size controls). */
 export const patchBothAxes = (chartId: Id, patch: Partial<AxisConfig>): Command => (p) =>
@@ -317,7 +323,7 @@ export const applyPalette = (chartId: Id, palette: Palette): Command => (p) => {
           (usesSeriesBlocks(table.kind) ? xySeries(table).map((x) => x.columns[0]) : table.groups).reduce((layer, g, gi) => {
             const color = paletteColor(palette, gi);
             // Charts of lines and symbols take the series colour everywhere; bar charts colour the bars.
-            return patchGroup(layer, g.id, isSeriesColourChart(chart.type) ? { barFill: color, symbolColor: color, symbolBorderColor: color, lineColor: color, errorColor: color } : { barFill: color, symbolColor: color });
+            return patchGroup(layer, g.id, isSeriesColourType(chart.type) ? { barFill: color, symbolColor: color, symbolBorderColor: color, lineColor: color, errorColor: color } : { barFill: color, symbolColor: color });
           }, l),
     ),
   }));
@@ -525,11 +531,50 @@ export const removeAnalysis = (id: Id): Command => (p) => ({ ...p, analyses: (p.
 export const setProjectName = (name: string): Command => (p) => (p.name === name ? p : { ...p, name });
 
 /** New graph of a data table; named after the table, like the original's linked graph. */
-export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; heightPx: number }, type?: ChartType): Command => (p) => {
+export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; heightPx: number }, type?: ChartType, variant?: ChartVariant): Command => (p) => {
   const table = p.dataTables.find((t) => t.id === tableId);
   if (!table) return p;
   // A type that does not suit the table's type is ignored: the table's default chart type is used.
   const suited = type !== undefined && chartTypeInfo(type)?.tableKind === table.kind ? type : defaultChartTypeFor(table.kind);
   const chart = { ...createChart(tableId, size, suited), id: chartId, name: table.name, title: table.name };
-  return { ...p, charts: [...p.charts, chart] };
+  return { ...p, charts: [...p.charts, applyVariant(chart, variant)] };
+};
+
+/** Colours, frame and gridline style of the chart (see model/axis.ts: sanitizeLook). */
+export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
+  mapChart(p, chartId, (c) => {
+    const { grid, ...rest } = patch;
+    return { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };
+  });
+
+/** Column spacing and baseline of a column chart. */
+export const patchBars = (chartId: Id, patch: Partial<BarLayout>): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, bars: sanitizeBars({ ...c.bars, ...patch }, c.bars) }));
+
+/** Put the data sets of a column chart in this order (ids not listed follow in their own order). */
+export const setGroupOrder = (chartId: Id, order: Id[]): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, groupOrder: sanitizeOrder(order) }));
+
+/** Space before a data set as a percentage of the normal space between columns (100 or null = normal). */
+export const setGroupGap = (chartId: Id, groupId: Id, pct: number | null): Command => (p) =>
+  mapChart(p, chartId, (c) => {
+    const next = sanitizeGaps({ ...c.groupGaps, [groupId]: pct ?? GROUP_GAP_LIMITS.normal });
+    return { ...c, groupGaps: next };
+  });
+
+/** Labels above the bars of a column chart. */
+export const patchBarLabels = (chartId: Id, patch: Partial<BarLabels>): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, barLabels: sanitizeBarLabels({ ...c.barLabels, ...patch }, c.barLabels) }));
+
+/** Settings of box plots and violins. */
+export const patchDistribution = (chartId: Id, patch: Partial<DistributionOptions>): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, distribution: sanitizeDistribution({ ...c.distribution, ...patch }, c.distribution) }));
+
+/** Rename a data table, a graph or an analysis from the navigator; a blank name is ignored. */
+export const renameItem = (kind: 'table' | 'chart' | 'analysis', id: Id, name: string): Command => (p) => {
+  const next = name.trim();
+  if (next === '') return p;
+  if (kind === 'table') return mapTable(p, id, (t) => (t.name === next ? t : { ...t, name: next }));
+  if (kind === 'chart') return mapChart(p, id, (c) => (c.name === next ? c : { ...c, name: next }));
+  return { ...p, analyses: (p.analyses ?? []).map((a) => (a.id === id && a.name !== next ? { ...a, name: next } : a)) };
 };

@@ -18,7 +18,7 @@ export interface HistoryState {
   lastAction: string | null;
 }
 
-export type HistoryAction =
+type HistoryAction =
   | { type: 'commit'; label: string; command: Command; coalesceKey?: string; now: number }
   | { type: 'undo' }
   | { type: 'redo' }

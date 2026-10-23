@@ -26,7 +26,7 @@ export const AXIS_TAG: Record<AxisBinding, string> = { primary: '', secondary: '
 /** Error bars are shown exactly when switched on; the calculation (spread) decides whether there is an interval. */
 export const errorShown = (style: Pick<ChartStyle, 'showErrorBars'>): boolean => style.showErrorBars;
 
-export type RangeStyle = Pick<ChartStyle, 'showBars' | 'showSymbols' | 'showErrorBars' | 'errorDirection'>;
+type RangeStyle = Pick<ChartStyle, 'showBars' | 'showSymbols' | 'showErrorBars' | 'errorDirection'>;
 
 /** One data set as the axis range sees it. */
 export interface RangeRow {
@@ -35,9 +35,11 @@ export interface RangeRow {
   style: RangeStyle;
   /** Raw observation values, aligned with the table rows. */
   values: ReadonlyArray<number | null | undefined>;
+  /** Box plots and violins: the values the axis has to show (whisker ends, outliers, the ends of the density). */
+  override?: number[];
 }
 
-export interface RangeContribution {
+interface RangeContribution {
   values: number[];
   hasBars: boolean;
 }
@@ -48,6 +50,7 @@ export interface RangeContribution {
  * (known deviation from spec 6.1 L355, recorded in the README).
  */
 export function groupRangeContribution(row: RangeRow, type: ChartType): RangeContribution {
+  if (row.override) return { values: row.override.filter((v) => Number.isFinite(v)), hasBars: false };
   const values = rangeValuesFor(row.stats, errorShown(row.style), row.style.errorDirection);
   if (row.style.showSymbols && type !== 'mean') {
     for (const v of row.values) if (v !== null && v !== undefined && Number.isFinite(v)) values.push(v);
@@ -55,7 +58,7 @@ export function groupRangeContribution(row: RangeRow, type: ChartType): RangeCon
   return { values, hasBars: row.style.showBars && row.stats.centre !== null };
 }
 
-export interface AxisPool {
+interface AxisPool {
   values: number[];
   /** True when any data set on the axis draws a bar (the baseline then needs zero in range). */
   hasBars: boolean;
@@ -63,7 +66,7 @@ export interface AxisPool {
   count: number;
 }
 
-export interface AxisPools {
+interface AxisPools {
   primary: AxisPool;
   secondary: AxisPool;
   /** The right axis exists only while a data set is bound to it (spec 6.2 L363). */
@@ -86,7 +89,7 @@ export function populateAxes(rows: ReadonlyArray<RangeRow>, type: ChartType): Ax
   return { ...pools, secondaryInUse: pools.secondary.count > 0 };
 }
 
-export interface BindingSelectState {
+interface BindingSelectState {
   /** "Plot data on" is offered for Cartesian chart types only. */
   offered: boolean;
   value: AxisBinding;

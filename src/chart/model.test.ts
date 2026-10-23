@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject, DEFAULT_STYLE } from '../model/defaults';
-import { permuteRows } from '../model/rows';
+import { permuteRows } from '../testing/tableChecks';
 import type { ChartStyle } from '../model/types';
 import { resolveStyle } from '../model/style';
 import { clearSummaryOverrides, composeCommands, patchStyle, patchSummary, resetStyle, setChartType, setCells } from '../state/commands';

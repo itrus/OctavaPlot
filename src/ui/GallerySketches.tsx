@@ -82,7 +82,8 @@ const SKETCHES: Record<string, () => ReactElement> = {
 
 /** The thumbnail of a gallery graph: the drawing of an available chart type, or a sketch of a planned preset. */
 export function GallerySketch({ item }: { item: GalleryItem }): ReactNode {
-  if (item.type) return <ChartSketch type={item.type} />;
+  // A horizontal graph has a sketch of its own; the chart type's sketch is the vertical one.
+  if (item.type && !SKETCHES[item.id]) return <ChartSketch type={item.type} />;
   const draw = SKETCHES[item.id];
   return <svg {...SVG}>{draw ? draw() : <Axes />}</svg>;
 }

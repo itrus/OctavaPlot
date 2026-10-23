@@ -1,36 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
+import { SYMBOL_SHAPE_OPTIONS } from '../../chart/symbols';
 import { displayName } from '../../chart/model';
-import { validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext, type YAxisScale } from '../../chart/scales';
+import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext, type YAxisScale } from '../../chart/scales';
 import { buildAnyModel } from '../../chart/anyModel';
 import { chartFamily, chartTypesFor } from '../../model/chartTypes';
 import { layoutOf, summaryFormatInfo, xySeries } from '../../model/tableLayout';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/summary';
 import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from '../../stats/describe';
 import { tooltipFmt } from '../../chart/tooltip';
+import { ColumnLayoutSection, FrameSection } from './LookControls';
+import { AxisStyleControls } from './AxisStyleControls';
 import { IntervalFields, LineAtField } from './SummaryControls';
-import { paletteById } from '../../model/palettes';
 import { isGroupOverridden, resolveStyle } from '../../model/style';
 import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, Id, SummarySpec } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { applyPalette, composeCommands, patchAxis, patchBothAxes, patchChart, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
+import { composeCommands, patchAxis, patchChart, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
+import { FitSection } from './FitControls';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './controls';
 import { SECTIONS, TABS, type AppearanceSection, type InspectorTab } from './nav';
-import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, PaletteInfo, PaletteOptions, TextSections } from './SharedSections';
+import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './SharedSections';
 
-const shapeOptions = [
-  { value: 'circle', label: 'Circle' },
-  { value: 'square', label: 'Square' },
-  { value: 'triangle', label: 'Triangle' },
-  { value: 'diamond', label: 'Diamond' },
-  { value: 'plus', label: 'Plus' },
-  { value: 'cross', label: 'Cross' },
-] as const;
-
-const axisCtx = (axis: AxisConfig, scale: YAxisScale): AxisEditContext => ({ min: axis.min, max: axis.max, majorInterval: axis.majorInterval, domain: scale.domain });
-const stepOf = (scale: YAxisScale) => (scale.ticks.length > 1 ? scale.ticks[1] - scale.ticks[0] : 1);
+const axisCtx = (axis: AxisConfig, scale: YAxisScale): AxisEditContext => ({ min: axis.min, max: axis.max, majorInterval: axis.majorInterval, domain: scale.domain, log: scale.log });
+const stepOf = majorStepOf;
 
 /** Range, limits and ticks of one numeric axis: Auto fits the data, Manual uses the limits. */
-function AxisLimits({ chart, which, scale, name }: { chart: Chart; which: 'xAxis' | 'yAxis'; scale: YAxisScale; name: string }) {
+export function AxisLimits({ chart, which, scale, name, canScale = true, canReverse = true }: { chart: Chart; which: 'xAxis' | 'yAxis'; scale: YAxisScale; name: string; canScale?: boolean; canReverse?: boolean }) {
   const { run } = useApp();
   const axis = chart[which];
   const ctx = axisCtx(axis, scale);
@@ -53,6 +47,7 @@ function AxisLimits({ chart, which, scale, name }: { chart: Chart; which: 'xAxis
       <Field label="Major gridlines">
         <Check checked={axis.showGrid} onChange={(v) => run(`${name} gridlines`, patchAxis(chart.id, which, { showGrid: v }))} />
       </Field>
+      <AxisStyleControls chart={chart} which={which} scale={scale} name={name} canScale={canScale} canReverse={canReverse} />
     </>
   );
 }
@@ -86,12 +81,14 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const any = useMemo(() => buildAnyModel(chart, table), [chart, table]);
   // The numeric-X model (XY, survival) and the category model (grouped, contingency) differ in what an axis is.
   const xyModel = any.family === 'xy' || any.family === 'survival' ? any.model : null;
-  const yScale = any.family === 'category' ? null : any.model.y;
-  const seriesView = any.family === 'category' ? [] : any.model.series.map((x) => ({ groupId: x.groupId, label: x.label, style: x.style, count: 'points' in x ? x.points.length : 0, bars: 'bars' in x ? x.bars.length : 0 }));
+  const yScale = any.family === 'category' || any.family === 'whole' || any.family === 'heat' ? null : any.model.y;
+  const seriesView = any.family === 'category' || any.family === 'whole' || any.family === 'heat' ? [] : any.model.series.map((x) => ({ groupId: x.groupId, label: x.label, style: x.style, count: 'points' in x ? x.points.length : 0, bars: 'bars' in x && x.bars ? x.bars.length : 0 }));
   const family = chartFamily(chart.type);
+  // Survival curves and stacked or percentage bars keep a plain linear axis (see the models).
+  const yAxisCanChange = family !== 'survival' && chart.type !== 'groupedStacked' && chart.type !== 'contingencyStacked' && chart.type !== 'contingencyPercent';
   const noun = table.kind === 'survival' ? 'Group' : table.kind === 'contingency' ? 'Outcome' : table.kind === 'grouped' ? 'Group' : 'Series';
-  const barChart = chart.type === 'groupedBar' || chart.type === 'contingencyBars' || chart.type === 'contingencyStacked' || chart.type === 'contingencyPercent';
-  const stacked = chart.type === 'contingencyStacked' || chart.type === 'contingencyPercent';
+  const barChart = chart.type === 'groupedBar' || chart.type === 'groupedStacked' || chart.type === 'contingencyBars' || chart.type === 'contingencyStacked' || chart.type === 'contingencyPercent';
+  const stacked = chart.type === 'groupedStacked' || chart.type === 'contingencyStacked' || chart.type === 'contingencyPercent';
 
   // "Global" shows the layer-level values; a series shows its own resolved values.
   const st: ChartStyle = useMemo(() => {
@@ -152,27 +149,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 <Field label="Graph type">
                   <SelectInput<ChartType> value={chart.type} options={chartTypesFor(table.kind).map((c) => ({ value: c.type, label: c.label }))} onChange={(t) => run('Change graph type', setChartType(chart.id, t))} />
                 </Field>
-                <Field label="Color palette" hint="Gives the series coordinated colours in order. Per-series colours below still apply on top.">
-                  <select
-                    value={chart.paletteId ?? 'custom'}
-                    aria-label="Color palette"
-                    onChange={(e) => {
-                      const palette = paletteById(e.target.value);
-                      if (palette) run(`Apply ${palette.name} palette`, applyPalette(chart.id, palette));
-                    }}
-                  >
-                    {chart.paletteId === null && <option value="custom" disabled>Custom colours</option>}
-<PaletteOptions />
-                  </select>
-                  {paletteById(chart.paletteId) && (
-                    <span className="palette-swatches" aria-hidden="true">
-                      {paletteById(chart.paletteId)!.colors.slice(0, 5).map((c) => (
-                        <i key={c} style={{ background: c }} />
-                      ))}
-                    </span>
-                  )}
-                  <PaletteInfo paletteId={chart.paletteId} />
-                </Field>
+                <PaletteField chart={chart} hint="Gives the series coordinated colours in order. Per-series colours below still apply on top." />
               </GroupBox>
 
               {layout.kind === 'replicates' && (
@@ -206,7 +183,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <ColorInput value={st.symbolColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolColor: v, symbolBorderColor: v })} />
                 </Field>
                 <Field label="Shape" overridden={ov('symbolShape')}>
-                  <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...shapeOptions]} onChange={(v) => setStyle({ symbolShape: v })} />
+                  <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...SYMBOL_SHAPE_OPTIONS]} onChange={(v) => setStyle({ symbolShape: v })} />
                 </Field>
                 <NumField label="Size" unit="pt" value={st.symbolSizePt} min={1} max={40} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
                 <Field label="Border color" overridden={ov('symbolBorderColor')}>
@@ -255,6 +232,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 <div className="muted small">{family === 'survival' ? 'The Kaplan-Meier estimate, a step at each event time.' : family === 'grouped' ? 'The means of each series are joined across the categories.' : 'Points are joined in the order of the table rows; a missing Y value breaks the line.'}</div>
               </GroupBox>
               )}
+              {family === 'xy' && xyModel && <FitSection chart={chart} model={xyModel} />}
               {family === 'survival' && (
                 <>
                   <GroupBox title="Confidence band" checked={chart.survival.band} onCheckedChange={(v) => run('Confidence band', patchSurvival(chart.id, { band: v }))}>
@@ -295,22 +273,25 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 <Field label="Show X axis">
                   <Check checked={chart.xAxis.visible} onChange={(v) => run('Show X axis', patchAxis(chart.id, 'xAxis', { visible: v }))} />
                 </Field>
-                {xyModel ? <AxisLimits chart={chart} which="xAxis" scale={xyModel.x} name={family === 'survival' ? 'Time' : 'X'} /> : <div className="muted small">The categories are the rows of the table, so there are no numeric limits to set.</div>}
+                {xyModel ? <AxisLimits chart={chart} which="xAxis" scale={xyModel.x} name={family === 'survival' ? 'Time' : 'X'} canScale={family !== 'survival'} canReverse={family !== 'survival'} /> : <div className="muted small">The categories are the rows of the table, so there are no numeric limits to set.</div>}
               </Section>
               <Section title="Y axis">
                 <Field label="Show Y axis">
                   <Check checked={chart.yAxis.visible} onChange={(v) => run('Show Y axis', patchAxis(chart.id, 'yAxis', { visible: v }))} />
                 </Field>
-                {yScale && <AxisLimits chart={chart} which="yAxis" scale={yScale} name="Y" />}
-              </Section>
-              <Section title="Axis lines">
-                <NumField label="Axis line thickness" unit="pt" value={chart.yAxis.lineWidthPt} min={0} max={10} onCommit={(v) => run('Axis line thickness', patchBothAxes(chart.id, { lineWidthPt: v }), 'axis:lw')} />
+                {yScale && <AxisLimits chart={chart} which="yAxis" scale={yScale} name="Y" canScale={yAxisCanChange} canReverse={yAxisCanChange} />}
               </Section>
             </div>
           )}
 
           {section === 'text' && <TextSections chart={chart} groups={series} yName="Y" dual={false} />}
-          {section === 'dimensions' && <DimensionsSection chart={chart} />}
+          {section === 'frame' && <FrameSection chart={chart} dual={false} origin={family === 'grouped' ? 'y' : 'xy'} />}
+          {section === 'layout' && (
+            <div>
+              <DimensionsSection chart={chart} />
+              {(chart.type === 'groupedBar' || chart.type === 'contingencyBars') && <ColumnLayoutSection chart={chart} spacing={false} baseline />}
+            </div>
+          )}
           {section === 'legend' && <LegendSection chart={chart} groups={series} />}
         </div>
       )}

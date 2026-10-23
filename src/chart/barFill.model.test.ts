@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../model/defaults';
 import type { Project } from '../model/types';
 import { patchAxis, patchStyle, setCells } from '../state/commands';
-import { dualAxisFixture } from './dualAxisFixture';
+import { dualAxisFixture } from '../testing/dualAxisFixture';
 import { patternMarks } from './hatch';
 import { buildChartModel, intersectRects } from './model';
 

@@ -1,5 +1,5 @@
 import { BAR_PALETTE } from './defaults';
-import { isSurvivalChartType, isXyChartType } from './chartTypes';
+import { isSeriesColourType } from './chartTypes';
 import { paletteById, paletteColor } from './palettes';
 import type { Chart, ChartLayer, ChartStyle, Group, Id } from './types';
 
@@ -20,7 +20,7 @@ export function resolveStyle(
     barFill: chartPalette ? paletteColor(chartPalette, group.paletteIndex) : BAR_PALETTE[group.paletteIndex % BAR_PALETTE.length],
   };
   // On an XY chart the series colour is the colour of its symbols and its line.
-  if ((isXyChartType(chart.type) || isSurvivalChartType(chart.type) || chart.type === 'groupedLine') && palette.barFill) {
+  if (isSeriesColourType(chart.type) && palette.barFill) {
     palette.symbolColor = palette.barFill;
     palette.symbolBorderColor = palette.barFill;
     palette.lineColor = palette.barFill;
@@ -96,10 +96,6 @@ export function clearObjectKeys(layer: ChartLayer, objectId: Id, keys: ReadonlyA
   if (Object.keys(copy).length > 0) objectOverrides[objectId] = copy;
   else delete objectOverrides[objectId];
   return { ...layer, objectOverrides };
-}
-
-export function isObjectOverridden(layer: ChartLayer, objectId: Id, key: keyof ChartStyle): boolean {
-  return layer.objectOverrides[objectId]?.[key] !== undefined;
 }
 
 /** The 12 point-label keys, in ChartStyle order (spec 7.1 L479-485). */
