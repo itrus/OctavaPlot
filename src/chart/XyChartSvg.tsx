@@ -8,6 +8,7 @@ import { GridLines } from './GridLines';
 import { hitAttrs } from './hitTest';
 import { crossingPosition, tickPaths, labelOffset } from './axisTicks';
 import { keyWidthOf, LEGEND_KEY, X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP } from './layout';
+import { linePattern } from '../model/look';
 import { symbolPath } from './symbols';
 import { BAND_OPACITY } from './survivalModel';
 import type { XyModel } from './xyModel';
@@ -43,6 +44,52 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
   const selectedGroup = editor?.selection.kind === 'group' ? editor.selection.groupId : null;
   const selectedPoint = editor?.selection.kind === 'point' ? editor.selection.pointId : null;
 
+  // Lines and error bars go under the symbols unless the chart asks for them on top.
+  const onTop = chart.lineOrder === 'onTop';
+  const linesAndErrors = (
+    <>
+    {series.map((s) => s.bandPath && <path key={`band-${s.groupId}`} d={s.bandPath} fill={s.style.lineColor} fillOpacity={BAND_OPACITY} stroke="none" {...hit('line', s.groupId)} />)}
+    {series.map(
+      (s) =>
+        s.style.showLines &&
+        s.linePath !== '' && (
+          <g key={`line-${s.groupId}`}>
+            <path d={s.linePath} fill="none" stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} {...linePattern(s.style)} strokeLinejoin="round" {...hit('line', s.groupId)} />
+            {ed && <path d={s.linePath} fill="none" stroke="transparent" strokeWidth={Math.max(10, s.style.lineWidthPt + 6)} {...hit('line', s.groupId)} />}
+            {selectedGroup === s.groupId && <path data-editor-only d={s.linePath} fill="none" stroke={SELECT_COLOR} strokeOpacity={0.35} strokeWidth={s.style.lineWidthPt + 5} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
+          </g>
+        ),
+    )}
+    {series.map((s) => s.fit?.bandPath && <path key={`fit-band-${s.groupId}`} d={s.fit.bandPath} fill={s.style.lineColor} fillOpacity={BAND_OPACITY} stroke="none" {...hit('line', s.groupId)} />)}
+    {series.map((s) => s.fit?.path && <path key={`fit-${s.groupId}`} d={s.fit.path} fill="none" stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} {...linePattern(s.style)} strokeLinejoin="round" {...hit('line', s.groupId)} />)}
+    {series.map(
+      (s) =>
+        s.errorPath !== '' && (
+          <path key={`err-${s.groupId}`} d={s.errorPath} fill="none" stroke={s.style.errorColor} strokeWidth={s.style.errorLineWidthPt} strokeLinecap="butt" {...hit('error', s.groupId)} />
+        ),
+    )}
+    </>
+  );
+  const symbols = (
+    <>
+    {series.map(
+      (s) =>
+        s.style.showSymbols &&
+        s.points.map((p) => (
+          <path
+            key={p.id}
+            d={symbolPath(s.style.symbolShape, p.px, p.py, s.style.symbolSizePt)}
+            fill={s.style.symbolColor}
+            fillOpacity={s.style.symbolFillOpacity < 1 ? s.style.symbolFillOpacity : undefined}
+            stroke={s.style.symbolBorderColor}
+            strokeWidth={s.style.symbolBorderWidthPt}
+            {...hit('point', s.groupId, p.id)}
+          />
+        )),
+    )}
+    </>
+  );
+
   return (
     <svg ref={ref} xmlns="http://www.w3.org/2000/svg" width={cssWidth} height={cssHeight} viewBox={`0 0 ${n2(W)} ${n2(H)}`} fontFamily={chart.fontFamily} style={{ background: chart.pageColor ?? 'transparent' }}>
       <PlotClip plot={plot} xPieces={xPieces} yPieces={yPieces} />
@@ -60,44 +107,21 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
             <rect key={b.id} x={n2(b.x)} y={n2(b.y)} width={n2(b.width)} height={n2(b.height)} fill={s.style.barFill} fillOpacity={s.style.barOpacity} stroke={s.style.barBorderColor} strokeWidth={s.style.barBorderWidthPt} {...hit('bar', s.groupId, b.id)} />
           )),
         )}
-        {series.map((s) => s.bandPath && <path key={`band-${s.groupId}`} d={s.bandPath} fill={s.style.lineColor} fillOpacity={BAND_OPACITY} stroke="none" {...hit('line', s.groupId)} />)}
-        {series.map(
-          (s) =>
-            s.style.showLines &&
-            s.linePath !== '' && (
-              <g key={`line-${s.groupId}`}>
-                <path d={s.linePath} fill="none" stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} strokeLinecap="round" strokeLinejoin="round" {...hit('line', s.groupId)} />
-                {ed && <path d={s.linePath} fill="none" stroke="transparent" strokeWidth={Math.max(10, s.style.lineWidthPt + 6)} {...hit('line', s.groupId)} />}
-                {selectedGroup === s.groupId && <path data-editor-only d={s.linePath} fill="none" stroke={SELECT_COLOR} strokeOpacity={0.35} strokeWidth={s.style.lineWidthPt + 5} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
-              </g>
-            ),
-        )}
-        {series.map((s) => s.fit?.bandPath && <path key={`fit-band-${s.groupId}`} d={s.fit.bandPath} fill={s.style.lineColor} fillOpacity={BAND_OPACITY} stroke="none" {...hit('line', s.groupId)} />)}
-        {series.map((s) => s.fit?.path && <path key={`fit-${s.groupId}`} d={s.fit.path} fill="none" stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} strokeLinecap="round" strokeLinejoin="round" {...hit('line', s.groupId)} />)}
-        {series.map(
-          (s) =>
-            s.errorPath !== '' && (
-              <path key={`err-${s.groupId}`} d={s.errorPath} fill="none" stroke={s.style.errorColor} strokeWidth={s.style.errorLineWidthPt} strokeLinecap="butt" {...hit('error', s.groupId)} />
-            ),
-        )}
-        {series.map(
-          (s) =>
-            s.style.showSymbols &&
-            s.points.map((p) => (
-              <path
-                key={p.id}
-                d={symbolPath(s.style.symbolShape, p.px, p.py, s.style.symbolSizePt)}
-                fill={s.style.symbolColor}
-                stroke={s.style.symbolBorderColor}
-                strokeWidth={s.style.symbolBorderWidthPt}
-                {...hit('point', s.groupId, p.id)}
-              />
-            )),
+        {onTop ? (
+          <>
+            {symbols}
+            {linesAndErrors}
+          </>
+        ) : (
+          <>
+            {linesAndErrors}
+            {symbols}
+          </>
         )}
       </g>
 
       {/* Fitted parameters, written in the corner of the plot in the colour of each curve. */}
-      {chart.fit.showParameters && <FitParameters series={series} x={plot.x + 8} y={plot.y + 4} fontSizePt={chart.yAxis.tickFontSizePt} level={chart.fit.level} />}
+      {model.fit.showParameters && <FitParameters series={series} x={plot.x + 8} y={plot.y + 4} fontSizePt={chart.yAxis.tickFontSizePt} level={model.fit.level} />}
 
       {/* Axes. */}
       {ya.visible && (
@@ -166,8 +190,8 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
             return (
               <g key={s.groupId} {...hit('legend', s.groupId)}>
                 {s.bars && <rect x={n2(it.x)} y={n2(it.y - 5)} width={w} height={10} fill={s.style.barFill} fillOpacity={s.style.barOpacity} stroke={s.style.barBorderColor} strokeWidth={s.style.barBorderWidthPt} />}
-                {s.style.showLines && <path d={`M${n2(it.x)},${n2(it.y)}H${n2(it.x + w)}`} stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} fill="none" />}
-                {s.style.showSymbols && <path d={symbolPath(s.style.symbolShape, it.x + w / 2, it.y, s.style.symbolSizePt)} fill={s.style.symbolColor} stroke={s.style.symbolBorderColor} strokeWidth={s.style.symbolBorderWidthPt} />}
+                {s.style.showLines && <path d={`M${n2(it.x)},${n2(it.y)}H${n2(it.x + w)}`} stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} {...linePattern(s.style)} fill="none" />}
+                {s.style.showSymbols && <path d={symbolPath(s.style.symbolShape, it.x + w / 2, it.y, s.style.symbolSizePt)} fill={s.style.symbolColor} fillOpacity={s.style.symbolFillOpacity < 1 ? s.style.symbolFillOpacity : undefined} stroke={s.style.symbolBorderColor} strokeWidth={s.style.symbolBorderWidthPt} />}
                 <text x={n2(it.x + w + LEGEND_KEY.gap)} y={n2(it.y)} dy="0.35em" fontSize={layout.legend!.fontSizePt} fill={chart.textColor}>
                   {it.label}
                 </text>

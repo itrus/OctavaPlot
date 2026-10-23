@@ -2,7 +2,8 @@ import { isXyChartType } from '../model/chartTypes';
 import { resolveStyle } from '../model/style';
 import { resolveSummary } from '../model/summary';
 import { layoutOf, summaryFormatInfo, xySeries } from '../model/tableLayout';
-import type { Chart, ChartStyle, DataTable, Id, SpreadKind, SummaryFormat } from '../model/types';
+import { NO_FIT_SETTINGS } from '../model/fitOptions';
+import type { Chart, ChartStyle, DataTable, FitSettings, Id, SpreadKind, SummaryFormat } from '../model/types';
 import { chartPx2Pt, n2 } from '../model/units';
 import { computeGroupStats, type GroupStats } from '../stats/summary';
 import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
@@ -86,6 +87,8 @@ export interface XyModel {
   /** Survival charts: the at-risk table, when asked for. */
   atRisk?: AtRiskTable | null;
   warnings: string[];
+  /** The curve fit drawn, with its settings (none when the chart has no curve fit). */
+  fit: FitSettings;
 }
 
 
@@ -161,7 +164,7 @@ export function suppliedStats(format: SummaryFormat, values: ReadonlyArray<numbe
  * of replicate / supplied-summary sub-columns). Rows with a missing X or Y are not drawn (missing is never zero); a
  * missing Y breaks the connecting line rather than bridging it.
  */
-export function buildXyModel(chart: Chart, table: DataTable): XyModel {
+export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = NO_FIT_SETTINGS): XyModel {
   if (!isXyChartType(chart.type) || table.groups.length === 0) throw new Error('buildXyModel needs an XY chart on an XY table');
   const [W, H] = [chartPx2Pt(chart.widthPx), chartPx2Pt(chart.heightPx)];
   const layer = chart.layers[0];
@@ -171,7 +174,7 @@ export function buildXyModel(chart: Chart, table: DataTable): XyModel {
 
   // 1. Per series and row: the centre and, where there is a spread, its stats.
   const raw = xySeries(table).map((s, i) => {
-    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: i });
+    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? i });
     const spec = resolveSummary(layer, s.id);
     const pts: Array<{ id: Id; row: number; x: number; y: number; stats: GroupStats | null }> = [];
     // What a curve is fitted to: every replicate on its own, or the single Y or entered mean of each row.
@@ -209,7 +212,7 @@ export function buildXyModel(chart: Chart, table: DataTable): XyModel {
       pts.push({ id: s.columns[0].observations[row].id, row, x, y, stats });
     }
     if (noError > 0) warnings.push(`${s.name}: ${noError} row${noError === 1 ? ' has' : 's have'} a mean but no usable error, so no error bar is drawn there.`);
-    return { s, style, pts, skipped, meaning, label: displayName(chart, s.id, s.name), fitRun: runFit(obs, chart.fit) };
+    return { s, style, pts, skipped, meaning, label: displayName(chart, s.id, s.name), fitRun: runFit(obs, fit) };
   });
 
   // 2. Scales from every drawn value, error bar ends included, so manual limits clip but never exclude.
@@ -282,7 +285,7 @@ export function buildXyModel(chart: Chart, table: DataTable): XyModel {
       errorMeaning = r.meaning ?? bar.meaning;
       clipped += clippedEndpointCount([bar]);
     }
-    const fitted = chart.fit.model === 'none' ? undefined : drawFit(r.fitRun, chart.fit, { xAxis, yAxis, xScale, yScale });
+    const fitted = fit.model === 'none' ? undefined : drawFit(r.fitRun, fit, { xAxis, yAxis, xScale, yScale });
     if (fitted?.failure) warnings.push(`${r.label}: no curve was fitted. ${fitted.failure}`);
     else if (fitted?.summary?.message) warnings.push(`${r.label}: ${fitted.summary.message}`);
     return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: d, errorPath, errorMeaning, skipped: r.skipped, fit: fitted };
@@ -293,5 +296,5 @@ export function buildXyModel(chart: Chart, table: DataTable): XyModel {
   if (skippedTotal > 0) warnings.push(`${skippedTotal} row${skippedTotal === 1 ? ' has' : 's have'} an X or Y value missing and ${skippedTotal === 1 ? 'is' : 'are'} not drawn.`);
   if (allX.length === 0) warnings.push('Enter numbers in the X column and in at least one Y column to see the chart.');
 
-  return { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)] };
+  return { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit };
 }

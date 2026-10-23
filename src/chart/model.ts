@@ -61,6 +61,8 @@ interface PointGeom {
   shape: SymbolShape;
   size: number;
   color: string;
+  /** Opacity of the inside of the symbol. */
+  fillOpacity: number;
   borderColor: string;
   borderWidth: number;
 }
@@ -404,6 +406,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
             shape: style.symbolShape,
             size: style.symbolSizePt,
             color: style.symbolColor,
+            fillOpacity: style.symbolFillOpacity,
             borderColor: style.symbolBorderColor,
             borderWidth: style.symbolBorderWidthPt,
           });
@@ -429,6 +432,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
             shape: ps.symbolShape,
             size: ps.symbolSizePt,
             color: ps.symbolColor,
+            fillOpacity: ps.symbolFillOpacity,
             borderColor: ps.symbolBorderColor,
             borderWidth: ps.symbolBorderWidthPt,
           });
@@ -471,11 +475,11 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
         if (!showAll && !wantDot(o.value)) return;
         const ps = resolveStyle(chart, layer, group, o.id);
         const offset = chart.jitter.enabled ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * dotWidth : 0;
-        points.push({ id: o.id, groupId: group.id, observationId: o.id, row, value: o.value, cx: centerX + offset, cy: toY(o.value), shape: ps.symbolShape, size: ps.symbolSizePt, color: ps.symbolColor, borderColor: ps.symbolBorderColor, borderWidth: ps.symbolBorderWidthPt });
+        points.push({ id: o.id, groupId: group.id, observationId: o.id, row, value: o.value, cx: centerX + offset, cy: toY(o.value), shape: ps.symbolShape, size: ps.symbolSizePt, color: ps.symbolColor, fillOpacity: ps.symbolFillOpacity, borderColor: ps.symbolBorderColor, borderWidth: ps.symbolBorderWidthPt });
       });
       if (opts.showMean && pre.summary) {
         const my = toY(pre.summary.mean);
-        if (Number.isFinite(my)) points.push({ id: `${group.id}:mean`, groupId: group.id, observationId: null, row: -1, value: pre.summary.mean, cx: centerX, cy: my, shape: 'plus', size: style.symbolSizePt, color: style.symbolColor, borderColor: style.symbolBorderColor, borderWidth: Math.max(style.symbolBorderWidthPt, 1) });
+        if (Number.isFinite(my)) points.push({ id: `${group.id}:mean`, groupId: group.id, observationId: null, row: -1, value: pre.summary.mean, cx: centerX, cy: my, shape: 'plus', size: style.symbolSizePt, color: style.symbolColor, fillOpacity: style.symbolFillOpacity, borderColor: style.symbolBorderColor, borderWidth: Math.max(style.symbolBorderWidthPt, 1) });
       }
       if (dist?.note) warnings.push(`${name}: ${dist.note}.`);
     }

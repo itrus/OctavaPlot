@@ -102,7 +102,25 @@ XY charts follow spec §3.1 and §7: symbols and a path layer per series, a nume
 
 ## Fitted curves
 
-XY charts can draw a fitted curve for each data set (Format graph, Fitted curve): straight line, polynomial (degree 2 to 6), one- and two-phase exponential, Gaussian peak, hyperbola, and 4- and 5-parameter logistic. Every replicate is a point. Parameters come with standard errors and confidence intervals, and a confidence or prediction band can be drawn. A fit that cannot be made says why instead of drawing a curve. Tables, graphs and analyses are renamed by double-clicking them in the navigator (or F2).
+A curve fit is an analysis in the Results section. On an XY table, **Fit curve…** (or New Analysis → Curve fit) adds one and opens it. Choose the model there: straight line, polynomial (degree 2 to 6), one- and two-phase exponential, Gaussian peak, hyperbola, and 4- and 5-parameter logistic. The sheet lists, for each Y series, the equation, the number of points and degrees of freedom, R squared, the sum of squares, Sy.x, and each parameter with its standard error and confidence limits; a fit that cannot be made says why under Notes. Every replicate is a point of the fit. The cells can be selected and copied like those of a data table.
+
+A graph draws a curve fit by choosing it under Format graph → Fitted curve (or with **Make graph** in the Results): the curve, an optional confidence or prediction band at the level of the fit, the whole X axis, and the parameters written on the graph. Tables, graphs and analyses are renamed by double-clicking them in the navigator (or F2).
+
+## More bars and survival options
+
+Grouped and contingency bars (side by side, stacked, 100%) can run horizontally (Format graph → Direction). Grouped tables also draw floating bars: from the smallest to the largest replicate of each series in each category, with a line at the mean. Survival and cumulative-event curves can mark every event with a symbol and draw error bars of one Greenwood standard error at each event time.
+
+## Symbols
+
+Symbols come in circle, square, triangle (up and down), diamond, hexagon, star, circle with a dot, plus, cross and asterisk. The inside has its own opacity (Fill opacity: 1 solid, 0 hollow, in between see-through) while the border stays opaque, so hollow symbols are drawn with the border colour and thickness.
+
+## Line patterns
+
+Lines (XY, grouped, survival, cumulative distribution and fitted curves) and gridlines can be solid, long dashes, dashes, dots, dash-dot or dash-dot-dot. The dashes scale with the line width, so a thick dotted line keeps its look.
+
+## Order of objects
+
+The series of XY, grouped, contingency and survival graphs can be put in another order (Data Sets on Graph: first to last, Top / Up / Down / Bottom / Reverse); the last is drawn on top, and each series keeps its colour. Under Layout, "Lines and error bars go" chooses whether lines and error bars are drawn over the symbols and bars (On top), behind them (Underneath), or as the chart type usually does (Auto).
 
 ## Analyses (Results)
 

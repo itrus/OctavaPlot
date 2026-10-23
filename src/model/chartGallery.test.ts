@@ -39,8 +39,12 @@ describe('graph gallery', () => {
     for (const k of KINDS) for (const i of galleryItems(k).filter((x) => x.type === null)) expect(i.spec).toMatch(/^[a-z_]+\.[a-z_]+$/);
   });
 
-  it('shows the whole catalogue: more planned graphs than ones available', () => {
+  it('names the specification preset of every graph that is still planned', () => {
     const planned = KINDS.flatMap((k) => galleryItems(k).filter((i) => i.type === null));
-    expect(planned.length).toBeGreaterThan(CHART_TYPES.length);
+    expect(planned.every((i) => !!i.spec)).toBe(true);
+  });
+  it('offers the horizontal versions of the grouped and contingency bars', () => {
+    const horizontal = [...availableItems('grouped'), ...availableItems('contingency')].filter((i) => i.variant?.orientation === 'horizontal').map((i) => i.type);
+    expect(horizontal.sort()).toEqual(['contingencyBars', 'contingencyPercent', 'contingencyStacked', 'groupedBar', 'groupedStacked']);
   });
 });

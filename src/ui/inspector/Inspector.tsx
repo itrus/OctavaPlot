@@ -39,7 +39,7 @@ import { HeatInspector } from './HeatInspector';
 import { HistInspector } from './HistInspector';
 import { PieInspector } from './PieInspector';
 import { DistributionControls } from './DistributionControls';
-import { ColumnLayoutSection, DirectionSection, FrameSection } from './LookControls';
+import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection } from './LookControls';
 import { AxisStyleControls, TickFields } from './AxisStyleControls';
 import { DataSetOrder } from './DataSetOrder';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './SharedSections';
@@ -345,6 +345,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
               <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...SYMBOL_SHAPE_OPTIONS]} onChange={(v) => setStyle({ symbolShape: v })} />
             </Field>
             <NumField label="Size" unit="pt" value={st.symbolSizePt} min={1} max={40} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
+            <NumField label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
             <Field label="Border color" overridden={ov('symbolBorderColor')}>
               <ColorInput value={st.symbolBorderColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolBorderColor: v })} />
             </Field>
@@ -598,6 +599,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
             <div>
               <DimensionsSection chart={chart} />
               {supportsHorizontal(chart.type) && <DirectionSection chart={chart} />}
+              <LineOrderSection chart={chart} />
               <ColumnLayoutSection chart={chart} spacing baseline={chart.type === 'bar'} />
             </div>
           )}

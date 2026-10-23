@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { ANALYSIS_TYPES, analysisApplies, analysisTypeInfo } from '../model/analysis';
+import { ANALYSIS_TYPES, analysisKindApplies, analysisTypeInfo } from '../model/analysis';
 import { tableTypeInfo } from '../model/chartTypes';
 import type { AnalysisKind, DataTable, Id } from '../model/types';
 import { Modal } from './NewItemDialogs';
 
 /** A new analysis: which analysis, and of which table. Only tables of a kind the analysis applies to are offered. */
 export function NewAnalysisDialog({ tables, initialTableId, onCreate, onClose }: { tables: DataTable[]; initialTableId: Id; onCreate: (tableId: Id, kind: AnalysisKind) => void; onClose: () => void }) {
-  const applicable = tables.filter((t) => analysisApplies(t.kind));
-  const [kind, setKind] = useState<AnalysisKind>('descriptive');
-  const [tableId, setTableId] = useState<Id>(applicable.find((t) => t.id === initialTableId)?.id ?? applicable[0]?.id ?? '');
+  // A curve fit is offered first for an XY table; otherwise descriptive statistics.
+  const [kind, setKind] = useState<AnalysisKind>(tables.find((t) => t.id === initialTableId)?.kind === 'xy' ? 'curvefit' : 'descriptive');
+  const applicable = tables.filter((t) => analysisKindApplies(kind, t.kind));
+  const [chosen, setTableId] = useState<Id>(applicable.find((t) => t.id === initialTableId)?.id ?? applicable[0]?.id ?? '');
+  // Changing the kind may leave the chosen table out (a curve fit needs an XY table): the first that suits is taken.
+  const tableId = applicable.some((t) => t.id === chosen) ? chosen : (applicable[0]?.id ?? '');
   const info = analysisTypeInfo(kind);
   return (
     <Modal title="New analysis" confirmLabel="Create analysis" onConfirm={() => tableId && onCreate(tableId, kind)} onClose={onClose} confirmDisabled={!tableId}>
@@ -32,8 +35,8 @@ export function NewAnalysisDialog({ tables, initialTableId, onCreate, onClose }:
           ))}
         </select>
       </label>
-      {applicable.length === 0 && <div className="field-error">There is no table this analysis applies to. It needs a column, XY or grouped table.</div>}
-      {tables.length > applicable.length && applicable.length > 0 && <p className="muted small">Contingency and survival tables hold counts and event flags, so {info.label.toLowerCase()} does not apply to them.</p>}
+      {applicable.length === 0 && <div className="field-error">{kind === 'curvefit' ? 'There is no XY table to fit a curve to.' : 'There is no table this analysis applies to. It needs a column, XY or grouped table.'}</div>}
+      {tables.length > applicable.length && applicable.length > 0 && <p className="muted small">{kind === 'curvefit' ? 'A curve fit needs the X and Y values of an XY table.' : `Contingency and survival tables hold counts and event flags, so ${info.label.toLowerCase()} does not apply to them.`}</p>}
     </Modal>
   );
 }

@@ -1,6 +1,7 @@
 import { isSurvivalChartType } from '../model/chartTypes';
 import { resolveStyle } from '../model/style';
 import { xySeries } from '../model/tableLayout';
+import { NO_FIT_SETTINGS } from '../model/fitOptions';
 import type { Chart, DataTable, SurvivalBandMethod } from '../model/types';
 import { chartPx2Pt, n2 } from '../model/units';
 import { normalQuantile } from '../stats/special';
@@ -17,6 +18,8 @@ interface SurvivalStep {
   /** Subjects still under observation just before this time. */
   atRisk: number;
   events: number;
+  /** Table row of the first subject with the event at this time. */
+  row: number;
   /** Greenwood sum: the cumulative sum of d / (n (n - d)) over the event times up to this one. Infinite when n = d. */
   greenwood: number;
 }
@@ -57,10 +60,13 @@ export function kaplanMeier(subjects: ReadonlyArray<{ time: number; event: boole
     let d = 0;
     let c = 0;
     const censoredRows: number[] = [];
+    let eventRow = -1;
     let j = i;
     while (j < sorted.length && sorted[j].time === t) {
-      if (sorted[j].event) d++;
-      else {
+      if (sorted[j].event) {
+        if (d === 0) eventRow = sorted[j].row;
+        d++;
+      } else {
         c++;
         censoredRows.push(sorted[j].row);
       }
@@ -69,7 +75,7 @@ export function kaplanMeier(subjects: ReadonlyArray<{ time: number; event: boole
     if (d > 0) {
       s *= 1 - d / atRisk;
       green += atRisk > d ? d / (atRisk * (atRisk - d)) : Infinity;
-      steps.push({ time: t, survival: s, atRisk, events: d, greenwood: green });
+      steps.push({ time: t, survival: s, atRisk, events: d, row: eventRow, greenwood: green });
       events += d;
     }
     for (const row of censoredRows) marks.push({ time: t, survival: s, row });
@@ -123,7 +129,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   let invalidStatus = 0;
   let noTime = 0;
   const raw = xySeries(table).map((s, i) => {
-    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: i });
+    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? i });
     const subjects: Array<{ time: number; event: boolean; row: number }> = [];
     s.columns[0].observations.forEach((o, row) => {
       if (o.value === null) return;
@@ -186,6 +192,23 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
     d += `H${n2(xScale(lastTime))}`;
     const col = r.s.columns[0];
     const points: XyPoint[] = r.km.marks.map((m) => ({ id: col.observations[m.row].id, row: m.row, x: m.time, y: level(m.survival), px: xScale(m.time), py: yScale(level(m.survival)), stats: null }));
+    // Symbols at the events too, when asked: the estimate just after each drop, tied to the first subject with the event.
+    if (opts.eventSymbols) for (const st of r.km.steps) points.push({ id: `${col.observations[st.row].id}:event`, row: st.row, x: st.time, y: level(st.survival), px: xScale(st.time), py: yScale(level(st.survival)), stats: null });
+
+    // Error bars of one standard error at each event time: S +/- S sqrt(Greenwood sum), kept within 0..1; none where it is not finite.
+    let errorPath = '';
+    if (opts.errorBars) {
+      const half = r.style.errorCap === 'bar' ? r.style.errorCapWidthPt / 2 : 0;
+      for (const st of r.km.steps) {
+        const se = st.survival * Math.sqrt(st.greenwood);
+        if (!Number.isFinite(se)) continue;
+        const x = xScale(st.time);
+        const hi = yScale(level(Math.min(1, st.survival + se)));
+        const lo = yScale(level(Math.max(0, st.survival - se)));
+        errorPath += `M${n2(x)},${n2(hi)}V${n2(lo)}`;
+        if (half > 0) errorPath += `M${n2(x - half)},${n2(hi)}H${n2(x + half)}M${n2(x - half)},${n2(lo)}H${n2(x + half)}`;
+      }
+    }
 
     // The band: the upper step function forward, the lower one back, closed. For the cumulative curve the
     // survival limits are flipped, which the same polygon handles.
@@ -205,7 +228,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
       const pt = ([t, v]: [number, number]) => `${n2(xScale(t))},${n2(yScale(level(v)))}`;
       bandPath = `M${upper.map(pt).join('L')}L${[...lower].reverse().map(pt).join('L')}Z`;
     }
-    return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: r.km.n === 0 ? '' : d, errorPath: '', errorMeaning: null, bandPath, skipped: 0 };
+    return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: r.km.n === 0 ? '' : d, errorPath, errorMeaning: errorPath === '' ? null : 'SE (Greenwood)', bandPath, skipped: 0 };
   });
   if (allT.length === 0) warnings.push('Enter the times in the first column and a 1 (event) or 0 (censored) in the column of each subject\'s group.');
 
@@ -222,5 +245,5 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
     };
   }
 
-  return { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, atRisk, warnings: [...new Set(warnings)] };
+  return { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, atRisk, warnings: [...new Set(warnings)], fit: NO_FIT_SETTINGS };
 }

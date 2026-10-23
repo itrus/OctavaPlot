@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { Chart, DataTable } from '../model/types';
+import type { Chart, DataTable, FitSettings } from '../model/types';
 import { buildAnyModel, ChartCanvas } from './anyModel';
 
 /**
@@ -7,14 +7,14 @@ import { buildAnyModel, ChartCanvas } from './anyModel';
  * selection outlines, hover helpers and hit-test attributes cannot leak in.
  * Output stays vector: paths, text and symbols.
  */
-export function chartToSvgString(chart: Chart, table: DataTable): string {
-  const markup = renderToStaticMarkup(<ChartCanvas chart={chart} any={buildAnyModel(chart, table)} cssWidth={`${chart.widthPx}px`} cssHeight={`${chart.heightPx}px`} />);
+export function chartToSvgString(chart: Chart, table: DataTable, fit?: FitSettings): string {
+  const markup = renderToStaticMarkup(<ChartCanvas chart={chart} any={buildAnyModel(chart, table, fit)} cssWidth={`${chart.widthPx}px`} cssHeight={`${chart.heightPx}px`} />);
   return `<?xml version="1.0" encoding="UTF-8"?>\n${markup}\n`;
 }
 
 /** Rasterise at `scale` x the chart's nominal CSS pixel size (96 px/in). */
-export async function chartToPngBlob(chart: Chart, table: DataTable, scale: number): Promise<Blob> {
-  const svg = chartToSvgString(chart, table);
+export async function chartToPngBlob(chart: Chart, table: DataTable, scale: number, fit?: FitSettings): Promise<Blob> {
+  const svg = chartToSvgString(chart, table, fit);
   const width = Math.max(1, Math.round(chart.widthPx * scale));
   const height = Math.max(1, Math.round(chart.heightPx * scale));
   const img = new Image();

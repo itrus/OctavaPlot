@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { buildAnyModel, ChartCanvas } from '../chart/anyModel';
 
-import { applyVariant, type ChartVariant } from '../model/chartVariant';
+import { applyVariant, previewFit, type ChartVariant } from '../model/chartVariant';
 import { GALLERY, availableItems, type GalleryItem } from '../model/chartGallery';
 import { tableTypeInfo } from '../model/chartTypes';
 import { createChart } from '../model/defaults';
@@ -18,7 +18,7 @@ function Preview({ table, type, variant }: { table: DataTable; type: ChartType; 
   const drawn = useMemo(() => {
     try {
       const chart = applyVariant({ ...createChart(table.id, { widthPx: 1024, heightPx: 768 }, type), title: table.name }, variant);
-      return { chart, any: buildAnyModel(chart, table) };
+      return { chart, any: buildAnyModel(chart, table, previewFit(chart, variant)) };
     } catch {
       return null;
     }

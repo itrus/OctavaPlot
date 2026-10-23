@@ -3,18 +3,22 @@ import { SYMBOL_SHAPE_OPTIONS } from '../../chart/symbols';
 import { displayName } from '../../chart/model';
 import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext, type YAxisScale } from '../../chart/scales';
 import { buildAnyModel } from '../../chart/anyModel';
-import { chartFamily, chartTypesFor } from '../../model/chartTypes';
+import { chartFamily, chartTypesFor, supportsHorizontal } from '../../model/chartTypes';
 import { layoutOf, summaryFormatInfo, xySeries } from '../../model/tableLayout';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/summary';
 import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from '../../stats/describe';
 import { tooltipFmt } from '../../chart/tooltip';
-import { ColumnLayoutSection, FrameSection } from './LookControls';
+import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection } from './LookControls';
+import { DataSetOrder } from './DataSetOrder';
 import { AxisStyleControls } from './AxisStyleControls';
 import { IntervalFields, LineAtField } from './SummaryControls';
 import { isGroupOverridden, resolveStyle } from '../../model/style';
-import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, Id, SummarySpec } from '../../model/types';
+import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, Id, LineStyle, SummarySpec } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { composeCommands, patchAxis, patchChart, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
+import { LINE_STYLES } from '../../model/look';
+import { analysesOf } from '../../model/analysis';
+import { resolveFit } from '../../model/fitOptions';
 import { FitSection } from './FitControls';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './controls';
 import { SECTIONS, TABS, type AppearanceSection, type InspectorTab } from './nav';
@@ -58,7 +62,7 @@ export function AxisLimits({ chart, which, scale, name, canScale = true, canReve
  * follows the chart type and how the table's values are entered.
  */
 export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { selection, setSelection, run, inspectorNav } = useApp();
+  const { project, selection, setSelection, run, inspectorNav } = useApp();
   const [tab, setTab] = useState<InspectorTab>('appearance');
   const [section, setSection] = useState<AppearanceSection>('style');
   useEffect(() => {
@@ -78,7 +82,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const scope: 'all' | Id = selected ? selected.id : 'all';
   const sampleIndex = selected ? series.indexOf(selected) : 0;
   const sample = series[sampleIndex];
-  const any = useMemo(() => buildAnyModel(chart, table), [chart, table]);
+  const curve = useMemo(() => resolveFit(chart.fit, analysesOf(project), table.id), [chart.fit, project.analyses, table.id]);
+  const any = useMemo(() => buildAnyModel(chart, table, curve), [chart, table, curve]);
   // The numeric-X model (XY, survival) and the category model (grouped, contingency) differ in what an axis is.
   const xyModel = any.family === 'xy' || any.family === 'survival' ? any.model : null;
   const yScale = any.family === 'category' || any.family === 'whole' || any.family === 'heat' ? null : any.model.y;
@@ -87,14 +92,14 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   // Survival curves and stacked or percentage bars keep a plain linear axis (see the models).
   const yAxisCanChange = family !== 'survival' && chart.type !== 'groupedStacked' && chart.type !== 'contingencyStacked' && chart.type !== 'contingencyPercent';
   const noun = table.kind === 'survival' ? 'Group' : table.kind === 'contingency' ? 'Outcome' : table.kind === 'grouped' ? 'Group' : 'Series';
-  const barChart = chart.type === 'groupedBar' || chart.type === 'groupedStacked' || chart.type === 'contingencyBars' || chart.type === 'contingencyStacked' || chart.type === 'contingencyPercent';
+  const barChart = chart.type === 'groupedBar' || chart.type === 'groupedStacked' || chart.type === 'groupedFloating' || chart.type === 'contingencyBars' || chart.type === 'contingencyStacked' || chart.type === 'contingencyPercent';
   const stacked = chart.type === 'groupedStacked' || chart.type === 'contingencyStacked' || chart.type === 'contingencyPercent';
 
   // "Global" shows the layer-level values; a series shows its own resolved values.
   const st: ChartStyle = useMemo(() => {
     if (!sample) return chart.defaults;
     const l = scope === 'all' ? { ...layer, groupOverrides: {}, objectOverrides: {} } : layer;
-    return resolveStyle(chart, l, { id: sample.id, paletteIndex: sampleIndex });
+    return resolveStyle(chart, l, { id: sample.id, paletteIndex: sample.seriesSlot ?? sampleIndex });
   }, [chart, layer, sample, sampleIndex, scope]);
   const ov = (key: keyof ChartStyle) => scope !== 'all' && isGroupOverridden(layer, scope, key);
   const setStyle = (patch: Partial<ChartStyle>) => {
@@ -164,6 +169,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 </GroupBox>
               )}
 
+              {barChart && supportsHorizontal(chart.type) && <DirectionSection chart={chart} />}
               {barChart && (
                 <GroupBox title="Bars">
                   <Field label="Fill" overridden={ov('barFill')}>
@@ -177,8 +183,23 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 </GroupBox>
               )}
 
-              {(!barChart || (chart.type === 'groupedBar' && layout.kind === 'replicates')) && (
+              {chart.type === 'groupedFloating' && (
+                <GroupBox title="Centre line" checked={st.showMeanLine} onCheckedChange={(v) => setStyle({ showMeanLine: v })} overridden={ov('showMeanLine')}>
+                  <Field label="Color" overridden={ov('lineColor')}>
+                    <ColorInput value={st.lineColor} disabled={!st.showMeanLine} onChange={(v) => setStyle({ lineColor: v })} />
+                  </Field>
+                  <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.1} max={20} disabled={!st.showMeanLine} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+                  <div className="muted small">The bar runs from the smallest to the largest value; the line marks the mean of the replicates.</div>
+                </GroupBox>
+              )}
+
+              {(!barChart || ((chart.type === 'groupedBar' || chart.type === 'groupedFloating') && layout.kind === 'replicates')) && (
               <GroupBox title={family === 'survival' ? 'Censor marks' : barChart ? 'Individual values' : 'Symbols'} checked={st.showSymbols} onCheckedChange={(v) => setStyle({ showSymbols: v })} overridden={ov('showSymbols')}>
+                {family === 'survival' && (
+                  <Field label="Also at every event" hint="A symbol where the curve drops, as well as at the censored subjects">
+                    <Check checked={chart.survival.eventSymbols} disabled={!st.showSymbols} onChange={(v) => run('Symbols at events', patchSurvival(chart.id, { eventSymbols: v }))} />
+                  </Field>
+                )}
                 <Field label="Color" overridden={ov('symbolColor')}>
                   <ColorInput value={st.symbolColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolColor: v, symbolBorderColor: v })} />
                 </Field>
@@ -186,6 +207,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...SYMBOL_SHAPE_OPTIONS]} onChange={(v) => setStyle({ symbolShape: v })} />
                 </Field>
                 <NumField label="Size" unit="pt" value={st.symbolSizePt} min={1} max={40} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
+                <NumField label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
                 <Field label="Border color" overridden={ov('symbolBorderColor')}>
                   <ColorInput value={st.symbolBorderColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolBorderColor: v })} />
                 </Field>
@@ -194,7 +216,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
 
               )}
 
-              {layout.kind !== 'single' && !stacked && table.kind !== 'contingency' && (
+              {layout.kind !== 'single' && !stacked && chart.type !== 'groupedFloating' && table.kind !== 'contingency' && (
                 <GroupBox title="Error bars" checked={st.showErrorBars} onCheckedChange={(v) => setStyle({ showErrorBars: v })} overridden={ov('showErrorBars')}>
                   {layout.kind === 'replicates' && (
                     <IntervalFields
@@ -229,12 +251,22 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <ColorInput value={st.lineColor} disabled={!st.showLines} onChange={(v) => setStyle({ lineColor: v })} />
                 </Field>
                 <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.1} max={20} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+                <Field label="Pattern" overridden={ov('lineStyle')}>
+                  <SelectInput<LineStyle> value={st.lineStyle} disabled={!st.showLines} options={LINE_STYLES.map((l) => ({ value: l.value, label: l.label }))} onChange={(v) => setStyle({ lineStyle: v })} />
+                </Field>
                 <div className="muted small">{family === 'survival' ? 'The Kaplan-Meier estimate, a step at each event time.' : family === 'grouped' ? 'The means of each series are joined across the categories.' : 'Points are joined in the order of the table rows; a missing Y value breaks the line.'}</div>
               </GroupBox>
               )}
-              {family === 'xy' && xyModel && <FitSection chart={chart} model={xyModel} />}
+              {family === 'xy' && xyModel && <FitSection chart={chart} table={table} model={xyModel} />}
               {family === 'survival' && (
                 <>
+                  <GroupBox title="Error bars (standard error)" checked={chart.survival.errorBars} onCheckedChange={(v) => run('Survival error bars', patchSurvival(chart.id, { errorBars: v }))}>
+                    <Field label="Color" overridden={ov('errorColor')}>
+                      <ColorInput value={st.errorColor} disabled={!chart.survival.errorBars} onChange={(v) => setStyle({ errorColor: v })} />
+                    </Field>
+                    <NumField label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.1} max={10} disabled={!chart.survival.errorBars} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
+                    <div className="muted small">One standard error (Greenwood) either side of the estimate at each event time, kept within 0 to 1.</div>
+                  </GroupBox>
                   <GroupBox title="Confidence band" checked={chart.survival.band} onCheckedChange={(v) => run('Confidence band', patchSurvival(chart.id, { band: v }))}>
                     <NumField
                       label="Confidence level"
@@ -263,6 +295,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   </GroupBox>
                 </>
               )}
+              {family !== 'survival' && <LineOrderSection chart={chart} />}
               {family === 'xy' && <div className="muted small">Missing is not zero: rows with an empty X or Y cell are left out, not plotted at 0.</div>}
             </div>
           )}
@@ -289,7 +322,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
           {section === 'layout' && (
             <div>
               <DimensionsSection chart={chart} />
-              {(chart.type === 'groupedBar' || chart.type === 'contingencyBars') && <ColumnLayoutSection chart={chart} spacing={false} baseline />}
+              {(chart.type === 'groupedBar' || chart.type === 'groupedFloating' || chart.type === 'contingencyBars') && <ColumnLayoutSection chart={chart} spacing={false} baseline />}
             </div>
           )}
           {section === 'legend' && <LegendSection chart={chart} groups={series} />}
@@ -299,6 +332,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
       {tab === 'datasets' && (
         <div className="tab-body">
           <OnThisGraph chart={chart} />
+          <DataSetOrder chart={chart} groups={series.map((g) => ({ id: g.id, label: g.name }))} gaps={false} heading={barChart ? 'Order within each category, left to right' : 'Plot order (the last is drawn on top)'} />
           <div className="muted small">Select a {noun.toLowerCase()} to edit its style, or click it in the chart.</div>
           <ul className="dataset-list">
             {seriesView.map((s) => (

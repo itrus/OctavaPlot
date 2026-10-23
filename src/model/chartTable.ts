@@ -1,6 +1,6 @@
-import { usesSeriesBlocks } from './chartTypes';
+import { leadingColumns, usesSeriesBlocks } from './chartTypes';
 import { applyOrder } from './groupOrder';
-import { xySeries } from './tableLayout';
+import { tableSeriesWidth, xySeries } from './tableLayout';
 import type { Chart, DataTable, Group, Id, Project } from './types';
 
 /** One data set a graph can plot, from its own table or from another one. */
@@ -67,10 +67,29 @@ export function effectiveTable(p: Project, chart: Chart): DataTable | undefined 
         : [...g.observations, ...Array.from({ length: rowCount - g.observations.length }, (_, k) => ({ id: `${g.id}:pad${k}`, value: null }))],
   }));
   // Column charts can put the data sets in another order; colours stay with their data set (paletteIndex above).
-  const groups = blocks ? unordered : applyOrder(unordered, chart.groupOrder);
+  const groups = blocks ? orderSeries(own, unordered, chart.groupOrder) : applyOrder(unordered, chart.groupOrder);
   const rows =
     own.rows.length === rowCount
       ? own.rows
       : [...own.rows, ...Array.from({ length: rowCount - own.rows.length }, (_, k) => ({ id: `${own.id}:pad${k}`, title: '' }))];
   return { ...own, rowCount, rows, groups };
+}
+
+/**
+ * The columns of a table of series (XY, grouped, contingency, survival) with the series in the order asked for: the
+ * leading column (X, time or the row titles' partner) stays first, then the blocks of columns of each series. Each
+ * series' first column notes where its series sat in the table, so its colour stays with it.
+ */
+function orderSeries(own: DataTable, columns: Group[], order: readonly Id[]): Group[] {
+  const lead = leadingColumns(own.kind);
+  const width = tableSeriesWidth(own);
+  const slotOf = new Map(xySeries(own).map((s) => [s.id, s.index]));
+  const blocks: Array<{ id: Id; columns: Group[] }> = [];
+  const rest = columns.slice(lead);
+  for (let i = 0; i < rest.length; i += width) {
+    const block = rest.slice(i, i + width);
+    const first = block[0];
+    blocks.push({ id: first.id, columns: [{ ...first, seriesSlot: slotOf.get(first.id) }, ...block.slice(1)] });
+  }
+  return [...columns.slice(0, lead), ...applyOrder(blocks, order).flatMap((b) => b.columns)];
 }

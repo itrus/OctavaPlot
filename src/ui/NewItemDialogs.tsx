@@ -151,6 +151,19 @@ export function ChartSketch({ type }: { type: ChartType }) {
           ))}
         </svg>
       );
+    case 'groupedFloating':
+      return (
+        <svg {...SKETCH}>
+          {axes}
+          {[[14, 14, 34], [46, 8, 28]].map(([x, top, bottom]) => (
+            <g key={x}>
+              <rect x={x} y={top} width="10" height={bottom - top} fill="currentColor" fillOpacity={0.25} />
+              <rect x={x + 10} y={top + 8} width="10" height={bottom - top - 4} fill="currentColor" fillOpacity={0.55} />
+              <path d={`M${x} ${top + 12}h10M${x + 10} ${top + 20}h10`} strokeWidth={1.6} />
+            </g>
+          ))}
+        </svg>
+      );
     case 'groupedLine':
       return (
         <svg {...SKETCH}>

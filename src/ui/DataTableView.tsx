@@ -2,7 +2,8 @@ import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useS
 import type { DataTable, TableKind } from '../model/types';
 import { useApp } from '../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../model/rows';
-import { addGroup, addRows, composeCommands, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../state/commands';
+import { newId } from '../model/ids';
+import { addAnalysis, addGroup, addRows, composeCommands, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../util/download';
 import { ExportIcon, ImportIcon } from './icons';
 import { importCsv, isCsvFile, tableToCsv } from './csv';
@@ -99,7 +100,7 @@ const KIND_TEXT: Record<TableKind, { label: string; noun: string; add: string; l
 };
 
 export function DataTableView({ table }: { table: DataTable }) {
-  const { run, tableZoom: z, settings } = useApp();
+  const { run, tableZoom: z, settings, setView } = useApp();
   // Tables other than the column table group their columns into series; XY and survival tables lead with X / time.
   const isSeries = usesSeriesBlocks(table.kind);
   const lead = leadingColumns(table.kind);
@@ -464,6 +465,13 @@ export function DataTableView({ table }: { table: DataTable }) {
     run('Rename group', renameGroup(table.id, groupId, v.trim()));
   };
 
+  // A curve fit of this table is added to the Results (a line to start with: the model is changed there) and opened.
+  const fitCurve = () => {
+    const id = newId('analysis');
+    run('New curve fit', addAnalysis(id, table.id, 'curvefit'));
+    setView({ kind: 'analysis', id });
+  };
+
   return (
     <div className="table-view">
       <div className="toolbar">
@@ -478,6 +486,12 @@ export function DataTableView({ table }: { table: DataTable }) {
         <button className="icon-text" onClick={exportCsv} title="Download this table as a .csv file">
           <ExportIcon /> Export CSV
         </button>
+        {table.kind === 'xy' && (
+          <>
+            <span className="sep" />
+            <button onClick={fitCurve} title="Fit a line, a curve or a dose-response model to the Y series; the results go to the Results section">Fit curve…</button>
+          </>
+        )}
         <input
           ref={csvRef}
           type="file"

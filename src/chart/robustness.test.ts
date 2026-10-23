@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { CHART_TYPES, supportsHorizontal } from '../model/chartTypes';
 import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createXyTable } from '../model/defaults';
-import type { Chart, DataTable, TableKind } from '../model/types';
+import { NO_FIT_SETTINGS } from '../model/fitOptions';
+import { FIT_MODELS } from '../stats/fit';
+import type { Chart, DataTable, FitSettings, TableKind } from '../model/types';
 import { buildAnyModel } from './anyModel';
 import { chartToSvgString } from './export';
 
@@ -48,11 +50,11 @@ function withScenario(table: DataTable, s: Scenario): DataTable {
   };
 }
 
-const check = (chart: Chart, table: DataTable, what: string) => {
+const check = (chart: Chart, table: DataTable, what: string, fit?: FitSettings) => {
   let svg = '';
   expect(() => {
-    buildAnyModel(chart, table);
-    svg = chartToSvgString(chart, table);
+    buildAnyModel(chart, table, fit);
+    svg = chartToSvgString(chart, table, fit);
   }, what).not.toThrow();
   expect(svg, `${what}: NaN`).not.toContain('NaN');
   expect(svg, `${what}: Infinity`).not.toContain('Infinity');
@@ -78,8 +80,6 @@ describe('every chart type with the axis settings switched on', () => {
     ['origin', (c) => ({ ...c, origin: { x: 1, y: 1 } })],
     ['hidden axes with scale bars', (c) => ({ ...c, yAxis: { ...c.yAxis, visible: false, scaleBar: true }, xAxis: { ...c.xAxis, visible: false, scaleBar: true } })],
     ['minor ticks and grids', (c) => ({ ...c, yAxis: { ...c.yAxis, minorTicks: 3, showGrid: true, showMinorGrid: true }, xAxis: { ...c.xAxis, minorTicks: 1, showGrid: true } })],
-    ['fitted curve, band, parameters', (c) => ({ ...c, fit: { ...c.fit, model: 'hill_4pl' as const, band: 'prediction' as const, extend: true, showParameters: true } })],
-    ['fitted polynomial', (c) => ({ ...c, fit: { ...c.fit, model: 'polynomial' as const, degree: 6, band: 'confidence' as const } })],
     ['horizontal', (c) => ({ ...c, orientation: supportsHorizontal(c.type) ? ('horizontal' as const) : ('vertical' as const) })],
     ['frame, colours, bar labels', (c) => ({ ...c, frame: 'box', pageColor: null, plotColor: null, barLabels: { ...c.barLabels, show: 'value' } })],
   ];
@@ -90,6 +90,23 @@ describe('every chart type with the axis settings switched on', () => {
           const table = withScenario(TABLES[info.tableKind](), s);
           const chart = apply(createChart(table.id, undefined, info.type));
           check(chart, table, `${info.type} / ${name} / ${s.name}`);
+        });
+      }
+    }
+  }
+});
+
+describe('every fitted curve with awkward data', () => {
+  const xyTypes = CHART_TYPES.filter((i) => i.tableKind === 'xy');
+  for (const info of xyTypes) {
+    for (const m of FIT_MODELS) {
+      for (const s of SCENARIOS) {
+        it(`${info.type}: ${m.id}, ${s.name}`, () => {
+          const table = withScenario(TABLES.xy(), s);
+          const fit: FitSettings = { ...NO_FIT_SETTINGS, model: m.id, degree: 6, band: 'prediction', extend: true, showParameters: true };
+          const chart = createChart(table.id, undefined, info.type);
+          check(chart, table, `${info.type} / ${m.id} / ${s.name}`, fit);
+          check({ ...chart, xAxis: { ...chart.xAxis, scale: 'log10' }, yAxis: { ...chart.yAxis, scale: 'log10' } }, table, `${info.type} / ${m.id} / ${s.name} / log`, fit);
         });
       }
     }

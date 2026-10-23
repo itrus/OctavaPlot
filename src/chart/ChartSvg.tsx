@@ -1,15 +1,16 @@
-import { forwardRef, type ReactElement, type ReactNode } from 'react';
+import { forwardRef, type ReactElement } from 'react';
 import type { Chart } from '../model/types';
 import { n2 } from '../model/units';
 import { BarLabelText } from './BarLabelText';
 import { axisGaps, axisPieces } from './axisScale';
-import { AnnotationLayer, axisLineD, Backgrounds, BreakMarks, ChartTitles, type EditorState, FrameBox, PlotClip, ScaleBar, SELECT_COLOR } from './ChartParts';
+import { Turned, AnnotationLayer, axisLineD, Backgrounds, BreakMarks, ChartTitles, type EditorState, FrameBox, PlotClip, ScaleBar, SELECT_COLOR } from './ChartParts';
 import { BarMark, KeyMark } from './FillMarks';
 import { GridLines } from './GridLines';
 import { hitAttrs } from './hitTest';
 import { crossingPosition, tickPath, tickPaths, labelOffset } from './axisTicks';
 import { keyWidthOf, LEGEND_KEY, X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP } from './layout';
 import type { ChartModel, GroupGeom } from './model';
+import { linePattern } from '../model/look';
 import { symbolPath } from './symbols';
 
 interface Props {
@@ -23,19 +24,14 @@ interface Props {
 }
 
 
-/** Shapes of a horizontal chart, turned into place by the model's matrix; a vertical chart draws them as they are. */
-function Turned({ matrix, children }: { matrix: string | null; children: ReactNode }) {
-  return matrix ? <g transform={matrix}>{children}</g> : <>{children}</>;
-}
-
 function LegendSwatch({ g, x, y, chartId, editor, w }: { g: GroupGeom; x: number; y: number; chartId: string; editor: boolean; w: number }): ReactElement {
   const s = g.style;
   if (s.showBars) return <KeyMark style={s} x={x} y={y} chartId={chartId} groupId={g.groupId} editor={editor} width={w} />;
   return (
     <g>
-      {s.showLines && <path d={`M${n2(x)},${n2(y)}H${n2(x + w)}`} stroke={s.lineColor} strokeWidth={s.lineWidthPt} fill="none" />}
+      {s.showLines && <path d={`M${n2(x)},${n2(y)}H${n2(x + w)}`} stroke={s.lineColor} strokeWidth={s.lineWidthPt} {...linePattern(s)} fill="none" />}
       {s.showSymbols && (
-        <path d={symbolPath(s.symbolShape, x + w / 2, y, s.symbolSizePt)} fill={s.symbolColor} stroke={s.symbolBorderColor} strokeWidth={s.symbolBorderWidthPt} />
+        <path d={symbolPath(s.symbolShape, x + w / 2, y, s.symbolSizePt)} fill={s.symbolColor} fillOpacity={s.symbolFillOpacity < 1 ? s.symbolFillOpacity : undefined} stroke={s.symbolBorderColor} strokeWidth={s.symbolBorderWidthPt} />
       )}
     </g>
   );
@@ -82,6 +78,62 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
   const selectedGroup = editor?.selection.kind === 'group' ? editor.selection.groupId : null;
   const selectedPoint = editor?.selection.kind === 'point' ? editor.selection.pointId : null;
 
+  // Lines and error bars go over the bars and symbols, under them, or (auto) over the bars and under the symbols.
+  const onTop = chart.lineOrder === 'onTop';
+  const bars = (
+    <Turned matrix={orient.matrix}>
+        {groups.map((g) => g.bar && <BarMark key={g.bar.id} bar={g.bar} chartId={chart.id} editor={ed} />)}
+        {groups.map((g) =>
+          g.dist && (
+            <g key={`${g.groupId}:dist`} fill="none">
+              {g.dist.outline && g.style.showBars && (
+                <path d={g.dist.outline} fill={g.style.barFill} fillOpacity={g.style.barOpacity} stroke={g.style.barBorderColor} strokeWidth={g.style.barBorderWidthPt} strokeLinejoin="round" {...hit('bar', g.groupId, `${g.groupId}:bar`)} />
+              )}
+              {g.dist.lines.map((l) => (
+                <path key={l.id} d={l.d} stroke={l.color} strokeWidth={l.strokeWidth} strokeDasharray={l.dash} strokeLinecap="butt" {...hit('bar', g.groupId, `${g.groupId}:bar`)} />
+              ))}
+            </g>
+          ),
+        )}
+    </Turned>
+  );
+  const linesAndErrors = (
+    <Turned matrix={orient.matrix}>
+        {model.pairLines.map((l) => (
+          <path key={l.id} d={l.d} fill="none" stroke={l.color} strokeWidth={l.strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+        ))}
+        {groups.map((g) => g.connector && (
+          <path key={g.connector.id} d={g.connector.d} fill="none" stroke={g.connector.color} strokeWidth={g.connector.strokeWidth} strokeLinecap="round" {...hit('line', g.groupId, g.connector.id)} />
+        ))}
+        {groups.map((g) => g.errorBar && (
+          <g key={g.errorBar.id} {...hit('error', g.groupId, g.errorBar.id)}>
+            <path d={g.errorBar.d} fill="none" stroke={g.errorBar.color} strokeWidth={g.errorBar.strokeWidth} strokeLinecap="butt" />
+            {ed && <path d={g.errorBar.d} fill="none" stroke="transparent" strokeWidth={8} />}
+          </g>
+        ))}
+        {groups.map((g) => g.meanLine && (
+          <path key={g.meanLine.id} d={g.meanLine.d} fill="none" stroke={g.meanLine.color} strokeWidth={g.meanLine.strokeWidth} strokeLinecap="butt" {...hit('meanLine', g.groupId, g.meanLine.id)} />
+        ))}
+    </Turned>
+  );
+  const points = (
+    <>
+        {groups.map((g) =>
+          g.points.map((p) => (
+            <path
+              key={p.id}
+              d={symbolPath(p.shape, orient.toScreen(p.cx, p.cy).x, orient.toScreen(p.cx, p.cy).y, p.size)}
+              fill={p.color}
+              fillOpacity={p.fillOpacity < 1 ? p.fillOpacity : undefined}
+              stroke={p.borderColor}
+              strokeWidth={p.borderWidth}
+              {...hit('point', g.groupId, p.id)}
+            />
+          )),
+        )}
+    </>
+  );
+
   return (
     <svg
       ref={ref}
@@ -109,47 +161,24 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
 
       {/* Data marks, clipped to the plotting region. Error bars are independent of bars and symbols. */}
       <g clipPath="url(#plot-clip)">
-        <Turned matrix={orient.matrix}>
-        {groups.map((g) => g.bar && <BarMark key={g.bar.id} bar={g.bar} chartId={chart.id} editor={ed} />)}
-        {groups.map((g) =>
-          g.dist && (
-            <g key={`${g.groupId}:dist`} fill="none">
-              {g.dist.outline && g.style.showBars && (
-                <path d={g.dist.outline} fill={g.style.barFill} fillOpacity={g.style.barOpacity} stroke={g.style.barBorderColor} strokeWidth={g.style.barBorderWidthPt} strokeLinejoin="round" {...hit('bar', g.groupId, `${g.groupId}:bar`)} />
-              )}
-              {g.dist.lines.map((l) => (
-                <path key={l.id} d={l.d} stroke={l.color} strokeWidth={l.strokeWidth} strokeDasharray={l.dash} strokeLinecap="butt" {...hit('bar', g.groupId, `${g.groupId}:bar`)} />
-              ))}
-            </g>
-          ),
-        )}
-        {model.pairLines.map((l) => (
-          <path key={l.id} d={l.d} fill="none" stroke={l.color} strokeWidth={l.strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
-        ))}
-        {groups.map((g) => g.connector && (
-          <path key={g.connector.id} d={g.connector.d} fill="none" stroke={g.connector.color} strokeWidth={g.connector.strokeWidth} strokeLinecap="round" {...hit('line', g.groupId, g.connector.id)} />
-        ))}
-        {groups.map((g) => g.errorBar && (
-          <g key={g.errorBar.id} {...hit('error', g.groupId, g.errorBar.id)}>
-            <path d={g.errorBar.d} fill="none" stroke={g.errorBar.color} strokeWidth={g.errorBar.strokeWidth} strokeLinecap="butt" />
-            {ed && <path d={g.errorBar.d} fill="none" stroke="transparent" strokeWidth={8} />}
-          </g>
-        ))}
-        {groups.map((g) => g.meanLine && (
-          <path key={g.meanLine.id} d={g.meanLine.d} fill="none" stroke={g.meanLine.color} strokeWidth={g.meanLine.strokeWidth} strokeLinecap="butt" {...hit('meanLine', g.groupId, g.meanLine.id)} />
-        ))}
-        </Turned>
-        {groups.map((g) =>
-          g.points.map((p) => (
-            <path
-              key={p.id}
-              d={symbolPath(p.shape, orient.toScreen(p.cx, p.cy).x, orient.toScreen(p.cx, p.cy).y, p.size)}
-              fill={p.color}
-              stroke={p.borderColor}
-              strokeWidth={p.borderWidth}
-              {...hit('point', g.groupId, p.id)}
-            />
-          )),
+        {onTop ? (
+          <>
+            {bars}
+            {points}
+            {linesAndErrors}
+          </>
+        ) : chart.lineOrder === 'underneath' ? (
+          <>
+            {linesAndErrors}
+            {bars}
+            {points}
+          </>
+        ) : (
+          <>
+            {bars}
+            {linesAndErrors}
+            {points}
+          </>
         )}
       </g>
 

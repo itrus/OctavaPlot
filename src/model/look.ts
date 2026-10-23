@@ -7,7 +7,7 @@ import { sanitizeFit } from './fitOptions';
 import { sanitizeHistogram } from './histogramOptions';
 import { sanitizePie } from './pieOptions';
 import { bool, clamp, hex, numberOrNull, oneOf, optionalHex, record, valuesOf } from './sanitize';
-import type { Chart, ChartOrientation, FrameStyle, GridStyle, LegendKeyShape, LineStyle } from './types';
+import type { Chart, ChartOrientation, FrameStyle, GridStyle, LegendKeyShape, LineOrder, LineStyle } from './types';
 
 /** How a chart looks as a whole: fonts, colours, frame, gridlines, direction (and the column and box settings it carries). */
 
@@ -22,8 +22,11 @@ export const FONT_FAMILIES: ReadonlyArray<{ value: string; label: string }> = [
 
 export const LINE_STYLES: ReadonlyArray<{ value: LineStyle; label: string }> = [
   { value: 'solid', label: 'Solid' },
-  { value: 'dashed', label: 'Dashed' },
-  { value: 'dotted', label: 'Dotted' },
+  { value: 'longDash', label: 'Long dashes' },
+  { value: 'dashed', label: 'Dashes' },
+  { value: 'dotted', label: 'Dots' },
+  { value: 'dashDot', label: 'Dash, dot' },
+  { value: 'dashDotDot', label: 'Dash, dot, dot' },
 ];
 
 export const FRAME_STYLES: ReadonlyArray<{ value: FrameStyle; label: string }> = [
@@ -35,15 +38,33 @@ export const GRID_LIMITS = { widthPt: { min: 0.1, max: 5 } } as const;
 
 const LINES = valuesOf(LINE_STYLES);
 const FRAMES = valuesOf(FRAME_STYLES);
+export const LINE_ORDERS: ReadonlyArray<LineOrder> = ['auto', 'onTop', 'underneath'];
 const ORIENTATIONS: readonly ChartOrientation[] = ['vertical', 'horizontal'];
 
-/** Dash pattern of a line style (undefined = solid). */
-export const dashOf = (style: LineStyle): string | undefined => (style === 'dashed' ? '4 3' : style === 'dotted' ? '1 2' : undefined);
+/** Lengths of the dashes and gaps of each pattern, in units of the line's width (a line thinner than 1 pt counts as 1 pt). */
+const DASHES: Record<LineStyle, readonly number[]> = {
+  solid: [],
+  longDash: [8, 4],
+  dashed: [4, 3],
+  dotted: [1, 2],
+  dashDot: [6, 3, 1, 3],
+  dashDotDot: [6, 3, 1, 3, 1, 3],
+};
+
+/** Dash pattern of a line style at a line width (undefined = solid). */
+export const dashOf = (style: LineStyle, widthPt = 1): string | undefined => {
+  const unit = Math.max(1, widthPt);
+  const lengths = DASHES[style];
+  return lengths.length === 0 ? undefined : lengths.map((n) => Number((n * unit).toFixed(2))).join(' ');
+};
+
+/** The attributes that draw a series line in its pattern: round ends for a solid line, square-cut ones so dashes and dots stay what they are. */
+export const linePattern = (s: { lineStyle: LineStyle; lineWidthPt: number }) => ({ strokeDasharray: dashOf(s.lineStyle, s.lineWidthPt), strokeLinecap: s.lineStyle === 'solid' ? ('round' as const) : ('butt' as const) });
 
 /** Width of the colour key in the legend, pt: 18 for a rectangle, 10 for a square (its height is 10). */
 export const legendKeyWidthPt = (shape: LegendKeyShape): number => (shape === 'square' ? 10 : 18);
 
-type Look = Pick<Chart, 'origin' | 'orientation' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
+type Look = Pick<Chart, 'origin' | 'orientation' | 'lineOrder' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
 
 /** The look of a chart from a file or a patch: a value that is not valid falls back to the one in `base`. */
 export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
@@ -59,6 +80,7 @@ export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
   };
   return {
     orientation: oneOf(ORIENTATIONS, c.orientation, base.orientation),
+    lineOrder: oneOf(LINE_ORDERS, c.lineOrder, base.lineOrder),
     origin: { x: numberOrNull(record(c.origin).x, base.origin.x), y: numberOrNull(record(c.origin).y, base.origin.y) },
     bars: sanitizeBars(c.bars, base.bars),
     barLabels: sanitizeBarLabels(c.barLabels, base.barLabels),

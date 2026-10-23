@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import { chartFamily } from '../model/chartTypes';
-import type { Chart, DataTable } from '../model/types';
+import type { Chart, DataTable, FitSettings } from '../model/types';
 import { ChartSvg, type EditorState } from './ChartSvg';
 import { GroupedChartSvg } from './GroupedChartSvg';
 import { buildGroupedModel, type GroupedModel } from './groupedModel';
@@ -22,11 +22,11 @@ type AnyModel =
   | { family: 'whole'; model: PieModel }
   | { family: 'heat'; model: HeatModel };
 
-export function buildAnyModel(chart: Chart, table: DataTable): AnyModel {
+export function buildAnyModel(chart: Chart, table: DataTable, fit?: FitSettings): AnyModel {
   const family = chartFamily(chart.type);
   switch (family) {
     case 'xy':
-      return { family, model: buildXyModel(chart, table) };
+      return { family, model: buildXyModel(chart, table, fit) };
     case 'survival':
       return { family, model: buildSurvivalModel(chart, table) };
     case 'grouped':

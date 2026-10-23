@@ -5,6 +5,8 @@ import { leadingColumns } from '../model/chartTypes';
 import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../model/tableLayout';
 import { sanitizeFillKeys } from '../model/fill';
 import { sanitizeAxis } from '../model/axis';
+import { analysisTypeInfo } from '../model/analysis';
+import { FIT_MODEL_IDS, sanitizeDegree } from '../model/fitOptions';
 import { sanitizeLook } from '../model/look';
 import { sanitizeGaps, sanitizeOrder } from '../model/groupOrder';
 import { createRows, sanitizeRowTitle } from '../model/rows';
@@ -65,6 +67,8 @@ function parseSurvival(raw: unknown): SurvivalOptions {
     level: typeof r.level === 'number' && r.level > 0 && r.level < 1 ? r.level : DEFAULT_SURVIVAL.level,
     method: r.method === 'plain' || r.method === 'loglog' ? r.method : DEFAULT_SURVIVAL.method,
     atRisk: typeof r.atRisk === 'boolean' ? r.atRisk : DEFAULT_SURVIVAL.atRisk,
+    eventSymbols: typeof r.eventSymbols === 'boolean' ? r.eventSymbols : DEFAULT_SURVIVAL.eventSymbols,
+    errorBars: typeof r.errorBars === 'boolean' ? r.errorBars : DEFAULT_SURVIVAL.errorBars,
   };
 }
 
@@ -105,7 +109,8 @@ function parseTable(raw: unknown, path: string): DataTable {
 
 /** Enum-valued style keys; an invalid stored value is dropped (the default applies) and noted. */
 const STYLE_ENUMS: Record<string, readonly string[]> = {
-  symbolShape: ['circle', 'square', 'triangle', 'diamond', 'plus', 'cross'],
+  symbolShape: ['circle', 'square', 'triangle', 'triangleDown', 'diamond', 'hexagon', 'star', 'target', 'plus', 'cross', 'asterisk'],
+  lineStyle: ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'],
   errorDirection: ['both', 'positive', 'negative'],
   errorCap: ['bar', 'none'],
   axisBinding: ['primary', 'secondary'],
@@ -301,8 +306,15 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
   if (dataTables.length === 0) fail('project.dataTables', 'must contain at least one table');
   // Analyses refer to tables by ID: one whose table is gone, or that is not recognised, is dropped.
   const analyses: Analysis[] = (Array.isArray(p.analyses) ? p.analyses : []).flatMap((a): Analysis[] => {
-    if (!isObj(a) || typeof a.id !== 'string' || a.kind !== 'descriptive' || typeof a.dataTableId !== 'string' || !tableIds.has(a.dataTableId)) return [];
-    return [{ id: a.id, name: typeof a.name === 'string' && a.name !== '' ? a.name : 'Descriptive statistics', kind: 'descriptive', dataTableId: a.dataTableId, level: typeof a.level === 'number' && a.level > 0 && a.level < 1 ? a.level : 0.95 }];
+    if (!isObj(a) || typeof a.id !== 'string' || (a.kind !== 'descriptive' && a.kind !== 'curvefit') || typeof a.dataTableId !== 'string' || !tableIds.has(a.dataTableId)) return [];
+    const kind = a.kind;
+    const level = typeof a.level === 'number' && a.level > 0 && a.level < 1 ? a.level : 0.95;
+    const name = typeof a.name === 'string' && a.name !== '' ? a.name : analysisTypeInfo(kind).label;
+    if (kind === 'descriptive') return [{ id: a.id, name, kind, dataTableId: a.dataTableId, level }];
+    // A curve fit applies to an XY table and names one of the models; one that does not is dropped.
+    const model = FIT_MODEL_IDS.find((m) => m === a.model);
+    if (!model || dataTables.find((t) => t.id === a.dataTableId)?.kind !== 'xy') return [];
+    return [{ id: a.id, name, kind, dataTableId: a.dataTableId, level, model, degree: sanitizeDegree(a.degree, 2) }];
   });
   // A chart type that does not suit its table's type (a hand-edited file) is switched to the table's default chart
   // type, so a graph is never drawn with the wrong reading of the columns.

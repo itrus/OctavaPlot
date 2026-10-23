@@ -1,5 +1,5 @@
 import { rowTitleAt } from '../model/rows';
-import { isGroupedChartType } from '../model/chartTypes';
+import { isGroupedChartType, supportsHorizontal } from '../model/chartTypes';
 import { resolveStyle } from '../model/style';
 import { resolveSummary } from '../model/summary';
 import { layoutOf, xySeries } from '../model/tableLayout';
@@ -8,7 +8,7 @@ import { chartPx2Pt, n2 } from '../model/units';
 import { computeGroupStats, type GroupStats } from '../stats/summary';
 import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
 import { computeLayout, type Layout } from './layout';
-import { displayName, hash01 } from './model';
+import { displayName, hash01, type Orientation } from './model';
 import { barLabelText, placeBarLabel, type BarLabelGeom } from './barLabels';
 import { axisMapper, onAxis, resolveAxis } from './axisScale';
 import type { YAxisScale } from './scales';
@@ -43,6 +43,9 @@ interface GroupedBar {
   count?: number;
   /** Value or sample size written above the bar, when the chart asks for it (side by side bars only). */
   label?: BarLabelGeom | null;
+  /** Floating bars: the lower and upper value of the bar, and the line across it at the centre. */
+  range?: [number, number];
+  centerLine?: { x1: number; x2: number; y: number };
 }
 
 interface GroupedPoint {
@@ -72,6 +75,8 @@ export interface GroupedModel {
   widthPt: number;
   heightPt: number;
   layout: Layout;
+  /** Horizontal bars are built as vertical ones in a virtual region and turned into place (see Orientation in model.ts). */
+  orient: Orientation;
   arrangement: Arrangement;
   asLines: boolean;
   categories: GroupedCategory[];
@@ -100,6 +105,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const layout = layoutOf(table);
   const arrangement = arrangementOf(chart.type);
   const asLines = chart.type === 'groupedLine';
+  const floating = chart.type === 'groupedFloating';
   const contingency = table.kind === 'contingency';
   const warnings: string[] = [];
   const seriesDefs = xySeries(table);
@@ -117,7 +123,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   let negative = 0;
   const noError: string[] = [];
   const raw = seriesDefs.map((s, si) => {
-    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: si });
+    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? si });
     const spec = resolveSummary(layer, s.id);
     let meaning: string | null = null;
     const cells = categoryRows.map((r, ci) => {
@@ -145,7 +151,13 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       }
       // The replicate values themselves, with the observation each came from, for the dots over the bars.
       const reps = layout.kind === 'replicates' && !contingency ? s.columns.flatMap((c) => (c.observations[r]?.value === null || c.observations[r] === undefined ? [] : [{ id: c.observations[r].id, value: c.observations[r].value as number }])) : [];
-      return { row: r, ci, value, stats, count: contingency ? (values[0] ?? undefined) : undefined, reps };
+      // A floating bar spans the replicate values, or the interval of values entered as limits.
+      let span: [number, number] | null = null;
+      if (floating) {
+        if (reps.length > 0) span = [Math.min(...reps.map((x) => x.value)), Math.max(...reps.map((x) => x.value))];
+        else if (stats?.interval.status === 'ok' && stats.interval.lower !== null && stats.interval.upper !== null) span = [stats.interval.lower, stats.interval.upper];
+      }
+      return { row: r, ci, value, stats, count: contingency ? (values[0] ?? undefined) : undefined, reps, span };
     });
     return { s, style, cells, meaning, label: displayName(chart, s.id, s.name) };
   });
@@ -156,12 +168,13 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   // Positive parts pile up above the baseline and negative ones below it (spec 8.4); the axis shows both piles.
   const stackedTotals = categoryRows.flatMap((_, ci) => [raw.reduce((sum, r) => sum + Math.max(0, r.cells[ci].value ?? 0), 0), raw.reduce((sum, r) => sum + Math.min(0, r.cells[ci].value ?? 0), 0)]);
   // Individual values are shown over bars of replicates, not over lines or counts.
-  const showDots = (style: ChartStyle) => chart.type === 'groupedBar' && layout.kind === 'replicates' && style.showSymbols;
+  const showDots = (style: ChartStyle) => (chart.type === 'groupedBar' || floating) && layout.kind === 'replicates' && style.showSymbols;
   const allY =
     arrangement === 'side'
-      ? raw.flatMap((r) => r.cells.flatMap((c) => (c.value === null ? [] : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars, r.style.errorDirection) : [c.value]), ...(showDots(r.style) ? c.reps.map((x) => x.value) : [])])))
+      ? raw.flatMap((r) => r.cells.flatMap((c) => (c.value === null ? [] : floating ? (c.span ? [...c.span, c.value] : []) : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars, r.style.errorDirection) : [c.value]), ...(showDots(r.style) ? c.reps.map((x) => x.value) : [])])))
       : stackedTotals;
-  const tickCountHint = Math.max(3, Math.min(10, Math.round(H / 50)));
+  const horizontal = chart.orientation === 'horizontal' && supportsHorizontal(chart.type);
+  const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? W / 60 : H / 50)));
   // Log scales suit values side by side or on lines, not stacked parts or percentages, so those stay linear.
   const axisCfg = arrangement === 'side' ? chart.yAxis : { ...chart.yAxis, scale: 'linear' as const, reverse: false };
   const yAxis = resolveAxis({
@@ -183,15 +196,21 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     widthPt: W,
     heightPt: H,
     title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
-    xAxis: chart.xAxis,
-    yAxis: chart.yAxis,
+    // Horizontal: the numbers run along the bottom (the value axis settings) and the category names down the left.
+    xAxis: horizontal ? chart.yAxis : chart.xAxis,
+    yAxis: horizontal ? chart.xAxis : chart.yAxis,
     legend: chart.legend,
     legendLabels: legendSeries.map((i) => raw[i].label),
-    categoryLabels: labels,
-    yTickLabels: yAxis.ticks.map(yAxis.tickLabel),
+    categoryLabels: horizontal ? [] : labels,
+    yTickLabels: horizontal ? labels : yAxis.ticks.map(yAxis.tickLabel),
   });
   warnings.push(...lay.warnings);
-  const { plot } = lay;
+  // The geometry below is made in the virtual region (the real one when vertical).
+  const real = lay.plot;
+  const plot = horizontal ? { x: real.x, y: real.y, width: real.height, height: real.width } : real;
+  const orient: Orientation = horizontal
+    ? { horizontal, real, virtual: plot, toScreen: (x, y) => ({ x: real.x + (plot.y + plot.height - y), y: real.y + (x - plot.x) }), matrix: `matrix(0 1 -1 0 ${n2(real.x + plot.y + plot.height)} ${n2(real.y - plot.x)})` }
+    : { horizontal, real, virtual: real, toScreen: (x, y) => ({ x, y }), matrix: null };
   const [y0, y1] = yAxis.domain;
   const yScale = axisMapper(yAxis, plot.y + plot.height, -plot.height);
   const slot = plot.width / Math.max(1, categoryRows.length);
@@ -206,6 +225,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const stackDown = new Array<number>(categoryRows.length).fill(0);
   let clipped = 0;
   let offAxis = 0;
+  let noSpan = 0;
   const series: GroupedSeries[] = raw.map((r, si) => {
     const bars: GroupedBar[] = [];
     const points: GroupedPoint[] = [];
@@ -244,6 +264,18 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       const x = stacked ? cat.centerX - bw / 2 : cat.centerX - cluster / 2 + si * bw;
       let from = baseline;
       let to = cell.value;
+      if (floating) {
+        // A floating bar needs a lower and an upper value; a single value has none.
+        if (!cell.span) {
+          noSpan++;
+          continue;
+        }
+        [from, to] = cell.span;
+        if (!onAxis(yAxis, from) || !onAxis(yAxis, to)) {
+          offAxis++;
+          continue;
+        }
+      }
       if (stacked) {
         // A part is as high as its own value; positive values pile up from the baseline, negative ones down from it.
         const pile = cell.value < 0 ? stackDown : stackUp;
@@ -256,6 +288,10 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       const yTop = Math.min(pa, pb);
       const yBottom = Math.max(pa, pb);
       const gbar: GroupedBar = { id, row: cell.row, categoryIndex: cell.ci, value: cell.value, x, y: yTop, width: bw, height: Math.max(0, yBottom - yTop), stats: cell.stats, count: cell.count };
+      if (floating) {
+        gbar.range = [from, to];
+        gbar.centerLine = { x1: x, x2: x + bw, y: yScale(cell.value) };
+      }
       bars.push(gbar);
       if (showDots(r.style)) {
         // Spread across the bar's width by a fixed hash of the observation, so the picture is the same every time.
@@ -264,7 +300,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       }
       let errTop: number | null = null;
       let errBottom: number | null = null;
-      if (cell.stats && !stacked) {
+      if (cell.stats && !stacked && !floating) {
         const bar = buildErrorBar({ groupId: r.s.id, centerX: x + bw / 2, stats: cell.stats, style: r.style, yScale, domain: yAxis.domain, log: !!yAxis.log });
         if (bar) {
           errorPath += bar.d;
@@ -274,7 +310,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
           errBottom = bar.bottom;
         }
       }
-      if (arrangement === 'side') {
+      if (arrangement === 'side' && !floating) {
         const text = barLabelText(chart.barLabels, cell.value, cell.count ?? cell.stats?.n ?? null);
         const yBase = yScale(baseline);
         if (text !== null && Number.isFinite(pb) && Number.isFinite(yBase)) {
@@ -286,7 +322,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     return { groupId: r.s.id, label: r.label, style: r.style, bars, points, dots, linePath, errorPath, errorMeaning };
   });
   if (offAxis > 0) warnings.push(`${offAxis} value${offAxis === 1 ? ' is' : 's are'} 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
+  if (noSpan > 0) warnings.push(`${noSpan} value${noSpan === 1 ? ' has' : 's have'} no range to draw a floating bar from: enter replicates, or limits as the values already calculated.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
 
-  return { widthPt: W, heightPt: H, layout: lay, arrangement, asLines, categories, y: yAxis, yScale, series, legendSeries, warnings: [...new Set(warnings)] };
+  return { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, legendSeries, warnings: [...new Set(warnings)] };
 }

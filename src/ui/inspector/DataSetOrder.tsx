@@ -8,13 +8,13 @@ import { NumField, SubHeading } from './controls';
  * The order of the data sets on a column chart (left to right) and the space before each of them. Colours stay with
  * the data set when it moves.
  */
-export function DataSetOrder({ chart, groups }: { chart: Chart; groups: Array<{ id: Id; label: string }> }) {
+export function DataSetOrder({ chart, groups, gaps = true, heading = 'Order, left to right' }: { chart: Chart; groups: Array<{ id: Id; label: string }>; gaps?: boolean; heading?: string }) {
   const { run } = useApp();
   const ids = groups.map((g) => g.id);
   const move = (id: Id, op: MoveOp) => run(op === 'reverse' ? 'Reverse data sets' : 'Move data set', setGroupOrder(chart.id, moveGroup(ids, id, op)));
   return (
     <div>
-      <SubHeading>Order, left to right</SubHeading>
+      <SubHeading>{heading}</SubHeading>
       <div className="order-actions">
         <button className="small-btn" onClick={() => move(ids[0] ?? '', 'reverse')} disabled={ids.length < 2}>
           Reverse
@@ -44,7 +44,7 @@ export function DataSetOrder({ chart, groups }: { chart: Chart; groups: Array<{ 
           </li>
         ))}
       </ol>
-      {groups.length > 1 && (
+      {gaps && groups.length > 1 && (
         <>
           <SubHeading>Space before a data set (% of normal)</SubHeading>
           {groups.slice(1).map((g) => (

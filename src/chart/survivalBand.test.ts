@@ -88,10 +88,10 @@ describe('survival confidence band and at-risk table', () => {
 
   it('saves and loads the options, and falls back for bad stored values', () => {
     const p = patchSurvival('c', { band: true, level: 0.9, method: 'plain', atRisk: true })(projectWith('survival', 'survival'));
-    expect(parseProject(stringifyProject(p)).charts.find((c) => c.id === 'c')!.survival).toEqual({ band: true, level: 0.9, method: 'plain', atRisk: true });
+    expect(parseProject(stringifyProject(p)).charts.find((c) => c.id === 'c')!.survival).toEqual({ band: true, level: 0.9, method: 'plain', atRisk: true, eventSymbols: false, errorBars: false });
     const file = JSON.parse(stringifyProject(p));
     file.project.charts.find((c: { id: string }) => c.id === 'c').survival = { band: 'yes', level: 7, method: 'x' };
-    expect(parseProject(JSON.stringify(file)).charts.find((c) => c.id === 'c')!.survival).toEqual({ band: false, level: 0.95, method: 'loglog', atRisk: false });
+    expect(parseProject(JSON.stringify(file)).charts.find((c) => c.id === 'c')!.survival).toEqual({ band: false, level: 0.95, method: 'loglog', atRisk: false, eventSymbols: false, errorBars: false });
   });
 });
 

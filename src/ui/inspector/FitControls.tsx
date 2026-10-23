@@ -1,33 +1,46 @@
 import { fitLines } from '../../chart/fitCurve';
 import type { XyModel } from '../../chart/xyModel';
-import { FIT_LIMITS } from '../../model/fitOptions';
-import type { Chart, FitSettings } from '../../model/types';
-import { FIT_MODELS, fitModelById } from '../../stats/fit';
+import { analysesOf } from '../../model/analysis';
+import { newId } from '../../model/ids';
+import type { Chart, ChartFit, DataTable } from '../../model/types';
+import { fitModelById } from '../../stats/fit';
 import { useApp } from '../../state/AppContext';
-import { patchLook } from '../../state/commands';
-import { Check, Field, GroupBox, NumField, SelectInput } from './controls';
+import { addAnalysis, composeCommands, patchLook } from '../../state/commands';
+import { Check, Field, GroupBox, SelectInput } from './controls';
 
-/** The fitted curve of an XY chart (spec 17): which model, the band around it, and what was found. */
-export function FitSection({ chart, model }: { chart: Chart; model: XyModel }) {
-  const { run } = useApp();
+/**
+ * The fitted curve of an XY chart (spec 17). The model and its confidence level belong to a curve fit of the Results;
+ * the chart picks one and chooses how the curve is drawn.
+ */
+export function FitSection({ chart, table, model }: { chart: Chart; table: DataTable; model: XyModel }) {
+  const { project, run, setView } = useApp();
   const f = chart.fit;
-  const on = f.model !== 'none';
-  const set = (label: string, patch: Partial<FitSettings>, key?: string) => run(label, patchLook(chart.id, { fit: { ...f, ...patch } }), key);
-  const info = f.model === 'none' ? null : fitModelById(f.model);
+  const fits = analysesOf(project).filter((a) => a.kind === 'curvefit' && a.dataTableId === table.id);
+  const chosen = fits.find((a) => a.id === f.analysisId);
+  const on = !!chosen;
+  const set = (label: string, patch: Partial<ChartFit>) => run(label, patchLook(chart.id, { fit: { ...f, ...patch } }));
+  // A new curve fit of this table, drawn by this chart; its model is chosen in the Results.
+  const create = () => {
+    const id = newId('analysis');
+    run('New curve fit', composeCommands(addAnalysis(id, table.id, 'curvefit'), patchLook(chart.id, { fit: { ...f, analysisId: id, band: f.band === 'none' ? 'confidence' : f.band } })));
+  };
   const fitted = model.series.filter((s) => s.fit);
   return (
     <GroupBox title="Fitted curve">
-      <Field label="Model" hint="Each data set is fitted on its own, using every replicate value">
-        <SelectInput<FitSettings['model']>
-          value={f.model}
-          options={[{ value: 'none', label: 'None' }, ...FIT_MODELS.map((m) => ({ value: m.id, label: m.label }))]}
-          onChange={(v) => set('Fitted curve', { model: v })}
+      <Field label="Curve fit" hint="The model is chosen in the curve fit of the Results; each data set is fitted on its own, using every replicate value">
+        <SelectInput<string>
+          value={chosen?.id ?? ''}
+          options={[{ value: '', label: 'None' }, ...fits.map((a) => ({ value: a.id, label: a.name }))]}
+          onChange={(v) => set('Fitted curve', { analysisId: v === '' ? null : v })}
         />
       </Field>
-      {info && <div className="muted small">{info.formula}{info.positiveX ? ' X must be above 0.' : ''}</div>}
-      {f.model === 'polynomial' && <NumField label="Degree" value={f.degree} min={FIT_LIMITS.degree.min} max={FIT_LIMITS.degree.max} step={1} slider={false} onCommit={(v) => set('Polynomial degree', { degree: v }, 'fit:degree')} />}
+      <div className="row-buttons">
+        <button onClick={create} title="Add a curve fit of this table to the Results and draw it here">New curve fit</button>
+        {chosen && <button onClick={() => setView({ kind: 'analysis', id: chosen.id })} title="Open the results to change the model or see the numbers">Open results</button>}
+      </div>
+      {on && model.fit.model !== 'none' && <div className="muted small">{fitModelById(model.fit.model).label}: {fitModelById(model.fit.model).formula}</div>}
       <Field label="Band">
-        <SelectInput<FitSettings['band']>
+        <SelectInput<ChartFit['band']>
           value={f.band}
           disabled={!on}
           options={[
@@ -38,7 +51,6 @@ export function FitSection({ chart, model }: { chart: Chart; model: XyModel }) {
           onChange={(v) => set('Fit band', { band: v })}
         />
       </Field>
-      <NumField label="Confidence level" unit="%" value={Number((f.level * 100).toPrecision(6))} min={FIT_LIMITS.level.min * 100} max={FIT_LIMITS.level.max * 100} disabled={!on} slider={false} onCommit={(v) => set('Confidence level', { level: v / 100 }, 'fit:level')} />
       <Field label="Extend over the whole X axis">
         <Check checked={f.extend} disabled={!on} onChange={(v) => set('Extend fitted curve', { extend: v })} />
       </Field>
@@ -52,7 +64,7 @@ export function FitSection({ chart, model }: { chart: Chart; model: XyModel }) {
             {s.fit?.failure && <div className="muted">No curve: {s.fit.failure}</div>}
             {s.fit?.summary && (
               <>
-                {fitLines(s.fit.summary, f.level).map((l) => (
+                {fitLines(s.fit.summary, model.fit.level).map((l) => (
                   <div key={l}>{l}</div>
                 ))}
                 <div className="muted">{s.fit.summary.n} points{s.fit.summary.df > 0 ? `, ${s.fit.summary.df} degrees of freedom` : ''}</div>

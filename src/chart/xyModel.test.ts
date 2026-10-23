@@ -20,7 +20,7 @@ describe('chart types and table types', () => {
   it('offers the chart types of each table type', () => {
     expect(chartTypesFor('column').map((c) => c.type)).toEqual(['bar', 'scatter', 'mean', 'box', 'floating', 'paired', 'histogram', 'ecdf', 'violin']);
     expect(chartTypesFor('xy').map((c) => c.type)).toEqual(['xyScatter', 'xyLine', 'xyLineSymbols']);
-    expect(CHART_TYPES).toHaveLength(23);
+    expect(CHART_TYPES).toHaveLength(24);
   });
   it('the presets decide symbols and lines', () => {
     const s = (t: ChartType) => createChart('t', undefined, t).layers[0].style;

@@ -135,7 +135,7 @@ describe('version 2 sanitising', () => {
   it('invalid style enums are dropped with notes', () => {
     const r = parseProjectWithNotes(
       v2((l) => {
-        l.style.symbolShape = 'star';
+        l.style.symbolShape = 'blob';
         l.groupOverrides = { a: { errorCap: 'x', barFill: '#111111' } };
       }),
     );

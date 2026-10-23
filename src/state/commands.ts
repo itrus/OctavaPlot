@@ -4,12 +4,14 @@ import { sanitizeDistribution } from '../model/distributionOptions';
 import { sanitizeLook } from '../model/look';
 import { GROUP_GAP_LIMITS, sanitizeGaps, sanitizeOrder } from '../model/groupOrder';
 import { createChart, createColumnTable, DEFAULT_SURVIVAL, initialLayerStyle, createContingencyTable, createGroupedTable, createSurvivalTable, defaultSummaryFor, createGroup, createXyTable, DEFAULT_JITTER, DEFAULT_STYLE, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
-import { analysisApplies, analysisTypeInfo } from '../model/analysis';
+import { analysisKindApplies, analysisTypeInfo } from '../model/analysis';
+import { sanitizeDegree } from '../model/fitOptions';
+import type { FitModelId } from '../stats/fit';
 import { effectiveTable } from '../model/chartTable';
 import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, xySeries } from '../model/tableLayout';
 
 /** Chart types whose series colour is the colour of symbols, lines and error bars (not of filled bars). */
-import { applyVariant, type ChartVariant } from '../model/chartVariant';
+import { applyVariant, type ChartVariant, variantFits } from '../model/chartVariant';
 import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns, usesSeriesBlocks } from '../model/chartTypes';
 import { newId } from '../model/ids';
 import { DEFAULT_PALETTE_ID, paletteColor, type Palette } from '../model/palettes';
@@ -511,22 +513,27 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
   });
 
 /** Add an analysis of a table to the Results section. */
-export const addAnalysis = (id: Id, tableId: Id, kind: AnalysisKind = 'descriptive'): Command => (p) => {
+export const addAnalysis = (id: Id, tableId: Id, kind: AnalysisKind = 'descriptive', fit?: { model: FitModelId; degree?: number }): Command => (p) => {
   const table = p.dataTables.find((t) => t.id === tableId);
-  if (!table || !analysisApplies(table.kind)) return p;
+  if (!table || !analysisKindApplies(kind, table.kind)) return p;
   const existing = p.analyses ?? [];
   const base = `${analysisTypeInfo(kind).label} of ${table.name}`;
   let name = base;
   for (let i = 2; existing.some((a) => a.name === name); i++) name = `${base} (${i})`;
-  return { ...p, analyses: [...existing, { id, name, kind, dataTableId: tableId, level: 0.95 }] };
+  return { ...p, analyses: [...existing, { id, name, kind, dataTableId: tableId, level: 0.95, ...(kind === 'curvefit' ? { model: fit?.model ?? 'linear', degree: sanitizeDegree(fit?.degree, 2) } : {}) }] };
 };
 
-export const patchAnalysis = (id: Id, patch: Partial<Pick<Analysis, 'name' | 'level'>>): Command => (p) => ({
+export const patchAnalysis = (id: Id, patch: Partial<Pick<Analysis, 'name' | 'level' | 'model' | 'degree'>>): Command => (p) => ({
   ...p,
-  analyses: (p.analyses ?? []).map((a) => (a.id === id ? { ...a, ...patch } : a)),
+  analyses: (p.analyses ?? []).map((a) => (a.id === id ? { ...a, ...patch, ...(patch.degree !== undefined ? { degree: sanitizeDegree(patch.degree, a.degree ?? 2) } : {}) } : a)),
 });
 
-export const removeAnalysis = (id: Id): Command => (p) => ({ ...p, analyses: (p.analyses ?? []).filter((a) => a.id !== id) });
+export const removeAnalysis = (id: Id): Command => (p) => ({
+  ...p,
+  analyses: (p.analyses ?? []).filter((a) => a.id !== id),
+  // A graph that drew this curve fit draws none now.
+  charts: p.charts.map((c) => (c.fit.analysisId === id ? { ...c, fit: { ...c.fit, analysisId: null } } : c)),
+});
 
 export const setProjectName = (name: string): Command => (p) => (p.name === name ? p : { ...p, name });
 
@@ -537,11 +544,16 @@ export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; hei
   // A type that does not suit the table's type is ignored: the table's default chart type is used.
   const suited = type !== undefined && chartTypeInfo(type)?.tableKind === table.kind ? type : defaultChartTypeFor(table.kind);
   const chart = { ...createChart(tableId, size, suited), id: chartId, name: table.name, title: table.name };
-  return { ...p, charts: [...p.charts, applyVariant(chart, variant)] };
+  const made = applyVariant(chart, variant);
+  if (!variant?.fit || !variantFits(made, variant)) return { ...p, charts: [...p.charts, made] };
+  // A chart with a curve fit has its fit in the Results: made here, and the chart points to it.
+  const analysisId = `fit-of-${chartId}`;
+  const withFit = addAnalysis(analysisId, tableId, 'curvefit', variant.fit)(p);
+  return { ...withFit, charts: [...withFit.charts, { ...made, fit: { ...made.fit, analysisId } }] };
 };
 
 /** Colours, frame and gridline style of the chart (see model/axis.ts: sanitizeLook). */
-export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
+export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
     const { grid, ...rest } = patch;
     return { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };

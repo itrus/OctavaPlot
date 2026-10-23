@@ -431,3 +431,7 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
 .order-buttons { display: inline-flex; gap: 2px; }
 
 .nav-rename { flex: 1; min-width: 0; font: inherit; padding: 0 3px; }
+
+.results-table { user-select: none; }
+.results-scroller:focus { outline: none; }
+.results-table .picked { background: var(--accent-soft) !important; }

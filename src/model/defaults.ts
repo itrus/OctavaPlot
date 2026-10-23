@@ -9,7 +9,7 @@ import type {
   BarLayout,
   DistributionOptions,
   HeatmapOptions,
-  FitSettings,
+  ChartFit,
   HistogramOptions,
   PieOptions,
   GridStyle,
@@ -72,7 +72,7 @@ function axisTitlesFor(type: ChartType): { x: string; y: string } {
 /** The summary a new chart of this type starts with: XY charts of replicate values show the SD, as the usual convention. */
 export const defaultSummaryFor = (type: ChartType): SummarySpec => (chartFamily(type) === 'xy' || type === 'groupedBar' || type === 'groupedLine' ? { ...DEFAULT_SUMMARY, spread: 'sd' } : { ...DEFAULT_SUMMARY });
 
-export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, method: 'loglog', atRisk: false };
+export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, method: 'loglog', atRisk: false, eventSymbols: false, errorBars: false };
 
 export const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4 };
 
@@ -95,8 +95,8 @@ const DEFAULT_DISTRIBUTION: DistributionOptions = {
 };
 /** Heat maps (spec 13.1): a single gradient, the range of the values, nothing normalised, no numbers in the cells. */
 const DEFAULT_HEATMAP: HeatmapOptions = { palette: 'viridis', reverse: false, min: null, max: null, centre: null, normalise: 'none', method: 'zscore', summary: 'mean', showValues: false, decimals: null, cellGapPt: 0, transpose: false, colourbar: true, missingColour: '#d9d9d9' };
-/** No fitted curve until one is chosen; a band, when asked for, is the 95% interval of the curve. */
-const DEFAULT_FIT: FitSettings = { model: 'none', degree: 2, band: 'none', level: 0.95, extend: false, showParameters: false };
+/** No fitted curve until a curve fit of the Results is chosen; a band, when asked for, uses that fit's confidence level. */
+const DEFAULT_FIT: ChartFit = { analysisId: null, band: 'none', extend: false, showParameters: false };
 
 /** Histograms (spec 11.1): automatic bins, counts, bars touching; the cumulative distribution steps up at each value. */
 const DEFAULT_HISTOGRAM: HistogramOptions = { binning: 'auto', binWidth: null, firstEdge: null, frequency: 'count', cumulative: 'off', arrangement: 'overlay', gapPct: 0, ecdfDirection: 'atOrBelow', ecdfUnits: 'fraction', ecdfSymbols: false, ecdfExtend: true };
@@ -127,6 +127,7 @@ export const DEFAULT_STYLE: ChartStyle = {
   symbolColor: '#000000',
   symbolShape: 'circle',
   symbolSizePt: 6,
+  symbolFillOpacity: 1,
   symbolBorderColor: '#000000',
   symbolBorderWidthPt: 1.5,
   showErrorBars: true,
@@ -139,6 +140,7 @@ export const DEFAULT_STYLE: ChartStyle = {
   showMeanLine: false,
   lineColor: '#000000',
   lineWidthPt: AXIS_LINE_PT,
+  lineStyle: 'solid',
   axisBinding: 'primary',
   // Point labels: spec 7.1 L479-485, all P.
   showPointLabels: false,
@@ -184,6 +186,7 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
   xyLineSymbols: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
   groupedBar: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedStacked: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
+  groupedFloating: { showBars: true, showSymbols: false, showLines: false, showMeanLine: true },
   heatmap: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedLine: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
   pie: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
@@ -265,6 +268,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     frame: 'none',
     grid: { ...DEFAULT_GRID },
     orientation: 'vertical',
+    lineOrder: 'auto',
     origin: { x: null, y: null },
     bars: { ...DEFAULT_BARS },
     barLabels: { ...DEFAULT_BAR_LABELS },

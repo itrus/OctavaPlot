@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { buildAnyModel, ChartCanvas } from '../chart/anyModel';
 import { hitFromTarget, pointerToChartPt } from '../chart/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../chart/tooltip';
+import { analysesOf } from '../model/analysis';
+import { resolveFit } from '../model/fitOptions';
 import type { Chart, DataTable } from '../model/types';
 import { useApp } from '../state/AppContext';
 import { patchAnnotation, resetAllDataSets } from '../state/commands';
@@ -15,8 +17,9 @@ const CANVAS_PAD = 24;
 const SCROLLBAR_ROOM = 17;
 
 export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { selection, setSelection, run, setStatus, zoom, setZoom, settings, fitRequest, navigateInspector } = useApp();
-  const any = useMemo(() => buildAnyModel(chart, table), [chart, table]);
+  const { project, selection, setSelection, run, setStatus, zoom, setZoom, settings, fitRequest, navigateInspector } = useApp();
+  const curve = useMemo(() => resolveFit(chart.fit, analysesOf(project), table.id), [chart.fit, project.analyses, table.id]);
+  const any = useMemo(() => buildAnyModel(chart, table, curve), [chart, table, curve]);
   const model = any.model;
   const svgRef = useRef<SVGSVGElement>(null);
   const [tip, setTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
@@ -102,7 +105,7 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
   const exportSvg = async () => {
     try {
       const { chartToSvgString } = await import('../chart/export');
-      downloadBlob(new Blob([chartToSvgString(chart, table)], { type: 'image/svg+xml' }), exportFileName(chart.name, 'svg', settings.timestampExports));
+      downloadBlob(new Blob([chartToSvgString(chart, table, curve)], { type: 'image/svg+xml' }), exportFileName(chart.name, 'svg', settings.timestampExports));
       setStatus('Exported SVG.');
     } catch (err) {
       setStatus(`SVG export failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -113,7 +116,7 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
     const scale = 1;
     try {
       const { chartToPngBlob } = await import('../chart/export');
-      downloadBlob(await chartToPngBlob(chart, table, scale), exportFileName(chart.name, 'png', settings.timestampExports));
+      downloadBlob(await chartToPngBlob(chart, table, scale, curve), exportFileName(chart.name, 'png', settings.timestampExports));
       setStatus(`Exported PNG, ${chart.widthPx} × ${chart.heightPx} px.`);
     } catch (err) {
       setStatus(`PNG export failed: ${err instanceof Error ? err.message : String(err)}`);

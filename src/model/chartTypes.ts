@@ -70,6 +70,7 @@ export const CHART_TYPES: readonly ChartTypeInfo[] = [
   { type: 'xyLineSymbols', tableKind: 'xy', label: 'Line with symbols', description: 'Points joined in X order, each marked.' },
   { type: 'groupedBar', tableKind: 'grouped', label: 'Grouped bars', description: 'Bars side by side within each category, with error bars.' },
   { type: 'groupedStacked', tableKind: 'grouped', label: 'Stacked bars', description: 'The series stacked in one bar per category: the value of each is its own height.' },
+  { type: 'groupedFloating', tableKind: 'grouped', label: 'Floating bars (min to max)', description: 'A bar from the smallest to the largest value of each series in each category, with a line at the mean or median.' },
   { type: 'heatmap', tableKind: 'grouped', label: 'Heat map', description: 'Each cell coloured by its value: rows are the categories, columns the series.' },
   { type: 'groupedLine', tableKind: 'grouped', label: 'Lines over categories', description: 'One line per series joining its means across the categories.' },
   { type: 'pie', tableKind: 'contingency', label: 'Pie charts', description: 'The outcomes of each row as parts of a circle.' },
@@ -87,8 +88,8 @@ export const defaultChartTypeFor = (kind: TableKind): ChartType => chartTypesFor
 export const tableTypeInfo = (kind: TableKind): TableTypeInfo => TABLE_TYPES.find((t) => t.kind === kind) ?? TABLE_TYPES[0];
 
 /** How a chart type is drawn: which model and drawing it uses, and so which inspector. */
-/** Chart types that can run horizontally: the column charts (bars, dots, means, boxes and violins). */
-export const supportsHorizontal = (type: ChartType): boolean => type === 'bar' || type === 'scatter' || type === 'mean' || type === 'box' || type === 'violin' || type === 'floating' || type === 'paired';
+/** Chart types that can run horizontally: the column charts (bars, dots, means, boxes and violins) and the bars of grouped and contingency tables. */
+export const supportsHorizontal = (type: ChartType): boolean => type === 'bar' || type === 'scatter' || type === 'mean' || type === 'box' || type === 'violin' || type === 'floating' || type === 'paired' || type === 'groupedBar' || type === 'groupedStacked' || type === 'groupedFloating' || type === 'contingencyBars' || type === 'contingencyStacked' || type === 'contingencyPercent';
 
 type ChartFamily = 'category' | 'xy' | 'grouped' | 'survival' | 'whole' | 'hist' | 'heat';
 
@@ -100,6 +101,7 @@ export function chartFamily(type: ChartType): ChartFamily {
       return 'xy';
     case 'groupedBar':
     case 'groupedStacked':
+    case 'groupedFloating':
     case 'groupedLine':
     case 'contingencyBars':
     case 'contingencyStacked':

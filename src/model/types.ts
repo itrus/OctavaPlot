@@ -1,3 +1,5 @@
+import type { FitModelId } from '../stats/fit';
+
 /** Typed project model. Everything here is plain JSON-serialisable data. */
 
 export type Id = string;
@@ -15,6 +17,8 @@ export interface Group {
   title: string;
   /** Stable index into the theme palette, assigned at creation. */
   paletteIndex: number;
+  /** Set only on the columns a graph is drawn from: where the series of this column sat in its table, so its colour stays with it when the series are reordered or hidden. */
+  seriesSlot?: number;
   /** Always exactly `DataTable.rowCount` long. */
   observations: Observation[];
 }
@@ -78,6 +82,7 @@ export type ChartType =
   | 'groupedLine'
   | 'heatmap'
   | 'groupedStacked'
+  | 'groupedFloating'
   | 'contingencyBars'
   | 'pie'
   | 'doughnut'
@@ -85,7 +90,7 @@ export type ChartType =
   | 'contingencyPercent'
   | 'survival'
   | 'cumulativeEvent';
-export type SymbolShape = 'circle' | 'square' | 'triangle' | 'diamond' | 'plus' | 'cross';
+export type SymbolShape = 'circle' | 'square' | 'triangle' | 'triangleDown' | 'diamond' | 'hexagon' | 'star' | 'target' | 'plus' | 'cross' | 'asterisk';
 export type ErrorDirection = 'both' | 'positive' | 'negative';
 type ErrorCap = 'bar' | 'none';
 type LegendPosition = 'right' | 'bottom' | 'top';
@@ -146,6 +151,8 @@ export interface ChartStyle {
   symbolColor: string;
   symbolShape: SymbolShape;
   symbolSizePt: number;
+  /** How opaque the inside of a symbol is, 0 (hollow: only the border shows) to 1. The border is always opaque. */
+  symbolFillOpacity: number;
   symbolBorderColor: string;
   symbolBorderWidthPt: number;
 
@@ -162,6 +169,8 @@ export interface ChartStyle {
   showMeanLine: boolean;
   lineColor: string;
   lineWidthPt: number;
+  /** Pattern of the line: solid, dashes, dots, or both. */
+  lineStyle: LineStyle;
 
   /** Which Y axis the data set is plotted on (group level; P left/right mapping, spec 5.3 L322). */
   axisBinding: AxisBinding;
@@ -287,18 +296,27 @@ export interface HeatmapOptions {
   missingColour: string;
 }
 
-/** Settings of fitted curves on an XY chart (spec 17), one set for the whole chart: each data set gets its own fit. */
-export interface FitSettings {
-  /** 'none' draws no curve. */
-  model: 'none' | 'linear' | 'polynomial' | 'exp_decay' | 'exp_association' | 'exp_two_phase' | 'gaussian_peak' | 'hyperbola' | 'hill_4pl' | 'asymmetric_5pl';
-  /** Polynomial only. */
-  degree: number;
+/** How an XY chart shows a curve fit of the Results: which one, and how it is drawn. The model itself belongs to the analysis. */
+export interface ChartFit {
+  /** The curve fit analysis the curves come from; null = no curve. */
+  analysisId: Id | null;
   band: 'none' | 'confidence' | 'prediction';
-  /** Confidence level of the band and of the parameter intervals, as a fraction. */
-  level: number;
   /** Carry the curve over the whole X axis rather than over the data. */
   extend: boolean;
   /** Write the fitted parameters on the chart. */
+  showParameters: boolean;
+}
+
+/** A curve fit as the chart is drawn from it: the chart's choices together with the model and level of the analysis. */
+export interface FitSettings {
+  /** 'none' draws no curve. */
+  model: FitModelId | 'none';
+  /** Polynomial only. */
+  degree: number;
+  band: ChartFit['band'];
+  /** Confidence level of the band and of the parameter intervals, as a fraction. */
+  level: number;
+  extend: boolean;
   showParameters: boolean;
 }
 
@@ -340,7 +358,8 @@ export interface BarLabels {
 }
 
 /** Pattern of a line: solid, dashed or dotted. */
-export type LineStyle = 'solid' | 'dashed' | 'dotted';
+export type LineOrder = 'auto' | 'onTop' | 'underneath';
+export type LineStyle = 'solid' | 'longDash' | 'dashed' | 'dotted' | 'dashDot' | 'dashDotDot';
 /** The frame round the plotting region: none, or a box (spec 6.2 frame.mode). */
 export type FrameStyle = 'none' | 'box';
 
@@ -458,6 +477,10 @@ export interface SurvivalOptions {
   method: SurvivalBandMethod;
   /** Show the number of subjects still at risk under the plot, at the ticks of the time axis. */
   atRisk: boolean;
+  /** A symbol at every event time too, not only at the censored subjects. */
+  eventSymbols: boolean;
+  /** Error bars of one standard error (Greenwood) at every event time. */
+  errorBars: boolean;
 }
 
 export interface Chart {
@@ -500,6 +523,8 @@ export interface Chart {
   grid: GridStyle;
   /** Column charts only: horizontal puts the categories on the left and the value axis along the bottom. */
   orientation: ChartOrientation;
+  /** Where lines and error bars are drawn relative to the symbols and bars: as the chart type usually does (auto), over them, or under them. */
+  lineOrder: LineOrder;
   /** Where the axis lines cross, as values on the other axis (null = the low edge): the Y axis at this X, the X axis at this Y. */
   origin: { x: number | null; y: number | null };
   bars: BarLayout;
@@ -508,7 +533,7 @@ export interface Chart {
   pairs: PairOptions;
   heatmap: HeatmapOptions;
   histogram: HistogramOptions;
-  fit: FitSettings;
+  fit: ChartFit;
   pie: PieOptions;
   xAxis: AxisConfig;
   yAxis: AxisConfig;
@@ -524,8 +549,8 @@ export interface Chart {
   annotations: Annotation[];
 }
 
-/** The analyses of the Results section. Only descriptive statistics exist so far. */
-export type AnalysisKind = 'descriptive';
+/** The analyses of the Results section: descriptive statistics of each column, and curve fits of an XY table. */
+export type AnalysisKind = 'descriptive' | 'curvefit';
 
 /** An analysis of one data table. Its results are never stored: they are recalculated from the table each time. */
 export interface Analysis {
@@ -535,6 +560,9 @@ export interface Analysis {
   dataTableId: Id;
   /** Confidence level of the intervals, 0 < level < 1. */
   level: number;
+  /** Curve fits: the model (a FitModelId) and, for a polynomial, its degree. */
+  model?: FitModelId;
+  degree?: number;
 }
 
 export interface Project {

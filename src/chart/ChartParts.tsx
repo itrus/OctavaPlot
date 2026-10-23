@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Annotation, AxisConfig, BreakMark, Chart, Selection } from '../model/types';
 import { n2 } from '../model/units';
 import type { hitAttrs } from './hitTest';
@@ -177,4 +178,9 @@ export function ScaleBar({ chart, axis, along, scale, map, plot }: { chart: Char
       </text>
     </g>
   );
+}
+
+/** Shapes of a horizontal chart, turned into place by the model's matrix; a vertical chart draws them as they are. */
+export function Turned({ matrix, children }: { matrix: string | null; children: ReactNode }) {
+  return matrix ? <g transform={matrix}>{children}</g> : <>{children}</>;
 }

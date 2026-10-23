@@ -1,4 +1,5 @@
 import { resolveStyle } from '../model/style';
+import { NO_FIT_SETTINGS } from '../model/fitOptions';
 import type { Chart, DataTable } from '../model/types';
 import { chartPx2Pt, n2 } from '../model/units';
 import { autoBinWidth, binEdges, binHeights, countBins, ecdfSteps } from '../stats/histogram';
@@ -121,5 +122,5 @@ export function buildHistModel(chart: Chart, table: DataTable): XyModel {
   if (histogram && opts.cumulative !== 'off' && opts.frequency === 'density') warnings.push('A cumulative histogram of a density shows the cumulative fraction.');
   if (histogram && edges.length > 400) warnings.push('There are very many bins; set a larger bin width.');
 
-  return { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)] };
+  return { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit: NO_FIT_SETTINGS };
 }

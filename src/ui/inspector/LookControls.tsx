@@ -1,5 +1,5 @@
 import { FRAME_STYLES, GRID_LIMITS, LINE_STYLES } from '../../model/look';
-import type { BarLabelMode, Chart, FrameStyle, LineStyle } from '../../model/types';
+import type { BarLabelMode, Chart, FrameStyle, LineOrder, LineStyle } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { patchLook } from '../../state/commands';
 import { AUTO_BAR_GAP_PCT, AUTO_BAR_OUTER_PCT, BAR_LIMITS } from '../../model/columnOptions';
@@ -178,6 +178,26 @@ export function DirectionSection({ chart }: { chart: Chart }) {
         />
       </Field>
       {chart.orientation === 'horizontal' && <div className="muted small">The value axis uses the Y axis settings; the right axis and point labels are not available on horizontal charts yet.</div>}
+    </Section>
+  );
+}
+
+/** Whether lines and error bars are drawn over or under the symbols and bars (Prism: "Line and error go"). */
+export function LineOrderSection({ chart }: { chart: Chart }) {
+  const { run } = useApp();
+  return (
+    <Section title="Drawing order">
+      <Field label="Lines and error bars go" hint="Auto draws them as the chart type usually does: over bars, under symbols. On top puts them over the symbols and bars too; Underneath puts them behind both.">
+        <SelectInput<LineOrder>
+          value={chart.lineOrder}
+          options={[
+            { value: 'auto', label: 'Auto' },
+            { value: 'onTop', label: 'On top' },
+            { value: 'underneath', label: 'Underneath' },
+          ]}
+          onChange={(v) => run('Drawing order', patchLook(chart.id, { lineOrder: v }))}
+        />
+      </Field>
     </Section>
   );
 }
