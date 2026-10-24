@@ -93,6 +93,11 @@ export function importCsv(text: string, separator: DecimalSeparator = 'auto'): C
   }
   if (records.length < 2) return { ok: false, message: 'The file needs a header line with the group names and at least one data line.' };
   const header = records[0];
+  // A header with no comma but a semicolon or tab is a differently delimited file; say so instead of failing on its first value.
+  if (header.length === 1 && /[;	]/.test(header[0])) {
+    const kind = header[0].includes('	') ? 'tab' : 'semicolon';
+    return { ok: false, message: `This file looks ${kind}-separated. Use a comma-separated file (CSV), or paste the cells into the table.` };
+  }
   const hasTitles = header[0]?.trim().toLowerCase() === ROW_TITLE_HEADER.toLowerCase();
   const offset = hasTitles ? 1 : 0;
   const width = header.length - offset;

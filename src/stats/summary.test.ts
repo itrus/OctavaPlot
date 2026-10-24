@@ -318,11 +318,12 @@ describe('numerical robustness', () => {
 describe('statsFor', () => {
   const obs = (values: number[]): Observation[] => values.map((value, i) => ({ id: `o${i}`, value }));
 
-  it('returns the identical object for the same array and settings', () => {
+  it('returns the identical object for the same values and settings, whichever array holds them', () => {
     const o = obs([1, 2, 3, 4]);
     expect(statsFor(o, spec({ spread: 'sd' }))).toBe(statsFor(o, spec({ spread: 'sd' })));
     expect(statsFor(o, spec({ spread: 'sd' }))).toEqual(computeGroupStats([1, 2, 3, 4], spec({ spread: 'sd' })));
-    expect(statsFor(obs([1, 2, 3, 4]), spec({ spread: 'sd' }))).not.toBe(statsFor(o, spec({ spread: 'sd' })));
+    expect(statsFor(obs([1, 2, 3, 4]), spec({ spread: 'sd' }))).toBe(statsFor(o, spec({ spread: 'sd' })));
+    expect(statsFor(obs([1, 2, 3, 5]), spec({ spread: 'sd' }))).not.toBe(statsFor(o, spec({ spread: 'sd' })));
   });
 
   it('keys only on settings that matter', () => {
@@ -338,11 +339,11 @@ describe('statsFor', () => {
     expect(statsFor(o, spec({ spread: 'sd', invalidPolicy: 'rejectGroup' }))).not.toBe(a);
   });
 
-  it('caps entries per array at 32 (oldest evicted)', () => {
+  it('keeps a bounded number of results, the least recently used going first', () => {
     const o = obs([1, 2, 3, 4]);
-    const first = statsFor(o, spec({ spread: 'ci', confidenceLevel: 0.5 }));
-    for (let i = 1; i <= 32; i++) statsFor(o, spec({ spread: 'ci', confidenceLevel: 0.5 + i / 100 }));
-    expect(statsFor(o, spec({ spread: 'ci', confidenceLevel: 0.5 }))).not.toBe(first);
+    const first = statsFor(o, spec({ spread: 'sd' }));
+    for (let i = 1; i <= 20001; i++) statsFor(obs([i]), spec({ spread: 'sd' }));
+    expect(statsFor(o, spec({ spread: 'sd' }))).not.toBe(first);
     expect(SUMMARY_ALGORITHM_VERSION).toBe(1);
   });
 });

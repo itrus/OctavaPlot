@@ -56,3 +56,13 @@ describe('malformed quotes', () => {
     expect(importCsv('a,b\r\n"1",3\r\n').ok).toBe(true);
   });
 });
+
+describe('other delimiters', () => {
+  it('names a semicolon- or tab-separated file instead of failing on its first value', () => {
+    for (const [text, kind] of [['A;B\n1;2\n', 'semicolon'], ['A\tB\n1\t2\n', 'tab']] as const) {
+      const r = importCsv(text);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.message).toContain(kind);
+    }
+  });
+});

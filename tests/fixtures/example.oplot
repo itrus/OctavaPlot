@@ -740,7 +740,8 @@
           }
         ],
         "annotations": [],
-        "referenceLines": []
+        "referenceLines": [],
+        "hiddenLayerIds": []
       }
     ]
   }

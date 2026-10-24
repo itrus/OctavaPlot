@@ -698,3 +698,13 @@ export const setExcluded = (tableId: Id, cells: CellRef[], excluded: boolean, re
     });
     return changed ? { ...t, groups } : t;
   });
+
+// ---------------------------------------------------------------- layers
+
+/** Hide a layer of the chart (take it out of the drawing; nothing that is calculated changes) or show it again. */
+export const setLayerHidden = (chartId: Id, layerId: Id, hidden: boolean): Command => (p) =>
+  mapChart(p, chartId, (c) => {
+    const has = c.hiddenLayerIds.includes(layerId);
+    if (hidden === has) return c;
+    return { ...c, hiddenLayerIds: hidden ? [...c.hiddenLayerIds, layerId] : c.hiddenLayerIds.filter((id) => id !== layerId) };
+  });

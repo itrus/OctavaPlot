@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyAspect, resizeChart } from './aspect';
+import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from './aspect';
 
 describe('chart shape lock', () => {
   it('leaves free sizes alone', () => {
@@ -7,7 +7,7 @@ describe('chart shape lock', () => {
   });
   it('returns only the two dimensions, so a patch cannot carry other chart fields', () => {
     const chart = { widthPx: 800, heightPx: 600, aspect: '4:3', title: 'x' };
-    for (const a of ['free', '4:3', '1:1'] as const) {
+    for (const a of ['free', '4:3', '3:4', '1:1'] as const) {
       expect(Object.keys(applyAspect(chart, a)).sort()).toEqual(['heightPx', 'widthPx']);
       expect(Object.keys(resizeChart(chart, a, 'height', 500)).sort()).toEqual(['heightPx', 'widthPx']);
     }
@@ -18,6 +18,17 @@ describe('chart shape lock', () => {
   });
   it('keeps a square square', () => {
     expect(resizeChart({ widthPx: 500, heightPx: 400 }, '1:1', 'height', 700)).toEqual({ widthPx: 700, heightPx: 700 });
+  });
+  it('keeps 3:4 portrait when either side changes', () => {
+    expect(resizeChart({ widthPx: 600, heightPx: 800 }, '3:4', 'width', 450)).toEqual({ widthPx: 450, heightPx: 600 });
+    expect(resizeChart({ widthPx: 600, heightPx: 800 }, '3:4', 'height', 400)).toEqual({ widthPx: 300, heightPx: 400 });
+  });
+  it('size presets are consistent with their shape lock and are recognised', () => {
+    for (const p of SIZE_PRESETS) {
+      expect(applyAspect(p, p.aspect)).toEqual({ widthPx: p.widthPx, heightPx: p.heightPx });
+      expect(presetOf(p)).toBe(p);
+    }
+    expect(presetOf({ widthPx: 800, heightPx: 600, aspect: 'free' })).toBeUndefined();
   });
   it('switching shape keeps the width', () => {
     expect(applyAspect({ widthPx: 1200, heightPx: 500 }, '4:3')).toEqual({ widthPx: 1200, heightPx: 900 });

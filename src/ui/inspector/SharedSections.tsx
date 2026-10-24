@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { displayName } from '../../chart/model';
-import { applyAspect, resizeChart } from '../../model/aspect';
+import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../model/aspect';
 import { graphSources, type GraphSource } from '../../model/chartTable';
 import { AXIS_LIMITS } from '../../model/axis';
 import { FONT_FAMILIES } from '../../model/look';
@@ -138,12 +138,13 @@ export function DimensionsSection({ chart }: { chart: Chart }) {
   const setChart = useChartSetter(chart);
   return (
     <div className="tab-body">
-      <Field label="Shape" hint="Free keeps width and height independent; 4:3 and Square move one when you change the other">
+      <Field label="Shape" hint="Free keeps width and height independent; 4:3, 3:4 and Square move one when you change the other">
         <span className="switch-group" role="group" aria-label="Chart shape">
           {(
             [
               ['free', 'Free'],
               ['4:3', '4:3'],
+              ['3:4', '3:4'],
               ['1:1', 'Square'],
             ] as const
           ).map(([value, label]) => (
@@ -157,6 +158,16 @@ export function DimensionsSection({ chart }: { chart: Chart }) {
             </button>
           ))}
         </span>
+      </Field>
+      <Field label="Size preset" hint="Sets width, height and shape together">
+        <SelectInput<string>
+          value={presetOf(chart)?.id ?? 'custom'}
+          options={[...(presetOf(chart) ? [] : [{ value: 'custom', label: 'Custom' }]), ...SIZE_PRESETS.map((p) => ({ value: p.id, label: p.label }))]}
+          onChange={(v) => {
+            const p = SIZE_PRESETS.find((s) => s.id === v);
+            if (p) setChart(`Chart size ${p.label}`, { aspect: p.aspect, widthPx: p.widthPx, heightPx: p.heightPx });
+          }}
+        />
       </Field>
       <NumField label="Chart width" unit="px" value={chart.widthPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => setChart('Chart width', resizeChart(chart, chart.aspect, 'width', v), 'chart:w')} />
       <NumField label="Chart height" unit="px" value={chart.heightPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => setChart('Chart height', resizeChart(chart, chart.aspect, 'height', v), 'chart:h')} />

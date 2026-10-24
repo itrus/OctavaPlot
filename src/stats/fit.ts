@@ -5,6 +5,9 @@
 
 import { studentTQuantileUpper } from './special';
 
+/** Raise when the numbers a fit gives change, so that no cached result of the old algorithm is shown. */
+export const FIT_ALGORITHM_VERSION = 1;
+
 export type FitModelId = 'linear' | 'polynomial' | 'exp_decay' | 'exp_association' | 'exp_two_phase' | 'gaussian_peak' | 'hyperbola' | 'hill_4pl' | 'asymmetric_5pl';
 
 export interface FitModel {

@@ -1,11 +1,12 @@
 import { isXyChartType } from '../model/chartTypes';
+import { layersAvailable, layersOf, type LayerSpec } from '../model/layers';
 import { resolveStyle } from '../model/style';
 import { resolveSummary } from '../model/summary';
 import { layoutOf, summaryFormatInfo, xySeries } from '../model/tableLayout';
 import { NO_FIT_SETTINGS } from '../model/fitOptions';
 import type { Chart, ChartStyle, DataTable, FitSettings, Id, SpreadKind, SummaryFormat } from '../model/types';
 import { chartPx2Pt, n2 } from '../model/units';
-import { computeGroupStats, type GroupStats } from '../stats/summary';
+import { summaryOf, type GroupStats } from '../stats/summary';
 import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
 import { computeLayout, type Layout } from './layout';
 import { curveYValues, drawFit, runFit, type FittedCurve } from './fitCurve';
@@ -89,6 +90,8 @@ export interface XyModel {
   warnings: string[];
   /** The curve fit drawn, with its settings (none when the chart has no curve fit). */
   fit: FitSettings;
+  /** The layers the chart is drawn from, lowest first; absent for the families that are not drawn from layers yet. */
+  layers?: LayerSpec[];
 }
 
 
@@ -198,7 +201,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
       if (layout.kind === 'single') y = values[0];
       else if (layout.kind === 'replicates') {
         if (x !== null) for (const v of values) if (v !== null && Number.isFinite(v)) obs.push({ x, y: v });
-        stats = computeGroupStats(values, spec);
+        stats = summaryOf(values, spec);
         y = stats.centre;
         if (y !== null && stats.effectiveSpread !== 'none' && stats.interval.status === 'unavailable') noError++;
       } else {
@@ -308,5 +311,5 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   if (skippedTotal > 0) warnings.push(`${skippedTotal} row${skippedTotal === 1 ? ' has' : 's have'} an X or Y value missing and ${skippedTotal === 1 ? 'is' : 'are'} not drawn.`);
   if (allX.length === 0) warnings.push('Enter numbers in the X column and in at least one Y column to see the chart.');
 
-  return { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit };
+  return { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit, layers: layersAvailable(chart) ? layersOf(chart, table) : undefined };
 }

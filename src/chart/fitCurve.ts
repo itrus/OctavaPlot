@@ -1,6 +1,7 @@
 import type { FitSettings } from '../model/types';
 import { n2 } from '../model/units';
-import { fitCurve, fitModelById, isFailure, type FitFailure, type FitModelId, type FitParam, type FitResult } from '../stats/fit';
+import { cachedCalc } from '../stats/calcCache';
+import { FIT_ALGORITHM_VERSION, fitCurve, fitModelById, isFailure, type FitFailure, type FitModelId, type FitParam, type FitResult } from '../stats/fit';
 import { inBreak, onAxis, polylinesThroughBreaks } from './axisScale';
 import type { YAxisScale } from './scales';
 
@@ -40,32 +41,17 @@ export interface FitRun {
   xRange: [number, number] | null;
 }
 
-/** Fits are kept by their inputs, so changing a colour or a title does not fit the same data again. */
-const FIT_CACHE_SIZE = 64;
-const fitCache = new Map<string, FitResult | FitFailure>();
 /** How many fits were actually calculated (not taken from the cache); for the tests. */
 export const fitStats = { calculated: 0 };
 
-function fitKey(obs: ReadonlyArray<{ x: number; y: number }>, fit: FitSettings): string {
-  // The numbers themselves, not a hash: a collision would silently show another series' curve.
-  let key = `${fit.model}|${fit.degree}|${fit.level}|${obs.length}|`;
-  for (const p of obs) key += `${p.x},${p.y};`;
-  return key;
-}
-
+/** Fits are kept by their identity, so changing a colour or a title does not fit the same data again. */
 function cachedFit(obs: ReadonlyArray<{ x: number; y: number }>, fit: FitSettings & { model: FitModelId }): FitResult | FitFailure {
-  const key = fitKey(obs, fit);
-  const hit = fitCache.get(key);
-  if (hit) {
-    fitCache.delete(key);
-    fitCache.set(key, hit);
-    return hit;
-  }
-  fitStats.calculated++;
-  const made = fitCurve(obs, { model: fit.model, degree: fit.degree, level: fit.level });
-  fitCache.set(key, made);
-  if (fitCache.size > FIT_CACHE_SIZE) fitCache.delete(fitCache.keys().next().value as string);
-  return made;
+  const data: number[] = [];
+  for (const p of obs) data.push(p.x, p.y);
+  return cachedCalc({ kind: 'fit', algorithm: FIT_ALGORITHM_VERSION, data, method: fit.model, params: [fit.degree], level: fit.level }, () => {
+    fitStats.calculated++;
+    return fitCurve(obs, { model: fit.model, degree: fit.degree, level: fit.level });
+  });
 }
 
 /** Fit one series from its observations (every replicate counts as a point). */

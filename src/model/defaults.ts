@@ -289,6 +289,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     layers: [layer],
     annotations: [],
     referenceLines: [],
+    hiddenLayerIds: [],
   };
 }
 

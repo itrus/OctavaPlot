@@ -20,6 +20,7 @@ import { LINE_STYLES } from '../../model/look';
 import { analysesOf } from '../../model/analysis';
 import { resolveFit } from '../../model/fitOptions';
 import { FitSection } from './FitControls';
+import { LayersSection } from './LayersSection';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './controls';
 import { SECTIONS, TABS, type AppearanceSection, type InspectorTab } from './nav';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './SharedSections';
@@ -258,6 +259,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
               </GroupBox>
               )}
               {family === 'xy' && xyModel && <FitSection chart={chart} table={table} model={xyModel} />}
+              {family === 'xy' && <LayersSection chart={chart} table={table} />}
               {family === 'survival' && (
                 <>
                   <GroupBox title="Error bars (standard error)" checked={chart.survival.errorBars} onCheckedChange={(v) => run('Survival error bars', patchSurvival(chart.id, { errorBars: v }))}>

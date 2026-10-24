@@ -148,3 +148,14 @@ describe('decimal separator', () => {
     expect(parseClipboardBlock('1,234\t2', false, 'comma')).toEqual({ ok: true, titles: [], matrix: [[1.234, 2]] });
   });
 });
+
+describe('numbers that cannot be stored', () => {
+  it('rejects a value that underflows to 0 instead of storing 0, but accepts a true zero', () => {
+    expect(parseCell('1e-400').ok).toBe(false);
+    expect(parseCell('2.5E-999').ok).toBe(false);
+    for (const z of ['0', '0.0', '0e5', '-0']) expect(parseCell(z)).toEqual({ ok: true, value: Number(z) });
+  });
+  it('still accepts the smallest ordinary values', () => {
+    expect(parseCell('1e-300')).toEqual({ ok: true, value: 1e-300 });
+  });
+});

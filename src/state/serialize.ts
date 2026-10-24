@@ -360,7 +360,7 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     extraGroups: Array.isArray(c.extraGroups)
       ? c.extraGroups.flatMap((e) => (isObj(e) && typeof e.tableId === 'string' && typeof e.groupId === 'string' ? [{ tableId: e.tableId, groupId: e.groupId }] : []))
       : [],
-    aspect: c.aspect === '4:3' || c.aspect === '1:1' ? c.aspect : 'free',
+    aspect: c.aspect === '4:3' || c.aspect === '3:4' || c.aspect === '1:1' ? c.aspect : 'free',
     paletteId: typeof c.paletteId === 'string' ? c.paletteId : null,
     ...sanitizeLook(c, base),
     xAxis: sanitizeAxis({ ...base.xAxis, ...(isObj(c.xAxis) ? c.xAxis : {}) }, base.xAxis),
@@ -377,6 +377,7 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     displayNames: cleanDisplayNames(c.displayNames, `${path}.displayNames`, notes),
     annotations: cleanAnnotations(c.annotations, `${path}.annotations`, notes),
     referenceLines: cleanReferenceLines(c.referenceLines, `${path}.referenceLines`, notes),
+    hiddenLayerIds: Array.isArray(c.hiddenLayerIds) ? c.hiddenLayerIds.filter((id): id is string => typeof id === 'string') : [],
     layers,
   };
   if (!(chart.widthPx > 0) || !(chart.heightPx > 0)) fail(`${path}`, 'must have positive widthPx and heightPx');

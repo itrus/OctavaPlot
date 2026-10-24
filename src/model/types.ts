@@ -68,7 +68,7 @@ export interface DataTable {
   groups: Group[];
 }
 
-export type ChartAspect = 'free' | '4:3' | '1:1';
+export type ChartAspect = 'free' | '4:3' | '3:4' | '1:1';
 export type ChartType =
   | 'bar'
   | 'scatter'
@@ -567,6 +567,8 @@ export interface Chart {
   annotations: Annotation[];
   /** Lines at chosen values of the axes. */
   referenceLines: ReferenceLine[];
+  /** IDs of layers (see model/layers.ts) that are not drawn. Hiding changes nothing that is calculated. */
+  hiddenLayerIds: Id[];
 }
 
 /** The analyses of the Results section: descriptive statistics of each column, and curve fits of an XY table. */

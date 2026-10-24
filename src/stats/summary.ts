@@ -4,7 +4,7 @@
  */
 
 import type { CentreKind, Observation, SpreadKind, SummarySpec } from '../model/types';
-import { memoFor } from './memo';
+import { cachedCalc } from './calcCache';
 import { medianCiRank, studentTQuantileUpper } from './special';
 
 export interface GroupSummary {
@@ -419,22 +419,30 @@ export function computeGroupStats(
   return result(centre, { status: 'ok', lower, upper, coverage, code: null });
 }
 
+/** The settings that affect a summary: the same for every way of asking for one. */
+function summaryParams(spec: SummarySpec): { method: string; params: Array<string | number | null>; level: number | null } {
+  const effective = effectiveSpreadOf(spec.centre, spec.spread);
+  return {
+    method: `${spec.centre}/${spec.spread}`,
+    params: [spec.invalidPolicy, effective === 'none' ? null : spec.smallSamplePolicy],
+    level: effective === 'ci' ? spec.confidenceLevel : null,
+  };
+}
+
+/**
+ * computeGroupStats kept by its identity (the values, the settings that affect the result and the algorithm version), so
+ * a style edit that rebuilds a chart does not calculate the same summary again. The result is shared: do not change it.
+ */
+export function summaryOf(values: ReadonlyArray<number | null | undefined>, spec: SummarySpec): GroupStats {
+  const { method, params, level } = summaryParams(spec);
+  const data = values.map((v) => (v === undefined || v === null ? null : v));
+  return cachedCalc({ kind: 'summary', algorithm: SUMMARY_ALGORITHM_VERSION, data, method, params, level }, () => computeGroupStats(values, spec));
+}
+
 /** Cached computeGroupStats keyed by only the settings that affect the result. */
 export function statsFor(observations: ReadonlyArray<Observation>, spec: SummarySpec): GroupStats {
-  const effective = effectiveSpreadOf(spec.centre, spec.spread);
-  const key = JSON.stringify([
-    'stats',
-    SUMMARY_ALGORITHM_VERSION,
-    spec.centre,
-    spec.spread,
-    spec.invalidPolicy,
-    effective === 'none' ? null : spec.smallSamplePolicy,
-    effective === 'ci' ? spec.confidenceLevel : null,
-  ]);
-  return memoFor(observations, key, () =>
-    computeGroupStats(
-      observations.map((o) => o.value),
-      spec,
-    ),
+  return summaryOf(
+    observations.map((o) => o.value),
+    spec,
   );
 }

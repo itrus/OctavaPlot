@@ -33,6 +33,8 @@ export function parseCell(text: string, separator: DecimalSeparator = 'auto'): C
   if (!NUMBER_RE.test(t)) return { ok: false, message: `"${text.trim()}" is not a number` };
   const value = Number(t);
   if (!Number.isFinite(value)) return { ok: false, message: `"${text.trim()}" is not a finite number` };
+  // A nonzero mantissa that underflows to 0 (1e-400) would silently become a different number.
+  if (value === 0 && /[1-9]/.test(t.split(/e/i)[0])) return { ok: false, message: `"${text.trim()}" is too small to store` };
   return { ok: true, value };
 }
 

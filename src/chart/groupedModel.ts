@@ -5,7 +5,7 @@ import { resolveSummary } from '../model/summary';
 import { layoutOf, xySeries } from '../model/tableLayout';
 import type { Chart, ChartStyle, DataTable, Id } from '../model/types';
 import { chartPx2Pt, extent, n2 } from '../model/units';
-import { computeGroupStats, type GroupStats } from '../stats/summary';
+import { summaryOf, type GroupStats } from '../stats/summary';
 import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
 import { computeLayout, type Layout } from './layout';
 import { displayName, hash01, type Orientation } from './model';
@@ -137,7 +137,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         if (value !== null && arrangement === 'percent') value = rowTotals[ci] > 0 ? (value / rowTotals[ci]) * 100 : null;
       } else if (layout.kind === 'single') value = values[0];
       else if (layout.kind === 'replicates') {
-        stats = computeGroupStats(values, spec);
+        stats = summaryOf(values, spec);
         value = stats.centre;
         if (value !== null && stats.effectiveSpread !== 'none' && stats.interval.status === 'unavailable') noError.push(`${s.name}, ${labelOfRow(r)}`);
       } else {
