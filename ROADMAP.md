@@ -7,8 +7,8 @@ The calculation rules, presets and acceptance fixtures are in [docs/calculation-
 ## Decisions
 
 - **Stack:** React, TypeScript and SVG (SVG is the authoritative output), with D3 scale, shape and array modules. No server, Rust or Python.
-- **Units:** `pt` and `px` only (1 px = 0.75 pt). No mm, cm or inches.
-- **Export:** SVG and PNG. PDF is not rendered.
+- **Units:** charts use `pt` and `px` (1 px = 0.75 pt). Layout pages are A4 and placed in mm. No cm or inches.
+- **Export:** SVG and PNG are the authoritative outputs. PDF exists but holds a raster picture, not vector shapes.
 - **Project model:** a project holds several data tables, graphs and Results sheets. The single-chart boundary of the old specification no longer applies.
 - **Calculation interface:** calculations sit behind a small replaceable `CalculationEngine` interface (request in, result with diagnostics and provenance out). A synchronous local implementation comes first; a SciPy/Pyodide engine is an option only if a fit cannot be validated in TypeScript.
 - **Out of scope:** ANOVA, mixed and generalized models, multiple-comparison workflows beyond labelled brackets, power analysis, report builders, model selection.
@@ -23,6 +23,10 @@ The calculation rules, presets and acceptance fixtures are in [docs/calculation-
 6. Invalid edits keep the last valid state and show a local error. Failed fits never show uncertainty.
 
 Target layout, reached by extraction rather than a big move: `core/{data,figure,calculations,geometry,layout,scene,validation}`, `renderers/{svg,raster}`, `ui/*`, `state/*`, `presets/`.
+
+## Current state
+
+Partly in place (not verified against every exit criterion below): a layer specification (`src/model/layers.ts`), a calculation cache keyed by identity (`src/stats/calcCache.ts`), a scene shared by preview, export and tests for the XY-style families and chrome (`src/chart/scene.ts`), PDF and layout export, linked graphs. Dead code is checked with `npx knip`; the last pass removed three unused components and 24 unused exports.
 
 ## Phases
 
@@ -83,4 +87,4 @@ Above about 100k points, clip to the viewport and simplify the preview only. Nev
 
 ## Size
 
-The code base is about 30 kLoC. The planning assumption is 65-85 kLoC with tests, up to 100 kLoC for advanced plotting. It is a budget, not a goal. Consolidating duplicated chart-specific models should lower net growth.
+The code base is about 36 kLoC in `src` (about 12 kLoC of it tests, 82 test files). The planning assumption is 65-85 kLoC with tests, up to 100 kLoC for advanced plotting. It is a budget, not a goal. Consolidating duplicated chart-specific models should lower net growth.

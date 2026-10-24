@@ -1,7 +1,7 @@
 import type { FrameMm, Layout, LayoutArrangement, PageOrientation, PanelLabelStyle } from './types';
 
 /** A4 in mm; the renderer's unit is the point (1 in = 72 pt). */
-export const A4_MM = { width: 210, height: 297 } as const;
+const A4_MM = { width: 210, height: 297 } as const;
 
 export const mmToPt = (mm: number): number => (mm * 72) / 25.4;
 
@@ -15,7 +15,7 @@ export const GAP_MM_MAX = 30;
 export const GRID_MAX = 6;
 /** Most panels of a free layout, and the smallest box (mm). */
 export const FREE_MAX = 12;
-export const FRAME_MIN_MM = 15;
+const FRAME_MIN_MM = 15;
 
 /** Size of the page in mm for an orientation. */
 export const pageMm = (o: PageOrientation): { width: number; height: number } => (o === 'landscape' ? { width: A4_MM.height, height: A4_MM.width } : A4_MM);
@@ -148,7 +148,7 @@ export function panelLabel(style: PanelLabelStyle, index: number): string {
 /** A graph's natural size on the page, in pt (its SVG viewBox), or null for an empty slot. */
 export type NaturalSize = { widthPt: number; heightPt: number } | null;
 
-export interface Placement {
+interface Placement {
   slot: number;
   rect: Rect;
   /** Where the graph is drawn (centred in the slot) and its size, in pt on the page; null for an empty slot. */

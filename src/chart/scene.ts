@@ -31,7 +31,7 @@ export interface SceneHit {
   objectId?: Id;
 }
 
-export interface ScenePath {
+interface ScenePath {
   /** Stable, from the layer (and the observation) the shape belongs to; unique in the drawing. */
   id: string;
   d: string;
@@ -51,7 +51,7 @@ export interface ScenePath {
   glow?: boolean;
 }
 
-export interface SceneLayer {
+interface SceneLayer {
   /** The ID of the layer (see model/layers.ts). */
   id: Id;
   kind: LayerKind;

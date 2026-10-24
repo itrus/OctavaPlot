@@ -44,27 +44,31 @@ npm install
 npm run dev      # development server
 npm run build    # type-check (strict) + production build
 npm test         # unit tests (vitest)
+npm run typecheck # type-check only (no unused locals or parameters allowed)
 ```
 
 ## Structure
 
 | Path | Concern |
 |---|---|
-| `src/model/` | Typed project model (`types.ts`), defaults, style hierarchy, units (pt/mm/px), table and chart types (`chartTypes.ts`, `chartGallery.ts`) |
+| `src/model/` | Typed project model (`types.ts`), defaults, style hierarchy, units (pt/px), table and chart types (`chartTypes.ts`, `chartGallery.ts`) |
 | `src/model/axis.ts`, `look.ts`, `columnOptions.ts`, `distributionOptions.ts` | Settings of axes, of the look of a chart (fonts, colours, frame, gridlines, direction), of columns and bar labels, of box plots and violins; each with its limits and a `sanitize*` function that checks what a file or a patch holds (`sanitize.ts` has the shared checks) |
 | `src/stats/` | `summary.ts`: per-data-set centre, spread and interval; `distribution.ts`: quartiles, whiskers, density; `special.ts`: gamma, beta and t functions and the exact median CI; `memo.ts`: results kept per observation array; independent of presentation |
 | `src/chart/scales.ts`, `axisScale.ts` | Value-axis domain and ticks: linear, log, reversed, minor ticks, number format |
 | `src/chart/layout.ts` | Margins, titles, legend placement |
 | `src/chart/model.ts`, `groupedModel.ts`, `xyModel.ts`, `survivalModel.ts` | Geometry of the four families of chart (column, grouped and contingency, XY, survival) |
-| `src/chart/ChartSvg.tsx`, `GroupedChartSvg.tsx`, `XyChartSvg.tsx` | Declarative SVG drawing of each family; `ChartParts.tsx`, `GridLines.tsx`, `axisTicks.ts` are the pieces they share |
+| `src/chart/ChartSvg.tsx`, `GroupedChartSvg.tsx`, `XyChartSvg.tsx` | Declarative SVG drawing of each family; `ChartParts.tsx`, `axisTicks.ts` are the pieces they share |
 | `src/chart/hatch.ts`, `labels.ts`, `axes.ts`, `errorGeometry.ts`, `distributionGeom.ts`, `columns.ts`, `barLabels.ts` | Fill pattern marks, point-label layout, axis binding, error-bar geometry, box and violin shapes, column positions, labels above bars |
+| `src/chart/scene.ts`, `sceneElement.ts`, `chrome.ts`, `categoryChrome.ts`, `SceneElements.tsx`, `SceneSvg.tsx` | Scene of a chart (shapes in pt, in drawing order) that the screen, the export and the tests draw from; chrome (axes, grid, frame, legend, titles) as scene elements |
+| `src/model/layers.ts`, `src/stats/calcCache.ts` | Layer specifications (kind, visibility, calculation reference); one calculation cache keyed by what a result is computed from |
 | `src/chart/hitTest.ts` | Hit testing / selection helpers (editor only) |
 | `src/chart/export.tsx` | SVG / PNG export (rendered without editor state) |
 | `src/state/` | Commands, undo/redo history, project file (.oplot), autosave, settings |
 | `src/ui/` | Navigator, data table, graph view, formatting inspector (`ui/inspector/`) |
+| `src/util/` | Download and file-name helpers |
 | `src/testing/` | Fixtures and checks used by the tests only; nothing in the app imports them |
 
-Style precedence: object override > group override > layer override > (group palette) > chart defaults. Chart internal unit is the point (1 in = 72 pt = 25.4 mm); the SVG viewBox is in pt. Sizes in the Inspector are true points: a 12 pt font is 12 pt tall in an export of the stated pixel size (96 px = 1 in, so 1 pt = 4/3 px). Project files from before version 3 stored half of every length in pt (the chart was drawn at twice its size); they are doubled on load.
+Style precedence: object override > group override > layer override > (group palette) > chart defaults. Chart internal unit is the point (1 in = 72 pt = 25.4 mm); the SVG viewBox is in pt. Sizes in the Inspector are true points: a 12 pt font is 12 pt tall in an export of the stated pixel size (96 px = 1 in, so 1 pt = 4/3 px).
 
 ## Table types and chart types
 
@@ -193,6 +197,7 @@ Reference lines are drawn on XY, survival, histogram, column and grouped charts 
 ## Evidence labels
 
 D = stated in a public source (see `docs/calculation-contracts.md`). P = proposal made here because no source gives a value. U = unverified.
+
 ## Calculation settings
 
 Summary settings (centre, spread, confidence level, small-sample policy, invalid-value policy) are calculation settings, stored in `summary` and `groupSummary`, not in the style hierarchy. Appearance (colour, cap, direction) stays in style.
@@ -204,7 +209,7 @@ Summary settings (centre, spread, confidence level, small-sample policy, invalid
 
 ## Project file versions
 
-Saved files carry `version: 3`. Version 2 added the summary settings; version 3 stores lengths in true points (earlier files stored half of every length in pt and are doubled on load). Version 1 files open and are migrated: a legacy `errorType` of sd or sem becomes the spread of the summary, and the legacy field is dropped. Older builds refuse newer files. Invalid stored values are stripped on load and reported as notes; excluded values, annotations and reference lines are checked field by field.
+Saved files carry `version: 1`, the only version this app reads and writes (see [docs/FILE_FORMAT.md](docs/FILE_FORMAT.md)). Invalid stored values are reset to their defaults on load and listed in the status bar; excluded values, annotations and reference lines are checked field by field.
 
 ## Fill pattern
 
@@ -221,6 +226,7 @@ The data table has an optional Row title column (undoable, copy and paste aware)
 ## License
 
 Released under the [GNU General Public License v3.0](LICENSE).
+
 ## Compliance note
 
 Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. The Business Associate Agreements in place cover Google Workspace and Microsoft 365 only, not this app or the browser. Do not enter patient identifiers (not verified whether sample identifiers are acceptable). Autosave can be switched off in Settings.

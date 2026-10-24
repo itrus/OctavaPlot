@@ -1,7 +1,6 @@
 import { FIT_MODELS } from '../stats/fit';
-import { analysesOf } from './analysis';
 import { bool, clamp, oneOf, record } from './sanitize';
-import type { Analysis, ChartFit, FitSettings, Id, Project } from './types';
+import type { Analysis, ChartFit, FitSettings, Id } from './types';
 
 /** Settings of fitted curves (spec 17): what a chart shows of a curve fit, and how a curve fit is read from its analysis. */
 
@@ -23,9 +22,6 @@ export function sanitizeFit(raw: unknown, base: ChartFit): ChartFit {
 
 /** The degree of a polynomial, kept within what is fitted. */
 export const sanitizeDegree = (v: unknown, fallback: number): number => Math.round(clamp(v, FIT_LIMITS.degree.min, FIT_LIMITS.degree.max, fallback));
-
-/** The curve fits of the Results. */
-export const curveFitsOf = (p: Pick<Project, 'analyses'>): Analysis[] => analysesOf(p).filter((a) => a.kind === 'curvefit');
 
 /** Fit settings that draw nothing. */
 export const NO_FIT_SETTINGS: FitSettings = { model: 'none', degree: 2, band: 'none', level: 0.95, extend: false, showParameters: false };

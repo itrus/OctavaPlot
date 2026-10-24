@@ -7,7 +7,7 @@ import type { Analysis, DataTable, Id } from './types';
 /** The Results of a curve fit: the numbers of each Y series of an XY table, as a sheet that can be shown, selected and copied. */
 
 /** One row of a results sheet: a label and one cell for each column. */
-export interface SheetRow {
+interface SheetRow {
   key: string;
   label: string;
   cells: string[];
@@ -55,7 +55,7 @@ const num = (v: number | null | undefined): string => (v === null || v === undef
 const full = (v: number | null | undefined): string => (v === null || v === undefined || !Number.isFinite(v) ? '' : String(v));
 
 /** The fits of every series of the table with the model and level of the analysis. */
-export function fitsOf(table: DataTable, analysis: Pick<Analysis, 'model' | 'degree' | 'level'>): Array<{ id: Id; label: string; result: FitResult | null; failure: string | null }> {
+function fitsOf(table: DataTable, analysis: Pick<Analysis, 'model' | 'degree' | 'level'>): Array<{ id: Id; label: string; result: FitResult | null; failure: string | null }> {
   const model = analysis.model ?? 'linear';
   return fitObservations(table).map((s) => {
     const r = fitCurve(s.obs, { model, degree: analysis.degree, level: analysis.level });

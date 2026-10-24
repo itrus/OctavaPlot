@@ -38,7 +38,7 @@ export const GRID_LIMITS = { widthPt: { min: 0.2, max: 10 } } as const;
 
 const LINES = valuesOf(LINE_STYLES);
 const FRAMES = valuesOf(FRAME_STYLES);
-export const LINE_ORDERS: ReadonlyArray<LineOrder> = ['auto', 'onTop', 'underneath'];
+const LINE_ORDERS: ReadonlyArray<LineOrder> = ['auto', 'onTop', 'underneath'];
 const ORIENTATIONS: readonly ChartOrientation[] = ['vertical', 'horizontal'];
 
 /** Lengths of the dashes and gaps of each pattern, in units of the line's width (a line thinner than 2 pt counts as 2 pt). */

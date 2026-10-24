@@ -18,7 +18,7 @@ export function fillClipId(chartId: string, markId: string): string {
 const rectAttrs = (r: Rect) => [['x', n2(r.x)], ['y', n2(r.y)], ['width', n2(r.width)], ['height', n2(r.height)]] as const;
 
 /** Pattern background plus all marks as one path, clipped to bounds, under a single group opacity. */
-export function fillMarksElement(clipId: string, bounds: Rect | null, marks: PatternMarks | null, fill: FillSpec): SceneElement | null {
+function fillMarksElement(clipId: string, bounds: Rect | null, marks: PatternMarks | null, fill: FillSpec): SceneElement | null {
   if (!bounds) return null;
   const d = marks ? marksToPathData(marks) : '';
   if (!fill.background && !d) return null;

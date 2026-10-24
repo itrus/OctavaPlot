@@ -150,7 +150,7 @@ export function drawFit(run: FitRun, fit: FitSettings, m: Mappers): FittedCurve 
 }
 
 /** A fitted number for reading: four significant digits. */
-export const fitNumber = (v: number): string => (Number.isFinite(v) ? String(Number(v.toPrecision(4))) : '–');
+const fitNumber = (v: number): string => (Number.isFinite(v) ? String(Number(v.toPrecision(4))) : '–');
 
 /** "8 points, 6 degrees of freedom": what the fit rests on (no degrees of freedom are named when none are left). */
 export const fitCountLine = (s: FitSummary): string => `${s.n} points${s.df > 0 ? `, ${s.df} degrees of freedom` : ''}`;

@@ -40,7 +40,7 @@ export const CHART_PX_MAX = 3000;
 export const BAR_PALETTE = ['#d9d9d9', '#a6a6a6', '#737373', '#f2f2f2', '#595959', '#bfbfbf'];
 
 /** The layer style a chart of this type starts with: its preset, and for survival curves a plus sign as the censor mark. */
-export const initialLayerStyle = (type: ChartType): Partial<ChartStyle> =>
+const initialLayerStyle = (type: ChartType): Partial<ChartStyle> =>
   type === 'survival' || type === 'cumulativeEvent' ? { ...TYPE_PRESETS[type], symbolShape: 'plus', symbolSizePt: 18, symbolBorderWidthPt: 4 } : { ...TYPE_PRESETS[type] };
 
 /** Axis titles a new chart of this type starts with. */
@@ -71,11 +71,11 @@ function axisTitlesFor(type: ChartType): { x: string; y: string } {
 }
 
 /** The summary a new chart of this type starts with: XY charts of replicate values show the SD, as the usual convention. */
-export const defaultSummaryFor = (type: ChartType): SummarySpec => (chartFamily(type) === 'xy' || type === 'groupedBar' || type === 'groupedLine' ? { ...DEFAULT_SUMMARY, spread: 'sd' } : { ...DEFAULT_SUMMARY });
+const defaultSummaryFor = (type: ChartType): SummarySpec => (chartFamily(type) === 'xy' || type === 'groupedBar' || type === 'groupedLine' ? { ...DEFAULT_SUMMARY, spread: 'sd' } : { ...DEFAULT_SUMMARY });
 
 export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, method: 'loglog', atRisk: false, eventSymbols: false, errorBars: false };
 
-export const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4 };
+const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4 };
 
 /** Line weight shared by the axes, bar borders, error bars and connecting lines, so they read as one family. */
 const AXIS_LINE_PT = 4;

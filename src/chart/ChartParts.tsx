@@ -1,17 +1,15 @@
 import type { ReactNode } from 'react';
-import type { Annotation, AxisConfig, BreakMark, Chart, Selection } from '../model/types';
+import type { Annotation, AxisConfig, Chart, Selection } from '../model/types';
 import { n2 } from '../model/units';
-import { backgroundElements, breakMarkElement, frameElement, plotClipElement, scaleBarElement, titleElements } from './chrome';
+import { backgroundElements, plotClipElement, titleElements } from './chrome';
 import type { hitAttrs } from './hitTest';
 import type { Layout, Rect } from './layout';
 import { SceneElements } from './SceneElements';
 import { svgId } from './svgIds';
-import type { YAxisScale } from './scales';
 import { measureText } from './text';
 
 /**
- * Pieces every kind of chart draws the same way: the backgrounds, the clip of the plotting region, the frame, the break marks,
- * the scale bars and the titles. They are made by the chrome functions (chrome.ts) as scene elements; these components only
+ * Pieces every kind of chart draws the same way: the backgrounds, the clip of the plotting region and the titles. They are made by the chrome functions (chrome.ts) as scene elements; these components only
  * write them as SVG, with the editor's hit attributes when the drawing is for the editor.
  */
 
@@ -29,23 +27,9 @@ export function PlotClip({ plot, xPieces, yPieces }: { plot: Rect; xPieces?: Arr
   return <SceneElements nodes={[plotClipElement(plot, xPieces, yPieces)]} editor={false} />;
 }
 
-export { axisLineD } from './chrome';
-
-/** The marks at the ends of the gaps of a broken axis: one slash or two, across the axis line. */
-export function BreakMarks(props: { along: 'x' | 'y'; fixed: number; gaps: Array<[number, number]>; mark: BreakMark; color: string; width: number }) {
-  const node = breakMarkElement(props);
-  return node ? <SceneElements nodes={[node]} editor={false} /> : null;
-}
-
 /** The chart background is the hit target for chart-level selection; the plotting region has its own colour. */
 export function Backgrounds({ chart, width, height, plot, hit }: { chart: Chart; width: number; height: number; plot: Rect; hit: HitProps }) {
   return <SceneElements nodes={backgroundElements(chart, width, height, plot)} editor={isEditor(hit)} />;
-}
-
-/** A box round the plotting region, when the chart asks for one. */
-export function FrameBox({ chart, plot, lineWidthPt }: { chart: Chart; plot: Rect; lineWidthPt: number }) {
-  const node = frameElement(chart, plot, lineWidthPt);
-  return node ? <SceneElements nodes={[node]} editor={false} /> : null;
 }
 
 /**
@@ -99,15 +83,6 @@ export function AnnotationLayer({ chart, editor, width, height, hit }: { chart: 
       })}
     </>
   );
-}
-
-/**
- * The scale bar of a hidden axis: a line as long as one major tick interval, with that interval written beside it, in
- * the lower left corner of the plotting region. `along` is the direction the axis runs; `map` its mapping to the page.
- */
-export function ScaleBar({ chart, axis, along, scale, map, plot }: { chart: Chart; axis: AxisConfig; along: 'x' | 'y'; scale: YAxisScale; map: (v: number) => number; plot: Rect }) {
-  const node = scaleBarElement(chart, axis, along, scale, map, plot);
-  return node ? <SceneElements nodes={[node]} editor={false} /> : null;
 }
 
 /** Shapes of a horizontal chart, turned into place by the model's matrix; a vertical chart draws them as they are. */

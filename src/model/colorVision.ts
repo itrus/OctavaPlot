@@ -29,7 +29,7 @@ export function simulate(hex: string, kind: Deficiency | null): number[] {
 }
 
 /** CIE L*a*b* (D65) of linear RGB. */
-export function lab(lin: number[]): number[] {
+function lab(lin: number[]): number[] {
   const [r, g, b] = lin;
   const x = (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047;
   const y = 0.2126729 * r + 0.7151522 * g + 0.072175 * b;

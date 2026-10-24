@@ -87,5 +87,3 @@ async function chartToCanvas(chart: Chart, table: DataTable, scale: number, fit?
   ctx.drawImage(img, 0, 0, width, height);
   return canvas;
 }
-
-export { downloadBlob, safeFileName } from '../util/download';

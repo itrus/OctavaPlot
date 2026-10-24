@@ -12,7 +12,7 @@ import type { Chart, ChartStyle, DataTable, Id, LayerStyle, LineStyle } from './
 export type LayerKind = 'atRisk' | 'band' | 'rawPoints' | 'points' | 'line' | 'errorBars' | 'fitCurve' | 'fitBand' | 'referenceLine' | 'annotation';
 
 /** What a layer's numbers come from; a calculation is keyed by what it is computed from, never by how the layer is styled. */
-export type CalcRef = { kind: 'summary'; seriesId: Id } | { kind: 'survival'; seriesId: Id } | { kind: 'curvefit'; analysisId: Id };
+type CalcRef = { kind: 'summary'; seriesId: Id } | { kind: 'survival'; seriesId: Id } | { kind: 'curvefit'; analysisId: Id };
 
 export interface LayerSpec {
   /** Stable: made from the series or object it belongs to and the kind, so it survives renaming, restyling and reordering. */
@@ -89,7 +89,7 @@ export function layersOf(chart: Chart, table: DataTable): LayerSpec[] {
 }
 
 /** What a kind of layer is called on screen. */
-export const LAYER_NAMES: Record<LayerKind, string> = {
+const LAYER_NAMES: Record<LayerKind, string> = {
   atRisk: 'At-risk table',
   band: 'Confidence band',
   rawPoints: 'Individual values',
@@ -164,12 +164,12 @@ export const STYLABLE_LAYERS: Partial<Record<LayerKind, ReadonlyArray<keyof Laye
   fitBand: ['color', 'opacity'],
 };
 
-export const LAYER_STYLE_LIMITS = { widthPt: { min: 0.2, max: 40 }, opacity: { min: 0, max: 1 } } as const;
+const LAYER_STYLE_LIMITS = { widthPt: { min: 0.2, max: 40 }, opacity: { min: 0, max: 1 } } as const;
 export const DEFAULT_BAND_OPACITY = 0.2;
 const LINE_STYLE_VALUES: readonly LineStyle[] = ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'];
 
 /** The layer kind of a layer ID (`${object id}:${kind}`), or null. */
-export const layerKindOf = (layerId: Id): LayerKind | null => {
+const layerKindOf = (layerId: Id): LayerKind | null => {
   const kind = layerId.slice(layerId.lastIndexOf(':') + 1);
   return kind in LAYER_NAMES ? (kind as LayerKind) : null;
 };

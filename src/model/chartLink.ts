@@ -29,7 +29,7 @@ function equal(a: unknown, b: unknown): boolean {
 }
 
 /** The merge of one setting (see above); the same value (not a copy) when nothing changes. undefined = the setting is absent. */
-export function merge3(own: unknown, before: unknown, after: unknown): unknown {
+function merge3(own: unknown, before: unknown, after: unknown): unknown {
   if (equal(before, after)) return own;
   if (equal(own, before)) return structuredClone(after);
   if (isObj(own) && isObj(before) && isObj(after)) {
@@ -67,7 +67,7 @@ function mergeApart(own: unknown, before: unknown, after: unknown, apart: readon
 }
 
 /** `child` after its source went from `before` to `after`. The same chart when there is nothing for it to follow. */
-export function followSource(child: Chart, before: Chart, after: Chart, sourceTable: DataTable, table: DataTable): Chart {
+function followSource(child: Chart, before: Chart, after: Chart, sourceTable: DataTable, table: DataTable): Chart {
   const out: Obj = { ...child };
   const c = child as unknown as Obj;
   const [b, a] = [before as unknown as Obj, after as unknown as Obj];

@@ -38,7 +38,7 @@ export interface Rect {
   height: number;
 }
 
-export interface Segment {
+interface Segment {
   x1: number;
   y1: number;
   x2: number;

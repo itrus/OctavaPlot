@@ -25,7 +25,7 @@ export function plotClipElement(plot: Rect, xPieces?: Array<[number, number]> | 
 }
 
 /** Path data of an axis line from `from` to `to` at `fixed` across it; a broken axis is drawn in its pieces, with no line in the gaps. */
-export function axisLineD(along: 'x' | 'y', fixed: number, from: number, to: number, pieces?: Array<[number, number]> | null): string {
+function axisLineD(along: 'x' | 'y', fixed: number, from: number, to: number, pieces?: Array<[number, number]> | null): string {
   const ranges = pieces ?? [[from, to] as [number, number]];
   return ranges.map(([a, b]) => (along === 'y' ? `M${n2(fixed)},${n2(a)}V${n2(b)}` : `M${n2(a)},${n2(fixed)}H${n2(b)}`)).join('');
 }
@@ -73,7 +73,7 @@ const MARK_HALF = 8;
 const MARK_SLANT = 6;
 
 /** The marks at the ends of the gaps of a broken axis: one slash or two, across the axis line. */
-export function breakMarkElement({ along, fixed, gaps, mark, color, width }: { along: 'x' | 'y'; fixed: number; gaps: Array<[number, number]>; mark: BreakMark; color: string; width: number }): SceneElement | null {
+function breakMarkElement({ along, fixed, gaps, mark, color, width }: { along: 'x' | 'y'; fixed: number; gaps: Array<[number, number]>; mark: BreakMark; color: string; width: number }): SceneElement | null {
   if (mark === 'none' || gaps.length === 0) return null;
   const slash = (p: number, shift: number) =>
     along === 'y' ? `M${n2(fixed - MARK_HALF)},${n2(p + shift + MARK_SLANT)}L${n2(fixed + MARK_HALF)},${n2(p + shift - MARK_SLANT)}` : `M${n2(p + shift - MARK_SLANT)},${n2(fixed + MARK_HALF)}L${n2(p + shift + MARK_SLANT)},${n2(fixed - MARK_HALF)}`;

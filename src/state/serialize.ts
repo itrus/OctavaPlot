@@ -17,8 +17,8 @@ import { defaultLayout, sanitizeLayout } from '../model/layout';
 import type { Analysis, Chart, ChartLayer, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SummarySpec } from '../model/types';
 
 /** The envelope of a project file (.oplot): this format and its one version. */
-export const FORMAT = 'octavaplot-project';
-export const VERSION = 1;
+const FORMAT = 'octavaplot-project';
+const VERSION = 1;
 /** Autosave in the browser's storage; the same text as a file. */
 export const AUTOSAVE_KEY = 'octavaplot:project:autosave';
 export const AUTOSAVE_BACKUP_KEY = 'octavaplot:project:autosave:backup';

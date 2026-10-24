@@ -29,7 +29,7 @@ export function exportFileName(base: string, ext: string, stamped: boolean, now:
   return `${safe}${stamped && !hasStamp ? `_${fileStamp(now)}` : ''}.${ext}`;
 }
 
-export const safeFileName = (name: string): string => name.replace(/[^\w.-]+/g, '_') || 'chart';
+const safeFileName = (name: string): string => name.replace(/[^\w.-]+/g, '_') || 'chart';
 
 /**
  * Copy text to the clipboard. Uses the async Clipboard API where the page may (secure context, user gesture),

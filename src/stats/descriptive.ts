@@ -2,7 +2,7 @@ import { medianCiRank, studentTQuantileUpper } from './special';
 import { quantileType6 } from './summary';
 
 /** An interval, or null when it cannot be computed. */
-export interface Interval {
+interface Interval {
   lower: number;
   upper: number;
 }

@@ -30,7 +30,7 @@ export interface XyPoint {
 }
 
 /** One replicate of a row, drawn on its own (the individual-values layer). */
-export interface XyRawPoint {
+interface XyRawPoint {
   /** Observation ID of the replicate: its stable identity. */
   id: Id;
   row: number;

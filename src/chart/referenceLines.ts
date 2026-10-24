@@ -43,7 +43,7 @@ const insideAxis = (axis: AxisFacts, v: number): boolean => {
  * Where each reference line is drawn, and why some are not: a line whose value lies outside the axis range, inside a gap of a
  * broken axis, or at or below 0 on a log axis is left out and reported (never moved to the edge).
  */
-export function placeReferenceLines(lines: readonly ReferenceLine[], place: Place): { placed: PlacedReferenceLine[]; skipped: ReferenceLine[]; unsupported: ReferenceLine[] } {
+function placeReferenceLines(lines: readonly ReferenceLine[], place: Place): { placed: PlacedReferenceLine[]; skipped: ReferenceLine[]; unsupported: ReferenceLine[] } {
   const placed: PlacedReferenceLine[] = [];
   const skipped: ReferenceLine[] = [];
   // A line of an axis the chart does not have (an X line on a column chart) is not drawn, and is told apart from one out of range.
