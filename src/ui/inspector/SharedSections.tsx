@@ -229,7 +229,7 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
   const lines = capabilitiesOf(chart.type).referenceLines;
   if (lines === 'none') return null;
   const hasX = lines === 'xy';
-  const add = (axis: 'x' | 'y') => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis, value: 0, color: '#cc0000', widthPt: 2, style: 'dashed', label: '', showLabel: false }));
+  const add = (axis: 'x' | 'y') => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis, value: 0, color: '#cc0000', widthPt: 2, style: 'dashed', opacity: 1, label: '', showLabel: false }));
   return (
     <Section title="Reference lines">
       <div className="button-row">
@@ -252,6 +252,7 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
               <ColorInput value={l.color} onChange={(v) => set('Reference line colour', { color: v }, 'color')} />
             </Field>
             <NumField label="Thickness" unit="pt" value={l.widthPt} min={0.2} max={40} onCommit={(v) => set('Reference line thickness', { widthPt: v }, 'width')} />
+            <NumField label="Opacity" value={l.opacity} min={0} max={1} onCommit={(v) => set('Reference line opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
             <Field label="Pattern">
               <SelectInput<LineStyle> value={l.style} options={LINE_STYLES.map((o) => ({ value: o.value, label: o.label }))} onChange={(v) => set('Reference line pattern', { style: v })} />
             </Field>
@@ -275,7 +276,7 @@ export function AnnotationsTab({ chart }: { chart: Chart }) {
         <button
           onClick={() => {
             const id = newId('ann');
-            run('Add annotation', addAnnotation(chart.id, { id, text: 'Text', xFrac: 0.4, yFrac: 0.08, fontSizePt: 28, color: '#000000' }));
+            run('Add annotation', addAnnotation(chart.id, { id, text: 'Text', xFrac: 0.4, yFrac: 0.08, fontSizePt: 28, color: '#000000', opacity: 1 }));
             setSelection({ kind: 'annotation', annotationId: id });
           }}
         >
@@ -315,6 +316,7 @@ export function AnnotationsTab({ chart }: { chart: Chart }) {
                 <Field label="Colour">
                   <ColorInput value={a.color} onChange={(v) => run('Annotation colour', patchAnnotation(chart.id, a.id, { color: v }), `ann:${a.id}:color`)} />
                 </Field>
+                <NumField label="Opacity" value={a.opacity} min={0} max={1} onCommit={(v) => run('Annotation opacity', patchAnnotation(chart.id, a.id, { opacity: v }), `ann:${a.id}:opacity`)} hint="0 = transparent, 1 = opaque" />
                 <div className="button-row">
                   <button
                     onClick={() => {

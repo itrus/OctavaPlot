@@ -7,7 +7,7 @@ import { buildAnyModel } from './anyModel';
 import { chartToSvgString } from './export';
 import { referenceLineNotices, referenceLinesOf } from './referenceLines';
 
-const line = (patch: Partial<ReferenceLine> = {}): ReferenceLine => ({ id: 'r1', axis: 'y', value: 50, color: '#cc0000', widthPt: 1, style: 'dashed', label: 'Target', showLabel: true, ...patch });
+const line = (patch: Partial<ReferenceLine> = {}): ReferenceLine => ({ id: 'r1', axis: 'y', value: 50, color: '#cc0000', widthPt: 1, style: 'dashed', opacity: 1, label: 'Target', showLabel: true, ...patch });
 
 describe('reference lines', () => {
   const xyTable = createXyTable('XY', true);
@@ -73,8 +73,8 @@ describe('reference lines', () => {
     const base = createChart(xyTable.id, undefined, 'xyScatter');
     const p = { id: 'p', name: 'p', dataTables: [xyTable], charts: [base] };
     const env = JSON.parse(stringifyProject(p));
-    env.project.charts[0].referenceLines = [null, { id: 'a', axis: 'z', value: 1 }, { id: 'b', axis: 'y', value: 'x' }, { id: 'c', axis: 'y', value: 5, color: 'red', widthPt: -3, style: 'wavy', label: 7, showLabel: 'yes' }];
+    env.project.charts[0].referenceLines = [null, { id: 'a', axis: 'z', value: 1 }, { id: 'b', axis: 'y', value: 'x' }, { id: 'c', axis: 'y', value: 5, color: 'red', widthPt: -3, style: 'wavy', label: 7, showLabel: 'yes', opacity: 7 }];
     const parsed = parseProject(JSON.stringify(env));
-    expect(parsed.charts[0].referenceLines).toEqual([{ id: 'c', axis: 'y', value: 5, color: '#000000', widthPt: 2, style: 'dashed', label: '', showLabel: false }]);
+    expect(parsed.charts[0].referenceLines).toEqual([{ id: 'c', axis: 'y', value: 5, color: '#000000', widthPt: 2, style: 'dashed', opacity: 1, label: '', showLabel: false }]);
   });
 });

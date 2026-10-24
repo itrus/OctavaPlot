@@ -1,9 +1,10 @@
 import { sanitizeAxis } from '../model/axis';
 import { sanitizeBarLabels, sanitizeBars } from '../model/columnOptions';
 import { sanitizeDistribution } from '../model/distributionOptions';
+import { sanitizeLayerStyles } from '../model/layers';
 import { sanitizeLook } from '../model/look';
 import { GROUP_GAP_LIMITS, sanitizeGaps, sanitizeOrder } from '../model/groupOrder';
-import { createChart, createColumnTable, DEFAULT_SURVIVAL, initialLayerStyle, createContingencyTable, createGroupedTable, createSurvivalTable, defaultSummaryFor, createGroup, createXyTable, DEFAULT_JITTER, DEFAULT_STYLE, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
+import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createGroup, createXyTable, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
 import { analysisKindApplies, analysisTypeInfo } from '../model/analysis';
 import { sanitizeDegree } from '../model/fitOptions';
 import type { FitModelId } from '../stats/fit';
@@ -14,11 +15,12 @@ import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, 
 import { applyVariant, type ChartVariant, variantFits } from '../model/chartVariant';
 import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns, usesSeriesBlocks } from '../model/chartTypes';
 import { newId } from '../model/ids';
-import { DEFAULT_PALETTE_ID, paletteColor, type Palette } from '../model/palettes';
+import { paletteColor, type Palette } from '../model/palettes';
 import { createRows, sanitizeRowTitle } from '../model/rows';
 import { clearGroupSummary, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/summary';
 import { LABEL_STYLE_KEYS, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle } from '../model/style';
 import type {
+  LayerStyle,
   Analysis,
   AnalysisKind,
   Annotation,
@@ -365,6 +367,7 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
     return {
       ...c,
       type,
+      distribution: type === 'violin' && c.distribution.points === 'none' ? { ...c.distribution, points: 'all' } : c.distribution,
       layers: c.layers.map((l) => ({
         ...l,
         style: { ...l.style, ...TYPE_PRESETS[type] },
@@ -395,22 +398,32 @@ export const clearPointStyle = (
 ): Command => (p) => mapLayer0(p, chartId, (l) => clearObjectKeys(l, pointId, keys));
 
 /**
- * Put every data set of the graph back to the defaults: the chart-type preset, the default palette, and no
- * overrides at any level (global, data set or point). Titles, axes, legend and size are not touched.
+ * Put the graph back to the settings a new graph of its type starts with: data set styles at every level, palette, axes, grid,
+ * legend, fonts, colours, size and shape, and the options of the chart type. What the graph shows is kept: its name, table, type,
+ * the title and axis titles, which data sets are on it and in what order, annotations, reference lines and the chosen curve fit.
  */
 export const resetAllDataSets = (chartId: Id): Command => (p) =>
-  mapChart(p, chartId, (c) => ({
-    ...c,
-    defaults: { ...DEFAULT_STYLE },
-    paletteId: DEFAULT_PALETTE_ID,
-    jitter: { ...DEFAULT_JITTER },
-    layers: c.layers.map((l, i) =>
-      i !== 0
-        ? l
-        : { ...l, style: initialLayerStyle(c.type), groupOverrides: {}, objectOverrides: {}, summary: { ...defaultSummaryFor(c.type) }, groupSummary: {} },
-    ),
-    survival: { ...DEFAULT_SURVIVAL },
-  }));
+  mapChart(p, chartId, (c) => {
+    const fresh = createChart(c.dataTableId, undefined, c.type);
+    const axis = (key: 'xAxis' | 'yAxis' | 'y2Axis') => ({ ...fresh[key], title: c[key].title });
+    return {
+      ...fresh,
+      id: c.id,
+      name: c.name,
+      title: c.title,
+      hiddenGroupIds: c.hiddenGroupIds,
+      groupOrder: c.groupOrder,
+      extraGroups: c.extraGroups,
+      displayNames: c.displayNames,
+      annotations: c.annotations,
+      referenceLines: c.referenceLines,
+      fit: { ...fresh.fit, analysisId: c.fit.analysisId },
+      xAxis: axis('xAxis'),
+      yAxis: axis('yAxis'),
+      y2Axis: axis('y2Axis'),
+      layers: c.layers.map((l, i) => (i !== 0 ? l : { ...fresh.layers[0], id: l.id, name: l.name })),
+    };
+  });
 
 export const resetStyle = (chartId: Id, scope: 'all' | Id, table: DataTable): Command => (p) =>
   mapChart(p, chartId, (c) => ({
@@ -566,7 +579,7 @@ export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; hei
 };
 
 /** Colours, frame and gridline style of the chart (see model/axis.ts: sanitizeLook). */
-export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
+export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
     const { grid, ...rest } = patch;
     return { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };
@@ -700,6 +713,21 @@ export const setExcluded = (tableId: Id, cells: CellRef[], excluded: boolean, re
   });
 
 // ---------------------------------------------------------------- layers
+
+/** Give a layer its own look, or take a setting back to the series' (null). A setting the layer's kind does not take is ignored. */
+export const patchLayerStyle = (chartId: Id, layerId: Id, patch: { [K in keyof LayerStyle]?: LayerStyle[K] | null }): Command => (p) =>
+  mapChart(p, chartId, (c) => {
+    const merged: Record<string, unknown> = { ...(c.layerStyles[layerId] ?? {}) };
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === null) delete merged[k];
+      else if (v !== undefined) merged[k] = v;
+    }
+    const { styles } = sanitizeLayerStyles({ [layerId]: merged });
+    const next = { ...c.layerStyles };
+    if (styles[layerId]) next[layerId] = styles[layerId];
+    else delete next[layerId];
+    return { ...c, layerStyles: next };
+  });
 
 /** Hide a layer of the chart (take it out of the drawing; nothing that is calculated changes) or show it again. */
 export const setLayerHidden = (chartId: Id, layerId: Id, hidden: boolean): Command => (p) =>

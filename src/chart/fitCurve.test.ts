@@ -217,3 +217,28 @@ describe('fit caching', () => {
     expect(buildAnyModelCached(chart, table, fit)).toBe(buildAnyModelCached(chart, table, { ...fit }));
   });
 });
+
+describe('the fitted parameters as text to paste on the graph', () => {
+  it('reads like the list in the inspector: the series, a line for each parameter, R², and the points and degrees of freedom', async () => {
+    const { fitParametersText } = await import('./fitCurve');
+    const table = createXyTable('XY', true);
+    const chart = createChart(table.id, undefined, 'xyScatter');
+    const model = buildXyModel(chart, table, { ...NO_FIT_SETTINGS, model: 'linear', level: 0.95 });
+    const lines = fitParametersText(model.series, 0.95).split('\n');
+    expect(lines.length).toBeGreaterThan(8);
+    // One block per series: its name first, the count last.
+    const names = model.series.filter((s) => s.fit?.summary).map((s) => s.label);
+    expect(lines.filter((l) => names.includes(l))).toEqual(names);
+    expect(lines.filter((l) => /^a \(intercept\) = -?[\d.]+ \(95% CI -?[\d.]+ to -?[\d.]+\)$/.test(l)).length).toBe(names.length);
+    expect(lines.filter((l) => /^R² = [\d.]+$/.test(l)).length).toBe(names.length);
+    expect(lines.filter((l) => /^\d+ points, \d+ degrees of freedom$/.test(l)).length).toBe(names.length);
+    expect(lines[0]).toBe(names[0]);
+  });
+  it('is empty when nothing is fitted, and names no degrees of freedom when none are left', async () => {
+    const { fitParametersText, fitCountLine } = await import('./fitCurve');
+    const table = createXyTable('XY', true);
+    const chart = createChart(table.id, undefined, 'xyScatter');
+    expect(fitParametersText(buildXyModel(chart, table).series, 0.95)).toBe('');
+    expect(fitCountLine({ n: 2, df: 0 } as never)).toBe('2 points');
+  });
+});

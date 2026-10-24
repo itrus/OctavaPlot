@@ -16,6 +16,7 @@ const forged = (patch: Partial<GroupStats>, lower: number | null, upper: number 
 
 const styleOf = (patch: Partial<ErrorBarStyle> = {}): ErrorBarStyle => ({
   showErrorBars: true,
+  errorOpacity: DEFAULT_STYLE.errorOpacity,
   errorDirection: DEFAULT_STYLE.errorDirection,
   errorCap: DEFAULT_STYLE.errorCap,
   errorCapWidthPt: DEFAULT_STYLE.errorCapWidthPt,

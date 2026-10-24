@@ -139,6 +139,8 @@ export interface ChartStyle {
   barOpacity: number;
   barBorderColor: string;
   barBorderWidthPt: number;
+  /** How opaque the border of a bar (or box, violin) is, 0 to 1. */
+  barBorderOpacity: number;
   /** Fill block (P). Pattern mode ignores barFill and uses barPatternBackground. */
   barFillMode: FillMode;
   barPattern: FillPattern;
@@ -152,13 +154,17 @@ export interface ChartStyle {
   barPatternBackground: string | null;
 
   showSymbols: boolean;
+  /** XY charts of replicates: every replicate as a small symbol behind the mean (or median). */
+  showRawPoints: boolean;
   symbolColor: string;
   symbolShape: SymbolShape;
   symbolSizePt: number;
-  /** How opaque the inside of a symbol is, 0 (hollow: only the border shows) to 1. The border is always opaque. */
+  /** How opaque the inside of a symbol is, 0 (hollow: only the border shows) to 1. */
   symbolFillOpacity: number;
   symbolBorderColor: string;
   symbolBorderWidthPt: number;
+  /** How opaque the border of a symbol is, 0 to 1. */
+  symbolBorderOpacity: number;
 
   showErrorBars: boolean;
   errorDirection: ErrorDirection;
@@ -166,6 +172,8 @@ export interface ChartStyle {
   errorCapWidthPt: number;
   errorLineWidthPt: number;
   errorColor: string;
+  /** How opaque the error bars are, 0 to 1. */
+  errorOpacity: number;
 
   /** Connecting line between group means (mean/error chart only). */
   showLines: boolean;
@@ -173,6 +181,8 @@ export interface ChartStyle {
   showMeanLine: boolean;
   lineColor: string;
   lineWidthPt: number;
+  /** How opaque the connecting and mean lines are, 0 to 1. */
+  lineOpacity: number;
   /** Pattern of the line: solid, dashes, dots, or both. */
   lineStyle: LineStyle;
 
@@ -375,6 +385,9 @@ export interface GridStyle {
   minorColor: string;
   minorWidthPt: number;
   minorStyle: LineStyle;
+  /** Opacity of the major and of the minor gridlines, 0 to 1. */
+  opacity: number;
+  minorOpacity: number;
 }
 
 /** A range of values left out of a numeric axis: the axis shows what is below and above it, with a gap between. */
@@ -469,6 +482,8 @@ export interface ReferenceLine {
   color: string;
   widthPt: number;
   style: LineStyle;
+  /** How opaque the line and its label are, 0 (invisible) to 1. */
+  opacity: number;
   /** Text written at the end of the line. */
   label: string;
   showLabel: boolean;
@@ -482,6 +497,8 @@ export interface Annotation {
   yFrac: number;
   fontSizePt: number;
   color: string;
+  /** 0 (invisible) to 1. */
+  opacity: number;
 }
 
 /** How the pointwise interval of a survival estimate is built. Log-log keeps it inside 0 to 1; plain is S +/- z SE. */
@@ -534,6 +551,8 @@ export interface Chart {
   titleOffsetPt: number;
   /** Colour of the axis lines, ticks and the frame. */
   axisColor: string;
+  /** Opacity of the axis lines, their ticks and the frame, 0 to 1. */
+  axisOpacity: number;
   /** Fill of the plotting region and of the whole chart; null = none (transparent). */
   plotColor: string | null;
   pageColor: string | null;
@@ -569,6 +588,17 @@ export interface Chart {
   referenceLines: ReferenceLine[];
   /** IDs of layers (see model/layers.ts) that are not drawn. Hiding changes nothing that is calculated. */
   hiddenLayerIds: Id[];
+  /** Look of single layers, keyed by layer ID (see model/layers.ts); a value that is absent is the series' own. */
+  layerStyles: Record<Id, Partial<LayerStyle>>;
+}
+
+/** What a layer can be given of its own: the fit curve its colour, thickness and pattern, the fit band its colour and opacity. */
+export interface LayerStyle {
+  color: string;
+  widthPt: number;
+  lineStyle: LineStyle;
+  /** Fill opacity, 0 to 1. */
+  opacity: number;
 }
 
 /** The analyses of the Results section: descriptive statistics of each column, and curve fits of an XY table. */

@@ -21,6 +21,8 @@ import { buildBox, buildFloating, buildViolin, type DistGeom } from './distribut
 import { columnLayout } from './columns';
 import { axisMapper, onAxis, resolveAxis } from './axisScale';
 import type { YAxisScale } from './scales';
+import { compileCategoryScene } from './categoryChrome';
+import type { ChromeScene } from './scene';
 
 /**
  * Chart model: the pure, React-free pipeline
@@ -39,6 +41,8 @@ export interface BarGeom {
   opacity: number;
   stroke: string;
   strokeWidth: number;
+  /** Opacity of the border, 0 to 1. */
+  strokeOpacity: number;
   /** Resolved fill (mode, pattern and its physical sizes); the legacy fields above stay as they were. */
   fillSpec: FillSpec;
   /** Pattern lattice anchor: bar centre x, baseline pixel of the group's own axis. */
@@ -65,6 +69,8 @@ interface PointGeom {
   fillOpacity: number;
   borderColor: string;
   borderWidth: number;
+  /** Opacity of the border of the symbol. */
+  borderOpacity: number;
 }
 
 interface LineGeom {
@@ -73,6 +79,7 @@ interface LineGeom {
   d: string;
   color: string;
   strokeWidth: number;
+  opacity: number;
 }
 
 export interface GroupGeom {
@@ -125,6 +132,7 @@ interface PairLine {
   d: string;
   color: string;
   strokeWidth: number;
+  opacity: number;
 }
 
 export interface ChartModel {
@@ -147,6 +155,8 @@ export interface ChartModel {
   /** Point labels; always present, empty while none is requested. They never affect ranges, summaries or layout. */
   labels: PointLabelModel;
   warnings: string[];
+  /** The chrome of the chart (clip, backgrounds, grids, axes, titles, legend) as scene elements. */
+  scene?: ChromeScene;
 }
 
 /** Intersection of two rectangles; null when it has no area. */
@@ -380,6 +390,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
         opacity: style.barOpacity,
         stroke: style.barBorderColor,
         strokeWidth: style.barBorderWidthPt,
+        strokeOpacity: style.barBorderOpacity,
         fillSpec,
         anchor,
         bounds,
@@ -409,6 +420,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
             fillOpacity: style.symbolFillOpacity,
             borderColor: style.symbolBorderColor,
             borderWidth: style.symbolBorderWidthPt,
+            borderOpacity: style.symbolBorderOpacity,
           });
         }
       } else {
@@ -435,6 +447,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
             fillOpacity: ps.symbolFillOpacity,
             borderColor: ps.symbolBorderColor,
             borderWidth: ps.symbolBorderWidthPt,
+            borderOpacity: ps.symbolBorderOpacity,
           });
         });
       }
@@ -444,7 +457,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
     let dist: DistGeom | null = null;
     const pre = distPre[gi];
     if (pre) {
-      const common = { groupId: group.id, centerX, toY, opts, lineColor: style.lineColor, lineWidthPt: style.lineWidthPt };
+      const common = { groupId: group.id, centerX, toY, opts, lineColor: style.lineColor, lineWidthPt: style.lineWidthPt, lineOpacity: style.lineOpacity };
       const slotWidth = slotStep;
       if (chart.type === 'box') {
         dist = buildBox({ ...common, width: slotWidth * opts.boxWidth, summary: pre.summary });
@@ -459,7 +472,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
         const anchor: Point = { x: centerX, y: rect.y + rect.height };
         const bounds = intersectRects(rect, plot);
         const marks = fillSpec.mode === 'pattern' && bounds ? patternMarks(fillSpec.pattern, bounds, anchor, fillSpec.spacingPt) : null;
-        bar = { id: `${group.id}:bar`, groupId: group.id, x: rect.x, y: rect.y, width: rect.width, height: rect.height, fill: style.barFill, opacity: style.barOpacity, stroke: style.barBorderColor, strokeWidth: style.barBorderWidthPt, fillSpec, anchor, bounds, marks };
+        bar = { id: `${group.id}:bar`, groupId: group.id, x: rect.x, y: rect.y, width: rect.width, height: rect.height, fill: style.barFill, opacity: style.barOpacity, stroke: style.barBorderColor, strokeWidth: style.barBorderWidthPt, strokeOpacity: style.barBorderOpacity, fillSpec, anchor, bounds, marks };
       }
       const wantDot = (v: number): boolean => {
         if (!style.showSymbols) return false;
@@ -475,11 +488,11 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
         if (!showAll && !wantDot(o.value)) return;
         const ps = resolveStyle(chart, layer, group, o.id);
         const offset = chart.jitter.enabled ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * dotWidth : 0;
-        points.push({ id: o.id, groupId: group.id, observationId: o.id, row, value: o.value, cx: centerX + offset, cy: toY(o.value), shape: ps.symbolShape, size: ps.symbolSizePt, color: ps.symbolColor, fillOpacity: ps.symbolFillOpacity, borderColor: ps.symbolBorderColor, borderWidth: ps.symbolBorderWidthPt });
+        points.push({ id: o.id, groupId: group.id, observationId: o.id, row, value: o.value, cx: centerX + offset, cy: toY(o.value), shape: ps.symbolShape, size: ps.symbolSizePt, color: ps.symbolColor, fillOpacity: ps.symbolFillOpacity, borderColor: ps.symbolBorderColor, borderWidth: ps.symbolBorderWidthPt, borderOpacity: ps.symbolBorderOpacity });
       });
       if (opts.showMean && pre.summary) {
         const my = toY(pre.summary.mean);
-        if (Number.isFinite(my)) points.push({ id: `${group.id}:mean`, groupId: group.id, observationId: null, row: -1, value: pre.summary.mean, cx: centerX, cy: my, shape: 'plus', size: style.symbolSizePt, color: style.symbolColor, fillOpacity: style.symbolFillOpacity, borderColor: style.symbolBorderColor, borderWidth: Math.max(style.symbolBorderWidthPt, 2) });
+        if (Number.isFinite(my)) points.push({ id: `${group.id}:mean`, groupId: group.id, observationId: null, row: -1, value: pre.summary.mean, cx: centerX, cy: my, shape: 'plus', size: style.symbolSizePt, color: style.symbolColor, fillOpacity: style.symbolFillOpacity, borderColor: style.symbolBorderColor, borderWidth: Math.max(style.symbolBorderWidthPt, 2), borderOpacity: style.symbolBorderOpacity });
       }
       if (dist?.note) warnings.push(`${name}: ${dist.note}.`);
     }
@@ -493,6 +506,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
         d: `M${centerX - half},${yCentre}H${centerX + half}`,
         color: style.lineColor,
         strokeWidth: style.lineWidthPt,
+        opacity: style.lineOpacity,
       };
     }
 
@@ -540,7 +554,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
         if (joined) segments++;
         joined = true;
       }
-      if (segments > 0 && first) pairLines.push({ id: `pair:${row}`, row, d, color: first.lineColor, strokeWidth: first.lineWidthPt });
+      if (segments > 0 && first) pairLines.push({ id: `pair:${row}`, row, d, color: first.lineColor, strokeWidth: first.lineWidthPt, opacity: first.lineOpacity });
     }
   }
 
@@ -564,6 +578,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
         d: `M${a.centerX},${toY(a.centreValue)}L${b.centerX},${toY(b.centreValue)}`,
         color: a.style.lineColor,
         strokeWidth: a.style.lineWidthPt,
+        opacity: a.style.lineOpacity,
       };
     }
   }
@@ -666,5 +681,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
     );
   }
 
-  return { widthPt, heightPt, layout, orient, y, yScale, y2, y2Scale, clipped, groups, pairLines, legendGroups, labels, warnings: [...new Set(warnings)] };
+  const model: ChartModel = { widthPt, heightPt, layout, orient, y, yScale, y2, y2Scale, clipped, groups, pairLines, legendGroups, labels, warnings: [...new Set(warnings)] };
+  model.scene = compileCategoryScene(chart, model);
+  return model;
 }

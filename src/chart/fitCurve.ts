@@ -152,6 +152,19 @@ export function drawFit(run: FitRun, fit: FitSettings, m: Mappers): FittedCurve 
 /** A fitted number for reading: four significant digits. */
 export const fitNumber = (v: number): string => (Number.isFinite(v) ? String(Number(v.toPrecision(4))) : '–');
 
+/** "8 points, 6 degrees of freedom": what the fit rests on (no degrees of freedom are named when none are left). */
+export const fitCountLine = (s: FitSummary): string => `${s.n} points${s.df > 0 ? `, ${s.df} degrees of freedom` : ''}`;
+
+/**
+ * The fitted parameters of every series as plain text, to be placed on the graph and edited there: the name of the series,
+ * a line for each parameter with its interval, R², and the number of points and degrees of freedom; one block after another.
+ */
+export function fitParametersText(series: ReadonlyArray<{ label: string; fit?: { summary: FitSummary | null } }>, level: number): string {
+  return series
+    .flatMap((s) => (s.fit?.summary ? [s.label, ...fitLines(s.fit.summary, level), fitCountLine(s.fit.summary)] : []))
+    .join('\n');
+}
+
 /** The lines written for one fit: "EC50 = 51.2 (95% CI 40.1 to 62.3)" for each parameter, then R². */
 export function fitLines(s: FitSummary, level: number): string[] {
   const pct = `${Number((level * 100).toPrecision(3))}%`;

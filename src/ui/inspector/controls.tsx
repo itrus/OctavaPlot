@@ -2,20 +2,9 @@ import { createContext, useContext, useEffect, useId, useState, type ReactNode }
 import { formatNum, sliderStep, snapToStep } from '../numberFormat';
 import { WheelRange } from '../WheelRange';
 
-/** The text typed in the inspector's search box: only the settings that match it are shown (empty: all of them). */
-export const InspectorSearchContext = createContext('');
-
-/** True when a setting with this label (or hint) is shown for the search text. */
-const matchesSearch = (query: string, ...texts: Array<string | undefined>): boolean => {
-  const q = query.trim().toLowerCase();
-  return q === '' || texts.some((t) => t?.toLowerCase().includes(q));
-};
-
 export function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
   const [openState, setOpen] = useState(defaultOpen);
-  // While searching, every section is open: a match must not hide inside a folded one.
-  const searching = useContext(InspectorSearchContext).trim() !== '';
-  const open = openState || searching;
+  const open = openState;
   return (
     <section className="insp-section">
       <button className="insp-section-head" onClick={() => setOpen(!open)} aria-expanded={open}>
@@ -61,11 +50,9 @@ export function Field({
   /** Muted explanation under the control, e.g. why it is disabled. */
   note?: string | null;
 }) {
-  const query = useContext(InspectorSearchContext);
   const id = useId();
   const [labelId, errorId, noteId, hintId] = [`${id}-label`, `${id}-error`, `${id}-note`, `${id}-hint`];
   const describedBy = [error ? errorId : null, note ? noteId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined;
-  if (!matchesSearch(query, label, hint)) return null;
   return (
     <FieldContext.Provider value={{ labelId, describedBy, invalid: !!error }}>
       <div className="field">

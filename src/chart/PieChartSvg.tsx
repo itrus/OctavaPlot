@@ -42,6 +42,7 @@ export const PieChartSvg = forwardRef<SVGSVGElement, Props>(function PieChartSvg
                   fillRule="evenodd"
                   stroke={s.style.barBorderColor}
                   strokeWidth={s.style.barBorderWidthPt}
+                  strokeOpacity={s.style.barBorderOpacity < 1 ? s.style.barBorderOpacity : undefined}
                   strokeLinejoin="round"
                   {...hit('bar', s.groupId, s.id)}
                 />
@@ -83,7 +84,7 @@ export const PieChartSvg = forwardRef<SVGSVGElement, Props>(function PieChartSvg
             const w = keyWidthOf(chart.legend);
             return (
               <g key={part.groupId} {...hit('legend', part.groupId)}>
-                <rect x={n2(it.x)} y={n2(it.y - 10)} width={w} height={20} fill={part.style.barFill} fillOpacity={part.style.barOpacity} stroke={part.style.barBorderColor} strokeWidth={part.style.barBorderWidthPt} />
+                <rect x={n2(it.x)} y={n2(it.y - 10)} width={w} height={20} fill={part.style.barFill} fillOpacity={part.style.barOpacity} stroke={part.style.barBorderColor} strokeWidth={part.style.barBorderWidthPt} strokeOpacity={part.style.barBorderOpacity < 1 ? part.style.barBorderOpacity : undefined} />
                 <text x={n2(it.x + w + LEGEND_KEY.gap)} y={n2(it.y)} dy="0.35em" fontSize={layout.legend!.fontSizePt} fill={chart.textColor}>
                   {it.label}
                 </text>

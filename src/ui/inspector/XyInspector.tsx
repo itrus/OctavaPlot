@@ -178,6 +178,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   </Field>
                   <NumField label="Opacity" value={st.barOpacity} min={0} max={1} overridden={ov('barOpacity')} onCommit={(v) => setStyle({ barOpacity: v })} hint="0 = transparent, 1 = opaque" />
                   <NumField label="Border" unit="pt" value={st.barBorderWidthPt} min={0} max={40} overridden={ov('barBorderWidthPt')} onCommit={(v) => setStyle({ barBorderWidthPt: v })} />
+                  <NumField label="Border opacity" value={st.barBorderOpacity} min={0} max={1} overridden={ov('barBorderOpacity')} onCommit={(v) => setStyle({ barBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
                   <Field label="Border color" overridden={ov('barBorderColor')}>
                     <ColorInput value={st.barBorderColor} onChange={(v) => setStyle({ barBorderColor: v })} />
                   </Field>
@@ -190,6 +191,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                     <ColorInput value={st.lineColor} disabled={!st.showMeanLine} onChange={(v) => setStyle({ lineColor: v })} />
                   </Field>
                   <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={40} disabled={!st.showMeanLine} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+                  <NumField label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showMeanLine} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
                   <div className="muted small">The bar runs from the smallest to the largest value; the line marks the mean of the replicates.</div>
                 </GroupBox>
               )}
@@ -213,6 +215,12 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <ColorInput value={st.symbolBorderColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolBorderColor: v })} />
                 </Field>
                 <NumField label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={20} disabled={!st.showSymbols} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
+                <NumField label="Border opacity" value={st.symbolBorderOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolBorderOpacity')} onCommit={(v) => setStyle({ symbolBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
+                {family === 'xy' && layout.kind === 'replicates' && (
+                  <Field label="Individual values" overridden={ov('showRawPoints')} hint="Every replicate as a small symbol behind the mean or median; they are part of the axis range while shown">
+                    <Check checked={st.showRawPoints} onChange={(v) => setStyle({ showRawPoints: v })} />
+                  </Field>
+                )}
               </GroupBox>
 
               )}
@@ -243,6 +251,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                     <SelectInput value={st.errorDirection} options={[{ value: 'both', label: 'Both' }, { value: 'positive', label: 'Above' }, { value: 'negative', label: 'Below' }]} onChange={(v) => setStyle({ errorDirection: v })} />
                   </Field>
                   <NumField label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={40} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
+                  <NumField label="Opacity" value={st.errorOpacity} min={0} max={1} overridden={ov('errorOpacity')} onCommit={(v) => setStyle({ errorOpacity: v })} hint="0 = transparent, 1 = opaque" />
                 </GroupBox>
               )}
 
@@ -252,6 +261,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <ColorInput value={st.lineColor} disabled={!st.showLines} onChange={(v) => setStyle({ lineColor: v })} />
                 </Field>
                 <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={40} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+                <NumField label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showLines} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
                 <Field label="Pattern" overridden={ov('lineStyle')}>
                   <SelectInput<LineStyle> value={st.lineStyle} disabled={!st.showLines} options={LINE_STYLES.map((l) => ({ value: l.value, label: l.label }))} onChange={(v) => setStyle({ lineStyle: v })} />
                 </Field>
@@ -259,7 +269,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
               </GroupBox>
               )}
               {family === 'xy' && xyModel && <FitSection chart={chart} table={table} model={xyModel} />}
-              {family === 'xy' && <LayersSection chart={chart} table={table} />}
+              {(family === 'xy' || family === 'survival') && <LayersSection chart={chart} table={table} />}
               {family === 'survival' && (
                 <>
                   <GroupBox title="Error bars (standard error)" checked={chart.survival.errorBars} onCheckedChange={(v) => run('Survival error bars', patchSurvival(chart.id, { errorBars: v }))}>
@@ -267,6 +277,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                       <ColorInput value={st.errorColor} disabled={!chart.survival.errorBars} onChange={(v) => setStyle({ errorColor: v })} />
                     </Field>
                     <NumField label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={20} disabled={!chart.survival.errorBars} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
+                    <NumField label="Opacity" value={st.errorOpacity} min={0} max={1} disabled={!chart.survival.errorBars} overridden={ov('errorOpacity')} onCommit={(v) => setStyle({ errorOpacity: v })} hint="0 = transparent, 1 = opaque" />
                     <div className="muted small">One standard error (Greenwood) either side of the estimate at each event time, kept within 0 to 1.</div>
                   </GroupBox>
                   <GroupBox title="Confidence band" checked={chart.survival.band} onCheckedChange={(v) => run('Confidence band', patchSurvival(chart.id, { band: v }))}>

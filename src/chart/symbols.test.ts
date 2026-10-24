@@ -78,9 +78,9 @@ describe('line patterns', () => {
     expect(chartToSvgString(chart, table)).not.toContain('stroke-dasharray');
     const dotted = patchStyle(chart.id, 'all', { lineStyle: 'dashDot' })(project);
     const svg = chartToSvgString(dotted.charts[0], table);
-    expect(svg).toContain('stroke-dasharray="31.2 15.6 5.2 15.6"');
+    expect(svg).toContain('stroke-dasharray="24 12 4 12"');
     // The plot lines and the two legend keys.
-    expect((svg.match(/stroke-dasharray="31.2 15.6 5.2 15.6"/g) ?? []).length).toBe(4);
+    expect((svg.match(/stroke-dasharray="24 12 4 12"/g) ?? []).length).toBe(4);
     const back = parseProject(stringifyProject(dotted)).charts[0];
     expect(resolveStyle(back, back.layers[0], { id: 'g', paletteIndex: 0 }).lineStyle).toBe('dashDot');
   });

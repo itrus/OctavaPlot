@@ -33,6 +33,7 @@ function FrameAndColours({ chart }: { chart: Chart }) {
       <Field label="Axis colour">
         <ColorInput value={chart.axisColor} ariaLabel="Axis colour" onChange={(v) => run('Axis colour', patchLook(chart.id, { axisColor: v }))} />
       </Field>
+      <NumField label="Axis opacity" value={chart.axisOpacity} min={0} max={1} onCommit={(v) => run('Axis opacity', patchLook(chart.id, { axisOpacity: v }), 'axis:opacity')} hint="Axis lines, ticks and the frame; 0 = transparent, 1 = opaque" />
       <OptionalColour label="Plotting area" value={chart.plotColor} fallback="#ffffff" onChange={(v) => run('Plotting area colour', patchLook(chart.id, { plotColor: v }))} />
       <OptionalColour label="Page background" value={chart.pageColor} fallback="#ffffff" onChange={(v) => run('Page background colour', patchLook(chart.id, { pageColor: v }))} />
       <div className="muted small">With no page background a PNG export is transparent.</div>
@@ -52,6 +53,7 @@ function GridStyleSection({ chart }: { chart: Chart }) {
         <ColorInput value={g.color} ariaLabel="Major gridline colour" onChange={(v) => set('Major gridline colour', { color: v })} />
       </Field>
       <NumField label="Major thickness" unit="pt" value={g.widthPt} min={GRID_LIMITS.widthPt.min} max={GRID_LIMITS.widthPt.max} onCommit={(v) => set('Major gridline thickness', { widthPt: v }, 'grid:w')} />
+      <NumField label="Major opacity" value={g.opacity} min={0} max={1} onCommit={(v) => set('Major gridline opacity', { opacity: v }, 'grid:o')} hint="0 = transparent, 1 = opaque" />
       <Field label="Major pattern">
         <SelectInput<LineStyle> value={g.style} options={styles} onChange={(v) => set('Major gridline pattern', { style: v })} />
       </Field>
@@ -59,6 +61,7 @@ function GridStyleSection({ chart }: { chart: Chart }) {
         <ColorInput value={g.minorColor} ariaLabel="Minor gridline colour" onChange={(v) => set('Minor gridline colour', { minorColor: v })} />
       </Field>
       <NumField label="Minor thickness" unit="pt" value={g.minorWidthPt} min={GRID_LIMITS.widthPt.min} max={GRID_LIMITS.widthPt.max} onCommit={(v) => set('Minor gridline thickness', { minorWidthPt: v }, 'grid:mw')} />
+      <NumField label="Minor opacity" value={g.minorOpacity} min={0} max={1} onCommit={(v) => set('Minor gridline opacity', { minorOpacity: v }, 'grid:mo')} hint="0 = transparent, 1 = opaque" />
       <Field label="Minor pattern">
         <SelectInput<LineStyle> value={g.minorStyle} options={styles} onChange={(v) => set('Minor gridline pattern', { minorStyle: v })} />
       </Field>

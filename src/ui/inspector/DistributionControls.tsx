@@ -18,7 +18,7 @@ const NORMALISATION: Array<{ value: ViolinNormalisationKind; label: string }> = 
 ];
 
 /** The settings of a box plot or a violin that are shared by all data sets (spec 10). */
-export function DistributionControls({ chart, lineColor, lineWidthPt, onLine }: { chart: Chart; lineColor: string; lineWidthPt: number; onLine: (patch: { lineColor?: string; lineWidthPt?: number }) => void }) {
+export function DistributionControls({ chart, lineColor, lineWidthPt, lineOpacity, onLine }: { chart: Chart; lineColor: string; lineWidthPt: number; lineOpacity: number; onLine: (patch: { lineColor?: string; lineWidthPt?: number; lineOpacity?: number }) => void }) {
   const { run } = useApp();
   const d = chart.distribution;
   const set = (label: string, patch: Partial<Chart['distribution']>, key?: string) => run(label, patchDistribution(chart.id, patch), key);
@@ -83,6 +83,7 @@ export function DistributionControls({ chart, lineColor, lineWidthPt, onLine }: 
         <ColorInput value={lineColor} ariaLabel="Line colour" onChange={(v) => onLine({ lineColor: v })} />
       </Field>
       <NumField label="Line thickness" unit="pt" value={lineWidthPt} min={0.2} max={40} onCommit={(v) => onLine({ lineWidthPt: v })} />
+      <NumField label="Line opacity" value={lineOpacity} min={0} max={1} onCommit={(v) => onLine({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
       <Field label={floating ? 'Line at the centre' : 'Median line'}>
         <Check checked={d.showMedian} onChange={(v) => set(floating ? 'Centre line' : 'Median line', { showMedian: v })} />
       </Field>

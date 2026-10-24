@@ -79,6 +79,7 @@ A chart draws one table, named by `dataTableId`; the table must exist. `type` is
 | `bars`, `barLabels`, `distribution`, `heatmap`, `histogram`, `pie`, `survival`, `pairs`, `fit`, `jitter` | Settings that belong to one family of charts. They are always present. |
 | `hiddenGroupIds`, `groupOrder`, `groupGaps`, `extraGroups`, `displayNames` | Which data sets are on the graph, in what order, with what space between them, from which other tables, and under what names. |
 | `annotations`, `referenceLines` | Text and lines placed on the chart. |
+| `layerStyles` | Look of single layers by layer ID: `color`, `widthPt`, `lineStyle`, `opacity`, any of them. Used by the fit curve and the fit band. A setting that cannot be read is dropped, with a note. |
 | `hiddenLayerIds` | IDs of the parts of an XY chart that are not drawn (for example `<series id>:fitBand`). Hiding changes no calculation. |
 
 ### Styles

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildXyModel } from '../chart/xyModel';
-import { addChart, addDataTable, setLayerHidden } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
+import { addAnnotation, addChart, addDataTable, addReferenceLine, patchLayerStyle, setLayerHidden } from '../state/commands';
+import { parseProject, parseProjectWithNotes, stringifyProject } from '../state/serialize';
 import { NO_FIT_SETTINGS } from './fitOptions';
 import { createExampleProject } from './defaults';
-import { layerRows, layersAvailable, layersOf } from './layers';
+import { BAND_OPACITY } from '../chart/survivalModel';
+import { DEFAULT_BAND_OPACITY, layerLook, layerRows, layersAvailable, layersOf, sanitizeLayerStyles } from './layers';
 import type { Chart, Project } from './types';
 
 const projectWith = (patch: (c: Chart) => Chart = (c) => c): Project => {
@@ -96,10 +97,12 @@ describe('layers of an XY chart', () => {
 describe('layer rows and hiding', () => {
   const withFitChart = (p: Project): Project => ({ ...p, charts: p.charts.map((c) => (c.id === 'c' ? { ...c, fit: { ...c.fit, analysisId: 'a1', band: 'confidence' as const } } : c)) });
 
-  it('list the data layers topmost first, named by kind and series', () => {
-    const p = withFitChart(projectWith());
+  it('list the layers topmost first, named by kind and series, with reference lines and annotations too', () => {
+    const p = addAnnotation('c', { id: 'n1', text: 'A note', xFrac: 0.1, yFrac: 0.1, fontSizePt: 20, color: '#000000', opacity: 1 })(addReferenceLine('c', { id: 'r1', axis: 'y', value: 5, color: '#cc0000', widthPt: 2, style: 'dashed', label: '', showLabel: false, opacity: 1 })(withFitChart(projectWith())));
     const rows = layerRows(chartOf(p), tableOf(p));
-    expect(rows.every((r) => r.layer.kind !== 'referenceLine' && r.layer.kind !== 'annotation')).toBe(true);
+    expect(rows.map((r) => r.label)).toContain('Reference line: Y = 5');
+    expect(rows.map((r) => r.label)).toContain('Annotation: A note');
+    expect(rows[0].layer.kind).toBe('annotation');
     expect(rows.map((r) => r.layer.z)).toEqual([...rows.map((r) => r.layer.z)].sort((a, b) => b - a));
     expect(rows.filter((r) => r.layer.kind === 'fitBand').map((r) => r.label)).toEqual(['Fit band: Series B', 'Fit band: Series A']);
   });
@@ -137,5 +140,61 @@ describe('layer rows and hiding', () => {
     expect(chartOf(parseProject(JSON.stringify(raw))).hiddenLayerIds).toEqual([id]);
     delete raw.project.charts.find((c: { id: string }) => c.id === 'c').hiddenLayerIds;
     expect(chartOf(parseProject(JSON.stringify(raw))).hiddenLayerIds).toEqual([]);
+  });
+});
+
+describe('the look of a single layer', () => {
+  const fitProject = () => {
+    const p = projectWith((c) => ({ ...c, fit: { ...c.fit, analysisId: 'a1', band: 'confidence' as const } }));
+    const ls = layersOf(chartOf(p), tableOf(p));
+    return { p, curve: ls.find((l) => l.kind === 'fitCurve')!.id, band: ls.find((l) => l.kind === 'fitBand')!.id, line: ls.find((l) => l.kind === 'line')!.id };
+  };
+
+  it('keeps the band opacity of the charts in one place', () => {
+    expect(DEFAULT_BAND_OPACITY).toBe(BAND_OPACITY);
+  });
+  it('takes only the settings that suit the kind of layer, each valid, and counts what it drops', () => {
+    const r = sanitizeLayerStyles({
+      'a:fitCurve': { color: '#AA0000', widthPt: 3, lineStyle: 'dotted', opacity: 0.5, bogus: 1 },
+      'b:fitBand': { color: '#00ff00', opacity: 2, widthPt: 3 },
+      'c:line': { color: '#000000' },
+      'd:fitCurve': { color: 'red', widthPt: 0, lineStyle: 'zigzag' },
+      'e:fitCurve': 'x',
+    });
+    expect(r.styles).toEqual({ 'a:fitCurve': { color: '#aa0000', widthPt: 3, lineStyle: 'dotted', opacity: 0.5 }, 'b:fitBand': { color: '#00ff00' } });
+    expect(r.dropped).toBe(1 + 1 + 1 + 1 + 3 + 1);
+    expect(sanitizeLayerStyles(undefined)).toEqual({ styles: {}, dropped: 0 });
+    expect(sanitizeLayerStyles([]).dropped).toBe(1);
+  });
+  it('is set, changed and given back to the series by a command', () => {
+    const { p, curve } = fitProject();
+    const a = patchLayerStyle('c', curve, { color: '#112233', widthPt: 4 })(p);
+    expect(chartOf(a).layerStyles).toEqual({ [curve]: { color: '#112233', widthPt: 4 } });
+    const b = patchLayerStyle('c', curve, { widthPt: null })(a);
+    expect(chartOf(b).layerStyles).toEqual({ [curve]: { color: '#112233' } });
+    expect(chartOf(patchLayerStyle('c', curve, { color: null })(b)).layerStyles).toEqual({});
+  });
+  it('ignores a setting the layer does not take, and a layer that takes none', () => {
+    const { p, band, line } = fitProject();
+    expect(chartOf(patchLayerStyle('c', band, { widthPt: 4 })(p)).layerStyles).toEqual({});
+    expect(chartOf(patchLayerStyle('c', line, { color: '#112233' })(p)).layerStyles).toEqual({});
+  });
+  it('falls back to the series line look, and to its own settings where given', () => {
+    const { p, curve, band } = fitProject();
+    const series = { lineColor: '#123456', lineWidthPt: 3, lineStyle: 'dashed' as const };
+    expect(layerLook(chartOf(p), curve, series)).toEqual({ color: '#123456', widthPt: 3, lineStyle: 'dashed', opacity: 1 });
+    expect(layerLook(chartOf(p), band, series).opacity).toBe(DEFAULT_BAND_OPACITY);
+    const own = chartOf(patchLayerStyle('c', curve, { color: '#abcdef', lineStyle: 'dotted' })(p));
+    expect(layerLook(own, curve, series)).toMatchObject({ color: '#abcdef', widthPt: 3, lineStyle: 'dotted' });
+  });
+  it('are saved and read back, and an unreadable one is dropped with a note', () => {
+    const { p, curve } = fitProject();
+    const styled = patchLayerStyle('c', curve, { color: '#112233' })(p);
+    expect(chartOf(parseProject(stringifyProject(styled))).layerStyles).toEqual({ [curve]: { color: '#112233' } });
+    const raw = JSON.parse(stringifyProject(styled));
+    raw.project.charts.find((c: { id: string }) => c.id === 'c').layerStyles = { [curve]: { color: 'nope', widthPt: 2 } };
+    const read = parseProjectWithNotes(JSON.stringify(raw));
+    expect(chartOf(read.project).layerStyles).toEqual({ [curve]: { widthPt: 2 } });
+    expect(read.notes.join(' ')).toContain('layerStyles');
   });
 });

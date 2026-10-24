@@ -17,6 +17,11 @@ import { chartToSvgString } from './export';
  */
 const withoutCssSize = (s: string): string => s.replace(/(<svg [^>]*?) width="[^"]*" height="[^"]*"/, '$1');
 
+// The stable ids (see svgIds.ts) were added after the goldens were made. They are additions, not changes of the drawing, so
+// they are left out of the comparison; every other attribute, and the clip ids the goldens have, are compared as before.
+const STABLE_IDS = / id="(?:page|plot-area|(?:chart|x-axis|y-axis|y2-axis)-title|x-axis|y-axis|legend|at-risk-table|fit-parameters|annotation-[^"]*|reference-line-[^"]*)"/g;
+const withoutStableIds = (s: string): string => s.replace(STABLE_IDS, '');
+
 // The goldens are half the size of the drawing now, so the legacy 160 x 120 mm geometry needs twice its pixel size.
 const LEGACY_SCALE = 2;
 const legacyPx = (mm: number) => ((mm * 96) / 25.4) * LEGACY_SCALE;
@@ -32,7 +37,7 @@ const halvePath = (d: string): string =>
 const LENGTHS = /^(x|y|x1|y1|x2|y2|cx|cy|r|rx|ry|width|height|viewBox|font-size|stroke-width|stroke-dasharray)$/;
 /** The drawing brought back to the scale the goldens were made at. */
 const atLegacyScale = (svg: string): string =>
-  withoutCssSize(svg).replace(/([a-zA-Z-]+)="([^"]*)"/g, (m, name: string, value: string) => {
+  withoutStableIds(withoutCssSize(svg)).replace(/([a-zA-Z-]+)="([^"]*)"/g, (m, name: string, value: string) => {
     if (name !== 'd' && name !== 'transform' && !LENGTHS.test(name)) return m;
     if (name === 'd') return `d="${halvePath(value)}"`;
     if (name === 'transform') return `transform="${/rotate\(/.test(value) ? halve(value, (i) => i === 0) : /matrix\(/.test(value) ? halve(value, (i) => i < 4) : halve(value)}"`;

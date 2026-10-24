@@ -64,7 +64,7 @@ export const linePattern = (s: { lineStyle: LineStyle; lineWidthPt: number }) =>
 /** Width of the colour key in the legend, pt: 36 for a rectangle, 20 for a square (its height is 20). */
 export const legendKeyWidthPt = (shape: LegendKeyShape): number => (shape === 'square' ? 20 : 36);
 
-type Look = Pick<Chart, 'origin' | 'orientation' | 'lineOrder' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
+type Look = Pick<Chart, 'origin' | 'orientation' | 'lineOrder' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
 
 /** The look of a chart from a file or a patch: a value that is not valid falls back to the one in `base`. */
 export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
@@ -77,6 +77,8 @@ export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
     minorColor: hex(g.minorColor, base.grid.minorColor),
     minorWidthPt: clamp(g.minorWidthPt, width.min, width.max, base.grid.minorWidthPt),
     minorStyle: oneOf(LINES, g.minorStyle, base.grid.minorStyle),
+    opacity: clamp(g.opacity, 0, 1, base.grid.opacity),
+    minorOpacity: clamp(g.minorOpacity, 0, 1, base.grid.minorOpacity),
   };
   return {
     orientation: oneOf(ORIENTATIONS, c.orientation, base.orientation),
@@ -95,6 +97,7 @@ export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
     titleBold: bool(c.titleBold, base.titleBold),
     titleOffsetPt: clamp(c.titleOffsetPt, AXIS_LIMITS.offsetPt.min, AXIS_LIMITS.offsetPt.max, base.titleOffsetPt),
     axisColor: hex(c.axisColor, base.axisColor),
+    axisOpacity: clamp(c.axisOpacity, 0, 1, base.axisOpacity),
     // A missing colour is left as it is: "no colour" is a value of its own, written as null.
     plotColor: 'plotColor' in c ? optionalHex(c.plotColor, base.plotColor) : base.plotColor,
     pageColor: 'pageColor' in c ? optionalHex(c.pageColor, base.pageColor) : base.pageColor,

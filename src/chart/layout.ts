@@ -21,7 +21,7 @@ export interface Rect {
   height: number;
 }
 
-interface LegendItemLayout {
+export interface LegendItemLayout {
   index: number;
   x: number;
   /** Vertical centre of the row. */

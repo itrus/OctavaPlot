@@ -185,10 +185,10 @@ function Shell() {
           }}
         />
         <span className="topbar-sep" />
-        <button className="icon-text" onClick={() => setSettingsOpen(true)}><SettingsIcon /> Settings</button>
+        <button className="icon-text topbar-end" onClick={() => setSettingsOpen(true)}><SettingsIcon /> Settings</button>
         <button className="icon-text" onClick={() => setInfoOpen(true)} title="About OctavaPlot and credits"><InfoIcon /> Info</button>
         <button
-          className="icon-only topbar-end"
+          className="icon-only"
           onClick={() => setInspectorOpen(!inspectorOpen)}
           aria-pressed={inspectorOpen}
           disabled={!chart}

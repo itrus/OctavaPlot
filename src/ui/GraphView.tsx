@@ -39,10 +39,11 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // A chart opens at "fit".
-  useEffect(() => setZoom(1), [chart.id, setZoom]);
-  // The fit scale (screen px per chart px) is taken when a chart opens, when the window is resized and when Fit is
-  // pressed, not when the chart's size is edited: changing the dimensions resizes the page, never the elements on it.
+  // A chart opens at "fit", and goes back to it when its dimensions change (a typed size, a preset, an aspect lock, undo).
+  useEffect(() => setZoom(1), [chart.id, chart.widthPx, chart.heightPx, setZoom]);
+  // The fit scale (screen px per chart px) is taken when a chart opens, when its dimensions change, when the window is
+  // resized and when Fit is pressed, so the page always fills the window. Only the screen scale changes: the elements keep
+  // their sizes in pt on the page.
   const sizeRef = useRef({ w: chart.widthPx, h: chart.heightPx });
   sizeRef.current = { w: chart.widthPx, h: chart.heightPx };
   const [fit, setFit] = useState(1);
@@ -50,7 +51,7 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
     if (avail.w <= 0 || avail.h <= 0) return;
     const { w, h } = sizeRef.current;
     setFit(Math.max(0.05, Math.min((avail.w - 2 * CANVAS_PAD) / w, (avail.h - 2 * CANVAS_PAD) / h)));
-  }, [chart.id, avail.w, avail.h, fitRequest]);
+  }, [chart.id, chart.widthPx, chart.heightPx, avail.w, avail.h, fitRequest]);
   const cssW = chart.widthPx * fit * zoom;
   const cssH = chart.heightPx * fit * zoom;
 
@@ -118,17 +119,16 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
     }
   };
   const exportPng = async () => {
-    const scale = settings.pngScale;
-    const [pw, ph] = [Math.round(chart.widthPx * scale), Math.round(chart.heightPx * scale)];
+    const [pw, ph] = [chart.widthPx, chart.heightPx];
     // Browsers limit the size of a canvas; refuse a size that would fail or come out blank.
     if (Math.max(pw, ph) > 16000 || pw * ph > 200_000_000) {
-      setStatus(`PNG export needs ${pw} × ${ph} px, more than the browser can make. Choose a lower resolution in Settings.`);
+      setStatus(`PNG export needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, or export SVG.`);
       return;
     }
     try {
       const { chartToPngBlob } = await import('../chart/export');
-      downloadBlob(await chartToPngBlob(chart, table, scale, curve), exportFileName(chart.name, 'png', settings.timestampExports));
-      setStatus(`Exported PNG, ${pw} × ${ph} px (${Math.round(96 * scale)} dpi at the chart's size).`);
+      downloadBlob(await chartToPngBlob(chart, table, 1, curve), exportFileName(chart.name, 'png', settings.timestampExports));
+      setStatus(`Exported PNG, ${pw} × ${ph} px.`);
     } catch (err) {
       setStatus(`PNG export failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -141,26 +141,25 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
         <span className="sep" />
         <button
           className="icon-text"
+          onClick={() => {
+            run('Reset settings', resetAllDataSets(chart.id));
+            setStatus('Settings reset to defaults.');
+          }}
+          title="Reset the graph's settings (data set styles, axes, grid, legend, fonts, colours) to a new graph's defaults. Titles and data are kept. Undo restores them."
+        >
+          <ResetIcon />
+          Reset settings
+        </button>
+        <button
+          className="icon-text toolbar-end"
           onClick={() => void (settings.exportFormat === 'svg' ? exportSvg() : exportPng())}
           title={`Export as ${settings.exportFormat.toUpperCase()} (change the format in Settings)`}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11" />
           </svg>
-          Export
+          Export {settings.exportFormat.toUpperCase()} · {chart.widthPx} × {chart.heightPx} px
         </button>
-        <button
-          className="icon-text"
-          onClick={() => {
-            run('Reset settings', resetAllDataSets(chart.id));
-            setStatus('Data set settings reset to defaults.');
-          }}
-          title="Reset the data set settings (colours, bars, symbols, lines, summary) to the defaults. Undo restores them."
-        >
-          <ResetIcon />
-          Reset settings
-        </button>
-        <span className="toolbar-info">{chart.widthPx} × {chart.heightPx} px</span>
       </div>
       <div className="chart-scroller" ref={scrollerRef}>
         <div className="chart-wrap" ref={wrapRef} style={{ width: cssW }}>

@@ -24,8 +24,8 @@ function richProject(): Project {
   const chart = p.charts[0];
   p = setProjectName('Étude № 3: 日本語 ✓')(p);
   p = setRowTitles(p.dataTables[0].id, [{ row: 0, title: 'µ-sample "α"' }])(p);
-  p = addAnnotation(chart.id, { id: 'note', text: 'p < 0.05 — ✓', xFrac: 0.3, yFrac: 0.2, fontSizePt: 24, color: '#aa0000' })(p);
-  p = addReferenceLine(chart.id, { id: 'ref', axis: 'y', value: 1.5, color: '#0000ff', widthPt: 2, style: 'dotted', label: 'cut-off', showLabel: true })(p);
+  p = addAnnotation(chart.id, { id: 'note', text: 'p < 0.05 — ✓', xFrac: 0.3, yFrac: 0.2, fontSizePt: 24, color: '#aa0000', opacity: 1 })(p);
+  p = addReferenceLine(chart.id, { id: 'ref', axis: 'y', value: 1.5, color: '#0000ff', widthPt: 2, style: 'dotted', opacity: 1, label: 'cut-off', showLabel: true })(p);
   p = patchStyle(chart.id, 'all', { symbolSizePt: 14, barFill: '#336699' })(p);
   return p;
 }

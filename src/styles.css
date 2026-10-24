@@ -94,7 +94,7 @@ button.icon-only { display: inline-flex; align-items: center; justify-content: c
   transition: transform 0.2s ease, visibility 0s;
 }
 .app[data-nav='closed'] .navigator { transform: translateX(-100%); visibility: hidden; transition: transform 0.2s ease, visibility 0s 0.2s; }
-.app[data-insp='closed'] .inspector { transform: translateX(100%); visibility: hidden; transition: transform 0.2s ease, visibility 0s 0.2s; }
+.app[data-insp='closed'] .inspector, .app[data-insp='closed'] .inspector-host { transform: translateX(100%); visibility: hidden; transition: transform 0.2s ease, visibility 0s 0.2s; }
 
 .nav-folder, .nav-item {
   text-align: left;
@@ -121,6 +121,7 @@ button.icon-only { display: inline-flex; align-items: center; justify-content: c
   flex: none;
 }
 .toolbar .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+.toolbar-end { margin-left: auto; }
 .toolbar-info { margin-left: auto; color: var(--muted); font-size: 11.5px; }
 .inline-label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 
@@ -452,7 +453,16 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
 .cell.excluded { text-decoration: line-through; color: var(--muted); background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(120,120,120,0.12) 4px 5px); }
 
 /* Searching the inspector: sections with no matching setting are hidden. */
-.inspector-search { padding: 6px 8px 0; }
-.inspector-search input { width: 100%; box-sizing: border-box; }
-.inspector-searching .insp-section:not(:has(.field)) { display: none; }
-.inspector-searching .group-box:not(:has(.field)) { display: none; }
+/* The search box and the panel are one column that scrolls as a whole: this wrapper is what the grid places, so the
+   panel inside it must not size or scroll itself (it would grow to its content and no scroll bar would appear). */
+.inspector-host {
+  grid-area: insp;
+  width: var(--insp-px, 360px);
+  justify-self: end;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  transition: transform 0.2s ease, visibility 0s;
+}
+.app .inspector-host > .inspector { width: auto; overflow: visible; border-left: 0; transform: none; transition: none; visibility: inherit; }

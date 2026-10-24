@@ -1,11 +1,11 @@
-import { fitLines } from '../../chart/fitCurve';
+import { fitCountLine, fitLines, fitParametersText } from '../../chart/fitCurve';
 import type { XyModel } from '../../chart/xyModel';
 import { analysesOf } from '../../model/analysis';
 import { newId } from '../../model/ids';
 import type { Chart, ChartFit, DataTable } from '../../model/types';
 import { fitModelById } from '../../stats/fit';
 import { useApp } from '../../state/AppContext';
-import { addAnalysis, composeCommands, patchLook } from '../../state/commands';
+import { addAnalysis, addAnnotation, composeCommands, patchLook } from '../../state/commands';
 import { Check, Field, GroupBox, SelectInput } from './controls';
 
 /**
@@ -13,7 +13,7 @@ import { Check, Field, GroupBox, SelectInput } from './controls';
  * the chart picks one and chooses how the curve is drawn.
  */
 export function FitSection({ chart, table, model }: { chart: Chart; table: DataTable; model: XyModel }) {
-  const { project, run, setView } = useApp();
+  const { project, run, setView, setSelection } = useApp();
   const f = chart.fit;
   const fits = analysesOf(project).filter((a) => a.kind === 'curvefit' && a.dataTableId === table.id);
   const chosen = fits.find((a) => a.id === f.analysisId);
@@ -25,6 +25,13 @@ export function FitSection({ chart, table, model }: { chart: Chart; table: DataT
     run('New curve fit', composeCommands(addAnalysis(id, table.id, 'curvefit'), patchLook(chart.id, { fit: { ...f, analysisId: id, band: f.band === 'none' ? 'confidence' : f.band } })));
   };
   const fitted = model.series.filter((s) => s.fit);
+  // The parameters as an ordinary text annotation, top left in the plot where the automatic text goes: editable like any other.
+  const pasteText = () => {
+    const id = newId('ann');
+    const { plot } = model.layout;
+    run('Paste fit parameters as text', addAnnotation(chart.id, { id, text: fitParametersText(fitted, model.fit.level), xFrac: (plot.x + 16) / model.widthPt, yFrac: (plot.y + 8) / model.heightPt, fontSizePt: Number((chart.yAxis.tickFontSizePt * 0.7).toFixed(1)), color: chart.textColor, opacity: 1 }));
+    setSelection({ kind: 'annotation', annotationId: id });
+  };
   return (
     <GroupBox title="Fitted curve">
       <Field label="Curve fit" hint="The model is chosen in the curve fit of the Results; each data set is fitted on its own, using every replicate value">
@@ -67,11 +74,16 @@ export function FitSection({ chart, table, model }: { chart: Chart; table: DataT
                 {fitLines(s.fit.summary, model.fit.level).map((l) => (
                   <div key={l}>{l}</div>
                 ))}
-                <div className="muted">{s.fit.summary.n} points{s.fit.summary.df > 0 ? `, ${s.fit.summary.df} degrees of freedom` : ''}</div>
+                <div className="muted">{fitCountLine(s.fit.summary)}</div>
               </>
             )}
           </div>
         ))}
+      {on && fitted.some((s) => s.fit?.summary) && (
+        <div className="row-buttons">
+          <button onClick={pasteText} title="Put the parameters on the graph as text that can be edited, moved and deleted like any annotation">Paste parameters as text</button>
+        </div>
+      )}
     </GroupBox>
   );
 }

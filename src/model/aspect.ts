@@ -7,10 +7,11 @@ const aspectRatio = (aspect: ChartAspect): number | null =>
 
 /** Ready-made sizes; picking one also locks the matching shape. */
 export const SIZE_PRESETS: readonly { id: string; label: string; widthPx: number; heightPx: number; aspect: ChartAspect }[] = [
-  { id: '800x600', label: '800 × 600 (4:3)', widthPx: 800, heightPx: 600, aspect: '4:3' },
-  { id: '1600x1200', label: '1600 × 1200 (4:3)', widthPx: 1600, heightPx: 1200, aspect: '4:3' },
-  { id: '600x800', label: '600 × 800 (3:4)', widthPx: 600, heightPx: 800, aspect: '3:4' },
   { id: '600x600', label: '600 × 600 (square)', widthPx: 600, heightPx: 600, aspect: '1:1' },
+  { id: '600x800', label: '600 × 800 (3:4)', widthPx: 600, heightPx: 800, aspect: '3:4' },
+  { id: '800x600', label: '800 × 600 (4:3)', widthPx: 800, heightPx: 600, aspect: '4:3' },
+  { id: '1024x768', label: '1024 × 768 (4:3)', widthPx: 1024, heightPx: 768, aspect: '4:3' },
+  { id: '1600x1200', label: '1600 × 1200 (4:3)', widthPx: 1600, heightPx: 1200, aspect: '4:3' },
 ];
 
 /** The preset a chart currently matches, or undefined for a custom size. */

@@ -7,6 +7,7 @@ import { sanitizeFillKeys } from '../model/fill';
 import { sanitizeAxis } from '../model/axis';
 import { analysisTypeInfo } from '../model/analysis';
 import { FIT_MODEL_IDS, sanitizeDegree } from '../model/fitOptions';
+import { sanitizeLayerStyles } from '../model/layers';
 import { sanitizeLook } from '../model/look';
 import { sanitizeGaps, sanitizeOrder } from '../model/groupOrder';
 import { createRows, sanitizeRowTitle } from '../model/rows';
@@ -201,11 +202,15 @@ function cleanStyle(raw: unknown, path: string, notes: string[]): Obj {
     delete out[key];
     notes.push(`${path}.${key} had an invalid value and was reset to the default.`);
   }
+  for (const key of OPACITY_KEYS) if (typeof out[key] === 'number') out[key] = Math.min(1, Math.max(0, out[key] as number));
   cleanLabelKeys(out, path, notes);
   const { style, dropped } = sanitizeFillKeys(out);
   for (const key of dropped) notes.push(`${path}.${key} had an invalid value and was reset to the default.`);
   return style;
 }
+
+/** Style keys that hold an opacity: a number outside 0 to 1 is pulled to the nearest end. */
+const OPACITY_KEYS = ['barOpacity', 'barBorderOpacity', 'symbolFillOpacity', 'symbolBorderOpacity', 'errorOpacity', 'lineOpacity'] as const;
 
 /** Override maps keyed by group or object ID; non-object entries and __proto__ are skipped. */
 function cleanOverrideMap(raw: unknown, path: string, notes: string[]): Record<Id, Obj> {
@@ -296,6 +301,7 @@ function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['a
       yFrac: Math.min(1, Math.max(0, finiteOr(a.yFrac, 0.5))),
       fontSizePt: size > 0 ? size : 24,
       color,
+      opacity: Math.min(1, Math.max(0, finiteOr(a.opacity, 1))),
     });
   });
   return out;
@@ -326,6 +332,7 @@ function cleanReferenceLines(raw: unknown, path: string, notes: string[]): Chart
       color: typeof l.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(l.color) ? l.color : '#000000',
       widthPt: width > 0 && width <= 40 ? width : 2,
       style: LINE_STYLES.find((v) => v === l.style) ?? 'dashed',
+      opacity: typeof l.opacity === 'number' && Number.isFinite(l.opacity) ? Math.min(1, Math.max(0, l.opacity)) : 1,
       label: typeof l.label === 'string' ? l.label : '',
       showLabel: l.showLabel === true,
     });
@@ -377,6 +384,11 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     displayNames: cleanDisplayNames(c.displayNames, `${path}.displayNames`, notes),
     annotations: cleanAnnotations(c.annotations, `${path}.annotations`, notes),
     referenceLines: cleanReferenceLines(c.referenceLines, `${path}.referenceLines`, notes),
+    layerStyles: (() => {
+      const r = sanitizeLayerStyles(c.layerStyles);
+      if (r.dropped > 0) notes.push(`${path}.layerStyles: ${r.dropped} setting${r.dropped === 1 ? '' : 's'} could not be read and ${r.dropped === 1 ? 'was' : 'were'} dropped.`);
+      return r.styles;
+    })(),
     hiddenLayerIds: Array.isArray(c.hiddenLayerIds) ? c.hiddenLayerIds.filter((id): id is string => typeof id === 'string') : [],
     layers,
   };

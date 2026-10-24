@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../model/defaults';
 import { PALETTES, paletteById } from '../model/palettes';
 import { buildChartModel } from '../chart/model';
-import { applyPalette, patchPointStyle, patchStyle, patchSummary, resetAllDataSets, setLegendItemVisible } from './commands';
+import { applyPalette, patchAxis, patchPointStyle, patchStyle, patchSummary, resetAllDataSets, setLegendItemVisible } from './commands';
 
 describe('palettes', () => {
   it('assigns colours to the data sets in order and records the palette', () => {
@@ -51,11 +51,15 @@ describe('reset all data sets', () => {
     p = patchSummary(chartId, 'all', { spread: 'sd' })(p);
     p = applyPalette(chartId, paletteById('pastel')!)(p);
     expect(p.charts[0].layers).not.toEqual(p0.charts[0].layers);
+    p = patchAxis(chartId, 'yAxis', { lineWidthPt: 9 })(p);
+    p = { ...p, charts: p.charts.map((c) => ({ ...c, widthPx: 400, heightPx: 300, aspect: '4:3' as const })) };
     const r = resetAllDataSets(chartId)(p);
+    expect(r.charts[0].yAxis).toEqual(p0.charts[0].yAxis);
     expect(r.charts[0].layers).toEqual(p0.charts[0].layers);
     expect(r.charts[0].defaults).toEqual(p0.charts[0].defaults);
     expect(r.charts[0].paletteId).toBe(p0.charts[0].paletteId);
-    // Titles, axes, legend and size are left alone.
-    expect(r.charts[0].widthPx).toBe(p.charts[0].widthPx);
+    // Titles are kept; the rest of the look, size included, goes back to a new graph's.
+    expect(r.charts[0]).toMatchObject({ widthPx: p0.charts[0].widthPx, heightPx: p0.charts[0].heightPx, aspect: p0.charts[0].aspect });
+    expect(r.charts[0].title).toBe(p.charts[0].title);
   });
 });

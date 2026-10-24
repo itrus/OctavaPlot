@@ -190,7 +190,7 @@ describe('malformed persisted fields', () => {
     const r = parseProjectWithNotes(build((p) => (p.charts[0].annotations = [null, { id: 'a1', text: 42, xFrac: 2, yFrac: 'x', fontSizePt: -1, color: 'red' }])));
     const a = r.project.charts[0].annotations;
     expect(a).toHaveLength(1);
-    expect(a[0]).toEqual({ id: 'a1', text: '42', xFrac: 1, yFrac: 0.5, fontSizePt: 24, color: '#000000' });
+    expect(a[0]).toEqual({ id: 'a1', text: '42', xFrac: 1, yFrac: 0.5, fontSizePt: 24, color: '#000000', opacity: 1 });
     expect(r.notes.some((n) => n.includes('annotations[0]'))).toBe(true);
     expect(() => chartToSvgString(r.project.charts[0], r.project.dataTables[0])).not.toThrow();
   });

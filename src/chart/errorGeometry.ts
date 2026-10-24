@@ -14,6 +14,7 @@ export interface ErrorBarGeom {
   d: string;
   color: string;
   strokeWidth: number;
+  opacity: number;
   /** What the bar shows, e.g. "SD" or "SD (positive side only)". One-sided display is not a one-sided calculation (spec 9.2 L667). */
   meaning: string;
   /** True when a drawn end lies strictly outside the axis domain. */
@@ -26,7 +27,7 @@ export interface ErrorBarGeom {
 
 export type ErrorBarStyle = Pick<
   ChartStyle,
-  'showErrorBars' | 'errorDirection' | 'errorCap' | 'errorCapWidthPt' | 'errorLineWidthPt' | 'errorColor'
+  'showErrorBars' | 'errorDirection' | 'errorCap' | 'errorCapWidthPt' | 'errorLineWidthPt' | 'errorColor' | 'errorOpacity'
 >;
 
 export interface ErrorBarInput {
@@ -125,6 +126,7 @@ export function buildErrorBar(input: ErrorBarInput): ErrorBarGeom | null {
     d,
     color: style.errorColor,
     strokeWidth: style.errorLineWidthPt,
+    opacity: style.errorOpacity,
     meaning: `${describeSpread(stats.effectiveSpread, stats.confidenceLevel, stats.centreKind)}${side}`,
     clippedUpper: drawUpper && outside(ends.upper),
     clippedLower: drawLower && outside(ends.lower),

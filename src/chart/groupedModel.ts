@@ -13,6 +13,8 @@ import { barLabelText, placeBarLabel, type BarLabelGeom } from './barLabels';
 import { axisMapper, onAxis, resolveAxis } from './axisScale';
 import type { YAxisScale } from './scales';
 import { suppliedStats } from './xyModel';
+import { compileGroupedScene } from './categoryChrome';
+import type { ChromeScene } from './scene';
 
 /** How the bars of a cluster are arranged: side by side, stacked as counts, or stacked as shares of the row total. */
 type Arrangement = 'side' | 'stacked' | 'percent';
@@ -86,6 +88,8 @@ export interface GroupedModel {
   /** Index into `series` of each legend entry. */
   legendSeries: number[];
   warnings: string[];
+  /** The chrome of the chart (clip, backgrounds, grids, axes, titles, legend) as scene elements. */
+  scene?: ChromeScene;
 }
 
 /** Share of a category's slot taken by its cluster of bars. */
@@ -325,5 +329,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   if (noSpan > 0) warnings.push(`${noSpan} value${noSpan === 1 ? ' has' : 's have'} no range to draw a floating bar from: enter replicates, or limits as the values already calculated.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
 
-  return { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, legendSeries, warnings: [...new Set(warnings)] };
+  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, legendSeries, warnings: [...new Set(warnings)] };
+  model.scene = compileGroupedScene(chart, model);
+  return model;
 }

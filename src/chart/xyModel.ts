@@ -1,16 +1,17 @@
 import { isXyChartType } from '../model/chartTypes';
-import { layersAvailable, layersOf, type LayerSpec } from '../model/layers';
+import { layerLook, layersAvailable, layersOf, type LayerSpec } from '../model/layers';
 import { resolveStyle } from '../model/style';
 import { resolveSummary } from '../model/summary';
 import { layoutOf, summaryFormatInfo, xySeries } from '../model/tableLayout';
 import { NO_FIT_SETTINGS } from '../model/fitOptions';
-import type { Chart, ChartStyle, DataTable, FitSettings, Id, SpreadKind, SummaryFormat } from '../model/types';
+import type { Chart, ChartStyle, DataTable, FitSettings, Id, LayerStyle, SpreadKind, SummaryFormat } from '../model/types';
 import { chartPx2Pt, n2 } from '../model/units';
 import { summaryOf, type GroupStats } from '../stats/summary';
 import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
 import { computeLayout, type Layout } from './layout';
 import { curveYValues, drawFit, runFit, type FittedCurve } from './fitCurve';
 import { displayName } from './model';
+import { attachLazyScene, type Scene } from './scene';
 import { axisMapper, inBreak, onAxis, polylinesThroughBreaks, resolveAxis } from './axisScale';
 import type { YAxisScale } from './scales';
 
@@ -26,6 +27,17 @@ export interface XyPoint {
   py: number;
   /** The summary behind the point; null for a single Y value. */
   stats: GroupStats | null;
+}
+
+/** One replicate of a row, drawn on its own (the individual-values layer). */
+export interface XyRawPoint {
+  /** Observation ID of the replicate: its stable identity. */
+  id: Id;
+  row: number;
+  x: number;
+  y: number;
+  px: number;
+  py: number;
 }
 
 /** One bar of a histogram: its rectangle in chart pt, and the bin and value behind it. */
@@ -46,6 +58,8 @@ export interface XySeries {
   label: string;
   style: ChartStyle;
   points: XyPoint[];
+  /** Every replicate on its own, when the individual-values layer is on (a table of replicates only). */
+  rawPoints?: XyRawPoint[];
   /** SVG path data of the connecting line: one subpath per run of consecutive valid rows (a missing value breaks it). */
   linePath: string;
   /** Path data of all the error bars of the series (stems and caps); empty when there are none. */
@@ -58,6 +72,9 @@ export interface XySeries {
   bars?: HistBar[];
   /** The fitted curve with its band and parameters; absent when no model is chosen. */
   fit?: FittedCurve;
+  /** How the fit curve and its band are drawn: the series' line look, or what the layers were given of their own. */
+  fitCurveLook?: LayerStyle;
+  fitBandLook?: LayerStyle;
   /** Rows that could not be drawn because X or Y is missing. */
   skipped: number;
 }
@@ -92,6 +109,8 @@ export interface XyModel {
   fit: FitSettings;
   /** The layers the chart is drawn from, lowest first; absent for the families that are not drawn from layers yet. */
   layers?: LayerSpec[];
+  /** The data layers as shapes: what the drawing, the export and the editor's hit-testing are made from. */
+  scene?: Scene;
 }
 
 
@@ -189,6 +208,8 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     const pts: Array<{ id: Id; row: number; x: number; y: number; stats: GroupStats | null }> = [];
     // What a curve is fitted to: every replicate on its own, or the single Y or entered mean of each row.
     const obs: Array<{ x: number; y: number }> = [];
+    // Each replicate as it is, for the individual-values layer.
+    const rawObs: Array<{ id: Id; row: number; x: number; y: number }> = [];
     let skipped = 0;
     let meaning: string | null = null;
     let noError = 0;
@@ -200,7 +221,13 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
       let stats: GroupStats | null = null;
       if (layout.kind === 'single') y = values[0];
       else if (layout.kind === 'replicates') {
-        if (x !== null) for (const v of values) if (v !== null && Number.isFinite(v)) obs.push({ x, y: v });
+        if (x !== null) {
+          values.forEach((v, k) => {
+            if (v === null || !Number.isFinite(v)) return;
+            obs.push({ x, y: v });
+            if (style.showRawPoints) rawObs.push({ id: s.columns[k].observations[row].id, row, x, y: v });
+          });
+        }
         stats = summaryOf(values, spec);
         y = stats.centre;
         if (y !== null && stats.effectiveSpread !== 'none' && stats.interval.status === 'unavailable') noError++;
@@ -222,13 +249,13 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
       pts.push({ id: s.columns[0].observations[row].id, row, x, y, stats });
     }
     if (noError > 0) warnings.push(`${s.name}: ${noError} row${noError === 1 ? ' has' : 's have'} a mean but no usable error, so no error bar is drawn there.`);
-    return { s, style, pts, skipped, meaning, label: displayName(chart, s.id, s.name), fitRun: runFit(obs, fit) };
+    return { s, style, pts, rawObs, skipped, meaning, label: displayName(chart, s.id, s.name), fitRun: runFit(obs, fit) };
   });
 
   // 2. Scales from every drawn value, error bar ends included, so manual limits clip but never exclude.
-  const allX = raw.flatMap((r) => r.pts.map((p) => p.x));
+  const allX = raw.flatMap((r) => [...r.pts.map((p) => p.x), ...r.rawObs.map((o) => o.x)]);
   // A fitted curve is part of the data the axis holds (its band is not: a wide band is cut off by the plot).
-  const allY = raw.flatMap((r) => [...r.pts.flatMap((p) => (p.stats ? rangeValuesFor(p.stats, r.style.showErrorBars, r.style.errorDirection) : [p.y])), ...curveYValues(r.fitRun)]);
+  const allY = raw.flatMap((r) => [...r.pts.flatMap((p) => (p.stats ? rangeValuesFor(p.stats, r.style.showErrorBars, r.style.errorDirection) : [p.y])), ...curveYValues(r.fitRun), ...r.rawObs.map((o) => o.y)]);
   const xAxis = resolveAxis({
     values: allX,
     includeZero: chart.xAxis.scale === 'linear' && nearZero(allX),
@@ -278,6 +305,10 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     offAxis += r.pts.length - drawn.length;
     // A value inside a gap of a broken axis has no place on it: it is not drawn, and the line is cut at the gap's edge.
     const points: XyPoint[] = drawn.filter((p) => !inBreak(xAxis, p.x) && !inBreak(yAxis, p.y)).map((p) => ({ ...p, px: xScale(p.x), py: yScale(p.y) }));
+    // Individual values are placed like the points: none where a log axis or a break gives them no position.
+    const rawPoints: XyRawPoint[] = r.rawObs
+      .filter((o) => onAxis(xAxis, o.x) && onAxis(yAxis, o.y) && !inBreak(xAxis, o.x) && !inBreak(yAxis, o.y))
+      .map((o) => ({ ...o, px: xScale(o.x), py: yScale(o.y) }));
     // A run ends where a row between two drawn points is missing (Y or X), so a gap is a gap in the line.
     const seq: Array<{ x: number; y: number } | null> = [];
     let prevRow = -2;
@@ -303,7 +334,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     const fitted = fit.model === 'none' ? undefined : drawFit(r.fitRun, fit, { xAxis, yAxis, xScale, yScale });
     if (fitted?.failure) warnings.push(`${r.label}: no curve was fitted. ${fitted.failure}`);
     else if (fitted?.summary?.message) warnings.push(`${r.label}: ${fitted.summary.message}`);
-    return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: d, errorPath, errorMeaning, skipped: r.skipped, fit: fitted };
+    return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: d, errorPath, errorMeaning, skipped: r.skipped, ...(r.style.showRawPoints ? { rawPoints } : {}), fit: fitted, fitCurveLook: layerLook(chart, `${r.s.id}:fitCurve`, r.style), fitBandLook: layerLook(chart, `${r.s.id}:fitBand`, r.style) };
   });
   if (offAxis > 0) warnings.push(`${offAxis} point${offAxis === 1 ? ' has' : 's have'} a value of 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
@@ -311,5 +342,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   if (skippedTotal > 0) warnings.push(`${skippedTotal} row${skippedTotal === 1 ? ' has' : 's have'} an X or Y value missing and ${skippedTotal === 1 ? 'is' : 'are'} not drawn.`);
   if (allX.length === 0) warnings.push('Enter numbers in the X column and in at least one Y column to see the chart.');
 
-  return { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit, layers: layersAvailable(chart) ? layersOf(chart, table) : undefined };
+  const model: XyModel = { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit, layers: layersAvailable(chart) ? layersOf(chart, table) : undefined };
+  attachLazyScene(chart, model);
+  return model;
 }

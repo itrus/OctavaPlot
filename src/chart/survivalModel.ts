@@ -1,4 +1,6 @@
 import { isSurvivalChartType } from '../model/chartTypes';
+import { DEFAULT_BAND_OPACITY, layersOf } from '../model/layers';
+import { attachLazyScene } from './scene';
 import { resolveStyle } from '../model/style';
 import { xySeries } from '../model/tableLayout';
 import { NO_FIT_SETTINGS } from '../model/fitOptions';
@@ -110,7 +112,7 @@ export function survivalInterval(step: Pick<SurvivalStep, 'survival' | 'greenwoo
 
 
 /** Share of the series colour the confidence band is drawn at (spec 5.2: bands use 0.20). */
-export const BAND_OPACITY = 0.2;
+export const BAND_OPACITY = DEFAULT_BAND_OPACITY;
 
 /**
  * Model of survival and cumulative-event curves, as an XyModel so the XY drawing is reused: the curve is the series'
@@ -254,5 +256,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
     };
   }
 
-  return { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, atRisk, warnings: [...new Set(warnings)], fit: NO_FIT_SETTINGS };
+  const model: XyModel = { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, atRisk, warnings: [...new Set(warnings)], fit: NO_FIT_SETTINGS, layers: layersOf(chart, table) };
+  attachLazyScene(chart, model);
+  return model;
 }

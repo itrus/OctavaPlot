@@ -6,7 +6,7 @@ import type { Id } from '../model/types';
  * emitted in exported SVG.
  */
 
-type HitKind = 'bar' | 'point' | 'error' | 'line' | 'meanLine' | 'legend' | 'label' | 'annotation' | 'axis' | 'title' | 'background';
+export type HitKind = 'bar' | 'point' | 'error' | 'line' | 'meanLine' | 'legend' | 'label' | 'annotation' | 'axis' | 'title' | 'background';
 
 export interface HitTarget {
   kind: HitKind;

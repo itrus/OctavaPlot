@@ -77,7 +77,7 @@ export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, met
 export const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4 };
 
 /** Line weight shared by the axes, bar borders, error bars and connecting lines, so they read as one family. */
-const AXIS_LINE_PT = 5.2;
+const AXIS_LINE_PT = 4;
 /** Box plots and violins (spec 10): min-max whiskers, medium smoothing, equal maximum width. */
 const DEFAULT_DISTRIBUTION: DistributionOptions = {
   whisker: 'minmax',
@@ -107,7 +107,7 @@ export const DEFAULT_BAR_LABELS: BarLabels = { show: 'none', decimals: null, tho
 /** Automatic column layout: the spacing the column charts always had. */
 const DEFAULT_BARS: BarLayout = { gapPct: null, beforePct: null, afterPct: null, baseline: null };
 /** Gridlines: thin and light, and lighter still for the minor ones (P). */
-const DEFAULT_GRID: GridStyle = { color: '#d0d0d0', widthPt: 1, style: 'solid', minorColor: '#e6e6e6', minorWidthPt: 0.5, minorStyle: 'solid' };
+const DEFAULT_GRID: GridStyle = { color: '#d0d0d0', widthPt: 1, style: 'solid', minorColor: '#e6e6e6', minorWidthPt: 0.5, minorStyle: 'solid', opacity: 1, minorOpacity: 1 };
 /** Major tick length, pt (spec 20.2); the layout constant has the same value. */
 export const TICK_LENGTH_PT = 11.2;
 
@@ -117,6 +117,7 @@ export const DEFAULT_STYLE: ChartStyle = {
   barOpacity: 1,
   barBorderColor: '#000000',
   barBorderWidthPt: 0,
+  barBorderOpacity: 1,
   barFillMode: 'solid',
   barPattern: 'horizontal',
   barPatternSpacingPt: 8,
@@ -124,22 +125,26 @@ export const DEFAULT_STYLE: ChartStyle = {
   barPatternColor: null,
   barPatternBackground: '#ffffff',
   showSymbols: false,
+  showRawPoints: false,
   symbolColor: '#000000',
   symbolShape: 'circle',
   symbolSizePt: 12,
   symbolFillOpacity: 1,
   symbolBorderColor: '#000000',
   symbolBorderWidthPt: 3,
+  symbolBorderOpacity: 1,
   showErrorBars: true,
   errorDirection: 'both',
   errorCap: 'bar',
   errorCapWidthPt: 10,
   errorLineWidthPt: AXIS_LINE_PT,
   errorColor: '#000000',
+  errorOpacity: 1,
   showLines: false,
   showMeanLine: false,
   lineColor: '#000000',
   lineWidthPt: AXIS_LINE_PT,
+  lineOpacity: 1,
   lineStyle: 'solid',
   axisBinding: 'primary',
   // Point labels: spec 7.1 L479-485, all P.
@@ -263,6 +268,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     titleBold: true,
     titleOffsetPt: 0,
     axisColor: '#000000',
+    axisOpacity: 1,
     plotColor: '#ffffff',
     pageColor: '#ffffff',
     frame: 'none',
@@ -272,7 +278,8 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     origin: { x: null, y: null },
     bars: { ...DEFAULT_BARS },
     barLabels: { ...DEFAULT_BAR_LABELS },
-    distribution: { ...DEFAULT_DISTRIBUTION },
+    // A violin shows its values from the start: the Points box then switches them off.
+    distribution: { ...DEFAULT_DISTRIBUTION, ...(type === 'violin' ? { points: 'all' as const } : {}) },
     pairs: { bridge: false },
     heatmap: { ...DEFAULT_HEATMAP },
     histogram: { ...DEFAULT_HISTOGRAM },
@@ -290,6 +297,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     annotations: [],
     referenceLines: [],
     hiddenLayerIds: [],
+    layerStyles: {},
   };
 }
 

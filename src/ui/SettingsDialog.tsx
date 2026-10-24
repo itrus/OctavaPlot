@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../model/defaults';
 import { useApp } from '../state/AppContext';
 import type { DecimalSeparator } from './cellText';
-import { PNG_SCALES, type ExportFormat } from '../state/settings';
+import type { ExportFormat } from '../state/settings';
 import { DialogShell, trapTab } from './DialogShell';
 import { Check, Field, NumField, Section, SelectInput } from './inspector/controls';
 
@@ -67,13 +67,6 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                   { value: 'svg', label: 'SVG (vector)' },
                 ]}
                 onChange={(v) => updateSettings({ exportFormat: v })}
-              />
-            </Field>
-            <Field label="PNG resolution" hint="Pixels per pixel of the chart: 300 dpi and 600 dpi are the usual print resolutions">
-              <SelectInput<string>
-                value={String(settings.pngScale)}
-                options={PNG_SCALES.map((v) => ({ value: String(v), label: `${v}× (${Math.round(v * 96)} dpi): ${Math.round(settings.defaultChartWidthPx * v)} × ${Math.round(settings.defaultChartHeightPx * v)} px for a new chart` }))}
-                onChange={(v) => updateSettings({ pngScale: Number(v) })}
               />
             </Field>
           </Section>
