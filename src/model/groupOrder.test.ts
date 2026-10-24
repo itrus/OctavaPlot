@@ -3,8 +3,9 @@ import { buildChartModel } from '../chart/model';
 import { columnLayout } from '../chart/columns';
 import { createChart, createColumnTable } from './defaults';
 import { effectiveTable } from './chartTable';
-import { applyOrder, moveGroup, sanitizeGaps, sanitizeOrder } from './groupOrder';
-import { removeGroup, setGroupGap, setGroupOrder } from '../state/commands';
+import { applyOrder, moveGroup, sanitizeOrder } from './groupOrder';
+import { AUTO_BAR_GAP_PCT, foldGroupGaps } from './columnOptions';
+import { removeGroup, setGroupOrder } from '../state/commands';
 import { parseProject, stringifyProject } from '../state/serialize';
 import type { Project } from './types';
 
@@ -36,7 +37,6 @@ describe('moving data sets', () => {
   it('cleans what a file holds', () => {
     expect(sanitizeOrder(['a', 3, 'a', 'b'])).toEqual(['a', 'b']);
     expect(sanitizeOrder('a')).toEqual([]);
-    expect(sanitizeGaps({ a: 50, b: 100, c: 9999, d: 'x', e: -3 })).toEqual({ a: 50, c: 500, e: 0 });
   });
 });
 
@@ -53,27 +53,50 @@ describe('the order and the gaps on a chart', () => {
     expect(m.groups.map((g) => g.name)).toEqual(['Group D', 'Group C', 'Group B', 'Group A']);
     expect(m.groups[0].centerX).toBeLessThan(m.groups[3].centerX);
   });
-  it('gives a data set more room before it, and normal room by default', () => {
+  it('lays the columns out evenly, with the space between columns as the only spacing', () => {
     const { p, table } = setup();
-    const plain = columnLayout({ x: 0, width: 400 }, table.groups.map((g) => g.id), p.charts[0].bars, {});
     const idList = table.groups.map((g) => g.id);
-    const gapOf = (l: typeof plain, i: number) => l.x(idList[i])! - (l.x(idList[i - 1])! + l.bw);
-    expect(gapOf(plain, 1)).toBeCloseTo(gapOf(plain, 2), 6);
-    const wide = columnLayout({ x: 0, width: 400 }, idList, p.charts[0].bars, { [idList[2]]: 300 });
-    expect(gapOf(wide, 2)).toBeCloseTo(gapOf(wide, 1) * 3, 6);
-    // Everything still fits between the edges of the plotting region.
-    expect(wide.x(idList[3])! + wide.bw).toBeLessThanOrEqual(400);
-    const none = setGroupGap(p.charts[0].id, idList[2], 100)(p);
-    expect(none.charts[0].groupGaps).toEqual({});
+    const layout = columnLayout({ x: 0, width: 400 }, idList, p.charts[0].bars);
+    const gapOf = (i: number) => layout.x(idList[i])! - (layout.x(idList[i - 1])! + layout.bw);
+    expect(gapOf(1)).toBeCloseTo(gapOf(2), 6);
+    expect(gapOf(2)).toBeCloseTo(gapOf(3), 6);
+    const wider = columnLayout({ x: 0, width: 400 }, idList, { ...p.charts[0].bars, gapPct: 200 });
+    expect(wider.x(idList[1])! - (wider.x(idList[0])! + wider.bw)).toBeCloseTo(2 * wider.bw, 6);
   });
   it('is kept in a saved file', () => {
     const { p, table } = setup();
     const idList = table.groups.map((g) => g.id);
-    let next = setGroupOrder(p.charts[0].id, [...idList].reverse())(p);
-    next = setGroupGap(p.charts[0].id, idList[1], 150)(next);
+    const next = setGroupOrder(p.charts[0].id, [...idList].reverse())(p);
     const back = parseProject(stringifyProject(next));
     expect(back.charts[0].groupOrder).toEqual([...idList].reverse());
-    expect(back.charts[0].groupGaps).toEqual({ [idList[1]]: 150 });
+    expect('groupGaps' in back.charts[0]).toBe(false);
+  });
+});
+
+describe('spaces before single data sets in older files', () => {
+  const ids3 = ['a', 'b', 'c'];
+  const bars = { gapPct: null, beforePct: null, afterPct: null, baseline: null };
+  it('are added to the space between columns when they are all the same', () => {
+    const r = foldGroupGaps({ b: 200, c: 200 }, ids3, bars);
+    expect(r.bars.gapPct).toBeCloseTo(AUTO_BAR_GAP_PCT * 2, 1);
+    expect(r.note).not.toBeNull();
+    expect(foldGroupGaps({ b: 50, c: 50 }, ids3, { ...bars, gapPct: 80 }).bars.gapPct).toBe(40);
+  });
+  it('change nothing when they are all normal, and are dropped with a note when they differ', () => {
+    expect(foldGroupGaps({}, ids3, bars)).toEqual({ bars, note: null });
+    expect(foldGroupGaps({ b: 100, c: 100 }, ids3, bars)).toEqual({ bars, note: null });
+    const mixed = foldGroupGaps({ b: 300 }, ids3, bars);
+    expect(mixed.bars).toBe(bars);
+    expect(mixed.note).toMatch(/dropped/);
+  });
+  it('are folded when an old file is opened, and are not written again', () => {
+    const { p, table } = setup();
+    const env = JSON.parse(stringifyProject(p));
+    env.project.charts[0].groupGaps = Object.fromEntries(table.groups.slice(1).map((g) => [g.id, 200]));
+    const back = parseProject(JSON.stringify(env));
+    expect(back.charts[0].bars.gapPct).toBeCloseTo(AUTO_BAR_GAP_PCT * 2, 1);
+    expect('groupGaps' in back.charts[0]).toBe(false);
+    expect(stringifyProject(back)).not.toContain('groupGaps');
   });
 });
 

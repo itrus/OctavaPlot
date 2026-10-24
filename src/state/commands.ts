@@ -3,10 +3,12 @@ import { sanitizeBarLabels, sanitizeBars } from '../model/columnOptions';
 import { sanitizeDistribution } from '../model/distributionOptions';
 import { sanitizeLayerStyles } from '../model/layers';
 import { sanitizeLook } from '../model/look';
-import { GROUP_GAP_LIMITS, sanitizeGaps, sanitizeOrder } from '../model/groupOrder';
+import { sanitizeOrder } from '../model/groupOrder';
 import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createGroup, createXyTable, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
 import { analysisKindApplies, analysisTypeInfo } from '../model/analysis';
 import { sanitizeDegree } from '../model/fitOptions';
+import { inheritChart } from '../model/chartFormat';
+import { clampFrame, defaultLayout, FREE_MAX, framesOf, newFrame, resizePanels, sanitizeLayout, turnFrames } from '../model/layout';
 import type { FitModelId } from '../stats/fit';
 import { effectiveTable } from '../model/chartTable';
 import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, xySeries } from '../model/tableLayout';
@@ -39,6 +41,7 @@ import type {
   Id,
   Observation,
   JitterConfig,
+  Layout,
   LegendConfig,
   Project,
   ReferenceLine,
@@ -578,6 +581,19 @@ export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; hei
   return { ...withFit, charts: [...withFit.charts, { ...made, fit: { ...made.fit, analysisId } }] };
 };
 
+/** New graph of a data table that takes its format from an existing graph (see model/chartFormat.ts). */
+export const addChartLike = (chartId: Id, tableId: Id, sourceChartId: Id, linked = true): Command => (p) => {
+  const table = p.dataTables.find((t) => t.id === tableId);
+  const source = p.charts.find((c) => c.id === sourceChartId);
+  const sourceTable = source && p.dataTables.find((t) => t.id === source.dataTableId);
+  if (!table || !source || !sourceTable) return p;
+  const made = inheritChart(source, sourceTable, table, chartId);
+  return { ...p, charts: [...p.charts, linked ? { ...made, linkedTo: source.id } : made] };
+};
+
+/** Stop a graph following the graph it is linked to; it keeps all its settings as they are. */
+export const unlinkChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId && c.linkedTo !== undefined) ? mapChart(p, chartId, ({ linkedTo: _gone, ...c }) => c) : p);
+
 /** Colours, frame and gridline style of the chart (see model/axis.ts: sanitizeLook). */
 export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
@@ -593,13 +609,6 @@ export const patchBars = (chartId: Id, patch: Partial<BarLayout>): Command => (p
 export const setGroupOrder = (chartId: Id, order: Id[]): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, groupOrder: sanitizeOrder(order) }));
 
-/** Space before a data set as a percentage of the normal space between columns (100 or null = normal). */
-export const setGroupGap = (chartId: Id, groupId: Id, pct: number | null): Command => (p) =>
-  mapChart(p, chartId, (c) => {
-    const next = sanitizeGaps({ ...c.groupGaps, [groupId]: pct ?? GROUP_GAP_LIMITS.normal });
-    return { ...c, groupGaps: next };
-  });
-
 /** Labels above the bars of a column chart. */
 export const patchBarLabels = (chartId: Id, patch: Partial<BarLabels>): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, barLabels: sanitizeBarLabels({ ...c.barLabels, ...patch }, c.barLabels) }));
@@ -609,11 +618,12 @@ export const patchDistribution = (chartId: Id, patch: Partial<DistributionOption
   mapChart(p, chartId, (c) => ({ ...c, distribution: sanitizeDistribution({ ...c.distribution, ...patch }, c.distribution) }));
 
 /** Rename a data table, a graph or an analysis from the navigator; a blank name is ignored. */
-export const renameItem = (kind: 'table' | 'chart' | 'analysis', id: Id, name: string): Command => (p) => {
+export const renameItem = (kind: 'table' | 'chart' | 'analysis' | 'layout', id: Id, name: string): Command => (p) => {
   const next = name.trim();
   if (next === '') return p;
   if (kind === 'table') return mapTable(p, id, (t) => (t.name === next ? t : { ...t, name: next }));
   if (kind === 'chart') return mapChart(p, id, (c) => (c.name === next ? c : { ...c, name: next }));
+  if (kind === 'layout') return { ...p, layouts: (p.layouts ?? []).map((l) => (l.id === id && l.name !== next ? { ...l, name: next } : l)) };
   return { ...p, analyses: (p.analyses ?? []).map((a) => (a.id === id && a.name !== next ? { ...a, name: next } : a)) };
 };
 
@@ -650,19 +660,29 @@ export const removeTable = (tableId: Id): Command => (p) => {
   if (p.dataTables.length <= 1 || !p.dataTables.some((t) => t.id === tableId)) return p;
   const goneAnalyses = new Set((p.analyses ?? []).filter((a) => a.dataTableId === tableId).map((a) => a.id));
   const analyses = (p.analyses ?? []).filter((a) => !goneAnalyses.has(a.id));
-  return {
-    ...p,
-    dataTables: p.dataTables.filter((t) => t.id !== tableId),
-    charts: p.charts
-      .filter((c) => c.dataTableId !== tableId)
-      .map((c) => ({
-        ...c,
-        extraGroups: c.extraGroups.filter((e) => e.tableId !== tableId),
-        fit: c.fit.analysisId !== null && goneAnalyses.has(c.fit.analysisId) ? { ...c.fit, analysisId: null } : c.fit,
-      })),
-    ...(analyses.length > 0 ? { analyses } : { analyses: undefined }),
-  };
+  const goneCharts = new Set(p.charts.filter((c) => c.dataTableId === tableId).map((c) => c.id));
+  return clearPanels(
+    {
+      ...p,
+      dataTables: p.dataTables.filter((t) => t.id !== tableId),
+      charts: p.charts
+        .filter((c) => c.dataTableId !== tableId)
+        .map((c) => ({
+          ...c,
+          extraGroups: c.extraGroups.filter((e) => e.tableId !== tableId),
+          fit: c.fit.analysisId !== null && goneAnalyses.has(c.fit.analysisId) ? { ...c.fit, analysisId: null } : c.fit,
+        })),
+      ...(analyses.length > 0 ? { analyses } : { analyses: undefined }),
+    },
+    goneCharts,
+  );
 };
+
+/** Empties the layout panels that held a graph that is gone (they stay as placeholders). */
+const clearPanels = (p: Project, gone: ReadonlySet<Id>): Project =>
+  gone.size === 0 || !(p.layouts ?? []).some((l) => l.panels.some((id) => id !== null && gone.has(id)))
+    ? p
+    : { ...p, layouts: (p.layouts ?? []).map((l) => ({ ...l, panels: l.panels.map((id) => (id !== null && gone.has(id) ? null : id)) })) };
 
 /** A copy of a graph (same data table, same settings) with new IDs for it and its layers. */
 export const duplicateChart = (chartId: Id, copyId: Id): Command => (p) => {
@@ -672,7 +692,85 @@ export const duplicateChart = (chartId: Id, copyId: Id): Command => (p) => {
   return { ...p, charts: [...p.charts, copy] };
 };
 
-export const removeChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId) ? { ...p, charts: p.charts.filter((c) => c.id !== chartId) } : p);
+export const removeChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId) ? clearPanels({ ...p, charts: p.charts.filter((c) => c.id !== chartId) }, new Set([chartId])) : p);
+
+// ---------------------------------------------------------------------------------------------------------------
+// Layouts: A4 pages of graphs.
+
+/** Add a layout. `fillFrom` puts the graphs of the project in the panels, in order, starting with that graph. */
+export const addLayout = (id: Id, over: Parameters<typeof defaultLayout>[2] = {}, fillFrom?: Id): Command => (p) => {
+  const existing = p.layouts ?? [];
+  let name = 'Layout';
+  for (let i = 2; existing.some((l) => l.name === name); i++) name = `Layout ${i}`;
+  const layout = defaultLayout(id, name, over);
+  if (fillFrom !== undefined) {
+    const start = Math.max(0, p.charts.findIndex((c) => c.id === fillFrom));
+    layout.panels = layout.panels.map((_, i) => p.charts[start + i]?.id ?? null);
+  }
+  return { ...p, layouts: [...existing, layout] };
+};
+
+const mapLayout = (p: Project, id: Id, fn: (l: Layout) => Layout): Project => ({ ...p, layouts: (p.layouts ?? []).map((l) => (l.id === id ? fn(l) : l)) });
+
+/** Change the settings of a layout (page, arrangement, scaling, labels). A new arrangement keeps the graphs of the slots that remain. */
+export const patchLayout = (id: Id, patch: Partial<Omit<Layout, 'id' | 'panels'>>): Command => (p) =>
+  mapLayout(p, id, (l) => {
+    // Turning the page carries the boxes of a free layout with it.
+    const a = l.arrangement;
+    const turned = patch.orientation !== undefined && patch.orientation !== l.orientation && a.kind === 'free' && patch.arrangement === undefined;
+    return sanitizeLayout({ ...l, ...patch, ...(turned && a.kind === 'free' ? { arrangement: { kind: 'free' as const, frames: turnFrames(a.frames, l.orientation, patch.orientation!) } } : {}) }, l);
+  });
+
+/** Make the panels free boxes, starting where the arrangement put them. */
+export const freeLayout = (id: Id): Command => (p) =>
+  mapLayout(p, id, (l) => (l.arrangement.kind === 'free' ? l : { ...l, arrangement: { kind: 'free', frames: framesOf(l) } }));
+
+/** Move or resize the box of a panel of a free layout. */
+export const setFrame = (id: Id, slot: number, frame: { x: number; y: number; w: number; h: number }): Command => (p) =>
+  mapLayout(p, id, (l) => {
+    const a = l.arrangement;
+    if (a.kind !== 'free' || slot < 0 || slot >= a.frames.length) return l;
+    return { ...l, arrangement: { kind: 'free', frames: a.frames.map((f, i) => (i === slot ? clampFrame(frame, l.orientation) : f)) } };
+  });
+
+/** Add an empty panel to a free layout. */
+export const addFreePanel = (id: Id): Command => (p) =>
+  mapLayout(p, id, (l) => {
+    const a = l.arrangement;
+    if (a.kind !== 'free' || a.frames.length >= FREE_MAX) return l;
+    return { ...l, arrangement: { kind: 'free', frames: [...a.frames, newFrame(a.frames, l.orientation)] }, panels: [...l.panels, null] };
+  });
+
+/** Remove a panel of a free layout (the last one cannot be removed); later panels move up. */
+export const removeFreePanel = (id: Id, slot: number): Command => (p) =>
+  mapLayout(p, id, (l) => {
+    const a = l.arrangement;
+    if (a.kind !== 'free' || a.frames.length <= 1 || slot < 0 || slot >= a.frames.length) return l;
+    return { ...l, arrangement: { kind: 'free', frames: a.frames.filter((_, i) => i !== slot) }, panels: l.panels.filter((_, i) => i !== slot) };
+  });
+
+/** Put a graph in a panel (null empties it). A graph already in another panel of the layout swaps places with it. */
+export const setLayoutPanel = (id: Id, slot: number, chartId: Id | null): Command => (p) =>
+  mapLayout(p, id, (l) => {
+    if (slot < 0 || slot >= l.panels.length || (chartId !== null && !p.charts.some((c) => c.id === chartId))) return l;
+    const panels = [...l.panels];
+    const from = chartId === null ? -1 : panels.indexOf(chartId);
+    if (from >= 0) panels[from] = panels[slot];
+    panels[slot] = chartId;
+    return { ...l, panels: resizePanels(panels, l.arrangement) };
+  });
+
+export const removeLayout = (id: Id): Command => (p) => {
+  const layouts = (p.layouts ?? []).filter((l) => l.id !== id);
+  return { ...p, layouts: layouts.length > 0 ? layouts : undefined };
+};
+
+/** A copy of a layout (same graphs and settings). */
+export const duplicateLayout = (layoutId: Id, copyId: Id): Command => (p) => {
+  const l = (p.layouts ?? []).find((x) => x.id === layoutId);
+  if (!l) return p;
+  return { ...p, layouts: [...(p.layouts ?? []), { ...l, id: copyId, name: copyName(l.name, (p.layouts ?? []).map((x) => x.name)), panels: [...l.panels], arrangement: l.arrangement.kind === 'free' ? { kind: 'free', frames: l.arrangement.frames.map((f) => ({ ...f })) } : l.arrangement }] };
+};
 
 /** A copy of an analysis (same table and settings). */
 export const duplicateAnalysis = (analysisId: Id, copyId: Id): Command => (p) => {

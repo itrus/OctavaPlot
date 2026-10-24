@@ -1,7 +1,11 @@
 import type { DecimalSeparator } from '../ui/cellText';
 import { CHART_PX_MAX, CHART_PX_MIN, DEFAULT_CHART_HEIGHT_PX, DEFAULT_CHART_WIDTH_PX } from '../model/defaults';
 
-export type ExportFormat = 'png' | 'svg';
+export type ExportFormat = 'png' | 'svg' | 'pdf';
+
+/** Resolutions offered for the PNG and PDF of a layout page. */
+export const EXPORT_DPI_CHOICES = [150, 300, 600] as const;
+export type ExportDpi = (typeof EXPORT_DPI_CHOICES)[number];
 
 
 /** Application preferences. Kept apart from the project: they follow the browser, not the file. */
@@ -12,6 +16,8 @@ export interface Settings {
   /** New projects start with blank tables instead of the example data. */
   newProjectEmpty: boolean;
   exportFormat: ExportFormat;
+  /** Resolution of every PDF, and of the PNG of a layout page, in dots per inch (A4 at 600 dpi is 4960 × 7016 px). */
+  exportDpi: ExportDpi;
   /** How numbers typed, pasted or imported into tables are read (see DecimalSeparator). */
   decimalSeparator: DecimalSeparator;
   /** Size of newly created charts, in CSS pixels. */
@@ -24,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
   timestampExports: true,
   newProjectEmpty: false,
   exportFormat: 'png',
+  exportDpi: 600,
   decimalSeparator: 'auto',
   defaultChartWidthPx: DEFAULT_CHART_WIDTH_PX,
   defaultChartHeightPx: DEFAULT_CHART_HEIGHT_PX,
@@ -48,7 +55,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     autosave: typeof r.autosave === 'boolean' ? r.autosave : d.autosave,
     timestampExports: typeof r.timestampExports === 'boolean' ? r.timestampExports : d.timestampExports,
     newProjectEmpty: typeof r.newProjectEmpty === 'boolean' ? r.newProjectEmpty : d.newProjectEmpty,
-    exportFormat: r.exportFormat === 'svg' || r.exportFormat === 'png' ? r.exportFormat : d.exportFormat,
+    exportFormat: r.exportFormat === 'svg' || r.exportFormat === 'png' || r.exportFormat === 'pdf' ? r.exportFormat : d.exportFormat,
+    exportDpi: EXPORT_DPI_CHOICES.find((v) => v === r.exportDpi) ?? d.exportDpi,
     decimalSeparator: r.decimalSeparator === 'point' || r.decimalSeparator === 'comma' ? r.decimalSeparator : d.decimalSeparator,
     defaultChartWidthPx: px(r.defaultChartWidthPx, d.defaultChartWidthPx),
     defaultChartHeightPx: px(r.defaultChartHeightPx, d.defaultChartHeightPx),

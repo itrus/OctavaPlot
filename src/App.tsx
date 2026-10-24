@@ -8,6 +8,7 @@ import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIco
 import { setProjectName } from './state/commands';
 import { InfoDialog } from './ui/InfoDialog';
 import { SettingsDialog } from './ui/SettingsDialog';
+import { UndoRedo } from './ui/UndoRedo';
 import { WheelRange } from './ui/WheelRange';
 import { isTextEntryTarget } from './ui/shortcutGuard';
 import { downloadBlob, exportFileName } from './util/download';
@@ -21,6 +22,7 @@ type SaveFilePicker = (options: {
 // Each workspace view is its own chunk, loaded when first opened.
 const DataTableView = lazy(() => import('./ui/DataTableView').then((m) => ({ default: m.DataTableView })));
 const AnalysisView = lazy(() => import('./ui/AnalysisView').then((m) => ({ default: m.AnalysisView })));
+const LayoutView = lazy(() => import('./ui/LayoutView').then((m) => ({ default: m.LayoutView })));
 const GraphView = lazy(() => import('./ui/GraphView').then((m) => ({ default: m.GraphView })));
 const Inspector = lazy(() => import('./ui/inspector/Inspector').then((m) => ({ default: m.Inspector })));
 
@@ -173,6 +175,8 @@ function Shell() {
         <button className="icon-text" onClick={startNewProject}><NewProjectIcon /> New Project</button>
         <button className="icon-text" onClick={() => confirmDiscard('Opening another project') && fileRef.current?.click()}><OpenProjectIcon /> Open Project</button>
         <button className="icon-text" onClick={() => void saveProject()} title="Save the project to a file (you choose the name)"><SaveProjectIcon /> Save Project</button>
+        <span className="topbar-sep" />
+        <UndoRedo labeled />
         <input
           ref={fileRef}
           type="file"
@@ -184,7 +188,6 @@ function Shell() {
             if (f) void openProject(f);
           }}
         />
-        <span className="topbar-sep" />
         <button className="icon-text topbar-end" onClick={() => setSettingsOpen(true)}><SettingsIcon /> Settings</button>
         <button className="icon-text" onClick={() => setInfoOpen(true)} title="About OctavaPlot and credits"><InfoIcon /> Info</button>
         <button
@@ -206,7 +209,8 @@ function Shell() {
           {table && <DataTableView table={table} />}
           {chart && chartTable && <GraphView chart={chart} table={chartTable} />}
           {view.kind === 'analysis' && <AnalysisView analysisId={view.id} />}
-          {!table && !chart && view.kind !== 'analysis' && <div className="empty">Select an item in the navigator.</div>}
+          {view.kind === 'layout' && <LayoutView layoutId={view.id} />}
+          {!table && !chart && view.kind !== 'analysis' && view.kind !== 'layout' && <div className="empty">Select an item in the navigator.</div>}
         </Suspense>
       </main>
       {chart && chartTable && (

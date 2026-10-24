@@ -5,11 +5,10 @@ import { rowTitleAt, sanitizeRowTitle } from '../model/rows';
 import { newId } from '../model/ids';
 import { addAnalysis, addGroup, addRows, composeCommands, setExcluded, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../util/download';
-import { ExportIcon, ImportIcon } from './icons';
+import { AddColumnIcon, AddManyRowsIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon } from './icons';
 import { importCsv, isCsvFile, tableToCsv } from './csv';
 import { leadingColumns, usesSeriesBlocks } from '../model/chartTypes';
 import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../model/tableLayout';
-import { UndoRedo } from './UndoRedo';
 import { blockToText, formatCell, parseCell, planPaste, selectionStrings } from './cellText';
 
 // Sizes at 100% zoom, in px; the table multiplies them by its zoom.
@@ -349,9 +348,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   const excludeSelection = (excluded: boolean) => {
     const cells = selectedCells();
     if (cells.length === 0) return;
-    const reason = excluded ? (window.prompt('Why are these values excluded? (optional, kept with the table)', '') ?? null) : '';
-    if (reason === null) return; // cancelled
-    run(excluded ? 'Exclude values' : 'Include values', setExcluded(table.id, cells, excluded, reason.trim()));
+    run(excluded ? 'Exclude values' : 'Include values', setExcluded(table.id, cells, excluded));
     setMessage({ kind: 'info', text: excluded ? 'Excluded the selected values: they stay in the table but no chart or calculation uses them.' : 'Included the selected values again.' });
   };
 
@@ -509,24 +506,32 @@ export function DataTableView({ table }: { table: DataTable }) {
   return (
     <div className="table-view">
       <div className="toolbar">
-        <button onClick={() => run(kindText.add.replace('+ ', ''), addGroup(table.id))}>{kindText.add}</button>
-        <button onClick={() => run('Add rows', addRows(table.id, 20))}>+ Add 20 rows</button>
+        <button className="icon-text" onClick={() => run(kindText.add.replace('+ ', ''), addGroup(table.id))} title={kindText.add.replace('+ ', '')}>
+          <AddColumnIcon /> {kindText.add.replace('+ ', '')}
+        </button>
+        <button className="icon-text" onClick={() => run('Add rows', addRows(table.id, 1000))} title="Add 1000 rows">
+          <AddManyRowsIcon /> Add 1000 rows
+        </button>
         <span className="sep" />
-        <UndoRedo />
+        <button className="icon-text" onClick={() => excludeSelection(true)} title="Exclude: keep the selected values in the table but leave them out of every chart and calculation">
+          <ExcludeIcon /> Exclude
+        </button>
+        <button className="icon-text" onClick={() => excludeSelection(false)} title="Include: use the selected values again">
+          <IncludeIcon /> Include
+        </button>
         <span className="sep" />
-        <button onClick={() => excludeSelection(true)} title="Keep the selected values in the table but leave them out of every chart and calculation">Exclude</button>
-        <button onClick={() => excludeSelection(false)} title="Use the selected values again">Include</button>
-        <span className="sep" />
-        <button className="icon-text" onClick={() => csvRef.current?.click()} title="Replace this table with the contents of a .csv file (Undo restores it)">
+        <button className="icon-text" onClick={() => csvRef.current?.click()} title="Import CSV: replace this table with the contents of a .csv file (Undo restores it)">
           <ImportIcon /> Import CSV
         </button>
-        <button className="icon-text" onClick={exportCsv} title="Download this table as a .csv file">
+        <button className="icon-text" onClick={exportCsv} title="Export CSV: download this table as a .csv file">
           <ExportIcon /> Export CSV
         </button>
         {table.kind === 'xy' && (
           <>
             <span className="sep" />
-            <button onClick={fitCurve} title="Fit a line, a curve or a dose-response model to the Y series; the results go to the Results section">Fit curve…</button>
+            <button className="icon-text" onClick={fitCurve} title="Fit curve: a line, a curve or a dose-response model for the Y series; the results go to the Results section">
+              <FitCurveIcon /> Fit curve
+            </button>
           </>
         )}
         <input
@@ -540,9 +545,6 @@ export function DataTableView({ table }: { table: DataTable }) {
             if (f) void importFile(f);
           }}
         />
-        <span className="toolbar-info">
-          {kindText.label} · {isSeries ? `${seriesList.length} ${kindText.noun}${blocks ? ` (${blockWidth} columns each)` : ''}` : `${nCols} groups`} × {nRows} rows · empty cell = missing value
-        </span>
       </div>
       <div
         className="grid-scroller"

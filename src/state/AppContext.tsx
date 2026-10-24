@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { createEmptyProject, createExampleProject } from '../model/defaults';
+import { viewAfterRemoval } from '../model/viewOrder';
 import type { Project, Selection, ViewRef } from '../model/types';
 import type { InspectorTarget } from '../ui/inspector/nav';
 import type { Command } from './commands';
@@ -124,10 +125,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setStatus('New project.');
   }, [replaceProject]);
 
-  // Undoing the creation of the item on screen (or deleting it) must not leave an empty workspace: go to one that exists.
+  // Undoing the creation of the item on screen (or deleting it) must not leave an empty workspace: go to the page above it
+  // in the navigator (see viewAfterRemoval), not back to the first table.
+  const projectBefore = useRef(project);
   useEffect(() => {
-    const exists = view.kind === 'table' ? project.dataTables.some((t) => t.id === view.id) : view.kind === 'chart' ? project.charts.some((c) => c.id === view.id) : (project.analyses ?? []).some((a) => a.id === view.id);
-    if (!exists) setView({ kind: 'table', id: project.dataTables[0].id });
+    const exists = view.kind === 'table' ? project.dataTables.some((t) => t.id === view.id) : view.kind === 'chart' ? project.charts.some((c) => c.id === view.id) : view.kind === 'layout' ? (project.layouts ?? []).some((l) => l.id === view.id) : (project.analyses ?? []).some((a) => a.id === view.id);
+    if (!exists) setView(viewAfterRemoval(projectBefore.current, project, view));
+    projectBefore.current = project;
   }, [project, view]);
 
   // Undo/redo can remove the thing the selection points at; keep the status line informative.

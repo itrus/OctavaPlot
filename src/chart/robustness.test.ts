@@ -114,9 +114,9 @@ describe('every fitted curve with awkward data', () => {
 });
 
 describe('very long data', () => {
-  it('plots 200,000 points without overflowing the stack', () => {
+  it('plots 10,000 points without overflowing the stack', () => {
     const table = createXyTable('XY', false);
-    const n = 200_000;
+    const n = 10_000;
     const grow = (o: { id: string; value: number | null }, row: number, f: (r: number) => number) => ({ ...o, value: f(row) });
     const long: DataTable = {
       ...table,

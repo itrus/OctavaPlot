@@ -1,5 +1,5 @@
 import { bool, clamp, clampOrNull, numberOrNull, oneOf, optionalHex, record, text, valuesOf } from './sanitize';
-import type { BarLabelMode, BarLabels, BarLayout } from './types';
+import type { BarLabelMode, BarLabels, BarLayout, Id } from './types';
 
 /** Settings of the columns of a column chart: the space between them, their baseline and the labels above them. */
 
@@ -58,4 +58,22 @@ export function sanitizeBarLabels(raw: unknown, base: BarLabels): BarLabels {
     sizePt: clamp(b.sizePt, 4, 48, base.sizePt),
     color: optionalHex(b.color, base.color),
   };
+}
+
+/**
+ * Older files gave each data set its own space before it (a percentage of the normal space between columns). That is now
+ * one setting, Space between columns. When every data set after the first had the same space, it is folded into that
+ * setting; when they differed, they are dropped and the note says so. `ids` are the data sets in the order drawn.
+ */
+export function foldGroupGaps(raw: unknown, ids: readonly Id[], bars: BarLayout): { bars: BarLayout; note: string | null } {
+  if (typeof raw !== 'object' || raw === null || ids.length < 2) return { bars, note: null };
+  const gaps = raw as Record<string, unknown>;
+  const pct = (id: Id): number => (typeof gaps[id] === 'number' && Number.isFinite(gaps[id] as number) ? (gaps[id] as number) : 100);
+  const first = pct(ids[1]);
+  const same = ids.slice(1).every((id) => pct(id) === first);
+  if (same && first === 100) return { bars, note: null };
+  if (!same) return { bars, note: 'The spaces before single data sets are no longer a setting; they were dropped. Use Space between columns.' };
+  const { min, max } = BAR_LIMITS.spacingPct;
+  const gapPct = Math.min(max, Math.max(min, Math.round((bars.gapPct ?? AUTO_BAR_GAP_PCT) * first) / 100));
+  return { bars: { ...bars, gapPct }, note: 'The space before each data set was added to Space between columns.' };
 }

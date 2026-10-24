@@ -14,9 +14,13 @@ export const SIZE_PRESETS: readonly { id: string; label: string; widthPx: number
   { id: '1600x1200', label: '1600 × 1200 (4:3)', widthPx: 1600, heightPx: 1200, aspect: '4:3' },
 ];
 
-/** The preset a chart currently matches, or undefined for a custom size. */
+/**
+ * The preset a chart currently matches, or undefined for a custom size. It is the size that counts: a new chart is 1024 × 768
+ * with a free shape, and is still the 1024 × 768 preset (choosing the preset also locks the shape to its 4:3).
+ */
 export const presetOf = (chart: { widthPx: number; heightPx: number; aspect: ChartAspect }) =>
-  SIZE_PRESETS.find((p) => p.widthPx === chart.widthPx && p.heightPx === chart.heightPx && p.aspect === chart.aspect);
+  SIZE_PRESETS.find((p) => p.widthPx === chart.widthPx && p.heightPx === chart.heightPx && p.aspect === chart.aspect) ??
+  SIZE_PRESETS.find((p) => p.widthPx === chart.widthPx && p.heightPx === chart.heightPx);
 
 const clampPx = (v: number) => Math.min(CHART_PX_MAX, Math.max(CHART_PX_MIN, Math.round(v)));
 

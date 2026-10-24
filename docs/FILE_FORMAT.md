@@ -35,6 +35,7 @@ The file is written with two-space indents and the keys in a fixed order, so sav
 | `dataTables` | list | The data tables; at least one. |
 | `charts` | list | The graphs. May be empty. |
 | `analyses` | list, optional | Analyses of the Results section (descriptive statistics, curve fits): their settings only. Results are not stored; they are calculated again from the tables. |
+| `layouts` | list, optional | A4 pages of graphs: `orientation` (`portrait` or `landscape`), `background` (`#rrggbb` or `null`), `arrangement` (`{"kind":"grid","cols":2,"rows":1}`, `{"kind":"inset"}`, or `{"kind":"free","frames":[{"x":10,"y":10,"w":120,"h":90}]}` with the boxes in mm from the top left of the page), `panels` (the graph `id` in each slot, or `null`), `scaling` (`smallest`, `largest`, `fit`, or `percent` with a number; `equal`, the earlier name of `smallest`, is still read), `labelStyle` (`none`, `A`, `a`, `I`, `1`), `labelSizePt`, `showTitle`, `title`, `marginMm`, `gapMm`. A panel whose graph is missing is emptied on opening. |
 
 Every `id` in the file is a text. Identifiers are kept as they are on opening and saving, so a reference from one object to another stays valid.
 
@@ -72,12 +73,13 @@ A chart draws one table, named by `dataTableId`; the table must exist. `type` is
 | Group of keys | Meaning |
 |---|---|
 | `id`, `name`, `title`, `showTitle` | Identity and title. |
+| `linkedTo` | Optional: the `id` of the graph this one was made like and still follows (see the README, Graph like another graph). A link to a missing graph, to itself or round in a circle is removed on opening, with a note. |
 | `widthPx`, `heightPx` | Size in CSS pixels (96 px = 1 inch). |
 | `xAxis`, `yAxis`, `y2Axis` | Settings of the axes: titles, limits, scale (linear, log), ticks, breaks, grid. `y2Axis` is drawn only while a data set is bound to it. |
 | `legend`, `grid`, `frame`, colours, `fontFamily` | The look of the whole chart. |
 | `defaults`, `layers` | Styles of the data sets: see below. `layers` has at least one layer. |
 | `bars`, `barLabels`, `distribution`, `heatmap`, `histogram`, `pie`, `survival`, `pairs`, `fit`, `jitter` | Settings that belong to one family of charts. They are always present. |
-| `hiddenGroupIds`, `groupOrder`, `groupGaps`, `extraGroups`, `displayNames` | Which data sets are on the graph, in what order, with what space between them, from which other tables, and under what names. |
+| `hiddenGroupIds`, `groupOrder`, `extraGroups`, `displayNames` | Which data sets are on the graph, in what order, from which other tables, and under what names. An older file may hold `groupGaps` (a space before each data set): it is folded into `bars.gapPct` on opening and not written again. |
 | `annotations`, `referenceLines` | Text and lines placed on the chart. |
 | `layerStyles` | Look of single layers by layer ID: `color`, `widthPt`, `lineStyle`, `opacity`, any of them. Used by the fit curve and the fit band. A setting that cannot be read is dropped, with a note. |
 | `hiddenLayerIds` | IDs of the parts of an XY chart that are not drawn (for example `<series id>:fitBand`). Hiding changes no calculation. |

@@ -1,4 +1,5 @@
 import { newId } from './ids';
+import { untitledProjectName } from '../util/download';
 import { DEFAULT_PALETTE_ID } from './palettes';
 import { chartFamily } from './chartTypes';
 import { defaultSeriesName, subLabels, summaryFormatInfo } from './tableLayout';
@@ -26,7 +27,7 @@ import type {
 } from './types';
 
 export const FONT_FAMILY = 'Arial, Helvetica, sans-serif';
-export const INITIAL_ROWS = 20;
+export const INITIAL_ROWS = 1000;
 
 /** Size of a new chart when the user has not set another default in Settings. */
 export const DEFAULT_CHART_WIDTH_PX = 1024;
@@ -255,7 +256,6 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     heightPx: size?.heightPx ?? DEFAULT_CHART_HEIGHT_PX,
     hiddenGroupIds: [],
     groupOrder: [],
-    groupGaps: {},
     extraGroups: [],
     survival: { ...DEFAULT_SURVIVAL },
     aspect: 'free',
@@ -449,14 +449,14 @@ export function createEmptyProject(size?: { widthPx: number; heightPx: number })
   const groups: Group[] = [];
   for (let i = 0; i < 4; i++) groups.push(createGroup(nextGroupName(groups.map((g) => g.name)), i, INITIAL_ROWS));
   const table: DataTable = { id: newId('table'), name: 'Data 1', kind: 'column', rowCount: INITIAL_ROWS, rows: createRows(INITIAL_ROWS), groups };
-  return { id: newId('project'), name: 'Untitled project', dataTables: [table], charts: [createChart(table.id, size)] };
+  return { id: newId('project'), name: untitledProjectName(), dataTables: [table], charts: [createChart(table.id, size)] };
 }
 
 export function createExampleProject(size?: { widthPx: number; heightPx: number }): Project {
   const table = createExampleTable();
   return {
     id: newId('project'),
-    name: 'Untitled project',
+    name: untitledProjectName(),
     dataTables: [table],
     charts: [createChart(table.id, size)],
   };

@@ -6,11 +6,10 @@ import { analysesOf } from '../model/analysis';
 import { resolveFit } from '../model/fitOptions';
 import type { Chart, DataTable } from '../model/types';
 import { useApp } from '../state/AppContext';
-import { patchAnnotation, resetAllDataSets } from '../state/commands';
+import { patchAnnotation, removeChart, resetAllDataSets, unlinkChart } from '../state/commands';
 import { downloadBlob, exportFileName } from '../util/download';
-import { ResetIcon } from './icons';
+import { DeleteIcon, ResetIcon } from './icons';
 import { inspectorTargetFor } from './inspector/nav';
-import { UndoRedo } from './UndoRedo';
 
 /** Space kept around the chart inside the canvas, in px. */
 const CANVAS_PAD = 24;
@@ -134,11 +133,25 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
     }
   };
 
+  const exportPdf = async () => {
+    const k = settings.exportDpi / 96;
+    const [pw, ph] = [Math.round(chart.widthPx * k), Math.round(chart.heightPx * k)];
+    if (Math.max(pw, ph) > 16000 || pw * ph > 200_000_000) {
+      setStatus(`PDF export at ${settings.exportDpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, lower the PDF resolution in Settings, or export SVG.`);
+      return;
+    }
+    try {
+      const { chartToPdfBlob } = await import('../chart/export');
+      downloadBlob(await chartToPdfBlob(chart, table, settings.exportDpi, curve), exportFileName(chart.name, 'pdf', settings.timestampExports));
+      setStatus(`Exported PDF, ${pw} × ${ph} px (${settings.exportDpi} dpi).`);
+    } catch (err) {
+      setStatus(`PDF export failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   return (
     <div className="graph-view">
       <div className="toolbar">
-        <UndoRedo />
-        <span className="sep" />
         <button
           className="icon-text"
           onClick={() => {
@@ -148,17 +161,40 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
           title="Reset the graph's settings (data set styles, axes, grid, legend, fonts, colours) to a new graph's defaults. Titles and data are kept. Undo restores them."
         >
           <ResetIcon />
-          Reset settings
+          Reset
         </button>
         <button
+          className="icon-text"
+          onClick={() => {
+            run('Delete graph', removeChart(chart.id));
+            setStatus(`Deleted ${chart.name}. Undo (Ctrl+Z) restores it.`);
+          }}
+          title="Delete this graph (the data stay; it is also removed from layouts; can be undone)"
+        >
+          <DeleteIcon />
+          Delete
+        </button>
+        {chart.linkedTo && (
+          <button
+            className="icon-text"
+            onClick={() => {
+              run('Unlink graph', unlinkChart(chart.id));
+              setStatus('Unlinked: this graph no longer follows the format of the other one.');
+            }}
+            title={`Linked to ${project.charts.find((c) => c.id === chart.linkedTo)?.name ?? 'a graph'}: this graph follows its format, except for details you changed here. Click to stop following (settings stay as they are).`}
+          >
+            🔗 Unlink
+          </button>
+        )}
+        <button
           className="icon-text toolbar-end"
-          onClick={() => void (settings.exportFormat === 'svg' ? exportSvg() : exportPng())}
-          title={`Export as ${settings.exportFormat.toUpperCase()} (change the format in Settings)`}
+          onClick={() => void (settings.exportFormat === 'svg' ? exportSvg() : settings.exportFormat === 'pdf' ? exportPdf() : exportPng())}
+          title={`Export as ${settings.exportFormat.toUpperCase()}, ${chart.widthPx} × ${chart.heightPx} px${settings.exportFormat === 'pdf' ? ` at ${settings.exportDpi} dpi` : ''} (the format is chosen in Settings)`}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11" />
           </svg>
-          Export {settings.exportFormat.toUpperCase()} · {chart.widthPx} × {chart.heightPx} px
+          Export
         </button>
       </div>
       <div className="chart-scroller" ref={scrollerRef}>

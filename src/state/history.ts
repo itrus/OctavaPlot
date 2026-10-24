@@ -1,4 +1,5 @@
 import type { Project } from '../model/types';
+import { syncLinks } from '../model/chartLink';
 import type { Command } from './commands';
 
 /** Undo/redo for the project (data edits and chart formatting share one history). */
@@ -42,8 +43,10 @@ export const initialHistory = (project: Project): HistoryState => ({
 export function historyReducer(state: HistoryState, action: HistoryAction): HistoryState {
   switch (action.type) {
     case 'commit': {
-      const next = action.command(state.present);
-      if (next === state.present) return state;
+      // Graphs linked to one that the command changed follow it, as part of the same step (one undo undoes both).
+      const changed = action.command(state.present);
+      if (changed === state.present) return state;
+      const next = syncLinks(state.present, changed);
       const merge =
         action.coalesceKey !== undefined &&
         state.coalesce?.key === action.coalesceKey &&

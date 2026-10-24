@@ -458,7 +458,6 @@
         "heightPx": 768,
         "hiddenGroupIds": [],
         "groupOrder": [],
-        "groupGaps": {},
         "extraGroups": [],
         "survival": {
           "band": false,

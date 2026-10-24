@@ -14,7 +14,7 @@ const pattern = (p: Project, extra: Record<string, unknown> = {}) =>
   patchStyle(chartId, 'all', { barFillMode: 'pattern', barPattern: 'horizontal', barPatternSpacingPt: 6, ...extra })(p);
 const setCol = (p: Project, col: number, f: (v: number) => number) => {
   const t = p.dataTables[0];
-  return setCells(t.id, t.groups[col].observations.map((o, row) => ({ row, col, value: f(o.value as number) })))(p);
+  return setCells(t.id, t.groups[col].observations.flatMap((o, row) => (o.value === null ? [] : [{ row, col, value: f(o.value) }])))(p);
 };
 const ys = (marks: unknown): number[] => {
   const m = marks as { kind: string; segments: { y1: number }[] };

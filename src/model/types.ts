@@ -522,6 +522,8 @@ export interface Chart {
   id: Id;
   name: string;
   dataTableId: Id;
+  /** The graph this one was made like and still follows: its format settings that this graph has not changed itself (see model/chartLink.ts). */
+  linkedTo?: Id;
   type: ChartType;
   /** Chart size in CSS pixels (1 px = 0.75 pt). */
   widthPx: number;
@@ -530,8 +532,6 @@ export interface Chart {
   hiddenGroupIds: Id[];
   /** Order of the data sets on the graph (column charts): those listed come first, in this order. */
   groupOrder: Id[];
-  /** Space before a data set as a percentage of the normal space between columns; absent = 100. */
-  groupGaps: Record<Id, number>;
   /** Data sets from other tables that are plotted on this graph too. */
   extraGroups: Array<{ tableId: Id; groupId: Id }>;
   /** Survival and cumulative-event charts: confidence band and at-risk table. */
@@ -617,6 +617,53 @@ export interface Analysis {
   degree?: number;
 }
 
+/** A layout is a page of graphs: A4, portrait or landscape, with the graphs placed in panels. */
+export type PageOrientation = 'portrait' | 'landscape';
+
+/** How the panels are lettered: none, A B C, a b c, I II III, or 1 2 3. */
+export type PanelLabelStyle = 'none' | 'A' | 'a' | 'I' | '1';
+
+/** A box on the page in mm from its top left corner. */
+export interface FrameMm {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * The panel slots of a page: a grid of equal cells, one large panel with a small one inset in its top right corner, or
+ * free: boxes placed and sized by the user (a graph is drawn inside its box, centred, with its proportions kept).
+ */
+export type LayoutArrangement = { kind: 'grid'; cols: number; rows: number } | { kind: 'inset' } | { kind: 'free'; frames: FrameMm[] };
+
+/**
+ * How the graphs are sized on the page. The scaling factor of a graph is its size on the page divided by its size in the
+ * Graphs section, so equal factors give equal font sizes and line widths. Each graph has the factor at which it would fill
+ * its panel. 'smallest': all graphs take the smallest of these, so every one fits. 'largest': all take the largest, so the
+ * graph that needs the most room fills its panel and the others, with the same fonts, are cut off where they do not fit.
+ * 'fit': each graph keeps its own factor. 'percent': one factor chosen by the user.
+ */
+export type LayoutScaling = { mode: 'smallest' | 'largest' | 'fit' } | { mode: 'percent'; percent: number };
+
+export interface Layout {
+  id: Id;
+  name: string;
+  orientation: PageOrientation;
+  /** Page colour; null = transparent. */
+  background: string | null;
+  arrangement: LayoutArrangement;
+  /** The graph in each slot of the arrangement, or null for an empty placeholder. */
+  panels: Array<Id | null>;
+  scaling: LayoutScaling;
+  labelStyle: PanelLabelStyle;
+  labelSizePt: number;
+  showTitle: boolean;
+  title: string;
+  marginMm: number;
+  gapMm: number;
+}
+
 export interface Project {
   id: Id;
   name: string;
@@ -624,6 +671,8 @@ export interface Project {
   charts: Chart[];
   /** Absent when there are none. */
   analyses?: Analysis[];
+  /** Absent when there are none. */
+  layouts?: Layout[];
 }
 
 export type Selection =
@@ -633,4 +682,4 @@ export type Selection =
   | { kind: 'point'; groupId: Id; pointId: Id }
   | { kind: 'annotation'; annotationId: Id };
 
-export type ViewRef = { kind: 'table'; id: Id } | { kind: 'chart'; id: Id } | { kind: 'analysis'; id: Id };
+export type ViewRef = { kind: 'table'; id: Id } | { kind: 'chart'; id: Id } | { kind: 'analysis'; id: Id } | { kind: 'layout'; id: Id };

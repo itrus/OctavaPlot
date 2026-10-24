@@ -28,7 +28,9 @@ describe('chart shape lock', () => {
       expect(applyAspect(p, p.aspect)).toEqual({ widthPx: p.widthPx, heightPx: p.heightPx });
       expect(presetOf(p)).toBe(p);
     }
-    expect(presetOf({ widthPx: 800, heightPx: 600, aspect: 'free' })).toBeUndefined();
+    // The size counts: a new chart (1024 × 768, free shape) is the 1024 × 768 preset, not "Custom".
+    expect(presetOf({ widthPx: 1024, heightPx: 768, aspect: 'free' })?.id).toBe('1024x768');
+    expect(presetOf({ widthPx: 900, heightPx: 600, aspect: 'free' })).toBeUndefined();
   });
   it('switching shape keeps the width', () => {
     expect(applyAspect({ widthPx: 1200, heightPx: 500 }, '4:3')).toEqual({ widthPx: 1200, heightPx: 900 });

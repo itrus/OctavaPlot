@@ -1,15 +1,33 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../model/defaults';
 import { useApp } from '../state/AppContext';
 import type { DecimalSeparator } from './cellText';
-import type { ExportFormat } from '../state/settings';
+import { EXPORT_DPI_CHOICES, type ExportDpi, type ExportFormat } from '../state/settings';
 import { DialogShell, trapTab } from './DialogShell';
-import { Check, Field, NumField, Section, SelectInput } from './inspector/controls';
+import { Check, Field, NumField, SelectInput } from './inspector/controls';
+
+const TABS = [
+  { id: 'general', label: 'General' },
+  { id: 'tables', label: 'Tables' },
+  { id: 'graphs', label: 'Graphs' },
+  { id: 'export', label: 'Export' },
+] as const;
+type TabId = (typeof TABS)[number]['id'];
 
 /** Centralised application preferences. They apply to the app and to new charts, not to a saved project. */
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { settings, updateSettings, autosaveOk } = useApp();
   const ref = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<TabId>('general');
+  // Left and Right move between the tabs, as in any tab list.
+  const onTabKey = (e: ReactKeyboardEvent) => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (step === 0) return;
+    e.preventDefault();
+    const next = TABS[(TABS.findIndex((t) => t.id === tab) + step + TABS.length) % TABS.length];
+    setTab(next.id);
+    requestAnimationFrame(() => document.getElementById(`settings-tab-${next.id}`)?.focus());
+  };
 
   // Focus the dialog once, when it opens. (Doing it in the effect below would pull focus out of a field being edited
   // every time a setting changed, because onClose is a new function on each render.)
@@ -24,13 +42,21 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   return (
     <DialogShell>
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onKeyDown={trapTab}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label="Settings" tabIndex={-1} ref={ref}>
+      <div className="modal settings-modal" role="dialog" aria-modal="true" aria-label="Settings" tabIndex={-1} ref={ref}>
         <div className="modal-head">
           <strong>Settings</strong>
           <button className="icon-btn" onClick={onClose} aria-label="Close settings">×</button>
         </div>
-        <div className="modal-body">
-          <Section title="General">
+        <div className="format-tabs settings-tabs" role="tablist" aria-label="Settings" onKeyDown={onTabKey}>
+          {TABS.map((t) => (
+            <button key={t.id} id={`settings-tab-${t.id}`} role="tab" aria-selected={tab === t.id} aria-controls="settings-panel" tabIndex={tab === t.id ? 0 : -1} className={`format-tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="modal-body settings-body" role="tabpanel" id="settings-panel" aria-labelledby={`settings-tab-${tab}`}>
+          {tab === 'general' && (
+            <>
             <Field
               label="Autosave"
               hint="Keep a copy of the project in this browser while you work"
@@ -38,11 +64,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             >
               <Check checked={settings.autosave} onChange={(v) => updateSettings({ autosave: v })} ariaLabel="Autosave" />
             </Field>
-            <Field label="New projects and tables start empty" hint="Off: a new project, and the New Data Table dialog, start with sample data. On: they start with blank tables (the dialog still lets you choose).">
-              <Check checked={settings.newProjectEmpty} onChange={(v) => updateSettings({ newProjectEmpty: v })} ariaLabel="New projects and tables start empty" />
+            <Field label="Start new tables empty" hint="Off: a new project, and the New Data Table dialog, start with sample data. On: they start with blank tables (the dialog still lets you choose).">
+              <Check checked={settings.newProjectEmpty} onChange={(v) => updateSettings({ newProjectEmpty: v })} ariaLabel="Start new tables empty" />
             </Field>
-          </Section>
-          <Section title="Numbers in tables">
+            </>
+          )}
+          {tab === 'tables' && (
+            <>
             <Field label="Decimal separator" hint="How typed, pasted and imported numbers are read. Automatic takes 1,5 as 1.5 but refuses 1,234, which could be 1.234 or 1234.">
               <SelectInput<DecimalSeparator>
                 value={settings.decimalSeparator}
@@ -54,27 +82,44 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 onChange={(v) => updateSettings({ decimalSeparator: v })}
               />
             </Field>
-          </Section>
-          <Section title="Export">
-            <Field label="Add date and time to file names" hint="Exported JSON, CSV, PNG and SVG files get a suffix like _261022_1435 (yymmdd_HHMM)">
-              <Check checked={settings.timestampExports} onChange={(v) => updateSettings({ timestampExports: v })} ariaLabel="Add date and time to file names" />
+            </>
+          )}
+          {tab === 'export' && (
+            <>
+            <Field label="Date and time in file names" hint="Exported JSON, CSV, PNG and SVG files get a suffix like _261022_1435 (yymmdd_HHMM)">
+              <Check checked={settings.timestampExports} onChange={(v) => updateSettings({ timestampExports: v })} ariaLabel="Date and time in file names" />
             </Field>
-            <Field label="Format" hint="Used by the Export button on the Graphs page">
-              <SelectInput<ExportFormat>
-                value={settings.exportFormat}
-                options={[
-                  { value: 'png', label: 'PNG (default)' },
-                  { value: 'svg', label: 'SVG (vector)' },
-                ]}
-                onChange={(v) => updateSettings({ exportFormat: v })}
+            <Field label="Format" hint="Used by the Export button on the Graphs page. PNG is a bitmap; SVG is vector; PDF holds a picture at the resolution below, at the size of the graph.">
+              <span className="switch-group" role="group" aria-label="Export format">
+                {(
+                  [
+                    ['png', 'PNG'],
+                    ['svg', 'SVG'],
+                    ['pdf', 'PDF'],
+                  ] as const satisfies ReadonlyArray<readonly [ExportFormat, string]>
+                ).map(([value, label]) => (
+                  <button key={value} className={`switch${settings.exportFormat === value ? ' on' : ''}`} aria-pressed={settings.exportFormat === value} onClick={() => updateSettings({ exportFormat: value })}>
+                    {label}
+                  </button>
+                ))}
+              </span>
+            </Field>
+            <Field label="PDF resolution" hint="Resolution of the picture in a PDF, and of the PNG of a layout page. A4 at 600 dpi is 4960 × 7016 px and takes a few seconds; SVG has no resolution.">
+              <SelectInput<string>
+                value={String(settings.exportDpi)}
+                options={EXPORT_DPI_CHOICES.map((d) => ({ value: String(d), label: `${d} dpi` }))}
+                onChange={(v) => updateSettings({ exportDpi: Number(v) as ExportDpi })}
               />
             </Field>
-          </Section>
-          <Section title="New charts">
+            </>
+          )}
+          {tab === 'graphs' && (
+            <>
             <NumField label="Default width" unit="px" step={10} slider={false} value={settings.defaultChartWidthPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => updateSettings({ defaultChartWidthPx: v })} />
             <NumField label="Default height" unit="px" step={10} slider={false} value={settings.defaultChartHeightPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => updateSettings({ defaultChartHeightPx: v })} />
             <div className="muted small">Applies to charts created from now on; existing charts keep their size.</div>
-          </Section>
+            </>
+          )}
         </div>
       </div>
     </div>

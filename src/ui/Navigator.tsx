@@ -4,13 +4,15 @@ import { newId } from '../model/ids';
 import type { AnalysisKind, ChartType, Id, TableKind, ViewRef } from '../model/types';
 import type { ChartVariant } from '../model/chartVariant';
 import { useApp } from '../state/AppContext';
-import { addAnalysis, addChart, addDataTable, duplicateAnalysis, duplicateChart, duplicateTable, removeChart, removeTable, renameItem, removeAnalysis, type NewTableOptions } from '../state/commands';
+import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, removeAnalysis, type NewTableOptions } from '../state/commands';
+import { DeleteIcon } from './icons';
 import { NewAnalysisDialog } from './NewAnalysisDialog';
+import { NewLayoutDialog, type NewLayoutOptions } from './NewLayoutDialog';
 import { NewGraphDialog } from './NewGraphDialog';
 import { analysesOf } from '../model/analysis';
 import { NewTableDialog } from './NewTableDialog';
 
-type Folder = 'tables' | 'results' | 'graphs';
+type Folder = 'tables' | 'results' | 'graphs' | 'layouts';
 
 /** A short tag beside every table, so its kind is visible in the list. */
 const TABLE_BADGE: Record<TableKind, { text: string; title: string }> = {
@@ -24,18 +26,24 @@ const TABLE_BADGE: Record<TableKind, { text: string; title: string }> = {
 const sameView = (a: ViewRef, b: ViewRef) => a.kind === b.kind && a.id === b.id;
 
 /** Sections that are not finished yet: shown with a lock and not reachable. */
-const LOCKED_SECTIONS = ['Layouts'] as const;
+const LOCKED_SECTIONS: readonly string[] = [];
 
 export function Navigator() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const { project, view, setView, run, settings, setStatus } = useApp();
-  const [open, setOpen] = useState<Record<Folder, boolean>>({ tables: true, results: true, graphs: true });
+  const [open, setOpen] = useState<Record<Folder, boolean>>({ tables: true, results: true, graphs: true, layouts: true });
 
   const currentTableId =
     view.kind === 'table' ? view.id : project.charts.find((c) => c.id === view.id)?.dataTableId;
 
   // New items are made in two clear steps: the type of table first, then a chart type that suits that table.
-  const [dialog, setDialog] = useState<'table' | 'graph' | 'analysis' | null>(null);
+  const [dialog, setDialog] = useState<'table' | 'graph' | 'analysis' | 'layout' | null>(null);
+  const createLayout = (options: NewLayoutOptions, fillFrom?: Id) => {
+    const id = newId('layout');
+    run('New layout', addLayout(id, options, fillFrom));
+    setView({ kind: 'layout', id });
+    setDialog(null);
+  };
   const createAnalysis = (tableId: Id, kind: AnalysisKind) => {
     const id = newId('analysis');
     run('New analysis', addAnalysis(id, tableId, kind));
@@ -48,6 +56,12 @@ export function Navigator() {
     setView({ kind: 'table', id });
     setDialog(null);
   };
+  const createGraphLike = (tableId: Id, sourceChartId: Id, linked: boolean) => {
+    const id = newId('chart');
+    run('New graph like another', addChartLike(id, tableId, sourceChartId, linked));
+    setView({ kind: 'chart', id });
+    setDialog(null);
+  };
   const createGraph = (tableId: Id, type: ChartType, variant?: ChartVariant) => {
     const id = newId('chart');
     run('New graph', addChart(id, tableId, { widthPx: settings.defaultChartWidthPx, heightPx: settings.defaultChartHeightPx }, type, variant));
@@ -56,7 +70,7 @@ export function Navigator() {
   };
 
   // Duplicate and delete act on the item on screen; both can be undone.
-  const current = view.kind === 'table' ? project.dataTables.find((t) => t.id === view.id) : view.kind === 'chart' ? project.charts.find((c) => c.id === view.id) : (project.analyses ?? []).find((a) => a.id === view.id);
+  const current = view.kind === 'table' ? project.dataTables.find((t) => t.id === view.id) : view.kind === 'chart' ? project.charts.find((c) => c.id === view.id) : view.kind === 'layout' ? (project.layouts ?? []).find((l) => l.id === view.id) : (project.analyses ?? []).find((a) => a.id === view.id);
   const duplicateCurrent = () => {
     if (!current) return;
     if (view.kind === 'table') {
@@ -67,6 +81,10 @@ export function Navigator() {
       const id = newId('chart');
       run('Duplicate graph', duplicateChart(view.id, id));
       setView({ kind: 'chart', id });
+    } else if (view.kind === 'layout') {
+      const id = newId('layout');
+      run('Duplicate layout', duplicateLayout(view.id, id));
+      setView({ kind: 'layout', id });
     } else {
       const id = newId('analysis');
       run('Duplicate analysis', duplicateAnalysis(view.id, id));
@@ -84,6 +102,9 @@ export function Navigator() {
       setStatus(`Deleted ${current.name}${graphs + results > 0 ? ` with ${graphs} graph${graphs === 1 ? '' : 's'} and ${results} result${results === 1 ? '' : 's'} that used it` : ''}. Undo (Ctrl+Z) restores it.`);
     } else if (view.kind === 'chart') {
       run('Delete graph', removeChart(view.id));
+      setStatus(`Deleted ${current.name}. Undo (Ctrl+Z) restores it.`);
+    } else if (view.kind === 'layout') {
+      run('Delete layout', removeLayout(view.id));
       setStatus(`Deleted ${current.name}. Undo (Ctrl+Z) restores it.`);
     } else {
       run('Delete analysis', removeAnalysis(view.id));
@@ -150,8 +171,15 @@ export function Navigator() {
           {folder('graphs', 'Graphs')}
           {open.graphs && (
             <>
-              {project.charts.map((c) => item({ kind: 'chart', id: c.id }, '▥', c.name))}
+              {project.charts.map((c) => item({ kind: 'chart', id: c.id }, '▥', c.name, c.linkedTo ? { text: '🔗', title: `Linked to ${project.charts.find((x) => x.id === c.linkedTo)?.name ?? 'another graph'}: it follows that graph's format` } : undefined))}
               {newItem('New Graph…', () => setDialog('graph'))}
+            </>
+          )}
+          {folder('layouts', 'Layouts')}
+          {open.layouts && (
+            <>
+              {(project.layouts ?? []).map((l) => item({ kind: 'layout', id: l.id }, '▤', l.name))}
+              {newItem('New Layout…', () => setDialog('layout'))}
             </>
           )}
           {LOCKED_SECTIONS.map((title) => (
@@ -163,14 +191,15 @@ export function Navigator() {
         {current && (
           <div className="nav-actions" role="group" aria-label={`Actions for ${current.name}`}>
             <button onClick={duplicateCurrent} title="Make a copy of the item on screen">Duplicate</button>
-            <button onClick={deleteCurrent} disabled={view.kind === 'table' && project.dataTables.length <= 1} title={view.kind === 'table' ? 'Delete this table and the graphs and results that use it (can be undone)' : 'Delete this item (can be undone)'}>Delete</button>
+            <button onClick={deleteCurrent} disabled={view.kind === 'table' && project.dataTables.length <= 1} title={view.kind === 'table' ? 'Delete this table and the graphs and results that use it (can be undone)' : 'Delete this item (can be undone)'}><DeleteIcon /> Delete</button>
           </div>
         )}
       </div>
       {/* In the page body, not in the (sliding) panel, so the dialog is positioned against the window. */}
       {dialog === 'table' && createPortal(<NewTableDialog defaultSample={!settings.newProjectEmpty} onCreate={createTable} onClose={() => setDialog(null)} />, document.body)}
+      {dialog === 'layout' && createPortal(<NewLayoutDialog charts={project.charts} initialChartId={view.kind === 'chart' ? view.id : undefined} onCreate={createLayout} onClose={() => setDialog(null)} />, document.body)}
       {dialog === 'analysis' && createPortal(<NewAnalysisDialog tables={project.dataTables} initialTableId={currentTableId ?? project.dataTables[0].id} onCreate={createAnalysis} onClose={() => setDialog(null)} />, document.body)}
-      {dialog === 'graph' && createPortal(<NewGraphDialog tables={project.dataTables} initialTableId={currentTableId ?? project.dataTables[0].id} onCreate={createGraph} onClose={() => setDialog(null)} />, document.body)}
+      {dialog === 'graph' && createPortal(<NewGraphDialog tables={project.dataTables} charts={project.charts} initialTableId={currentTableId ?? project.dataTables[0].id} initialChartId={view.kind === 'chart' ? view.id : undefined} onCreate={createGraph} onCreateLike={createGraphLike} onClose={() => setDialog(null)} />, document.body)}
     </nav>
   );
 }

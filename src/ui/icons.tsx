@@ -68,3 +68,51 @@ export const InfoIcon = () => (
     <circle cx="8" cy="4.9" r="0.5" fill="currentColor" />
   </Icon>
 );
+
+/** Waste bin: delete. */
+export const DeleteIcon = () => (
+  <Icon>
+    <path d="M2.5 4.2h11M6 4.2V2.6h4v1.6M4 4.2l.6 9a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-9M6.6 6.8v4.6M9.4 6.8v4.6" />
+  </Icon>
+);
+
+/** A column with a plus: add a group, series or outcome. */
+export const AddColumnIcon = () => (
+  <Icon>
+    <rect x="2.5" y="2.5" width="5" height="11" rx="1" />
+    <path d="M11.5 6v4M9.5 8h4" />
+  </Icon>
+);
+
+/** An eye, crossed out: leave the selected values out of charts and calculations. */
+export const ExcludeIcon = () => (
+  <Icon>
+    <path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z" />
+    <circle cx="8" cy="8" r="1.8" />
+    <path d="M3 13 13 3" />
+  </Icon>
+);
+
+/** An eye: use the selected values again. */
+export const IncludeIcon = () => (
+  <Icon>
+    <path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z" />
+    <circle cx="8" cy="8" r="1.8" />
+  </Icon>
+);
+
+/** Axes with a curve: fit a curve. */
+export const FitCurveIcon = () => (
+  <Icon>
+    <path d="M2.5 2.5v11h11" />
+    <path d="M4.5 11c2-.2 3-2 4-4s2-3 3.5-3.2" />
+  </Icon>
+);
+
+/** Many rows with a plus: add a large block of rows. */
+export const AddManyRowsIcon = () => (
+  <Icon>
+    <path d="M2.5 2.5h11M2.5 5.5h11M2.5 8.5h6" />
+    <path d="M11.5 9.5v4M9.5 11.5h4" />
+  </Icon>
+);

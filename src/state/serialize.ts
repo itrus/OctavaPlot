@@ -9,10 +9,12 @@ import { analysisTypeInfo } from '../model/analysis';
 import { FIT_MODEL_IDS, sanitizeDegree } from '../model/fitOptions';
 import { sanitizeLayerStyles } from '../model/layers';
 import { sanitizeLook } from '../model/look';
-import { sanitizeGaps, sanitizeOrder } from '../model/groupOrder';
+import { applyOrder, sanitizeOrder } from '../model/groupOrder';
+import { foldGroupGaps } from '../model/columnOptions';
 import { createRows, sanitizeRowTitle } from '../model/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/summary';
-import type { Analysis, Chart, ChartLayer, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SummarySpec } from '../model/types';
+import { defaultLayout, sanitizeLayout } from '../model/layout';
+import type { Analysis, Chart, ChartLayer, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SummarySpec } from '../model/types';
 
 /** The envelope of a project file (.oplot): this format and its one version. */
 export const FORMAT = 'octavaplot-project';
@@ -361,7 +363,6 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     widthPx: typeof c.widthPx === 'number' ? c.widthPx : base.widthPx,
     heightPx: typeof c.heightPx === 'number' ? c.heightPx : base.heightPx,
     groupOrder: sanitizeOrder(c.groupOrder),
-    groupGaps: sanitizeGaps(c.groupGaps),
     hiddenGroupIds: Array.isArray(c.hiddenGroupIds) ? c.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
     survival: parseSurvival(c.survival),
     extraGroups: Array.isArray(c.extraGroups)
@@ -427,6 +428,38 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
     if (!model || dataTables.find((t) => t.id === a.dataTableId)?.kind !== 'xy') return [];
     return [{ id: a.id, name, kind, dataTableId: a.dataTableId, level, model, degree: sanitizeDegree(a.degree, 2) }];
   });
+  // Older files held a space before each data set: it is now part of Space between columns (and never kept as it was).
+  for (const c of charts) {
+    const legacy = (c as unknown as Record<string, unknown>).groupGaps;
+    delete (c as unknown as Record<string, unknown>).groupGaps;
+    const table = dataTables.find((t) => t.id === c.dataTableId);
+    if (!table || legacy === undefined) continue;
+    const folded = foldGroupGaps(legacy, applyOrder(table.groups, c.groupOrder).map((g) => g.id), c.bars);
+    c.bars = folded.bars;
+    if (folded.note) notes.push(`Graph "${c.name}": ${folded.note}`);
+  }
+  // A link refers to another graph: one to a graph that is missing, to itself, or round in a circle is dropped.
+  const linkOf = new Map(charts.map((c) => [c.id, typeof c.linkedTo === 'string' ? c.linkedTo : undefined]));
+  for (const c of charts) {
+    let at: string | undefined = c.linkedTo;
+    const seen = new Set<string>([c.id]);
+    while (at !== undefined && charts.some((x) => x.id === at) && !seen.has(at)) {
+      seen.add(at);
+      at = linkOf.get(at);
+    }
+    if (c.linkedTo !== undefined && (typeof c.linkedTo !== 'string' || at !== undefined)) {
+      notes.push(`Graph "${c.name}" was linked to a graph that is missing or to itself; the link was removed.`);
+      delete c.linkedTo;
+    }
+  }
+  // Layouts refer to graphs by ID: a panel whose graph is gone is emptied; a layout without an ID is dropped.
+  const chartIds = new Set(charts.map((c) => c.id));
+  const layouts: Layout[] = (Array.isArray(p.layouts) ? p.layouts : []).flatMap((l): Layout[] => {
+    if (!isObj(l) || typeof l.id !== 'string') return [];
+    const made = sanitizeLayout(l, defaultLayout(l.id, typeof l.name === 'string' && l.name.trim() !== '' ? l.name.trim() : 'Layout'));
+    return [{ ...made, panels: made.panels.map((id) => (id !== null && chartIds.has(id) ? id : null)) }];
+  });
+  if (new Set(layouts.map((l) => l.id)).size !== layouts.length) fail('project.layouts', 'has two layouts with the same ID');
   // A chart type that does not suit its table's type (a hand-edited file) is switched to the table's default chart
   // type, so a graph is never drawn with the wrong reading of the columns.
   for (const c of charts) {
@@ -444,6 +477,7 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
     dataTables,
     charts,
     ...(analyses.length > 0 ? { analyses } : {}),
+    ...(layouts.length > 0 ? { layouts } : {}),
   };
   return { project, notes };
 }

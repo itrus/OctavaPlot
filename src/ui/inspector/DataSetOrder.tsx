@@ -1,14 +1,14 @@
-import { GROUP_GAP_LIMITS, moveGroup, type MoveOp } from '../../model/groupOrder';
+import { moveGroup, type MoveOp } from '../../model/groupOrder';
 import type { Chart, Id } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { setGroupGap, setGroupOrder } from '../../state/commands';
-import { NumField, SubHeading } from './controls';
+import { setGroupOrder } from '../../state/commands';
+import { SubHeading } from './controls';
 
 /**
- * The order of the data sets on a column chart (left to right) and the space before each of them. Colours stay with
+ * The order of the data sets on a column chart (left to right). Colours stay with
  * the data set when it moves.
  */
-export function DataSetOrder({ chart, groups, gaps = true, heading = 'Order, left to right' }: { chart: Chart; groups: Array<{ id: Id; label: string }>; gaps?: boolean; heading?: string }) {
+export function DataSetOrder({ chart, groups, heading = 'Order, left to right' }: { chart: Chart; groups: Array<{ id: Id; label: string }>; heading?: string }) {
   const { run } = useApp();
   const ids = groups.map((g) => g.id);
   const move = (id: Id, op: MoveOp) => run(op === 'reverse' ? 'Reverse data sets' : 'Move data set', setGroupOrder(chart.id, moveGroup(ids, id, op)));
@@ -44,23 +44,6 @@ export function DataSetOrder({ chart, groups, gaps = true, heading = 'Order, lef
           </li>
         ))}
       </ol>
-      {gaps && groups.length > 1 && (
-        <>
-          <SubHeading>Space before a data set (% of normal)</SubHeading>
-          {groups.slice(1).map((g) => (
-            <NumField
-              key={g.id}
-              label={g.label}
-              unit="%"
-              value={chart.groupGaps[g.id] ?? GROUP_GAP_LIMITS.normal}
-              min={GROUP_GAP_LIMITS.min}
-              max={GROUP_GAP_LIMITS.max}
-              slider={false}
-              onCommit={(v) => run('Space before data set', setGroupGap(chart.id, g.id, v), `gap:${g.id}`)}
-            />
-          ))}
-        </>
-      )}
     </div>
   );
 }

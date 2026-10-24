@@ -36,7 +36,7 @@ describe('setRowTitles', () => {
   it('returns the same project for no-ops and bad rows', () => {
     const { p, t } = setup();
     expect(setRowTitles(t.id, [{ row: 0, title: '' }])(p)).toBe(p);
-    expect(setRowTitles(t.id, [{ row: -1, title: 'a' }, { row: 999, title: 'a' }, { row: 0.5, title: 'a' }])(p)).toBe(p);
+    expect(setRowTitles(t.id, [{ row: -1, title: 'a' }, { row: INITIAL_ROWS + 5, title: 'a' }, { row: 0.5, title: 'a' }])(p)).toBe(p);
     expect(setRowTitles('missing', [{ row: 0, title: 'a' }])(p)).toBe(p);
     expect(setRowTitles(t.id, [])(p)).toBe(p);
   });
@@ -46,7 +46,7 @@ describe('no-op identity', () => {
   it('setCells with unchanged values returns the same project', () => {
     const { p, t } = setup();
     expect(setCells(t.id, [{ row: 0, col: 0, value: t.groups[0].observations[0].value }])(p)).toBe(p);
-    expect(setCells(t.id, [{ row: 99, col: 0, value: 1 }])(p)).toBe(p);
+    expect(setCells(t.id, [{ row: INITIAL_ROWS + 99, col: 0, value: 1 }])(p)).toBe(p);
     expect(setCells(t.id, [{ row: 0, col: 0, value: 42 }])(p)).not.toBe(p);
   });
   it('addRows(0) returns the same project', () => {

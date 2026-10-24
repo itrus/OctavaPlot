@@ -18,16 +18,19 @@ const RedoIcon = () => (
   </svg>
 );
 
-/** The one Undo/Redo pair of the active page, icon-only. */
-export function UndoRedo() {
+/** The one Undo/Redo pair of the project (one history for tables, graphs, results and layouts), in the top bar. */
+export function UndoRedo({ labeled = false }: { labeled?: boolean }) {
   const { undo, redo, canUndo, canRedo } = useApp();
+  const cls = labeled ? 'icon-text' : 'icon-only';
   return (
     <span className="undo-redo">
-      <button className="icon-only" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">
+      <button className={cls} onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">
         <UndoIcon />
+        {labeled && 'Undo'}
       </button>
-      <button className="icon-only" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" aria-label="Redo">
+      <button className={cls} onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" aria-label="Redo">
         <RedoIcon />
+        {labeled && 'Redo'}
       </button>
     </span>
   );

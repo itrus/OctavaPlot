@@ -17,9 +17,16 @@ export function fileStamp(now: Date): string {
   return `${p(now.getFullYear() % 100)}${p(now.getMonth() + 1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
 }
 
-/** File name for an export: the safe base name, plus the date and time when the Settings option is on. */
+/** Name for a new project: the date and time it was created are part of it, so the saved file name matches. */
+export function untitledProjectName(now: Date = new Date()): string {
+  return `Untitled_project_${fileStamp(now)}`;
+}
+
+/** File name for an export: the safe base name, plus the date and time when the Settings option is on (unless the name already ends with one). */
 export function exportFileName(base: string, ext: string, stamped: boolean, now: Date = new Date()): string {
-  return `${safeFileName(base)}${stamped ? `_${fileStamp(now)}` : ''}.${ext}`;
+  const safe = safeFileName(base);
+  const hasStamp = /_\d{6}_\d{4}$/.test(safe);
+  return `${safe}${stamped && !hasStamp ? `_${fileStamp(now)}` : ''}.${ext}`;
 }
 
 export const safeFileName = (name: string): string => name.replace(/[^\w.-]+/g, '_') || 'chart';

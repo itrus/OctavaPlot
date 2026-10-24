@@ -12,7 +12,6 @@ import { copyText, downloadBlob, exportFileName } from '../util/download';
 import { NumField } from './inspector/controls';
 import { ExportIcon } from './icons';
 import { SheetTable, sheetText, useSheetSelection } from './ResultsSheet';
-import { UndoRedo } from './UndoRedo';
 
 const LEVELS = [0.9, 0.95, 0.99] as const;
 
@@ -75,8 +74,6 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
   return (
     <div className="analysis-view">
       <div className="toolbar">
-        <UndoRedo />
-        <span className="sep" />
         <input
           className="analysis-name"
           type="text"

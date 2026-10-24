@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Chart, DataTable, FitSettings } from '../model/types';
+import { chartPx2Pt } from '../model/units';
 import { buildAnyModel, ChartCanvas } from './anyModel';
+import { buildPdf, rgbaToFlateRgb } from './pdf';
 
 /**
  * Export renders the same declarative <ChartSvg> without editor state, so
@@ -48,6 +50,22 @@ function describeSvg(markup: string, chart: Chart, table: DataTable, notices: re
 
 /** Rasterise at `scale` x the chart's nominal CSS pixel size (96 px/in). */
 export async function chartToPngBlob(chart: Chart, table: DataTable, scale: number, fit?: FitSettings): Promise<Blob> {
+  const canvas = await chartToCanvas(chart, table, scale, fit);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encoding failed.'))), 'image/png'),
+  );
+}
+
+/** A one-page PDF the size of the chart (1 px = 0.75 pt) holding a picture of it at `dpi` dots per inch; see pdf.ts. */
+export async function chartToPdfBlob(chart: Chart, table: DataTable, dpi: number, fit?: FitSettings): Promise<Blob> {
+  const canvas = await chartToCanvas(chart, table, dpi / 96, fit);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D context is unavailable.');
+  const flateRgb = await rgbaToFlateRgb(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
+  return new Blob([buildPdf({ widthPt: chartPx2Pt(chart.widthPx), heightPt: chartPx2Pt(chart.heightPx), pxWidth: canvas.width, pxHeight: canvas.height, flateRgb, title: chart.name }) as BlobPart], { type: 'application/pdf' });
+}
+
+async function chartToCanvas(chart: Chart, table: DataTable, scale: number, fit?: FitSettings): Promise<HTMLCanvasElement> {
   const svg = chartToSvgString(chart, table, fit);
   const width = Math.max(1, Math.round(chart.widthPx * scale));
   const height = Math.max(1, Math.round(chart.heightPx * scale));
@@ -67,9 +85,7 @@ export async function chartToPngBlob(chart: Chart, table: DataTable, scale: numb
   // The page colour is part of the SVG; with none chosen the PNG stays transparent.
   ctx.clearRect(0, 0, width, height);
   ctx.drawImage(img, 0, 0, width, height);
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encoding failed.'))), 'image/png'),
-  );
+  return canvas;
 }
 
 export { downloadBlob, safeFileName } from '../util/download';

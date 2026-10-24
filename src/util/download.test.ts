@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exportFileName, fileStamp } from './download';
+import { exportFileName, fileStamp, untitledProjectName } from './download';
 
 describe('export file names', () => {
   const when = new Date(2026, 9, 22, 14, 5);
@@ -10,5 +10,10 @@ describe('export file names', () => {
   it('adds the stamp before the extension only when asked', () => {
     expect(exportFileName('Graph 1', 'png', true, when)).toBe('Graph_1_261022_1405.png');
     expect(exportFileName('Graph 1', 'png', false, when)).toBe('Graph_1.png');
+  });
+  it('puts the creation stamp in a new project name and does not stamp the file name twice', () => {
+    const name = untitledProjectName(when);
+    expect(name).toBe('Untitled_project_261022_1405');
+    expect(exportFileName(name, 'oplot', true, new Date(2026, 9, 23, 9, 0))).toBe('Untitled_project_261022_1405.oplot');
   });
 });

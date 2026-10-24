@@ -12,14 +12,16 @@ interface Format {
   /** The kind of table it creates; null while the format is not available yet. */
   kind: TableKind | null;
   blurb: string;
+  /** A small gap in the menu before this format: the formats come in three groups. */
+  gapBefore?: boolean;
 }
 
-/** The table formats, as in the top menu of the dialog. */
+/** The table formats, as in the top menu of the dialog: Column and Grouped, then XY, then the others. */
 const FORMATS: readonly Format[] = [
-  { id: 'xy', label: 'XY', kind: 'xy', blurb: 'A numeric X column and one or more Y series: how Y changes with X.' },
   { id: 'column', label: 'Column', kind: 'column', blurb: 'One column per group, with its replicate values in the rows: comparing groups.' },
   { id: 'grouped', label: 'Grouped', kind: 'grouped', blurb: 'Two category levels with replicates in subcolumns, for example Male / Female by Control / Treated.' },
-  { id: 'contingency', label: 'Contingency', kind: 'contingency', blurb: 'Counts of subjects in each outcome: groups of subjects in the rows, outcomes in the columns.' },
+  { id: 'xy', label: 'XY', kind: 'xy', blurb: 'A numeric X column and one or more Y series: how Y changes with X.', gapBefore: true },
+  { id: 'contingency', label: 'Contingency', kind: 'contingency', gapBefore: true, blurb: 'Counts of subjects in each outcome: groups of subjects in the rows, outcomes in the columns.' },
   { id: 'survival', label: 'Survival', kind: 'survival', blurb: 'Time to an event, with censoring, for each group: one row per subject.' },
 ];
 
@@ -157,11 +159,11 @@ function FormatSketch({ id, layout }: { id: FormatId; layout: ReplicateLayout })
 type XyMode = 'single' | 'replicates' | 'summary';
 
 /**
- * New data table. The format is chosen in the menu along the top (XY, Column, Grouped, Contingency and
+ * New data table. The format is chosen in the menu along the top (Column, Grouped, XY, Contingency and
  * Survival), then whether to start empty or with sample data, then how the values are entered.
  */
 export function NewTableDialog({ defaultSample, onCreate, onClose }: { defaultSample: boolean; onCreate: (kind: TableKind, options: NewTableOptions) => void; onClose: () => void }) {
-  const [formatId, setFormatId] = useState<FormatId>('xy');
+  const [formatId, setFormatId] = useState<FormatId>('column');
   const [sample, setSample] = useState(defaultSample);
   const [mode, setMode] = useState<XyMode>('single');
   const [n, setN] = useState(3);
@@ -182,7 +184,7 @@ export function NewTableDialog({ defaultSample, onCreate, onClose }: { defaultSa
             key={f.id}
             role="tab"
             aria-selected={formatId === f.id}
-            className={`format-tab${formatId === f.id ? ' active' : ''}`}
+            className={`format-tab${formatId === f.id ? ' active' : ''}${f.gapBefore ? ' format-tab-gap' : ''}`}
             title={f.blurb}
             onClick={() => setFormatId(f.id)}
           >

@@ -345,7 +345,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
       {tab === 'datasets' && (
         <div className="tab-body">
           <OnThisGraph chart={chart} />
-          <DataSetOrder chart={chart} groups={series.map((g) => ({ id: g.id, label: g.name }))} gaps={false} heading={barChart ? 'Order within each category, left to right' : 'Plot order (the last is drawn on top)'} />
+          <DataSetOrder chart={chart} groups={series.map((g) => ({ id: g.id, label: g.name }))} heading={barChart ? 'Order within each category, left to right' : 'Plot order (the last is drawn on top)'} />
           <div className="muted small">Select a {noun.toLowerCase()} to edit its style, or click it in the chart.</div>
           <ul className="dataset-list">
             {seriesView.map((s) => (

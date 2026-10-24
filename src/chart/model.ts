@@ -345,7 +345,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
     const baseline = Math.min(Math.max(scale.log ? 0 : (chart.bars.baseline ?? 0), scale.domain[0]), scale.domain[1]);
     return { scale, toY, baseline };
   };
-  const cols = columnLayout(plot, table.groups.map((g) => g.id), chart.bars, chart.groupGaps);
+  const cols = columnLayout(plot, table.groups.map((g) => g.id), chart.bars);
   const bw = cols.bw;
   const slotStep = cols.step;
 

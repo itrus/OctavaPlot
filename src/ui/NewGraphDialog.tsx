@@ -3,9 +3,10 @@ import { buildAnyModel, ChartCanvas } from '../chart/anyModel';
 
 import { applyVariant, previewFit, type ChartVariant } from '../model/chartVariant';
 import { GALLERY, availableItems, type GalleryItem } from '../model/chartGallery';
-import { tableTypeInfo } from '../model/chartTypes';
+import { inheritChart } from '../model/chartFormat';
+import { chartTypeInfo, tableTypeInfo } from '../model/chartTypes';
 import { createChart } from '../model/defaults';
-import type { ChartType, DataTable, Id, TableKind } from '../model/types';
+import type { Chart, ChartType, DataTable, Id, TableKind } from '../model/types';
 import { GallerySketch } from './GallerySketches';
 import { Modal } from './NewItemDialogs';
 
@@ -27,12 +28,32 @@ function Preview({ table, type, variant }: { table: DataTable; type: ChartType; 
   return <ChartCanvas chart={drawn.chart} any={drawn.any} cssWidth="100%" cssHeight="100%" />;
 }
 
+/** A live preview of a graph that would take its format from another. */
+function PreviewLike({ source, sourceTable, table }: { source: Chart; sourceTable: DataTable; table: DataTable }) {
+  const drawn = useMemo(() => {
+    try {
+      const chart = inheritChart(source, sourceTable, table, 'preview');
+      return { chart, any: buildAnyModel(chart, table) };
+    } catch {
+      return null;
+    }
+  }, [source, sourceTable, table]);
+  if (!drawn) return <div className="gallery-preview-empty muted">No preview available.</div>;
+  return <ChartCanvas chart={drawn.chart} any={drawn.any} cssWidth="100%" cssHeight="100%" />;
+}
+
 /**
- * New graph. The graph family is the type of the table (as chosen when the table was made); the gallery shows every
+ * New graph. Either from the gallery, or like an existing graph (which gives its format to the new one, for the table
+ * chosen). In the gallery the graph family is the type of the table (as chosen when the table was made); the gallery shows every
  * graph of that family in tabs, with a live preview. Graphs that cannot be made yet are shown locked, so the whole
  * range is visible.
  */
-export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { tables: DataTable[]; initialTableId: Id; onCreate: (tableId: Id, type: ChartType, variant?: ChartVariant) => void; onClose: () => void }) {
+export function NewGraphDialog({ tables, charts, initialTableId, initialChartId, onCreate, onCreateLike, onClose }: { tables: DataTable[]; charts: Chart[]; initialTableId: Id; initialChartId?: Id; onCreate: (tableId: Id, type: ChartType, variant?: ChartVariant) => void; onCreateLike: (tableId: Id, sourceChartId: Id, linked: boolean) => void; onClose: () => void }) {
+  const [mode, setMode] = useState<'gallery' | 'like'>('gallery');
+  const [sourceId, setSourceId] = useState<Id>(charts.find((c) => c.id === initialChartId)?.id ?? charts[0]?.id ?? '');
+  const [linked, setLinked] = useState(true);
+  const source = charts.find((c) => c.id === sourceId);
+  const sourceTable = source ? tables.find((t) => t.id === source.dataTableId) : undefined;
   const firstTable = tables.find((t) => t.id === initialTableId) ?? tables[0];
   const [tableId, setTableId] = useState<Id>(firstTable.id);
   const table = tables.find((t) => t.id === tableId) ?? firstTable;
@@ -67,7 +88,65 @@ export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { 
   };
 
   return (
-    <Modal title="New graph" confirmLabel="Create graph" onConfirm={() => selected.type && onCreate(table.id, selected.type, selected.variant)} onClose={onClose} confirmDisabled={!canCreate} wide>
+    <Modal
+      title="New graph"
+      confirmLabel="Create graph"
+      onConfirm={() => (mode === 'like' ? source && onCreateLike(table.id, source.id, linked) : selected.type && onCreate(table.id, selected.type, selected.variant))}
+      onClose={onClose}
+      confirmDisabled={mode === 'like' ? !source || !sourceTable : !canCreate}
+      wide
+    >
+      <span className="switch-group" role="radiogroup" aria-label="How to make the graph">
+        <button role="radio" aria-checked={mode === 'gallery'} className={`switch${mode === 'gallery' ? ' on' : ''}`} onClick={() => setMode('gallery')}>
+          From the gallery
+        </button>
+        <button role="radio" aria-checked={mode === 'like'} className={`switch${mode === 'like' ? ' on' : ''}`} onClick={() => setMode('like')} disabled={charts.length === 0} title={charts.length === 0 ? 'There is no graph to take the format from yet' : undefined}>
+          Like an existing graph
+        </button>
+      </span>
+      {mode === 'like' && source && sourceTable ? (
+        <>
+          <p className="muted">The new graph takes the format of an existing graph and shows the table you choose. Data sets are matched by position: the third data set of the graph styles the third of the new table.</p>
+          <div className="gallery-top">
+            <label className="choice-label">
+              <span>Like graph</span>
+              <select value={source.id} onChange={(e) => setSourceId(e.target.value)} aria-label="Graph to take the format from">
+                {charts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({chartTypeInfo(c.type)?.label ?? c.type})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="choice-label">
+              <span>Of table</span>
+              <select value={table.id} onChange={(e) => pickTable(e.target.value)} aria-label="Data table">
+                {tables.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({tableTypeInfo(t.kind).label})
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="muted small">
+            {sourceTable.kind === table.kind
+              ? 'Taken over: size, chart type and its options, fonts, colours, frame, grid, axis look, legend and the style of each data set. Not taken over: data, titles, axis ranges, reference lines, annotations and the fitted curve.'
+              : `The table is of another type than ${sourceTable.name}, so only the general format is taken over: size, fonts, colours, frame, grid, axis look and legend. The graph type is the table's usual one.`}
+          </p>
+          <label className="choice-label">
+            <input type="checkbox" checked={linked} onChange={(e) => setLinked(e.target.checked)} />
+            <span>Keep the graphs linked: later changes to the format of “{source.name}” also reach the new graph, except for details you have changed on the new graph itself</span>
+          </label>
+          <div className="gallery-preview-box">
+            <div className="gallery-preview-title">Preview</div>
+            <div className="gallery-preview">
+              <PreviewLike source={source} sourceTable={sourceTable} table={table} />
+            </div>
+          </div>
+        </>
+      ) : (
+      <>
       <div className="gallery-top">
         <label className="choice-label">
           <span>Graph family</span>
@@ -137,6 +216,8 @@ export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { 
           {selected.type ? <Preview table={table} type={selected.type} variant={selected.variant} /> : <div className="gallery-preview-empty muted">🔒 Planned: no preview yet.</div>}
         </div>
       </div>
+      </>
+      )}
     </Modal>
   );
 }
