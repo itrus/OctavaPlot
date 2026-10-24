@@ -190,3 +190,18 @@ describe('null cases', () => {
     expect(buildErrorBar(inputOf(ci))).toBeNull();
   });
 });
+
+describe('log axis (spec 15, log endpoint)', () => {
+  const NEG = forged({ centre: 2 }, -1, 5); // centre 2, interval [-1, 5]
+  it('keeps the centre and draws the endpoint at or below 0 at the low end, flagged as clipped', () => {
+    const g = buildErrorBar(inputOf(NEG, { errorCap: 'none' }, { log: true, domain: [0.1, 10] }));
+    expect(g).not.toBeNull();
+    expect(g?.clippedLower).toBe(true);
+    expect(g?.clippedUpper).toBe(false);
+    expect(g?.d).toContain(`${yScale(5)}`);
+    expect(g?.d).toContain(`${yScale(0.1)}`);
+  });
+  it('draws nothing when the centre itself is not positive', () => {
+    expect(buildErrorBar(inputOf(forged({ centre: -2 }, -5, 1), {}, { log: true, domain: [0.1, 10] }))).toBeNull();
+  });
+});

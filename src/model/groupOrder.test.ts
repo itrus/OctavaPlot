@@ -4,7 +4,7 @@ import { columnLayout } from '../chart/columns';
 import { createChart, createColumnTable } from './defaults';
 import { effectiveTable } from './chartTable';
 import { applyOrder, moveGroup, sanitizeGaps, sanitizeOrder } from './groupOrder';
-import { setGroupGap, setGroupOrder } from '../state/commands';
+import { removeGroup, setGroupGap, setGroupOrder } from '../state/commands';
 import { parseProject, stringifyProject } from '../state/serialize';
 import type { Project } from './types';
 
@@ -74,5 +74,19 @@ describe('the order and the gaps on a chart', () => {
     const back = parseProject(stringifyProject(next));
     expect(back.charts[0].groupOrder).toEqual([...idList].reverse());
     expect(back.charts[0].groupGaps).toEqual({ [idList[1]]: 150 });
+  });
+});
+
+describe('series colours stay with their data set', () => {
+  it('keeps each data set palette index when others are reordered or removed', () => {
+    const { p, table, chart } = setup();
+    const before = new Map(table.groups.map((g) => [g.id, g.paletteIndex]));
+    const [first, second, , last] = table.groups.map((g) => g.id);
+    const reordered = setGroupOrder(chart.id, [last, second, first])(p);
+    const removed = removeGroup(table.id, first)(reordered);
+    const groups = removed.dataTables[0].groups;
+    expect(groups.some((g) => g.id === first)).toBe(false);
+    expect(reordered.charts[0].groupOrder).toEqual([last, second, first]);
+    for (const g of groups) expect(g.paletteIndex).toBe(before.get(g.id));
   });
 });
