@@ -123,7 +123,8 @@ describe('the chrome of bars and grouped charts in the scene', () => {
     const dotted = barP((c) => style(c, { barFillMode: 'pattern', barPattern: 'dots' }));
     for (const p of [barP(), dotted, groupedP()]) {
       const scene = chromeOf(p);
-      const write = (nodes: ReadonlyArray<SceneElement>, editor: boolean) => renderToStaticMarkup(createElement(SceneElements, { nodes, editor }));
+      // Inside an <svg>, as in a drawing: outside it React reads clipPath as an HTML tag and warns.
+      const write = (nodes: ReadonlyArray<SceneElement>, editor: boolean) => renderToStaticMarkup(createElement('svg', null, createElement(SceneElements, { nodes, editor })));
       for (const nodes of [scene.back, scene.front]) {
         const exportedRaw = write(nodes, false);
         const exported = exportedRaw.replace(/ pointer-events="[a-z]+"/g, '');
