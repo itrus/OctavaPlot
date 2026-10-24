@@ -9,7 +9,7 @@ import { LEGEND_KEY } from './layout';
 import type { BarGeom } from './model';
 
 /** Extra half-height (pt) of the editor-only hit rect over a bar that renders with no height. */
-const ZERO_BAR_HIT_PAD_PT = 4;
+const ZERO_BAR_HIT_PAD_PT = 8;
 
 /** Deterministic, XML-safe clip id for one fill: no randomness, no characters outside [A-Za-z0-9_-]. */
 export function fillClipId(chartId: string, markId: string): string {
@@ -146,7 +146,7 @@ export function BarMark({ bar, chartId, editor }: { bar: BarGeom; chartId: strin
   );
 }
 
-/** Legend key (18 x 10 pt): solid keeps the legacy rect, pattern and none show the fill at key scale. */
+/** Legend key (36 x 20 pt): solid keeps the legacy rect, pattern and none show the fill at key scale. */
 export function KeyMark({
   style,
   x,
@@ -171,9 +171,9 @@ export function KeyMark({
     return (
       <rect
         x={n2(x)}
-        y={n2(y - 5)}
+        y={n2(y - 10)}
         width={w}
-        height={10}
+        height={20}
         fill={style.barFill}
         fillOpacity={style.barOpacity}
         stroke={style.barBorderColor}
@@ -182,8 +182,8 @@ export function KeyMark({
     );
   }
   const key = legendKeyFill(fill);
-  const rect: Rect = { x, y: y - 5, width: w, height: 10 };
-  const marks = key.mode === 'pattern' ? patternMarks(key.pattern, rect, { x: x + w / 2, y: y + 5 }, key.spacingPt) : null;
+  const rect: Rect = { x, y: y - 10, width: w, height: 20 };
+  const marks = key.mode === 'pattern' ? patternMarks(key.pattern, rect, { x: x + w / 2, y: y + 10 }, key.spacingPt) : null;
   return (
     <PatternRect
       rect={rect}

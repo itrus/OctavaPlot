@@ -127,7 +127,7 @@ export function NewGraphDialog({ tables, initialTableId, onCreate, onClose }: { 
         {selectedTab && selectedTab.id !== tab.id && <span className="muted small"> · in “{selectedTab.label}”</span>}
         <p className="muted">{selected.description}</p>
         {selected.type === null && (
-          <p className="gallery-planned">🔒 Planned{selected.spec ? ` (specification preset ${selected.spec})` : ''}. It cannot be created yet; the graphs without a lock can.</p>
+          <p className="gallery-planned">🔒 Planned{selected.spec ? ` (preset ${selected.spec})` : ''}. It cannot be created yet; the graphs without a lock can.</p>
         )}
       </div>
 

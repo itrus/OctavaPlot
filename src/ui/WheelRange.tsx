@@ -14,7 +14,7 @@ interface Props {
 /** Wheel distance (deltaY units) that moves the slider by one step; a mouse notch is 100. */
 const WHEEL_PER_STEP = 100;
 
-/** A range slider that also responds to the mouse wheel: wheel up raises the value, wheel down lowers it. */
+/** A range slider that also responds to the mouse wheel once it has the focus: wheel up raises the value, wheel down lowers it. */
 export function WheelRange({ value, min, max, step, onValue, disabled, ariaLabel }: Props) {
   const ref = useRef<HTMLInputElement>(null);
   // The listener is attached once; it reads the latest props from here.
@@ -28,7 +28,9 @@ export function WheelRange({ value, min, max, step, onValue, disabled, ariaLabel
     const onWheel = (e: WheelEvent) => {
       const s = latest.current;
       if (s.disabled || e.ctrlKey || e.metaKey) return; // browser zoom
-      e.preventDefault(); // the panel behind must not scroll while the wheel is used on the slider
+      // Only a slider that has the focus takes the wheel: passing over one while scrolling the panel must not change it.
+      if (document.activeElement !== el) return;
+      e.preventDefault(); // the panel behind must not scroll while the wheel is used on the focused slider
       const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 100 : 1;
       carry.current += -(e.deltaY || e.deltaX) * unit;
       const steps = Math.trunc(carry.current / WHEEL_PER_STEP);

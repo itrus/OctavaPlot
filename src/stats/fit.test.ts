@@ -186,3 +186,54 @@ describe('the models', () => {
     expect(fitModelById('polynomial').fn(2, [1, 2, 3])).toBe(17);
   });
 });
+
+describe('reviewed regressions (confidence level, convergence, invariance)', () => {
+  const X = [1, 2, 3, 4, 5];
+  const Y = [2.1, 3.9, 6.2, 7.8, 10.1];
+  const data = X.map((x, i) => ({ x, y: Y[i] }));
+
+  it('widens parameter intervals with the confidence level', () => {
+    const s = (level: number) => ok(fitCurve(data, { model: 'linear', level })).params[1];
+    expect(s(0.95).lower).toBeCloseTo(1.799939, 5);
+    expect(s(0.95).upper).toBeCloseTo(2.180061, 5);
+    expect(s(0.99).lower).toBeCloseTo(1.641172, 5);
+    expect(s(0.99).upper).toBeCloseTo(2.338828, 5);
+    expect(s(0.9).upper! - s(0.9).lower!).toBeLessThan(s(0.95).upper! - s(0.95).lower!);
+  });
+
+  it('gives no errors or bands when a nonlinear fit did not converge', () => {
+    const xs = Array.from({ length: 12 }, (_, i) => i);
+    const noisy = xs.map((x, i) => ({ x, y: 5 + 3 * Math.exp(-0.5 * x) + 2 * Math.exp(-0.05 * x) + (i % 2 ? 0.3 : -0.3) }));
+    const r = ok(fitCurve(noisy, { model: 'exp_two_phase', maxIterations: 2 }));
+    expect(r.converged).toBe(false);
+    expect(r.halfWidth(3, 'confidence', 0.95)).toBeNull();
+    expect(r.params.every((p) => p.se === null && p.lower === null)).toBe(true);
+    expect(Number.isFinite(r.predict(3))).toBe(true);
+  });
+
+  it('is unchanged by shifting X by 1e8', () => {
+    const base = ok(fitCurve([0, 1, 2, 3, 4].map((x) => ({ x, y: 2 * x + 1 })), { model: 'linear' }));
+    const shifted = ok(fitCurve([0, 1, 2, 3, 4].map((x) => ({ x: x + 1e8, y: 2 * x + 1 })), { model: 'linear' }));
+    expect(base.params[1].value).toBeCloseTo(2, 10);
+    expect(shifted.params[1].value).toBeCloseTo(2, 6);
+    expect(shifted.predict(1e8 + 2.5)).toBeCloseTo(6, 8);
+    expect(shifted.rSquared).toBeCloseTo(1, 10);
+  });
+
+  it('reports polynomial coefficients in the original X after centring', () => {
+    const r = ok(fitCurve([-2, -1, 0, 1, 2, 3].map((x) => ({ x: x + 10, y: 1 + 2 * (x + 10) + 0.5 * (x + 10) ** 2 })), { model: 'polynomial', degree: 2 }));
+    expect(r.params[0].value).toBeCloseTo(1, 6);
+    expect(r.params[1].value).toBeCloseTo(2, 6);
+    expect(r.params[2].value).toBeCloseTo(0.5, 8);
+  });
+
+  it('fits a four-parameter logistic whatever the unit of X', () => {
+    const f = (x: number) => 1 + 9 / (1 + (5 / x) ** 1.5);
+    const xs = [0.5, 1, 2, 3, 5, 8, 12, 20, 40];
+    for (const k of [1, 1e-9, 1e6]) {
+      const r = ok(fitCurve(xs.map((x) => ({ x: x * k, y: f(x) + (x % 2 ? 0.01 : -0.01) })), { model: 'hill_4pl' }));
+      expect(r.converged, `unit ${k}`).toBe(true);
+      expect(r.rss, `unit ${k}`).toBeLessThan(0.01);
+    }
+  });
+});

@@ -3,8 +3,8 @@ import { createEmptyProject, createExampleProject } from '../model/defaults';
 import type { Project, Selection, ViewRef } from '../model/types';
 import type { InspectorTarget } from '../ui/inspector/nav';
 import type { Command } from './commands';
-import { historyReducer, initialHistory } from './history';
-import { loadAutosave, saveAutosave } from './serialize';
+import { historyReducer, initialHistory, scopeCoalesceKey } from './history';
+import { backupAutosave, loadAutosave, saveAutosave } from './serialize';
 import { loadSettings, saveSettings, sanitizeSettings, type Settings } from './settings';
 
 interface AppApi {
@@ -25,8 +25,8 @@ interface AppApi {
   newProject: () => void;
   /** True when the project has changes since it was last opened, created or saved to a file. */
   hasUnsavedChanges: () => boolean;
-  /** Record that the current project was just saved to a file. */
-  markSaved: () => void;
+  /** Record that a project was just saved to a file: the one that was written (edits made while writing stay unsaved). */
+  markSaved: (written: Project) => void;
   status: string;
   setStatus: (s: string) => void;
   autosaveOk: boolean;
@@ -55,7 +55,17 @@ export function useApp(): AppApi {
   return v;
 }
 
-const initialProject = (): Project => loadAutosave() ?? createExampleProject();
+/** The project to start with: the autosave (kept as a backup first, so a bad edit cannot replace the only copy), else a new one by the saved settings. */
+const initialProject = (): Project => {
+  const recovered = loadAutosave();
+  if (recovered) {
+    backupAutosave();
+    return recovered;
+  }
+  const s = loadSettings();
+  const size = { widthPx: s.defaultChartWidthPx, heightPx: s.defaultChartHeightPx };
+  return s.newProjectEmpty ? createEmptyProject(size) : createExampleProject(size);
+};
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [history, dispatch] = useReducer(historyReducer, undefined, () => initialHistory(initialProject()));
@@ -79,9 +89,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Edits merge into one undo step only on the same object: the key carries the page and the selection it was made on.
+  const scopeRef = useRef({ view, selection });
+  scopeRef.current = { view, selection };
   const run = useCallback(
     (label: string, command: Command, coalesceKey?: string) =>
-      dispatch({ type: 'commit', label, command, coalesceKey, now: Date.now() }),
+      dispatch({ type: 'commit', label, command, coalesceKey: scopeCoalesceKey(scopeRef.current, coalesceKey), now: Date.now() }),
     [],
   );
   const undo = useCallback(() => dispatch({ type: 'undo' }), []);
@@ -91,8 +104,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const presentRef = useRef(project);
   presentRef.current = project;
   const hasUnsavedChanges = useCallback(() => presentRef.current !== cleanProject.current, []);
-  const markSaved = useCallback(() => {
-    cleanProject.current = presentRef.current;
+  const markSaved = useCallback((written: Project) => {
+    cleanProject.current = written;
   }, []);
   const replaceProject = useCallback((p: Project) => {
     cleanProject.current = p;
@@ -111,21 +124,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setStatus('New project.');
   }, [replaceProject]);
 
+  // Undoing the creation of the item on screen (or deleting it) must not leave an empty workspace: go to one that exists.
+  useEffect(() => {
+    const exists = view.kind === 'table' ? project.dataTables.some((t) => t.id === view.id) : view.kind === 'chart' ? project.charts.some((c) => c.id === view.id) : (project.analyses ?? []).some((a) => a.id === view.id);
+    if (!exists) setView({ kind: 'table', id: project.dataTables[0].id });
+  }, [project, view]);
+
   // Undo/redo can remove the thing the selection points at; keep the status line informative.
   useEffect(() => {
     if (history.lastAction) setStatus(history.lastAction);
   }, [history.lastAction, project]);
 
   // Debounced autosave of unsaved changes; switching autosave back on saves what was edited while it was off.
+  // The saved pointer moves only after a write succeeded, so a failure is retried (every 15 s) rather than forgotten.
   const saved = useRef(project);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (!settings.autosave || project === saved.current) return;
     const t = setTimeout(() => {
-      saved.current = project;
-      setAutosaveOk(saveAutosave(project));
+      const ok = saveAutosave(project);
+      setAutosaveOk(ok);
+      if (ok) saved.current = project;
+      else setTimeout(() => setRetry((n) => n + 1), 15000);
     }, 400);
     return () => clearTimeout(t);
-  }, [project, settings.autosave]);
+  }, [project, settings.autosave, retry]);
 
   const api = useMemo<AppApi>(
     () => ({

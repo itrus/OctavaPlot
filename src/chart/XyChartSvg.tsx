@@ -3,6 +3,8 @@ import type { Chart } from '../model/types';
 import { n2 } from '../model/units';
 import { axisGaps, axisPieces } from './axisScale';
 import { AnnotationLayer, axisLineD, Backgrounds, BreakMarks, ChartTitles, type EditorState, FrameBox, PlotClip, ScaleBar, SELECT_COLOR } from './ChartParts';
+import { ReferenceLinesLayer } from './ReferenceLinesLayer';
+import { referenceLinesOf } from './referenceLines';
 import { FitParameters } from './FitParameters';
 import { GridLines } from './GridLines';
 import { hitAttrs } from './hitTest';
@@ -55,8 +57,8 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
         s.linePath !== '' && (
           <g key={`line-${s.groupId}`}>
             <path d={s.linePath} fill="none" stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} {...linePattern(s.style)} strokeLinejoin="round" {...hit('line', s.groupId)} />
-            {ed && <path d={s.linePath} fill="none" stroke="transparent" strokeWidth={Math.max(10, s.style.lineWidthPt + 6)} {...hit('line', s.groupId)} />}
-            {selectedGroup === s.groupId && <path data-editor-only d={s.linePath} fill="none" stroke={SELECT_COLOR} strokeOpacity={0.35} strokeWidth={s.style.lineWidthPt + 5} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
+            {ed && <path d={s.linePath} fill="none" stroke="transparent" strokeWidth={Math.max(20, s.style.lineWidthPt + 12)} {...hit('line', s.groupId)} />}
+            {selectedGroup === s.groupId && <path data-editor-only d={s.linePath} fill="none" stroke={SELECT_COLOR} strokeOpacity={0.35} strokeWidth={s.style.lineWidthPt + 10} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
           </g>
         ),
     )}
@@ -100,6 +102,8 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
       {ya.visible && <GridLines dir="h" grid={chart.grid} major={y.ticks} minor={y.minorTicks ?? []} showMajor={ya.showGrid} showMinor={ya.showMinorGrid} at={yScale} from={plot.x} to={right} />}
       {xa.visible && <GridLines dir="v" grid={chart.grid} major={x.ticks} minor={x.minorTicks ?? []} showMajor={xa.showGrid} showMinor={xa.showMinorGrid} at={xScale} from={plot.y} to={bottom} />}
 
+      <ReferenceLinesLayer lines={referenceLinesOf(chart, { family: 'xy', model }).placed} fontSizePt={chart.yAxis.tickFontSizePt} />
+
       {/* Data: bands, then lines, then symbols over them, clipped to the plotting region. */}
       <g clipPath="url(#plot-clip)">
         {series.map((s) =>
@@ -121,13 +125,13 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
       </g>
 
       {/* Fitted parameters, written in the corner of the plot in the colour of each curve. */}
-      {model.fit.showParameters && <FitParameters series={series} x={plot.x + 8} y={plot.y + 4} fontSizePt={chart.yAxis.tickFontSizePt} level={model.fit.level} />}
+      {model.fit.showParameters && <FitParameters series={series} x={plot.x + 16} y={plot.y + 8} fontSizePt={chart.yAxis.tickFontSizePt} level={model.fit.level} />}
 
       {/* Axes. */}
       {ya.visible && (
         <g stroke={chart.axisColor} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y')}>
           <path d={axisLineD('y', yAxisX, plot.y, bottom, yPieces)} />
-          {ed && <path d={axisLineD('y', yAxisX, plot.y, bottom, yPieces)} stroke="transparent" strokeWidth={14} />}
+          {ed && <path d={axisLineD('y', yAxisX, plot.y, bottom, yPieces)} stroke="transparent" strokeWidth={28} />}
           <BreakMarks along="y" fixed={yAxisX} gaps={yGaps} mark={ya.breakMark} color={chart.axisColor} width={ya.lineWidthPt} />
           {tickPaths('left', yAxisX, ya, y.ticks, y.minorTicks ?? [], yScale).map((p) => (
             <path key={p.key} d={p.d} strokeLinecap="butt" />
@@ -143,7 +147,7 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
       {xa.visible && (
         <g stroke={chart.axisColor} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'x')}>
           <path d={axisLineD('x', xAxisY, plot.x, right, xPieces)} />
-          {ed && <path d={axisLineD('x', xAxisY, plot.x, right, xPieces)} stroke="transparent" strokeWidth={14} />}
+          {ed && <path d={axisLineD('x', xAxisY, plot.x, right, xPieces)} stroke="transparent" strokeWidth={28} />}
           <BreakMarks along="x" fixed={xAxisY} gaps={xGaps} mark={xa.breakMark} color={chart.axisColor} width={xa.lineWidthPt} />
           {tickPaths('bottom', xAxisY, xa, x.ticks, x.minorTicks ?? [], xScale).map((p) => (
             <path key={p.key} d={p.d} strokeLinecap="butt" />
@@ -189,7 +193,7 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
             const w = keyWidthOf(chart.legend);
             return (
               <g key={s.groupId} {...hit('legend', s.groupId)}>
-                {s.bars && <rect x={n2(it.x)} y={n2(it.y - 5)} width={w} height={10} fill={s.style.barFill} fillOpacity={s.style.barOpacity} stroke={s.style.barBorderColor} strokeWidth={s.style.barBorderWidthPt} />}
+                {s.bars && <rect x={n2(it.x)} y={n2(it.y - 10)} width={w} height={20} fill={s.style.barFill} fillOpacity={s.style.barOpacity} stroke={s.style.barBorderColor} strokeWidth={s.style.barBorderWidthPt} />}
                 {s.style.showLines && <path d={`M${n2(it.x)},${n2(it.y)}H${n2(it.x + w)}`} stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} {...linePattern(s.style)} fill="none" />}
                 {s.style.showSymbols && <path d={symbolPath(s.style.symbolShape, it.x + w / 2, it.y, s.style.symbolSizePt)} fill={s.style.symbolColor} fillOpacity={s.style.symbolFillOpacity < 1 ? s.style.symbolFillOpacity : undefined} stroke={s.style.symbolBorderColor} strokeWidth={s.style.symbolBorderWidthPt} />}
                 <text x={n2(it.x + w + LEGEND_KEY.gap)} y={n2(it.y)} dy="0.35em" fontSize={layout.legend!.fontSizePt} fill={chart.textColor}>
@@ -209,7 +213,7 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
         series.flatMap((s) =>
           s.points
             .filter((p) => p.id === selectedPoint)
-            .map((p) => <circle key={`ring-${p.id}`} data-editor-only cx={n2(p.px)} cy={n2(p.py)} r={n2(s.style.symbolSizePt / 2 + 3)} fill="none" stroke={SELECT_COLOR} strokeWidth={1.2} pointerEvents="none" />),
+            .map((p) => <circle key={`ring-${p.id}`} data-editor-only cx={n2(p.px)} cy={n2(p.py)} r={n2(s.style.symbolSizePt / 2 + 6)} fill="none" stroke={SELECT_COLOR} strokeWidth={2.4} pointerEvents="none" />),
         )}
     </svg>
   );

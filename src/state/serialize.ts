@@ -11,14 +11,14 @@ import { sanitizeLook } from '../model/look';
 import { sanitizeGaps, sanitizeOrder } from '../model/groupOrder';
 import { createRows, sanitizeRowTitle } from '../model/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/summary';
-import type { Analysis, Chart, ChartLayer, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SpreadKind, SummarySpec } from '../model/types';
+import type { Analysis, Chart, ChartLayer, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SummarySpec } from '../model/types';
 
-const FORMAT = 'octavaplot-project';
-/** Files and autosave written before the project was renamed from "Scientific Plotter" still load. */
-const LEGACY_FORMAT = 'scientific-plotter-project';
-const VERSION = 2;
-export const AUTOSAVE_KEY = 'octavaplot:project:v1';
-const LEGACY_AUTOSAVE_KEY = 'scientific-plotter:project:v1';
+/** The envelope of a project file (.oplot): this format and its one version. */
+export const FORMAT = 'octavaplot-project';
+export const VERSION = 1;
+/** Autosave in the browser's storage; the same text as a file. */
+export const AUTOSAVE_KEY = 'octavaplot:project:autosave';
+export const AUTOSAVE_BACKUP_KEY = 'octavaplot:project:autosave:backup';
 
 export function stringifyProject(project: Project): string {
   return JSON.stringify({ format: FORMAT, version: VERSION, project }, null, 2);
@@ -79,6 +79,7 @@ function parseTable(raw: unknown, path: string): DataTable {
   const rowCount = num(t.rowCount, `${path}.rowCount`);
   if (!Number.isInteger(rowCount) || rowCount < 0) fail(`${path}.rowCount`, 'must be a non-negative integer');
   const ids = new Set<string>();
+  const obsIds = new Set<string>();
   const groups: Group[] = arr(t.groups, `${path}.groups`).map((rg, gi) => {
     const gp = `${path}.groups[${gi}]`;
     const g = obj(rg, gp);
@@ -88,7 +89,11 @@ function parseTable(raw: unknown, path: string): DataTable {
     const observations: Observation[] = arr(g.observations, `${gp}.observations`).map((ro, oi) => {
       const o = obj(ro, `${gp}.observations[${oi}]`);
       const value = o.value === null ? null : num(o.value, `${gp}.observations[${oi}].value`);
-      return { id: str(o.id, `${gp}.observations[${oi}].id`), value };
+      const oid = str(o.id, `${gp}.observations[${oi}].id`);
+      if (obsIds.has(oid)) fail(`${gp}.observations[${oi}].id`, 'is duplicated');
+      obsIds.add(oid);
+      // An excluded value is kept, with its reason, but not used (model/exclusion.ts).
+      return { id: oid, value, ...(o.excluded === true ? { excluded: true as const, ...(typeof o.excludedReason === 'string' && o.excludedReason !== '' ? { excludedReason: o.excludedReason } : {}) } : {}) };
     });
     if (observations.length !== rowCount) fail(`${gp}.observations`, `must have ${rowCount} entries`);
     return {
@@ -152,13 +157,43 @@ function cleanLabelKeys(out: Obj, path: string, notes: string[]): void {
   }
 }
 
+/** Values that are text or a number by default but may also be null: "no colour" and "transparent". */
+const NULL_OK = new Set(['barPatternBackground', 'plotColor', 'pageColor']);
+const isHexColour = (v: unknown): boolean => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+
+/**
+ * Checks the keys of `raw` that `base` (the defaults) also has against the type of the default: a number must be
+ * a finite number, text text, a flag true or false, a list a list, an object an object (checked in turn). A key whose
+ * default is null holds a number or null; or, if its name ends in "colour", a #rrggbb colour or null; or, if it ends in "Id", an ID or null. A key that
+ * fails is taken out, so the default applies, and noted. Keys `base` does not have, and the keys in `skip`, stay as they are.
+ */
+function conform(raw: Obj, base: Obj, path: string, notes: string[], skip: ReadonlySet<string> = new Set()): Obj {
+  const out: Obj = {};
+  for (const key of Object.keys(raw)) if (key !== '__proto__') out[key] = raw[key];
+  for (const key of Object.keys(base)) {
+    if (skip.has(key) || !Object.prototype.hasOwnProperty.call(raw, key)) continue;
+    const want = base[key];
+    const got = raw[key];
+    let ok: boolean;
+    if (got === null) ok = want === null || NULL_OK.has(key);
+    else if (isObj(want)) {
+      ok = isObj(got);
+      if (ok) out[key] = conform(got as Obj, want, `${path}.${key}`, notes);
+    } else if (Array.isArray(want)) ok = Array.isArray(got);
+    else if (want === null) ok = /colou?r$/i.test(key) ? isHexColour(got) : /Id$/.test(key) ? typeof got === 'string' : typeof got === 'number' && Number.isFinite(got);
+    else if (typeof want === 'number') ok = typeof got === 'number' && Number.isFinite(got);
+    else ok = typeof got === typeof want;
+    if (!ok) {
+      delete out[key];
+      notes.push(`${path}.${key} had an invalid value and was reset to the default.`);
+    }
+  }
+  return out;
+}
+
 /** The one pipeline every raw defaults/style/override object passes through. */
 function cleanStyle(raw: unknown, path: string, notes: string[]): Obj {
-  const out: Obj = isObj(raw) ? { ...raw } : {};
-  // Earlier builds stored the placeholder yAxis: 'primary' in styles; it is now axisBinding.
-  delete out.yAxis;
-  // errorType was replaced by summary.spread; parseLayer reads the legacy value from the raw objects.
-  delete out.errorType;
+  const out: Obj = isObj(raw) ? conform(raw, DEFAULT_STYLE as unknown as Obj, path, notes) : {};
   for (const [key, allowed] of Object.entries(STYLE_ENUMS)) {
     if (!Object.prototype.hasOwnProperty.call(out, key)) continue;
     const v = out[key];
@@ -178,17 +213,12 @@ function cleanOverrideMap(raw: unknown, path: string, notes: string[]): Record<I
   if (!isObj(raw)) return out;
   for (const key of Object.keys(raw)) {
     if (key === '__proto__' || !isObj(raw[key])) continue;
-    const cleaned = cleanStyle(raw[key], `${path}.${key}`, notes);
-    // An entry that held only the legacy errorType is dropped; any other empty entry is kept as stored.
-    if (Object.keys(cleaned).length === 0 && Object.prototype.hasOwnProperty.call(raw[key], 'errorType')) continue;
-    out[key] = cleaned;
+    out[key] = cleanStyle(raw[key], `${path}.${key}`, notes);
   }
   return out;
 }
 
-const isLegacySpread = (v: unknown): v is SpreadKind => v === 'none' || v === 'sd' || v === 'sem';
-
-function parseLayer(l: Obj, lp: string, rawDefaults: unknown, notes: string[]): ChartLayer {
+function parseLayer(l: Obj, lp: string, notes: string[]): ChartLayer {
   const style = cleanStyle(l.style, `${lp}.style`, notes);
   const groupOverrides = cleanOverrideMap(l.groupOverrides, `${lp}.groupOverrides`, notes);
   const objectOverrides = cleanOverrideMap(l.objectOverrides, `${lp}.objectOverrides`, notes);
@@ -212,20 +242,6 @@ function parseLayer(l: Obj, lp: string, rawDefaults: unknown, notes: string[]): 
   } else {
     summary = sanitizeSummary(undefined);
   }
-  // Legacy errorType (version 1 files, and builds that still used it as the live source): layer style, then
-  // chart defaults, sets the layer spread and wins over a stored summary; group overrides become data set
-  // overrides and object overrides are dropped.
-  const rawStyle = isObj(l.style) ? l.style : {};
-  const rawDefs = isObj(rawDefaults) ? rawDefaults : {};
-  const layerSpread = [rawStyle.errorType, rawDefs.errorType].find(isLegacySpread);
-  if (layerSpread !== undefined) summary = { ...summary, spread: layerSpread };
-  if (isObj(l.groupOverrides)) {
-    for (const gid of Object.keys(l.groupOverrides)) {
-      const o = l.groupOverrides[gid];
-      if (gid === '__proto__' || !isObj(o) || !isLegacySpread(o.errorType)) continue;
-      groupSummary[gid] = { ...groupSummary[gid], spread: o.errorType };
-    }
-  }
   return {
     id: str(l.id, `${lp}.id`),
     name: typeof l.name === 'string' ? l.name : 'Data',
@@ -237,27 +253,106 @@ function parseLayer(l: Obj, lp: string, rawDefaults: unknown, notes: string[]): 
   } as ChartLayer;
 }
 
+/** Display names are strings keyed by object ID; anything else is dropped and noted. */
+function cleanDisplayNames(raw: unknown, path: string, notes: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (raw === undefined) return out;
+  if (!isObj(raw)) {
+    notes.push(`${path} was not a list of names and was reset.`);
+    return out;
+  }
+  for (const key of Object.keys(raw)) {
+    if (key === '__proto__') continue;
+    if (typeof raw[key] === 'string') out[key] = raw[key] as string;
+    else notes.push(`${path}.${key} was not text and was dropped.`);
+  }
+  return out;
+}
+
+const finiteOr = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+
+/** Annotations: every field checked; an entry that cannot be read, or repeats an ID, is dropped and noted. */
+function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['annotations'] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    notes.push(`${path} was not a list and was reset.`);
+    return [];
+  }
+  const out: Chart['annotations'] = [];
+  const seen = new Set<string>();
+  raw.forEach((a, i) => {
+    if (!isObj(a) || typeof a.id !== 'string' || a.id === '' || seen.has(a.id)) {
+      notes.push(`${path}[${i}] could not be read and was dropped.`);
+      return;
+    }
+    seen.add(a.id);
+    const text = typeof a.text === 'string' ? a.text : typeof a.text === 'number' && Number.isFinite(a.text) ? String(a.text) : '';
+    const color = typeof a.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(a.color) ? a.color : '#000000';
+    const size = finiteOr(a.fontSizePt, 24);
+    out.push({
+      id: a.id,
+      text,
+      xFrac: Math.min(1, Math.max(0, finiteOr(a.xFrac, 0.5))),
+      yFrac: Math.min(1, Math.max(0, finiteOr(a.yFrac, 0.5))),
+      fontSizePt: size > 0 ? size : 24,
+      color,
+    });
+  });
+  return out;
+}
+
+const LINE_STYLES = ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'] as const;
+
+/** Reference lines: every field checked; an entry that cannot be read (or repeats an ID) is dropped and noted. */
+function cleanReferenceLines(raw: unknown, path: string, notes: string[]): Chart['referenceLines'] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    notes.push(`${path} was not a list and was reset.`);
+    return [];
+  }
+  const out: Chart['referenceLines'] = [];
+  const seen = new Set<string>();
+  raw.forEach((l, i) => {
+    if (!isObj(l) || typeof l.id !== 'string' || l.id === '' || seen.has(l.id) || (l.axis !== 'x' && l.axis !== 'y') || typeof l.value !== 'number' || !Number.isFinite(l.value)) {
+      notes.push(`${path}[${i}] could not be read and was dropped.`);
+      return;
+    }
+    seen.add(l.id);
+    const width = finiteOr(l.widthPt, 2);
+    out.push({
+      id: l.id,
+      axis: l.axis,
+      value: l.value,
+      color: typeof l.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(l.color) ? l.color : '#000000',
+      widthPt: width > 0 && width <= 40 ? width : 2,
+      style: LINE_STYLES.find((v) => v === l.style) ?? 'dashed',
+      label: typeof l.label === 'string' ? l.label : '',
+      showLabel: l.showLabel === true,
+    });
+  });
+  return out;
+}
+
 function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: string[]): Chart {
-  const c = obj(raw, path);
-  const dataTableId = str(c.dataTableId, `${path}.dataTableId`);
+  const c0 = obj(raw, path);
+  const dataTableId = str(c0.dataTableId, `${path}.dataTableId`);
   if (!tableIds.has(dataTableId)) fail(`${path}.dataTableId`, 'refers to a missing data table');
-  if (typeof c.type !== 'string' || !CHART_TYPES.some((t) => t.type === c.type)) fail(`${path}.type`, `must be one of ${CHART_TYPES.map((t) => t.type).join(', ')}`);
-  const base = createChart(dataTableId, undefined, c.type as ChartType);
-  // Merge over defaults so files from earlier prototype versions keep working.
+  if (typeof c0.type !== 'string' || !CHART_TYPES.some((t) => t.type === c0.type)) fail(`${path}.type`, `must be one of ${CHART_TYPES.map((t) => t.type).join(', ')}`);
+  const base = createChart(dataTableId, undefined, c0.type as ChartType);
+  // Styles and layers have their own checks below.
+  const c = conform(c0, base as unknown as Obj, path, notes, new Set(['defaults', 'layers']));
+  // Merged over the defaults: a value that is missing or not valid takes the default.
   const defaults = cleanStyle(c.defaults, `${path}.defaults`, notes);
   const layers = arr(c.layers, `${path}.layers`).map((rl, i) =>
-    parseLayer(obj(rl, `${path}.layers[${i}]`), `${path}.layers[${i}]`, c.defaults, notes),
+    parseLayer(obj(rl, `${path}.layers[${i}]`), `${path}.layers[${i}]`, notes),
   );
   if (layers.length === 0) fail(`${path}.layers`, 'must contain at least one layer');
-  // Files from before the switch to pixels stored millimetres (1 mm = 96 / 25.4 px).
-  const { widthMm, heightMm, ...rest } = c;
-  const mmToPx = (mm: unknown): number | undefined => (typeof mm === 'number' && mm > 0 ? Math.round((mm * 96) / 25.4) : undefined);
   const legendIn = isObj(c.legend) ? c.legend : {};
   const chart: Chart = {
     ...base,
-    ...(rest as Partial<Chart>),
-    widthPx: typeof c.widthPx === 'number' ? c.widthPx : (mmToPx(widthMm) ?? base.widthPx),
-    heightPx: typeof c.heightPx === 'number' ? c.heightPx : (mmToPx(heightMm) ?? base.heightPx),
+    ...(c as Partial<Chart>),
+    widthPx: typeof c.widthPx === 'number' ? c.widthPx : base.widthPx,
+    heightPx: typeof c.heightPx === 'number' ? c.heightPx : base.heightPx,
     groupOrder: sanitizeOrder(c.groupOrder),
     groupGaps: sanitizeGaps(c.groupGaps),
     hiddenGroupIds: Array.isArray(c.hiddenGroupIds) ? c.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
@@ -279,8 +374,9 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     },
     jitter: { ...base.jitter, ...(isObj(c.jitter) ? c.jitter : {}) },
     defaults: { ...DEFAULT_STYLE, ...defaults },
-    displayNames: isObj(c.displayNames) ? (c.displayNames as Record<string, string>) : {},
-    annotations: Array.isArray(c.annotations) ? (c.annotations as Chart['annotations']) : [],
+    displayNames: cleanDisplayNames(c.displayNames, `${path}.displayNames`, notes),
+    annotations: cleanAnnotations(c.annotations, `${path}.annotations`, notes),
+    referenceLines: cleanReferenceLines(c.referenceLines, `${path}.referenceLines`, notes),
     layers,
   };
   if (!(chart.widthPx > 0) || !(chart.heightPx > 0)) fail(`${path}`, 'must have positive widthPx and heightPx');
@@ -297,12 +393,14 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
     throw new Error('Invalid project file: not valid JSON.');
   }
   const env = obj(json, 'file');
-  if (env.format !== FORMAT && env.format !== LEGACY_FORMAT) fail('format', `must be "${FORMAT}"`);
-  if (typeof env.version !== 'number' || env.version < 1 || env.version > VERSION) fail('version', `is not supported (this app reads up to ${VERSION})`);
+  if (env.format !== FORMAT) fail('format', `must be "${FORMAT}"`);
+  if (env.version !== VERSION) fail('version', `must be ${VERSION} (this app reads version ${VERSION} only)`);
   const p = obj(env.project, 'project');
   const dataTables = arr(p.dataTables, 'project.dataTables').map((t, i) => parseTable(t, `project.dataTables[${i}]`));
   const tableIds = new Set(dataTables.map((t) => t.id));
+  if (tableIds.size !== dataTables.length) fail('project.dataTables', 'has two tables with the same ID');
   const charts = arr(p.charts, 'project.charts').map((c, i) => parseChart(c, `project.charts[${i}]`, tableIds, notes));
+  if (new Set(charts.map((c) => c.id)).size !== charts.length) fail('project.charts', 'has two graphs with the same ID');
   if (dataTables.length === 0) fail('project.dataTables', 'must contain at least one table');
   // Analyses refer to tables by ID: one whose table is gone, or that is not recognised, is dropped.
   const analyses: Analysis[] = (Array.isArray(p.analyses) ? p.analyses : []).flatMap((a): Analysis[] => {
@@ -341,7 +439,7 @@ export const parseProject = (text: string): Project => parseProjectWithNotes(tex
 
 export function loadAutosave(): Project | null {
   try {
-    const text = localStorage.getItem(AUTOSAVE_KEY) ?? localStorage.getItem(LEGACY_AUTOSAVE_KEY);
+    const text = localStorage.getItem(AUTOSAVE_KEY);
     return text ? parseProject(text) : null;
   } catch {
     return null;
@@ -352,10 +450,18 @@ export function loadAutosave(): Project | null {
 export function saveAutosave(project: Project): boolean {
   try {
     localStorage.setItem(AUTOSAVE_KEY, stringifyProject(project));
-    // The copy under the new key is now the live one; drop the stale pre-rename entry.
-    localStorage.removeItem(LEGACY_AUTOSAVE_KEY);
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Keeps a copy of the autosave as it was when the app started, apart from the one that the next edits will overwrite. */
+export function backupAutosave(): void {
+  try {
+    const text = localStorage.getItem(AUTOSAVE_KEY);
+    if (text) localStorage.setItem(AUTOSAVE_BACKUP_KEY, text);
+  } catch {
+    /* storage is unavailable: nothing to protect */
   }
 }

@@ -6,6 +6,8 @@ import { GridLines } from './GridLines';
 import { BarLabelText } from './BarLabelText';
 import { axisGaps, axisPieces } from './axisScale';
 import { AnnotationLayer, Turned, axisLineD, Backgrounds, BreakMarks, ChartTitles, type EditorState, FrameBox, PlotClip, ScaleBar, SELECT_COLOR } from './ChartParts';
+import { ReferenceLinesLayer } from './ReferenceLinesLayer';
+import { referenceLinesOf } from './referenceLines';
 import { hitAttrs } from './hitTest';
 import { crossingPosition, tickPath, tickPaths, labelOffset } from './axisTicks';
 import { keyWidthOf, LEGEND_KEY, X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP } from './layout';
@@ -85,7 +87,7 @@ export const GroupedChartSvg = forwardRef<SVGSVGElement, Props>(function Grouped
             s.linePath !== '' && (
               <g key={`line-${s.groupId}`}>
                 <path d={s.linePath} fill="none" stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} {...linePattern(s.style)} strokeLinejoin="round" {...hit('line', s.groupId)} />
-                {selectedGroup === s.groupId && <path data-editor-only d={s.linePath} fill="none" stroke={SELECT_COLOR} strokeOpacity={0.35} strokeWidth={s.style.lineWidthPt + 5} strokeLinecap="round" pointerEvents="none" />}
+                {selectedGroup === s.groupId && <path data-editor-only d={s.linePath} fill="none" stroke={SELECT_COLOR} strokeOpacity={0.35} strokeWidth={s.style.lineWidthPt + 10} strokeLinecap="round" pointerEvents="none" />}
               </g>
             ),
         )}
@@ -125,6 +127,8 @@ export const GroupedChartSvg = forwardRef<SVGSVGElement, Props>(function Grouped
         <GridLines dir="h" grid={chart.grid} major={y.ticks} minor={y.minorTicks ?? []} showMajor={ya.showGrid} showMinor={ya.showMinorGrid} at={yScale} from={plot.x} to={right} />
       ))}
 
+      <ReferenceLinesLayer lines={referenceLinesOf(chart, { family: 'grouped', model }).placed} fontSizePt={ya.tickFontSizePt} />
+
       {/* Data, clipped to the plotting region: bars, then error bars, then lines and their symbols. */}
       <g clipPath="url(#plot-clip)">
         {onTop ? (
@@ -151,7 +155,7 @@ export const GroupedChartSvg = forwardRef<SVGSVGElement, Props>(function Grouped
             selectedGroup &&
             series
               .filter((s) => s.groupId === selectedGroup)
-              .flatMap((s) => s.bars.map((b) => <rect key={`sel-${b.id}`} data-editor-only x={n2(b.x - 1.5)} y={n2(b.y - 1.5)} width={n2(b.width + 3)} height={n2(b.height + 3)} fill="none" stroke={SELECT_COLOR} strokeWidth={1.2} strokeDasharray="3 2" pointerEvents="none" />))}
+              .flatMap((s) => s.bars.map((b) => <rect key={`sel-${b.id}`} data-editor-only x={n2(b.x - 3)} y={n2(b.y - 3)} width={n2(b.width + 6)} height={n2(b.height + 6)} fill="none" stroke={SELECT_COLOR} strokeWidth={2.4} strokeDasharray="6 4" pointerEvents="none" />))}
         </Turned>
       </g>
 
@@ -162,7 +166,7 @@ export const GroupedChartSvg = forwardRef<SVGSVGElement, Props>(function Grouped
       {!horizontal && ya.visible && (
         <g stroke={chart.axisColor} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y')}>
           <path d={axisLineD('y', plot.x, plot.y, bottom, yPieces)} />
-          {ed && <path d={axisLineD('y', plot.x, plot.y, bottom, yPieces)} stroke="transparent" strokeWidth={14} />}
+          {ed && <path d={axisLineD('y', plot.x, plot.y, bottom, yPieces)} stroke="transparent" strokeWidth={28} />}
           <BreakMarks along="y" fixed={plot.x} gaps={yGaps} mark={ya.breakMark} color={chart.axisColor} width={ya.lineWidthPt} />
           {tickPaths('left', plot.x, ya, y.ticks, y.minorTicks ?? [], yScale).map((p) => (
             <path key={p.key} d={p.d} strokeLinecap="butt" />
@@ -178,7 +182,7 @@ export const GroupedChartSvg = forwardRef<SVGSVGElement, Props>(function Grouped
       {!horizontal && xa.visible && (
         <g stroke={chart.axisColor} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'x')}>
           <path d={`M${n2(plot.x)},${n2(categoryAxisY)}H${n2(right)}`} />
-          {ed && <path d={`M${n2(plot.x)},${n2(categoryAxisY)}H${n2(right)}`} stroke="transparent" strokeWidth={14} />}
+          {ed && <path d={`M${n2(plot.x)},${n2(categoryAxisY)}H${n2(right)}`} stroke="transparent" strokeWidth={28} />}
           {categories.map((c) => (
             <path key={c.row} d={tickPath('bottom', c.centerX, categoryAxisY, xa)} strokeLinecap="butt" />
           ))}
@@ -204,7 +208,7 @@ export const GroupedChartSvg = forwardRef<SVGSVGElement, Props>(function Grouped
           {ya.visible && (
             <g stroke={chart.axisColor} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y')}>
               <path d={axisLineD('x', bottom, plot.x, right, xPieces)} />
-              {ed && <path d={axisLineD('x', bottom, plot.x, right, xPieces)} stroke="transparent" strokeWidth={14} />}
+              {ed && <path d={axisLineD('x', bottom, plot.x, right, xPieces)} stroke="transparent" strokeWidth={28} />}
               <BreakMarks along="x" fixed={bottom} gaps={onPage(yGaps)} mark={ya.breakMark} color={chart.axisColor} width={ya.lineWidthPt} />
               {tickPaths('bottom', bottom, ya, y.ticks, y.minorTicks ?? [], valueX).map((p) => (
                 <path key={p.key} d={p.d} strokeLinecap="butt" />
@@ -220,7 +224,7 @@ export const GroupedChartSvg = forwardRef<SVGSVGElement, Props>(function Grouped
           {xa.visible && (
             <g stroke={chart.axisColor} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'x')}>
               <path d={`M${n2(categoryAxisX)},${n2(plot.y)}V${n2(bottom)}`} />
-              {ed && <path d={`M${n2(categoryAxisX)},${n2(plot.y)}V${n2(bottom)}`} stroke="transparent" strokeWidth={14} />}
+              {ed && <path d={`M${n2(categoryAxisX)},${n2(plot.y)}V${n2(bottom)}`} stroke="transparent" strokeWidth={28} />}
               {categories.map((c) => (
                 <path key={c.row} d={tickPath('left', categoryY(c.centerX), categoryAxisX, xa)} strokeLinecap="butt" />
               ))}
@@ -249,7 +253,7 @@ export const GroupedChartSvg = forwardRef<SVGSVGElement, Props>(function Grouped
             const bars = !model.asLines;
             return (
               <g key={s.groupId} {...hit('legend', s.groupId)}>
-                {bars && <rect x={n2(it.x)} y={n2(it.y - 5)} width={w} height={10} fill={s.style.barFill} stroke={s.style.barBorderWidthPt > 0 ? s.style.barBorderColor : 'none'} strokeWidth={s.style.barBorderWidthPt} />}
+                {bars && <rect x={n2(it.x)} y={n2(it.y - 10)} width={w} height={20} fill={s.style.barFill} stroke={s.style.barBorderWidthPt > 0 ? s.style.barBorderColor : 'none'} strokeWidth={s.style.barBorderWidthPt} />}
                 {!bars && s.style.showLines && <path d={`M${n2(it.x)},${n2(it.y)}H${n2(it.x + w)}`} stroke={s.style.lineColor} strokeWidth={s.style.lineWidthPt} {...linePattern(s.style)} fill="none" />}
                 {!bars && s.style.showSymbols && <path d={symbolPath(s.style.symbolShape, it.x + w / 2, it.y, s.style.symbolSizePt)} fill={s.style.symbolColor} fillOpacity={s.style.symbolFillOpacity < 1 ? s.style.symbolFillOpacity : undefined} stroke={s.style.symbolBorderColor} strokeWidth={s.style.symbolBorderWidthPt} />}
                 <text x={n2(it.x + w + LEGEND_KEY.gap)} y={n2(it.y)} dy="0.35em" fontSize={layout.legend!.fontSizePt} fill={chart.textColor}>

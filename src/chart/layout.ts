@@ -5,14 +5,14 @@ import type { AxisConfig, LegendConfig } from '../model/types';
 import { measureText } from './text';
 
 /** Layout constants in pt (spec section 20 starting tokens). */
-const OUTER_MARGIN = 7;
-export const X_TICK_LABEL_GAP = 2.8;
-export const Y_TICK_LABEL_GAP = 3;
-export const AXIS_TITLE_GAP = 8.4;
-const LEGEND_KEY_WIDTH = 18;
-const LEGEND_KEY_GAP = 5;
-const LEGEND_ITEM_GAP = 14;
-const MIN_PLOT = 24;
+const OUTER_MARGIN = 14;
+export const X_TICK_LABEL_GAP = 5.6;
+export const Y_TICK_LABEL_GAP = 6;
+export const AXIS_TITLE_GAP = 16.8;
+const LEGEND_KEY_WIDTH = 36;
+const LEGEND_KEY_GAP = 10;
+const LEGEND_ITEM_GAP = 28;
+const MIN_PLOT = 48;
 
 export interface Rect {
   x: number;
@@ -114,7 +114,7 @@ export function computeLayout(input: LayoutInput): Layout {
     const fs = input.title.fontSizePt;
     top += input.titleOffsetPt ?? 0;
     titleLayout = { x: 0, y: top + fs * 0.9, fontSizePt: fs };
-    top += fs * 1.2 + 6;
+    top += fs * 1.2 + 12;
   }
 
   // ---- Legend sizing.
@@ -141,16 +141,16 @@ export function computeLayout(input: LayoutInput): Layout {
   let legendTop = 0;
   if (showLegend && legend.position === 'top') {
     legendTop = top;
-    top += legendHeight + 6;
+    top += legendHeight + 12;
   }
   let bottom = M;
   let legendBottomY = 0;
   if (showLegend && legend.position === 'bottom') {
     legendBottomY = H - M - legendHeight;
-    bottom += legendHeight + 6;
+    bottom += legendHeight + 12;
   }
   let right = M;
-  if (showLegend && legend.position === 'right') right += legendWidth + 10;
+  if (showLegend && legend.position === 'right') right += legendWidth + 20;
 
   // ---- Right: secondary Y axis ticks, tick labels and title, outside the legend.
   const y2Visible = !!input.y2Axis && input.y2Axis.visible;
@@ -201,7 +201,7 @@ export function computeLayout(input: LayoutInput): Layout {
   if (titleLayout) titleLayout.x = plot.x + plot.width / 2;
 
   const xTitle = xTitleVisible
-    ? { x: plot.x + plot.width / 2, y: H - M - (showLegend && legend.position === 'bottom' ? legendHeight + 6 : 0) - extra - xAxis.titleFontSizePt * 0.25 }
+    ? { x: plot.x + plot.width / 2, y: H - M - (showLegend && legend.position === 'bottom' ? legendHeight + 12 : 0) - extra - xAxis.titleFontSizePt * 0.25 }
     : null;
   const yTitle = yTitleVisible ? { x: M + yAxis.titleFontSizePt * 0.9, y: plot.y + plot.height / 2 } : null;
 
@@ -238,11 +238,11 @@ export function computeLayout(input: LayoutInput): Layout {
     legendLayout = { rect, items, fontSizePt: legendFont };
   }
 
-  const extraBottom = extra > 0 ? { y: H - M - (showLegend && legend.position === 'bottom' ? legendHeight + 6 : 0) - extra, height: extra } : null;
+  const extraBottom = extra > 0 ? { y: H - M - (showLegend && legend.position === 'bottom' ? legendHeight + 12 : 0) - extra, height: extra } : null;
   return { plot, title: titleLayout, legend: legendLayout, xTickRotated, xTitle, yTitle, y2Title, extraBottom, warnings };
 }
 
 export const LEGEND_KEY = { width: LEGEND_KEY_WIDTH, gap: LEGEND_KEY_GAP };
 
-/** Width of a legend colour key: 18 pt for a rectangle, 10 pt for a square. */
+/** Width of a legend colour key: 36 pt for a rectangle, 20 pt for a square. */
 export const keyWidthOf = (legend: Pick<LegendConfig, 'keyShape'>): number => legendKeyWidthPt(legend.keyShape);

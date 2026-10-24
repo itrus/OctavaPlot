@@ -163,7 +163,7 @@ describe('point label rendering', () => {
     const start = s.indexOf('<g><path d="M');
     expect(start).toBeGreaterThan(-1);
     const block = s.slice(start);
-    expect((block.match(/<path d="M[\d.-]+,[\d.-]+L[\d.-]+,[\d.-]+" fill="none" stroke="#000000" stroke-width="0.5">/g) ?? []).length).toBe(displaced);
+    expect((block.match(/<path d="M[\d.-]+,[\d.-]+L[\d.-]+,[\d.-]+" fill="none" stroke="#000000" stroke-width="1">/g) ?? []).length).toBe(displaced);
     expect(block.lastIndexOf('<path')).toBeLessThan(block.indexOf('<text'));
   });
 
@@ -184,5 +184,20 @@ describe('point label rendering', () => {
 
   it('builds label hit attributes', () => {
     expect(hitAttrs('label', 'g1', 'p1')).toEqual({ 'data-hit': 'label', 'data-group-id': 'g1', 'data-object-id': 'p1' });
+  });
+});
+
+describe('SVG export identity', () => {
+  it('has a title and a description, and ids that cannot collide with another export', () => {
+    const p = createExampleProject();
+    const a = chartToSvgString(p.charts[0], p.dataTables[0], undefined, { metadata: true });
+    expect(a).toMatch(/<svg role="img" [^>]*aria-labelledby="octp-[^"]+-title octp-[^"]+-desc">/);
+    expect(a).toMatch(/<title id="octp-[^"]+-title">[^<]+<\/title><desc id="octp-[^"]+-desc">/);
+    const other = { ...p.charts[0], id: 'another-chart' };
+    const b = chartToSvgString(other, p.dataTables[0], undefined, { metadata: true });
+    const ids = (svg: string) => [...svg.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
+    expect(ids(a).filter((id) => ids(b).includes(id))).toEqual([]);
+    // Every reference points at an id that exists.
+    for (const ref of a.matchAll(/url\(#([^)]+)\)/g)) expect(ids(a)).toContain(ref[1]);
   });
 });

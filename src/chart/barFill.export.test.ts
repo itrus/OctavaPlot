@@ -98,11 +98,11 @@ describe('zero-height bars', () => {
     }
   });
 
-  it('Z2 the editor adds a transparent hit rect padded by 4 pt', () => {
+  it('Z2 the editor adds a transparent hit rect padded by 8 pt', () => {
     const html = editorHtml(zero());
     const hits = html.match(/<rect[^>]*data-hit="bar"[^>]*>/g) ?? [];
     expect(hits).toHaveLength(4);
-    expect(hits.filter((h) => h.includes('fill="transparent"') && h.includes('height="8"'))).toHaveLength(1);
+    expect(hits.filter((h) => h.includes('fill="transparent"') && h.includes('height="16"'))).toHaveLength(1);
     expect(svgOf(zero())).not.toContain('transparent');
   });
 

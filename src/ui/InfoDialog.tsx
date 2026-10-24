@@ -1,3 +1,4 @@
+import { DialogShell, trapTab } from './DialogShell';
 import { PALETTE_GROUPS, PALETTE_GROUP_INFO, GGSCI_CITATION, palettesInGroup } from '../model/palettes';
 
 const link = (href: string) => (
@@ -7,7 +8,8 @@ const link = (href: string) => (
 /** A window with the program's version and credits, and the credits for what it uses; the source of the colour palettes is cited here. */
 export function InfoDialog({ onClose }: { onClose: () => void }) {
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+    <DialogShell>
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onKeyDown={(e) => (e.key === 'Escape' ? onClose() : trapTab(e))}>
       <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Info" tabIndex={-1} ref={(el) => el?.focus()}>
         <div className="modal-head">
           <strong>Info</strong>
@@ -52,5 +54,6 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
+    </DialogShell>
   );
 }

@@ -1,3 +1,4 @@
+import { withoutExcluded } from './exclusion';
 import { layoutOf, subLabels, tableSeriesWidth, xySeries } from './tableLayout';
 import { leadingColumns } from './chartTypes';
 import type { Analysis, AnalysisKind, DataTable, Id, Project, TableKind } from './types';
@@ -43,7 +44,8 @@ interface AnalysisColumn {
  * The columns a column analysis covers: every data column of a column table; the X column and every Y column of an XY
  * table; every column of a grouped table. With sub-columns each is analysed on its own and labelled with its series.
  */
-export function analysisColumns(table: DataTable): AnalysisColumn[] {
+export function analysisColumns(source: DataTable): AnalysisColumn[] {
+  const table = withoutExcluded(source);
   if (!analysisApplies(table.kind)) return [];
   const col = (g: DataTable['groups'][number], label: string): AnalysisColumn => ({ id: g.id, label, values: g.observations.map((o) => o.value) });
   if (table.kind === 'column') return table.groups.map((g) => col(g, g.name));

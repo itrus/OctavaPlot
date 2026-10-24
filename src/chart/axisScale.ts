@@ -1,5 +1,6 @@
 import { format, precisionFixed } from 'd3';
 import { logBaseOf } from '../model/axis';
+import { extent } from '../model/units';
 import type { AxisBreak, AxisConfig } from '../model/types';
 import { clean, MAX_TICKS_PER_AXIS, resolveYAxis, type YAxisInput, type YAxisScale } from './scales';
 
@@ -103,8 +104,9 @@ function resolveLogAxis(input: YAxisInput, cfg: AxisScaleSettings, base: number)
     lo = 1;
     hi = base;
   } else {
-    lo = base ** Math.floor(logb(Math.min(...positive)) + EPS);
-    hi = base ** Math.ceil(logb(Math.max(...positive)) - EPS);
+    const [pLo, pHi] = extent(positive);
+    lo = base ** Math.floor(logb(pLo) + EPS);
+    hi = base ** Math.ceil(logb(pHi) - EPS);
     if (!(hi > lo)) hi = lo * base;
   }
   lo = min ?? lo;
@@ -149,8 +151,8 @@ export function resolveAxis(input: YAxisInput, cfg: AxisScaleSettings): YAxisSca
   return { ...shared, ticks: [...new Set(ticks)].sort((a, b) => a - b), minorTicks: minor.filter(inside), segments, gapPt: Math.max(BREAK_GAP_PT, (cfg.tickFontSizePt ?? 0) * 1.3) };
 }
 
-/** Room between two stretches of a broken axis, pt (spec 6.6: 6 pt). */
-export const BREAK_GAP_PT = 6;
+/** Room between two stretches of a broken axis, pt (spec 6.6 asks for 6 pt; drawn at 12 pt). */
+export const BREAK_GAP_PT = 12;
 
 /**
  * The stretches of a domain that are left when the breaks are taken out, or null when there is nothing to break (no break
@@ -250,4 +252,90 @@ export function axisMapper(scale: Pick<YAxisScale, 'domain' | 'log' | 'reverse' 
     return (v) => (v > 0 ? start + ((Math.log(v) - l0) / (l1 - l0)) * length : NaN);
   }
   return (v) => start + ((v - d0) / (d1 - d0)) * length;
+}
+
+/** The stretches of data values that a broken axis leaves out, in data units; none for an unbroken, log or reversed axis. */
+export function dataGaps(scale: Pick<YAxisScale, 'segments' | 'log' | 'reverse'>): Array<[number, number]> {
+  const segs = scale.segments;
+  if (!segs || segs.length < 2 || scale.log || scale.reverse) return [];
+  return segs.slice(0, -1).map((s, i) => [s.hi, segs[i + 1].lo] as [number, number]);
+}
+
+/** True when the value lies strictly inside a gap of the axis: it has no place there and is not drawn. */
+export const inBreak = (scale: Pick<YAxisScale, 'segments' | 'log' | 'reverse'>, v: number): boolean => dataGaps(scale).some(([a, b]) => v > a && v < b);
+
+interface DataPoint {
+  x: number;
+  y: number;
+}
+
+/** The parts of the segment p0-p1 (as ranges of t in 0..1) that lie outside every gap of both axes. */
+function retainedRanges(p0: DataPoint, p1: DataPoint, xGaps: ReadonlyArray<[number, number]>, yGaps: ReadonlyArray<[number, number]>): Array<[number, number]> {
+  const forbidden: Array<[number, number]> = [];
+  const forbid = (v0: number, v1: number, gaps: ReadonlyArray<[number, number]>) => {
+    for (const [a, b] of gaps) {
+      if (v0 === v1) {
+        if (v0 > a && v0 < b) forbidden.push([0, 1]);
+        continue;
+      }
+      const ta = (a - v0) / (v1 - v0);
+      const tb = (b - v0) / (v1 - v0);
+      forbidden.push([Math.min(ta, tb), Math.max(ta, tb)]);
+    }
+  };
+  forbid(p0.x, p1.x, xGaps);
+  forbid(p0.y, p1.y, yGaps);
+  forbidden.sort((a, b) => a[0] - b[0]);
+  const out: Array<[number, number]> = [];
+  let at = 0;
+  for (const [a, b] of forbidden) {
+    if (b <= at) continue;
+    if (a > at) out.push([at, Math.min(a, 1)]);
+    at = Math.max(at, b);
+    if (at >= 1) break;
+  }
+  if (at < 1) out.push([at, 1]);
+  return out.filter(([a, b]) => b > a);
+}
+
+/**
+ * The lines through a sequence of data points (null ends a line), cut in data coordinates where they cross the gaps of
+ * broken axes: each cut lies exactly on the edge of a gap, so the relationship drawn is the one in the data. Points inside a
+ * gap are not part of any line. Each returned line is a list of data points.
+ */
+export function polylinesThroughBreaks(seq: ReadonlyArray<DataPoint | null>, xAxis: Pick<YAxisScale, 'segments' | 'log' | 'reverse'>, yAxis: Pick<YAxisScale, 'segments' | 'log' | 'reverse'>): DataPoint[][] {
+  const xGaps = dataGaps(xAxis);
+  const yGaps = dataGaps(yAxis);
+  const hidden = (p: DataPoint) => xGaps.some(([a, b]) => p.x > a && p.x < b) || yGaps.some(([a, b]) => p.y > a && p.y < b);
+  const at = (p0: DataPoint, p1: DataPoint, t: number): DataPoint => (t <= 0 ? p0 : t >= 1 ? p1 : { x: p0.x + t * (p1.x - p0.x), y: p0.y + t * (p1.y - p0.y) });
+  const parts: DataPoint[][] = [];
+  let cur: DataPoint[] | null = null;
+  let prev: DataPoint | null = null;
+  for (const item of seq) {
+    if (item === null) {
+      prev = null;
+      cur = null;
+      continue;
+    }
+    if (prev === null) {
+      cur = hidden(item) ? null : [item];
+      if (cur) parts.push(cur);
+      prev = item;
+      continue;
+    }
+    const ranges = retainedRanges(prev, item, xGaps, yGaps);
+    if (ranges.length === 0) cur = null;
+    for (const [ta, tb] of ranges) {
+      const a = at(prev, item, ta);
+      const b = at(prev, item, tb);
+      if (ta === 0 && cur) cur.push(b);
+      else {
+        cur = [a, b];
+        parts.push(cur);
+      }
+      if (tb < 1) cur = null;
+    }
+    prev = item;
+  }
+  return parts;
 }

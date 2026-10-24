@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { buildAnyModel, ChartCanvas } from '../chart/anyModel';
+import { buildAnyModelCached, ChartCanvas } from '../chart/anyModel';
 import { hitFromTarget, pointerToChartPt } from '../chart/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../chart/tooltip';
 import { analysesOf } from '../model/analysis';
@@ -19,7 +19,7 @@ const SCROLLBAR_ROOM = 17;
 export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) {
   const { project, selection, setSelection, run, setStatus, zoom, setZoom, settings, fitRequest, navigateInspector } = useApp();
   const curve = useMemo(() => resolveFit(chart.fit, analysesOf(project), table.id), [chart.fit, project.analyses, table.id]);
-  const any = useMemo(() => buildAnyModel(chart, table, curve), [chart, table, curve]);
+  const any = useMemo(() => buildAnyModelCached(chart, table, curve), [chart, table, curve]);
   const model = any.model;
   const svgRef = useRef<SVGSVGElement>(null);
   const [tip, setTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
@@ -90,7 +90,13 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
     const hit = hitFromTarget(e.target, svg);
     const lines = any.family === 'category' ? tooltipLines(any.model, table, hit) : any.family === 'grouped' ? groupedTooltipLines(any.model, hit) : any.family === 'whole' ? pieTooltipLines(any.model, hit) : any.family === 'hist' ? histTooltipLines(any.model, hit) : any.family === 'heat' ? heatTooltipLines(any.model, hit) : xyTooltipLines(any.model, table, hit);
     const box = wrapRef.current?.getBoundingClientRect();
-    if (lines && box) setTip({ x: e.clientX - box.left + 14, y: e.clientY - box.top + 14, lines });
+    if (lines && box) {
+      // The tooltip is kept inside the chart area: it flips to the other side of the pointer near the right or bottom edge.
+      const [tw, th] = [Math.max(...lines.map((l) => l.length)) * 7 + 20, lines.length * 18 + 12];
+      const x = e.clientX - box.left;
+      const y = e.clientY - box.top;
+      setTip({ x: x + 14 + tw > box.width ? Math.max(0, x - 14 - tw) : x + 14, y: y + 14 + th > box.height ? Math.max(0, y - 14 - th) : y + 14, lines });
+    }
     else setTip(null);
   };
 
@@ -105,19 +111,24 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
   const exportSvg = async () => {
     try {
       const { chartToSvgString } = await import('../chart/export');
-      downloadBlob(new Blob([chartToSvgString(chart, table, curve)], { type: 'image/svg+xml' }), exportFileName(chart.name, 'svg', settings.timestampExports));
+      downloadBlob(new Blob([chartToSvgString(chart, table, curve, { metadata: true })], { type: 'image/svg+xml' }), exportFileName(chart.name, 'svg', settings.timestampExports));
       setStatus('Exported SVG.');
     } catch (err) {
       setStatus(`SVG export failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
   const exportPng = async () => {
-    // PNG pixels match the chart size in px.
-    const scale = 1;
+    const scale = settings.pngScale;
+    const [pw, ph] = [Math.round(chart.widthPx * scale), Math.round(chart.heightPx * scale)];
+    // Browsers limit the size of a canvas; refuse a size that would fail or come out blank.
+    if (Math.max(pw, ph) > 16000 || pw * ph > 200_000_000) {
+      setStatus(`PNG export needs ${pw} × ${ph} px, more than the browser can make. Choose a lower resolution in Settings.`);
+      return;
+    }
     try {
       const { chartToPngBlob } = await import('../chart/export');
       downloadBlob(await chartToPngBlob(chart, table, scale, curve), exportFileName(chart.name, 'png', settings.timestampExports));
-      setStatus(`Exported PNG, ${chart.widthPx} × ${chart.heightPx} px.`);
+      setStatus(`Exported PNG, ${pw} × ${ph} px (${Math.round(96 * scale)} dpi at the chart's size).`);
     } catch (err) {
       setStatus(`PNG export failed: ${err instanceof Error ? err.message : String(err)}`);
     }

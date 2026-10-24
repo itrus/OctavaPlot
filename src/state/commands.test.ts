@@ -206,3 +206,41 @@ describe('renaming from the navigator', () => {
     expect(renameItem('table', p.dataTables[0].id, '   ')(p)).toBe(p);
   });
 });
+
+describe('duplicating and deleting items', () => {
+  it('duplicates a table with new IDs, and deleting it takes its graphs and results with it', async () => {
+    const { duplicateTable, removeTable, addAnalysis } = await import('./commands');
+    const p0 = createExampleProject();
+    const t = p0.dataTables[0];
+    let p = duplicateTable(t.id, 'copy-1')(p0);
+    expect(p.dataTables).toHaveLength(2);
+    const copy = p.dataTables[1];
+    expect(copy.name).toBe(`${t.name} (copy)`);
+    expect(copy.groups[0].id).not.toBe(t.groups[0].id);
+    expect(copy.groups[0].observations[0].id).not.toBe(t.groups[0].observations[0].id);
+    expect(copy.groups[0].observations.map((o) => o.value)).toEqual(t.groups[0].observations.map((o) => o.value));
+    expect(new Set(p.dataTables.flatMap((x) => x.groups.flatMap((g) => g.observations.map((o) => o.id)))).size).toBe(p.dataTables.reduce((n, x) => n + x.groups.reduce((m, g) => m + g.observations.length, 0), 0));
+    p = addAnalysis('an-1', t.id, 'descriptive')(p);
+    const after = removeTable(t.id)(p);
+    expect(after.dataTables.map((x) => x.id)).toEqual(['copy-1']);
+    expect(after.charts.every((c) => c.dataTableId === 'copy-1')).toBe(true);
+    expect(after.analyses).toBeUndefined();
+    // The last table is never deleted.
+    expect(removeTable('copy-1')(after)).toBe(after);
+    // And the deletion is one undoable step.
+    const h = historyReducer(initialHistory(p), { type: 'commit', label: 'Delete table', command: removeTable(t.id), now: 0 });
+    expect(historyReducer(h, { type: 'undo' }).present).toBe(p);
+  });
+  it('duplicates and deletes graphs and analyses', async () => {
+    const { duplicateChart, removeChart, addAnalysis, duplicateAnalysis, removeAnalysis } = await import('./commands');
+    let p = createExampleProject();
+    p = duplicateChart(p.charts[0].id, 'chart-copy')(p);
+    expect(p.charts.map((c) => c.id)).toContain('chart-copy');
+    expect(p.charts[1].layers[0].id).not.toBe(p.charts[0].layers[0].id);
+    expect(removeChart('chart-copy')(p).charts).toHaveLength(1);
+    p = addAnalysis('a1', p.dataTables[0].id, 'descriptive')(p);
+    p = duplicateAnalysis('a1', 'a2')(p);
+    expect(p.analyses!.map((a) => a.id)).toEqual(['a1', 'a2']);
+    expect(removeAnalysis('a1')(p).analyses!.map((a) => a.id)).toEqual(['a2']);
+  });
+});

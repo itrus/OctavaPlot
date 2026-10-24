@@ -26,8 +26,8 @@ describe('defaults and options', () => {
   it('fill defaults', () => {
     expect(DEFAULT_STYLE.barFillMode).toBe('solid');
     expect(DEFAULT_STYLE.barPattern).toBe('horizontal');
-    expect(DEFAULT_STYLE.barPatternSpacingPt).toBe(4);
-    expect(DEFAULT_STYLE.barPatternWidthPt).toBe(1);
+    expect(DEFAULT_STYLE.barPatternSpacingPt).toBe(8);
+    expect(DEFAULT_STYLE.barPatternWidthPt).toBe(2);
     expect(DEFAULT_STYLE.barPatternColor).toBeNull();
     expect(DEFAULT_STYLE.barPatternBackground).toBe('#ffffff');
   });
@@ -54,20 +54,20 @@ describe('resolveBarFill', () => {
       mode: 'solid',
       solidColor: DEFAULT_STYLE.barFill,
       pattern: 'horizontal',
-      spacingPt: 4,
-      widthPt: 1,
-      markWidthPt: 1,
+      spacingPt: 8,
+      widthPt: 2,
+      markWidthPt: 2,
       patternColor: '#000000',
       background: '#ffffff',
       opacity: 1,
     });
   });
   it('clamps spacing, width and opacity; mark width never exceeds spacing', () => {
-    const r = resolveBarFill(pattern({ barPatternSpacingPt: 60, barPatternWidthPt: 9, barOpacity: 3 }));
+    const r = resolveBarFill(pattern({ barPatternSpacingPt: 120, barPatternWidthPt: 18, barOpacity: 3 }));
     expect([r.spacingPt, r.widthPt, r.opacity]).toEqual([FILL_LIMITS.spacingPt.max, FILL_LIMITS.widthPt.max, 1]);
-    const lo = resolveBarFill(pattern({ barPatternSpacingPt: 0.2, barPatternWidthPt: 0.01, barOpacity: -1 }));
-    expect([lo.spacingPt, lo.widthPt, lo.opacity]).toEqual([1, 0.1, 0]);
-    expect(resolveBarFill(pattern({ barPatternSpacingPt: 1, barPatternWidthPt: 5 })).markWidthPt).toBe(1);
+    const lo = resolveBarFill(pattern({ barPatternSpacingPt: 0.4, barPatternWidthPt: 0.02, barOpacity: -1 }));
+    expect([lo.spacingPt, lo.widthPt, lo.opacity]).toEqual([2, 0.2, 0]);
+    expect(resolveBarFill(pattern({ barPatternSpacingPt: 2, barPatternWidthPt: 10 })).markWidthPt).toBe(2);
   });
   it('is total for invalid values', () => {
     const bad = {
@@ -81,7 +81,7 @@ describe('resolveBarFill', () => {
       barBorderColor: 'nope',
     } as unknown as Partial<ChartStyle>;
     const r = resolveBarFill(style(bad));
-    expect(r).toMatchObject({ mode: 'solid', pattern: 'horizontal', spacingPt: 4, widthPt: 0.5, patternColor: '#000000', background: null, opacity: 1 });
+    expect(r).toMatchObject({ mode: 'solid', pattern: 'horizontal', spacingPt: 8, widthPt: 1, patternColor: '#000000', background: null, opacity: 1 });
   });
   it('pattern colour falls back to the border colour; background null stays null', () => {
     const r = resolveBarFill(pattern({ barBorderColor: '#336699', barPatternBackground: null }));
@@ -121,11 +121,11 @@ describe('sanitizeFillKeys', () => {
 function fileText(mutate: (p: Any) => void): string {
   const p = JSON.parse(JSON.stringify(createExampleProject())) as Any;
   mutate(p);
-  return JSON.stringify({ format: 'scientific-plotter-project', version: 2, project: p });
+  return JSON.stringify({ format: 'octavaplot-project', version: 1, project: p });
 }
 
 describe('serialize', () => {
-  it('old files without fill keys load with defaults', () => {
+  it('files without fill keys load with defaults', () => {
     const text = fileText((p) => {
       for (const k of Object.keys(DEFAULT_STYLE)) {
         if (k.startsWith('barPattern') || k === 'barFillMode') delete p.charts[0].defaults[k];
@@ -134,7 +134,7 @@ describe('serialize', () => {
     const r = parseProjectWithNotes(text);
     expect(r.notes).toEqual([]);
     expect(r.project.charts[0].defaults.barFillMode).toBe('solid');
-    expect(r.project.charts[0].defaults.barPatternSpacingPt).toBe(4);
+    expect(r.project.charts[0].defaults.barPatternSpacingPt).toBe(8);
   });
   it('corrupt fill keys in defaults, layer and overrides fall back with notes', () => {
     const text = fileText((p) => {
@@ -146,7 +146,7 @@ describe('serialize', () => {
     });
     const { project, notes } = parseProjectWithNotes(text);
     const c = project.charts[0];
-    expect(c.defaults.barPatternSpacingPt).toBe(4);
+    expect(c.defaults.barPatternSpacingPt).toBe(8);
     expect(c.layers[0].style.barFillMode).toBeUndefined();
     expect(c.layers[0].groupOverrides.g1).toEqual({ barPattern: 'dots' });
     expect(c.layers[0].objectOverrides.o1).toEqual({});
@@ -204,8 +204,8 @@ describe('describeBarFillUi', () => {
   it('pattern mode, limits and invisible warning', () => {
     const ok = describeBarFillUi(pattern());
     expect(ok).toMatchObject({ solidColorEnabled: false, patternControlsEnabled: true, note: null, spacingError: null, widthError: null, invisibleWarning: null });
-    const bad = describeBarFillUi(pattern({ barPatternSpacingPt: 60, barPatternWidthPt: 0 }));
-    expect(bad.spacingError).toMatch(/P limit 1 to 50/);
+    const bad = describeBarFillUi(pattern({ barPatternSpacingPt: 120, barPatternWidthPt: 0 }));
+    expect(bad.spacingError).toMatch(/P limit 2 to 100/);
     expect(bad.widthError).toMatch(/positive/);
     expect(describeBarFillUi(pattern({ barPatternColor: '#FFFFFF' })).invisibleWarning).not.toBeNull();
   });
@@ -216,12 +216,12 @@ describe('describeBarFillUi', () => {
 });
 
 describe('legendKeyFill', () => {
-  it('caps spacing at 4 and mark width at half the spacing', () => {
-    const k = legendKeyFill(resolveBarFill(pattern({ barPatternSpacingPt: 10, barPatternWidthPt: 3 })));
-    expect([k.spacingPt, k.markWidthPt]).toEqual([4, 2]);
+  it('caps spacing at 8 and mark width at half the spacing', () => {
+    const k = legendKeyFill(resolveBarFill(pattern({ barPatternSpacingPt: 20, barPatternWidthPt: 6 })));
+    expect([k.spacingPt, k.markWidthPt]).toEqual([8, 4]);
   });
   it('leaves small values and other fields alone', () => {
-    const f = resolveBarFill(pattern({ barPatternSpacingPt: 2, barPatternWidthPt: 0.5 }));
+    const f = resolveBarFill(pattern({ barPatternSpacingPt: 4, barPatternWidthPt: 1 }));
     expect(legendKeyFill(f)).toEqual(f);
   });
 });

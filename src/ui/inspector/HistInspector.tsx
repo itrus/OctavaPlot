@@ -145,14 +145,14 @@ export function HistInspector({ chart, table }: { chart: Chart; table: DataTable
                 ))}
                 {histogram ? (
                   <>
-                    <NumField label="Border" unit="pt" value={rows[0]?.style.barBorderWidthPt ?? 0} min={0} max={20} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderWidthPt: v }), 'style:all:border')} />
+                    <NumField label="Border" unit="pt" value={rows[0]?.style.barBorderWidthPt ?? 0} min={0} max={40} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderWidthPt: v }), 'style:all:border')} />
                     <Field label="Border color">
                       <ColorInput value={rows[0]?.style.barBorderColor ?? '#000000'} ariaLabel="Border colour" onChange={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderColor: v }), 'style:all:bordercolor')} />
                     </Field>
                     <NumField label="Opacity" value={rows[0]?.style.barOpacity ?? 1} min={0} max={1} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barOpacity: v }), 'style:all:opacity')} />
                   </>
                 ) : (
-                  <NumField label="Line thickness" unit="pt" value={rows[0]?.style.lineWidthPt ?? 1} min={0.1} max={20} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { lineWidthPt: v }), 'style:all:line')} />
+                  <NumField label="Line thickness" unit="pt" value={rows[0]?.style.lineWidthPt ?? 1} min={0.2} max={40} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { lineWidthPt: v }), 'style:all:line')} />
                 )}
               </GroupBox>
             </div>

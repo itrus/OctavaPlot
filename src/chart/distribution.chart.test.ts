@@ -84,7 +84,7 @@ describe('violin chart', () => {
     expect(g.dist!.shape).toBe('violin');
     expect(g.dist!.outline).toMatch(/^M.*Z$/);
     expect(g.dist!.lines.map((l) => l.id.split(':').pop())).toEqual(['q1', 'q3', 'median']);
-    expect(g.dist!.lines[0].dash).toBe('4 3');
+    expect(g.dist!.lines[0].dash).toBe('8 6');
     expect(g.errorBar).toBeNull();
   });
   it('is symmetric about the middle of its column', () => {

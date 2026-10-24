@@ -36,20 +36,25 @@ describe('survival confidence band and at-risk table', () => {
 
   it('plain and log-log intervals follow their formulas and stay inside 0 to 1', () => {
     const step = { survival: 0.8, greenwood: 0.05 };
-    const [pl, ph] = survivalInterval(step, 0.95, 'plain');
+    const [pl, ph] = survivalInterval(step, 0.95, 'plain')!;
     const se = 0.8 * Math.sqrt(0.05);
     expect(pl).toBeCloseTo(0.8 - 1.959964 * se, 5);
     expect(ph).toBe(1);
-    const [ll, lh] = survivalInterval(step, 0.95, 'loglog');
+    const [ll, lh] = survivalInterval(step, 0.95, 'loglog')!;
     const sell = Math.sqrt(0.05) / Math.abs(Math.log(0.8));
     expect(ll).toBeCloseTo(0.8 ** Math.exp(1.959964 * sell), 5);
     expect(lh).toBeCloseTo(0.8 ** Math.exp(-1.959964 * sell), 5);
     expect(ll).toBeGreaterThan(0);
     expect(lh).toBeLessThan(1);
-    expect(survivalInterval({ survival: 0, greenwood: Infinity }, 0.95, 'loglog')).toEqual([0, 0]);
-    expect(survivalInterval({ survival: 1, greenwood: 0 }, 0.95, 'plain')).toEqual([1, 1]);
-    const [l99, h99] = survivalInterval(step, 0.99, 'loglog');
+    const [l99, h99] = survivalInterval(step, 0.99, 'loglog')!;
     expect(h99 - l99).toBeGreaterThan(lh - ll);
+  });
+
+  it('has no interval where a limit is undefined (spec 15.2): at S = 0, an infinite variance, or log-log at S = 1', () => {
+    expect(survivalInterval({ survival: 0, greenwood: Infinity }, 0.95, 'loglog')).toBeNull();
+    expect(survivalInterval({ survival: 0, greenwood: Infinity }, 0.95, 'plain')).toBeNull();
+    expect(survivalInterval({ survival: 1, greenwood: 0 }, 0.95, 'loglog')).toBeNull();
+    expect(survivalInterval({ survival: 1, greenwood: 0 }, 0.95, 'plain')).toEqual([1, 1]);
   });
 
   it('counts the subjects at risk at a time', () => {

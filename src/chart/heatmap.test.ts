@@ -166,7 +166,7 @@ describe('heat map chart', () => {
   it('keeps its settings in a file; bad values fall back, and old files get the defaults', () => {
     const { p } = setup();
     const next = patchLook(p.charts[0].id, { heatmap: { ...p.charts[0].heatmap, palette: 'magma', min: 1, max: 9, normalise: 'column', cellGapPt: 99 } })(p);
-    expect(next.charts[0].heatmap.cellGapPt).toBe(20);
+    expect(next.charts[0].heatmap.cellGapPt).toBe(40);
     const back = parseProject(stringifyProject(next));
     expect(back.charts[0].heatmap).toMatchObject({ palette: 'magma', min: 1, max: 9, normalise: 'column' });
     const text = JSON.parse(stringifyProject(next));
@@ -174,5 +174,27 @@ describe('heat map chart', () => {
     expect(parseProject(JSON.stringify(text)).charts[0].heatmap).toMatchObject({ palette: 'viridis', min: null, max: null, missingColour: '#d9d9d9', normalise: 'none' });
     delete text.project.charts[0].heatmap;
     expect(parseProject(JSON.stringify(text)).charts[0].heatmap.palette).toBe('viridis');
+  });
+});
+
+describe('colour range limits', () => {
+  it('uses the automatic range when a manual minimum lies above the automatic maximum', () => {
+    const { table, chart } = setup({ min: 100 });
+    const m = buildHeatModel(chart, table);
+    expect(m.bar!.hi).toBeGreaterThan(m.bar!.lo);
+    expect(m.bar!.ticks.length).toBeGreaterThan(0);
+    expect(m.warnings.some((w) => /colour range/.test(w))).toBe(true);
+  });
+});
+
+describe('cell labels', () => {
+  it('fit the cell in width and height, shrink when needed, and are left out when they cannot be read', async () => {
+    const { fitCellLabel } = await import('./HeatmapSvg');
+    expect(fitCellLabel('4.2', 120, 80, 20)).toBe(20);
+    const narrow = fitCellLabel('123456.789', 60, 80, 20)!;
+    expect(narrow).toBeLessThan(20);
+    expect(narrow).toBeGreaterThanOrEqual(8);
+    expect(fitCellLabel('123456.789', 16, 80, 20)).toBeNull();
+    expect(fitCellLabel('4.2', 120, 8, 20)).toBeNull();
   });
 });

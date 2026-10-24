@@ -1,4 +1,5 @@
 import { format, precisionFixed, ticks as d3Ticks } from 'd3';
+import { extent } from '../model/units';
 
 export interface YAxisInput {
   /** Every value that must be visible: means, valid error endpoints, raw points, etc. */
@@ -35,8 +36,7 @@ export const clean = (v: number): number => Number(v.toPrecision(12));
 function autoDomain(input: YAxisInput): [number, number] {
   const { values, includeZero } = input;
   if (values.length === 0) return [0, 1];
-  let lo = Math.min(...values);
-  let hi = Math.max(...values);
+  let [lo, hi] = extent(values);
   if (includeZero) {
     lo = Math.min(lo, 0);
     hi = Math.max(hi, 0);

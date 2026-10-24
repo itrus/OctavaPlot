@@ -1,6 +1,10 @@
+import type { DecimalSeparator } from '../ui/cellText';
 import { CHART_PX_MAX, CHART_PX_MIN, DEFAULT_CHART_HEIGHT_PX, DEFAULT_CHART_WIDTH_PX } from '../model/defaults';
 
 export type ExportFormat = 'png' | 'svg';
+
+/** PNG magnifications offered: 1 px per CSS pixel (96 dpi), and the ones that give 192, 300, 384 and 600 dpi. */
+export const PNG_SCALES = [1, 2, 3.125, 4, 6.25] as const;
 
 /** Application preferences. Kept apart from the project: they follow the browser, not the file. */
 export interface Settings {
@@ -10,6 +14,10 @@ export interface Settings {
   /** New projects start with blank tables instead of the example data. */
   newProjectEmpty: boolean;
   exportFormat: ExportFormat;
+  /** How numbers typed, pasted or imported into tables are read (see DecimalSeparator). */
+  decimalSeparator: DecimalSeparator;
+  /** PNG pixels per CSS pixel of the chart (see PNG_SCALES). */
+  pngScale: number;
   /** Size of newly created charts, in CSS pixels. */
   defaultChartWidthPx: number;
   defaultChartHeightPx: number;
@@ -20,6 +28,8 @@ export const DEFAULT_SETTINGS: Settings = {
   timestampExports: true,
   newProjectEmpty: false,
   exportFormat: 'png',
+  decimalSeparator: 'auto',
+  pngScale: 1,
   defaultChartWidthPx: DEFAULT_CHART_WIDTH_PX,
   defaultChartHeightPx: DEFAULT_CHART_HEIGHT_PX,
 };
@@ -44,6 +54,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     timestampExports: typeof r.timestampExports === 'boolean' ? r.timestampExports : d.timestampExports,
     newProjectEmpty: typeof r.newProjectEmpty === 'boolean' ? r.newProjectEmpty : d.newProjectEmpty,
     exportFormat: r.exportFormat === 'svg' || r.exportFormat === 'png' ? r.exportFormat : d.exportFormat,
+    decimalSeparator: r.decimalSeparator === 'point' || r.decimalSeparator === 'comma' ? r.decimalSeparator : d.decimalSeparator,
+    pngScale: PNG_SCALES.find((v) => v === r.pngScale) ?? d.pngScale,
     defaultChartWidthPx: px(r.defaultChartWidthPx, d.defaultChartWidthPx),
     defaultChartHeightPx: px(r.defaultChartHeightPx, d.defaultChartHeightPx),
   };

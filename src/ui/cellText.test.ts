@@ -98,7 +98,7 @@ describe('planPaste', () => {
   });
   it('pastes titles with values from the first group', () => {
     const p = planPaste('a\t1\t2\nb\t3', at(0, 0, -1, -1));
-    expect(p).toMatchObject({ ok: true, row0: 0, col0: 0, titles: ['a', 'b'], matrix: [[1, 2], [3]], sel: { ar: 0, ac: -1, fr: 1, fc: 1 } });
+    expect(p).toMatchObject({ ok: true, row0: 0, col0: 0, titles: ['a', 'b'], matrix: [[1, 2], [3, null]], sel: { ar: 0, ac: -1, fr: 1, fc: 1 } });
   });
   it('fills a multi-row title selection with one title', () => {
     const p = planPaste('same', at(1, 3, -1, -1));
@@ -112,12 +112,39 @@ describe('planPaste', () => {
     expect(planPaste('1\t2\n3\t4', at(1, 1, 0, 0))).toMatchObject({ ok: true, row0: 1, col0: 0, titles: null, matrix: [[1, 2], [3, 4]], label: 'Paste values', message: 'Pasted 2 rows × 2 columns.', sel: { ar: 1, ac: 0, fr: 2, fc: 1 } });
     expect(planPaste('5', at(0, 1, 1, 2))).toMatchObject({ ok: true, matrix: [[5, 5], [5, 5]] });
   });
-  it('keeps ragged rows and reports the widest', () => {
-    expect(planPaste('1\t2\t3\n4', at(0, 0, 0, 0))).toMatchObject({ ok: true, matrix: [[1, 2, 3], [4]], sel: { ar: 0, ac: 0, fr: 1, fc: 2 } });
+  it('pads ragged rows with missing values and reports the widest', () => {
+    expect(planPaste('1\t2\t3\n4', at(0, 0, 0, 0))).toMatchObject({ ok: true, matrix: [[1, 2, 3], [4, null, null]], sel: { ar: 0, ac: 0, fr: 1, fc: 2 } });
   });
   it('fails atomically on a non-numeric value', () => {
     const p = planPaste('1\tx', at(0, 0, 0, 0));
     expect(p.ok).toBe(false);
     if (!p.ok) expect(p.message).toMatch(/^Paste rejected, non-numeric values found/);
+  });
+});
+
+describe('ragged paste', () => {
+  it('pads a short row with missing values so the block is a rectangle', () => {
+    const r = parseClipboard('1\t2\n3');
+    expect(r).toEqual({ ok: true, matrix: [[1, 2], [3, null]] });
+  });
+});
+
+describe('decimal separator', () => {
+  it('refuses an ambiguous 1,234 in automatic mode instead of guessing', () => {
+    expect(parseCell('1,234').ok).toBe(false);
+    expect(parseCell('12,5')).toEqual({ ok: true, value: 12.5 });
+    expect(parseCell('1,2345')).toEqual({ ok: true, value: 1.2345 });
+  });
+  it('point mode refuses a comma; comma mode reads 1.234,5 and refuses a point', () => {
+    expect(parseCell('1,5', 'point').ok).toBe(false);
+    expect(parseCell('1.5', 'point')).toEqual({ ok: true, value: 1.5 });
+    expect(parseCell('1.234,5', 'comma')).toEqual({ ok: true, value: 1234.5 });
+    expect(parseCell('1,234', 'comma')).toEqual({ ok: true, value: 1.234 });
+    expect(parseCell('1.5', 'comma').ok).toBe(false);
+    expect(parseCell('-2e3', 'comma')).toEqual({ ok: true, value: -2000 });
+  });
+  it('applies to pasted blocks', () => {
+    expect(parseClipboard('1,234\t2').ok).toBe(false);
+    expect(parseClipboardBlock('1,234\t2', false, 'comma')).toEqual({ ok: true, titles: [], matrix: [[1.234, 2]] });
   });
 });

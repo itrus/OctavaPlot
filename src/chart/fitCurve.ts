@@ -1,7 +1,7 @@
 import type { FitSettings } from '../model/types';
 import { n2 } from '../model/units';
-import { fitCurve, fitModelById, isFailure, type FitParam, type FitResult } from '../stats/fit';
-import { onAxis } from './axisScale';
+import { fitCurve, fitModelById, isFailure, type FitFailure, type FitModelId, type FitParam, type FitResult } from '../stats/fit';
+import { inBreak, onAxis, polylinesThroughBreaks } from './axisScale';
 import type { YAxisScale } from './scales';
 
 /** The fitted curve of one XY series, ready to draw (spec 17). */
@@ -40,13 +40,41 @@ export interface FitRun {
   xRange: [number, number] | null;
 }
 
+/** Fits are kept by their inputs, so changing a colour or a title does not fit the same data again. */
+const FIT_CACHE_SIZE = 64;
+const fitCache = new Map<string, FitResult | FitFailure>();
+/** How many fits were actually calculated (not taken from the cache); for the tests. */
+export const fitStats = { calculated: 0 };
+
+function fitKey(obs: ReadonlyArray<{ x: number; y: number }>, fit: FitSettings): string {
+  // The numbers themselves, not a hash: a collision would silently show another series' curve.
+  let key = `${fit.model}|${fit.degree}|${fit.level}|${obs.length}|`;
+  for (const p of obs) key += `${p.x},${p.y};`;
+  return key;
+}
+
+function cachedFit(obs: ReadonlyArray<{ x: number; y: number }>, fit: FitSettings & { model: FitModelId }): FitResult | FitFailure {
+  const key = fitKey(obs, fit);
+  const hit = fitCache.get(key);
+  if (hit) {
+    fitCache.delete(key);
+    fitCache.set(key, hit);
+    return hit;
+  }
+  fitStats.calculated++;
+  const made = fitCurve(obs, { model: fit.model, degree: fit.degree, level: fit.level });
+  fitCache.set(key, made);
+  if (fitCache.size > FIT_CACHE_SIZE) fitCache.delete(fitCache.keys().next().value as string);
+  return made;
+}
+
 /** Fit one series from its observations (every replicate counts as a point). */
 export function runFit(obs: ReadonlyArray<{ x: number; y: number }>, fit: FitSettings): FitRun {
   if (fit.model === 'none') return { result: null, failure: null, xRange: null };
-  const r = fitCurve(obs, { model: fit.model, degree: fit.degree });
+  const r = cachedFit(obs, { ...fit, model: fit.model });
   if (isFailure(r)) return { result: null, failure: r.message, xRange: null };
   const xs = obs.map((p) => p.x);
-  return { result: r, failure: null, xRange: [Math.min(...xs), Math.max(...xs)] };
+  return { result: r, failure: null, xRange: [xs.reduce((m, v) => (v < m ? v : m), Infinity), xs.reduce((m, v) => (v > m ? v : m), -Infinity)] };
 }
 
 /** Where the curve is calculated: evenly along the axis (evenly in its logarithm on a log axis). */
@@ -105,18 +133,22 @@ export function drawFit(run: FitRun, fit: FitSettings, m: Mappers): FittedCurve 
     }
     band = [];
   };
-  let pen = false;
+  const seq: Array<{ x: number; y: number } | null> = [];
   for (const x of xs) {
     const y = result.predict(x);
     const px = m.xScale(x);
     const py = m.yScale(y);
     if (!onAxis(m.yAxis, y) || !placed(px) || !placed(py)) {
-      pen = false;
+      seq.push(null);
       flush();
       continue;
     }
-    path += `${pen ? 'L' : 'M'}${n2(px)},${n2(py)}`;
-    pen = true;
+    seq.push({ x, y });
+    // Over a gap of a broken axis the band ends, as the curve does.
+    if (inBreak(m.xAxis, x) || inBreak(m.yAxis, y)) {
+      flush();
+      continue;
+    }
     if (fit.band === 'none') continue;
     const h = result.halfWidth(x, fit.band, fit.level);
     // A band end with no position (below 0 on a log axis) ends the band there rather than bending it.
@@ -124,6 +156,10 @@ export function drawFit(run: FitRun, fit: FitSettings, m: Mappers): FittedCurve 
     else flush();
   }
   flush();
+  // The curve is cut in data coordinates where it crosses a gap of a broken axis.
+  path = polylinesThroughBreaks(seq, m.xAxis, m.yAxis)
+    .map((part) => part.map((q, i) => `${i === 0 ? 'M' : 'L'}${n2(m.xScale(q.x))},${n2(m.yScale(q.y))}`).join(''))
+    .join('');
   return { path, bandPath, summary, failure: null };
 }
 

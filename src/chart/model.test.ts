@@ -4,7 +4,6 @@ import { permuteRows } from '../testing/tableChecks';
 import type { ChartStyle } from '../model/types';
 import { resolveStyle } from '../model/style';
 import { clearSummaryOverrides, composeCommands, patchStyle, patchSummary, resetStyle, setChartType, setCells } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
 import { addGroup, patchAxis, setDisplayName, setRowTitles } from '../state/commands';
 import { buildChartModel } from './model';
 import { resolveYAxis } from './scales';
@@ -264,17 +263,6 @@ describe('summary pipeline (S15)', () => {
   it('does not jitter along the value axis', () => {
     const m = model(setChartType(chartId, 'scatter')(project));
     for (const g of m.groups) for (const pt of g.points) expect(pt.cy).toBeCloseTo(m.yScale(pt.value), 9);
-  });
-
-  it('an old v1 file with errorType sd draws the same bars', () => {
-    const v2 = patchSummary(chartId, 'all', { spread: 'sd' })(project);
-    const raw = JSON.parse(stringifyProject(project));
-    raw.version = 1;
-    delete raw.project.charts[0].layers[0].summary;
-    delete raw.project.charts[0].layers[0].groupSummary;
-    raw.project.charts[0].defaults.errorType = 'sd';
-    const old = parseProject(JSON.stringify(raw));
-    expect(model(old).groups.map((g) => g.errorBar?.d)).toEqual(model(v2).groups.map((g) => g.errorBar?.d));
   });
 
   it('default regression: no error bars, no warnings, centre equals the mean', () => {

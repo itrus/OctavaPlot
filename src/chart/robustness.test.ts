@@ -112,3 +112,21 @@ describe('every fitted curve with awkward data', () => {
     }
   }
 });
+
+describe('very long data', () => {
+  it('plots 200,000 points without overflowing the stack', () => {
+    const table = createXyTable('XY', false);
+    const n = 200_000;
+    const grow = (o: { id: string; value: number | null }, row: number, f: (r: number) => number) => ({ ...o, value: f(row) });
+    const long: DataTable = {
+      ...table,
+      rowCount: n,
+      groups: table.groups.map((g, gi) => ({
+        ...g,
+        observations: Array.from({ length: n }, (_, row) => grow({ id: `${g.id}-${row}`, value: null }, row, (r) => (gi === 0 ? r : Math.sin(r / 1000) * 50 + gi))),
+      })),
+    };
+    const chart = createChart(long.id, undefined, 'xyScatter');
+    expect(() => buildAnyModel(chart, long)).not.toThrow();
+  });
+});

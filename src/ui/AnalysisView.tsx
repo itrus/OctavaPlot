@@ -29,6 +29,10 @@ function descriptiveSheet(analysis: Analysis, table: Parameters<typeof analysisC
       blank: r.blank,
       indent: r.indent,
       cells: stats.map((d) => (r.value ? formatResult(r.value(d), r.format) : '')),
+      exact: stats.map((d) => {
+        const v = r.value?.(d);
+        return v === null || v === undefined || !Number.isFinite(v) ? '' : r.format === 'percent' ? `${v}%` : String(v);
+      }),
     })),
   };
 }

@@ -12,10 +12,10 @@ export interface BarLabelGeom {
   up: boolean;
 }
 
-export const BAR_LABEL_LIMITS = { sizePt: { min: 4, max: 48 }, decimals: { min: 0, max: 10 } } as const;
+export const BAR_LABEL_LIMITS = { sizePt: { min: 8, max: 96 }, decimals: { min: 0, max: 10 } } as const;
 
 /** Gap between the end of the bar (or its error bar) and the text, pt. */
-const GAP_PT = 3;
+const GAP_PT = 6;
 
 /** The text of a label, or null when labels are off or there is nothing to show. */
 export function barLabelText(cfg: BarLabels, value: number | null, n: number | null): string | null {

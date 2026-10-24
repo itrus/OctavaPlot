@@ -81,7 +81,7 @@ export function FrameSection({ chart, dual, origin = 'y' }: { chart: Chart; dual
         </Section>
       )}
       <Section title="Axis lines">
-        <NumField label="Axis line thickness" unit="pt" value={chart.yAxis.lineWidthPt} min={0} max={10} onCommit={(v) => run('Axis line thickness', patchBothAxes(chart.id, { lineWidthPt: v }), 'axis:lw')} />
+        <NumField label="Axis line thickness" unit="pt" value={chart.yAxis.lineWidthPt} min={0} max={20} onCommit={(v) => run('Axis line thickness', patchBothAxes(chart.id, { lineWidthPt: v }), 'axis:lw')} />
         {dual && <div className="muted small">Line thickness applies to both Y axes.</div>}
       </Section>
       <FrameAndColours chart={chart} />

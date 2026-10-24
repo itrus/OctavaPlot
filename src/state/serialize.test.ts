@@ -8,29 +8,18 @@ import { AUTOSAVE_KEY, loadAutosave, parseProject, parseProjectWithNotes, saveAu
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = Record<string, any>;
 
-/** A version 1 file: layers without summary, errorType in styles. */
-function v1Text(mutate?: (p: Any) => void): string {
-  const p = JSON.parse(JSON.stringify(createExampleProject())) as Any;
-  for (const c of p.charts) {
-    for (const l of c.layers) {
-      delete l.summary;
-      delete l.groupSummary;
-    }
-  }
-  mutate?.(p);
-  return JSON.stringify({ format: 'scientific-plotter-project', version: 1, project: p });
-}
 const layer0 = (p: Project) => p.charts[0].layers[0];
 
 describe('version', () => {
-  it('writes version 2', () => {
+  it('writes format octavaplot-project, version 1', () => {
     const env = JSON.parse(stringifyProject(createExampleProject()));
-    expect(env.version).toBe(2);
+    expect(env.format).toBe('octavaplot-project');
+    expect(env.version).toBe(1);
   });
-  it('rejects version 3 and 0', () => {
+  it('reads version 1 only', () => {
     const env = JSON.parse(stringifyProject(createExampleProject()));
-    expect(() => parseProject(JSON.stringify({ ...env, version: 3 }))).toThrow(/not supported/);
-    expect(() => parseProject(JSON.stringify({ ...env, version: 0 }))).toThrow(/not supported/);
+    for (const version of [0, 2, 3, '1', null]) expect(() => parseProject(JSON.stringify({ ...env, version }))).toThrow(/version/);
+    expect(() => parseProject(JSON.stringify({ ...env, format: 'other-project' }))).toThrow(/format/);
   });
   it('round trips and a valid project has no notes', () => {
     const p = createExampleProject();
@@ -40,77 +29,15 @@ describe('version', () => {
   });
 });
 
-describe('version 1 migration', () => {
-  it('loads with default summary', () => {
-    const p = parseProject(v1Text());
-    expect(layer0(p).summary).toEqual(DEFAULT_SUMMARY);
-    expect(layer0(p).groupSummary).toEqual({});
-  });
-  it('layer errorType wins over defaults errorType', () => {
-    const p = parseProject(
-      v1Text((j) => {
-        j.charts[0].defaults.errorType = 'sem';
-        j.charts[0].layers[0].style.errorType = 'sd';
-      }),
-    );
-    expect(layer0(p).summary.spread).toBe('sd');
-    const q = parseProject(
-      v1Text((j) => {
-        j.charts[0].defaults.errorType = 'sem';
-      }),
-    );
-    expect(layer0(q).summary.spread).toBe('sem');
-  });
-  it('group overrides migrate, object overrides are dropped, equal values kept', () => {
-    const p = parseProject(
-      v1Text((j) => {
-        const l = j.charts[0].layers[0];
-        l.style.errorType = 'sd';
-        l.groupOverrides = { g1: { errorType: 'sd' }, g2: { errorType: 'bogus' }, g3: { barFill: '#000000' } };
-        l.objectOverrides = { o1: { errorType: 'sem' } };
-      }),
-    );
-    expect(layer0(p).groupSummary).toEqual({ g1: { spread: 'sd' } });
-  });
-});
-
-describe('errorType stripping', () => {
-  it('removes errorType from defaults, style, group and object overrides', () => {
-    const r = parseProjectWithNotes(
-      v1Text((j) => {
-        const c = j.charts[0];
-        c.defaults.errorType = 'sem';
-        const l = c.layers[0];
-        l.style.errorType = 'sd';
-        l.groupOverrides = { g1: { errorType: 'sd' }, g2: { errorType: 'sd', barFill: '#000000' } };
-        l.objectOverrides = { o1: { errorType: 'sem' } };
-      }),
-    );
-    const c = r.project.charts[0];
-    expect('errorType' in c.defaults).toBe(false);
-    expect('errorType' in c.layers[0].style).toBe(false);
-    expect(c.layers[0].groupOverrides).toEqual({ g2: { barFill: '#000000' } });
-    expect(c.layers[0].objectOverrides).toEqual({});
-    expect(c.layers[0].groupSummary).toEqual({ g1: { spread: 'sd' }, g2: { spread: 'sd' } });
-    expect(JSON.stringify(r.project)).not.toContain('errorType');
-  });
-  it('files without errorType load as stored and without notes', () => {
-    const p = createExampleProject();
-    const r = parseProjectWithNotes(stringifyProject(p));
-    expect(r.project).toEqual(p);
-    expect(r.notes).toEqual([]);
-  });
-});
-
-describe('version 2 sanitising', () => {
-  const v2 = (mutate: (l: Any) => void) => {
+describe('stored values', () => {
+  const stored = (mutate: (l: Any) => void) => {
     const j = JSON.parse(stringifyProject(createExampleProject())) as Any;
     mutate(j.project.charts[0].layers[0]);
     return JSON.stringify(j);
   };
   it('drops invalid summary values with a note', () => {
     const r = parseProjectWithNotes(
-      v2((l) => {
+      stored((l) => {
         l.summary = { centre: 'median', spread: 'bogus', confidenceLevel: 5 };
         l.groupSummary = JSON.parse('{"a":{"spread":"sd","centre":"x"},"b":"nope","__proto__":{"spread":"sd"}}');
       }),
@@ -119,22 +46,13 @@ describe('version 2 sanitising', () => {
     expect(layer0(r.project).groupSummary).toEqual({ a: { spread: 'sd' } });
     expect(r.notes.length).toBeGreaterThan(0);
   });
-  it('a legacy errorType in a v2 file wins over the stored summary spread', () => {
-    const p = parseProject(
-      v2((l) => {
-        l.style.errorType = 'sd';
-        l.summary = { ...DEFAULT_SUMMARY, spread: 'iqr' };
-      }),
-    );
-    expect(layer0(p).summary.spread).toBe('sd');
-  });
-  it('a v2 file without errorType keeps its stored spread', () => {
-    const p = parseProject(v2((l) => (l.summary = { ...DEFAULT_SUMMARY, spread: 'iqr' })));
+  it('a stored spread is kept', () => {
+    const p = parseProject(stored((l) => (l.summary = { ...DEFAULT_SUMMARY, spread: 'iqr' })));
     expect(layer0(p).summary.spread).toBe('iqr');
   });
   it('invalid style enums are dropped with notes', () => {
     const r = parseProjectWithNotes(
-      v2((l) => {
+      stored((l) => {
         l.style.symbolShape = 'blob';
         l.groupOverrides = { a: { errorCap: 'x', barFill: '#111111' } };
       }),
@@ -180,7 +98,7 @@ describe('version 2 sanitising', () => {
   });
   it('keeps override entries that become empty and skips __proto__', () => {
     const r = parseProject(
-      v2((l) => {
+      stored((l) => {
         l.groupOverrides = JSON.parse('{"a":{"errorCap":"x"},"__proto__":{"barFill":"#000000"},"b":5}');
       }),
     );
@@ -195,15 +113,13 @@ describe('rows', () => {
   const stripRows = (j: Any) => {
     for (const t of j.dataTables) delete t.rows;
   };
-  it('v1 and v2 files without rows regenerate them', () => {
+  it('a file without rows regenerates them', () => {
     const env = v2Json();
     stripRows(env.project);
-    for (const text of [v1Text(stripRows), JSON.stringify(env)]) {
-      const p = parseProject(text);
-      expect(rowsOf(p)).toHaveLength(p.dataTables[0].rowCount);
-      expect(new Set(rowsOf(p).map((r) => r.id)).size).toBe(rowsOf(p).length);
-      expect(rowsOf(p).every((r) => r.title === '')).toBe(true);
-    }
+    const p = parseProject(JSON.stringify(env));
+    expect(rowsOf(p)).toHaveLength(p.dataTables[0].rowCount);
+    expect(new Set(rowsOf(p).map((r) => r.id)).size).toBe(rowsOf(p).length);
+    expect(rowsOf(p).every((r) => r.title === '')).toBe(true);
   });
   it('round trips titles and ids', () => {
     const p = createExampleProject();
@@ -236,7 +152,7 @@ describe('rows', () => {
   });
 });
 
-describe('OctavaPlot rename', () => {
+describe('autosave', () => {
   const fakeStorage = (initial: Record<string, string> = {}) => {
     const data = new Map(Object.entries(initial));
     vi.stubGlobal('localStorage', {
@@ -248,45 +164,44 @@ describe('OctavaPlot rename', () => {
   };
   afterEach(() => vi.unstubAllGlobals());
 
-  it('writes the octavaplot-project format', () => {
-    expect(JSON.parse(stringifyProject(createExampleProject())).format).toBe('octavaplot-project');
-  });
-  it('still opens files written under the old scientific-plotter-project format', () => {
-    expect(parseProject(v1Text()).charts).toHaveLength(1);
-  });
-  it('rejects an unknown format', () => {
-    const env = JSON.parse(stringifyProject(createExampleProject()));
-    expect(() => parseProject(JSON.stringify({ ...env, format: 'other-project' }))).toThrow(/format/);
-  });
-  it('loads a pre-rename autosave and moves it to the new key on the next save', () => {
+  it('saves under one key and loads the project back', () => {
     const p = createExampleProject();
-    const data = fakeStorage({ 'scientific-plotter:project:v1': v1Text() });
-    expect(loadAutosave()).not.toBeNull();
+    const data = fakeStorage();
     expect(saveAutosave(p)).toBe(true);
-    expect(data.has(AUTOSAVE_KEY)).toBe(true);
-    expect(data.has('scientific-plotter:project:v1')).toBe(false);
+    expect([...data.keys()]).toEqual([AUTOSAVE_KEY]);
+    expect(loadAutosave()).toEqual(p);
   });
-  it('prefers the new autosave key when both exist', () => {
-    const p = createExampleProject();
-    fakeStorage({ [AUTOSAVE_KEY]: stringifyProject(p), 'scientific-plotter:project:v1': v1Text() });
-    expect(loadAutosave()?.id).toBe(p.id);
+  it('loads nothing from an empty or damaged store', () => {
+    fakeStorage();
+    expect(loadAutosave()).toBeNull();
+    fakeStorage({ [AUTOSAVE_KEY]: '{not json' });
+    expect(loadAutosave()).toBeNull();
   });
 });
 
-describe('pixel sizes', () => {
-  it('converts the millimetre sizes of older files to pixels', () => {
-    const p = createExampleProject();
-    const file = JSON.parse(stringifyProject(p));
-    const chart = file.project.charts[0];
-    delete chart.widthPx;
-    delete chart.heightPx;
-    delete chart.legend.hiddenGroupIds;
-    chart.widthMm = 160;
-    chart.heightMm = 120;
-    const back = parseProject(JSON.stringify(file)).charts[0] as unknown as Record<string, unknown>;
-    expect(back.widthPx).toBe(605);
-    expect(back.heightPx).toBe(454);
-    expect('widthMm' in back).toBe(false);
-    expect((back.legend as { hiddenGroupIds: string[] }).hiddenGroupIds).toEqual([]);
+describe('malformed persisted fields', () => {
+  const fmt = JSON.parse(stringifyProject(createExampleProject())).format as string;
+  const build = (mutate: (p: Any) => void) => {
+    const p = JSON.parse(JSON.stringify(createExampleProject())) as Any;
+    mutate(p);
+    return JSON.stringify({ format: fmt, version: 1, project: p });
+  };
+  it('drops null annotations, coerces numeric text and notes both', () => {
+    const r = parseProjectWithNotes(build((p) => (p.charts[0].annotations = [null, { id: 'a1', text: 42, xFrac: 2, yFrac: 'x', fontSizePt: -1, color: 'red' }])));
+    const a = r.project.charts[0].annotations;
+    expect(a).toHaveLength(1);
+    expect(a[0]).toEqual({ id: 'a1', text: '42', xFrac: 1, yFrac: 0.5, fontSizePt: 24, color: '#000000' });
+    expect(r.notes.some((n) => n.includes('annotations[0]'))).toBe(true);
+    expect(() => chartToSvgString(r.project.charts[0], r.project.dataTables[0])).not.toThrow();
+  });
+  it('drops display names that are not text', () => {
+    const r = parseProjectWithNotes(build((p) => (p.charts[0].displayNames = { a: { x: 1 }, b: 'ok' })));
+    expect(r.project.charts[0].displayNames).toEqual({ b: 'ok' });
+    expect(r.notes.length).toBeGreaterThan(0);
+  });
+  it('rejects repeated table, graph and observation IDs', () => {
+    expect(() => parseProject(build((p) => p.dataTables.push(JSON.parse(JSON.stringify(p.dataTables[0])))))).toThrow(/same ID/);
+    expect(() => parseProject(build((p) => p.charts.push(JSON.parse(JSON.stringify(p.charts[0])))))).toThrow(/same ID/);
+    expect(() => parseProject(build((p) => (p.dataTables[0].groups[0].observations[1].id = p.dataTables[0].groups[0].observations[0].id)))).toThrow(/duplicated/);
   });
 });

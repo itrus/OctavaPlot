@@ -43,7 +43,7 @@ import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection }
 import { AxisStyleControls, TickFields } from './AxisStyleControls';
 import { DataSetOrder } from './DataSetOrder';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './SharedSections';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './controls';
+import { Check, ColorInput, Field, GroupBox, InspectorSearchContext, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './controls';
 import {
   backgroundDisplay,
   backgroundNonePatch,
@@ -79,11 +79,24 @@ function DatasetSwatchChip({ style }: { style: ChartStyle }) {
 
 /** The formatting panel: one for charts on a numeric X axis (XY tables), one for category charts. */
 export function Inspector({ chart, table }: { chart: Chart; table: DataTable }) {
+  const [query, setQuery] = useState('');
   const family = chartFamily(chart.type);
-  if (family === 'whole') return <PieInspector chart={chart} table={table} />;
-  if (family === 'hist') return <HistInspector chart={chart} table={table} />;
-  if (family === 'heat') return <HeatInspector chart={chart} table={table} />;
-  return family === 'category' ? <CategoryInspector chart={chart} table={table} /> : <XyInspector chart={chart} table={table} />;
+  const panel =
+    family === 'whole' ? <PieInspector chart={chart} table={table} />
+    : family === 'hist' ? <HistInspector chart={chart} table={table} />
+    : family === 'heat' ? <HeatInspector chart={chart} table={table} />
+    : family === 'category' ? <CategoryInspector chart={chart} table={table} />
+    : <XyInspector chart={chart} table={table} />;
+  return (
+    <InspectorSearchContext.Provider value={query}>
+      <div className={query.trim() !== '' ? 'inspector-searching' : undefined}>
+        <div className="inspector-search" role="search">
+          <input type="search" value={query} placeholder="Find a setting in this tab…" aria-label="Find a setting" onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setQuery('')} />
+        </div>
+        {panel}
+      </div>
+    </InspectorSearchContext.Provider>
+  );
 }
 
 function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable }) {
@@ -309,7 +322,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
               value={st.barPatternSpacingPt}
               disabled={!fillUi.patternControlsEnabled}
               overridden={ov('barPatternSpacingPt')}
-              hint="Distance between marks (P limit 1 to 50 pt)"
+              hint="Distance between marks (P limit 2 to 100 pt)"
               note={fillUi.spacingError}
               validate={(v) => spacingError(v, st.barPatternWidthPt)}
               onCommit={(v) => setStyle({ barPatternSpacingPt: v })}
@@ -320,13 +333,13 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
               value={st.barPatternWidthPt}
               disabled={!fillUi.patternControlsEnabled}
               overridden={ov('barPatternWidthPt')}
-              hint={`${widthName} (P limit 0.1 to 5 pt)`}
+              hint={`${widthName} (P limit 0.2 to 10 pt)`}
               note={fillUi.widthError}
               validate={(v) => widthError(v, st.barPatternSpacingPt, st.barPattern)}
               onCommit={(v) => setStyle({ barPatternWidthPt: v })}
             />
             <NumField label="Opacity" value={st.barOpacity} min={0} max={1} disabled={!st.showBars} overridden={ov('barOpacity')} onCommit={(v) => setStyle({ barOpacity: v })} hint="0 = transparent, 1 = opaque" note={opacityNote(st)} />
-            <NumField label="Border" unit="pt" value={st.barBorderWidthPt} min={0} max={20} disabled={!st.showBars} overridden={ov('barBorderWidthPt')} onCommit={(v) => setStyle({ barBorderWidthPt: v })} />
+            <NumField label="Border" unit="pt" value={st.barBorderWidthPt} min={0} max={40} disabled={!st.showBars} overridden={ov('barBorderWidthPt')} onCommit={(v) => setStyle({ barBorderWidthPt: v })} />
             <Field label="Border color" overridden={ov('barBorderColor')}>
               <ColorInput value={st.barBorderColor} disabled={!st.showBars} onChange={(v) => setStyle({ barBorderColor: v })} />
             </Field>
@@ -344,12 +357,12 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
             <Field label="Shape" overridden={ov('symbolShape')}>
               <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...SYMBOL_SHAPE_OPTIONS]} onChange={(v) => setStyle({ symbolShape: v })} />
             </Field>
-            <NumField label="Size" unit="pt" value={st.symbolSizePt} min={1} max={40} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
+            <NumField label="Size" unit="pt" value={st.symbolSizePt} min={2} max={80} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
             <NumField label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
             <Field label="Border color" overridden={ov('symbolBorderColor')}>
               <ColorInput value={st.symbolBorderColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolBorderColor: v })} />
             </Field>
-            <NumField label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={10} disabled={!st.showSymbols} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
+            <NumField label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={20} disabled={!st.showSymbols} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
             {chart.type !== 'mean' && (
               <>
                 <Field label="Horizontal jitter" note={st.showSymbols ? null : 'Jitter moves symbols. Turn on symbols to use it.'}>
@@ -394,7 +407,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
                 onChange={(v) => setStyle({ errorCap: v })}
               />
             </Field>
-            <NumField label="Cap width" unit="pt" value={st.errorCapWidthPt} min={0} max={60} disabled={errorOff || st.errorCap === 'none'} overridden={ov('errorCapWidthPt')} onCommit={(v) => setStyle({ errorCapWidthPt: v })} />
+            <NumField label="Cap width" unit="pt" value={st.errorCapWidthPt} min={0} max={120} disabled={errorOff || st.errorCap === 'none'} overridden={ov('errorCapWidthPt')} onCommit={(v) => setStyle({ errorCapWidthPt: v })} />
             <Field label="Dir." overridden={ov('errorDirection')} hint={DIRECTION_HINT}>
               <SelectInput
                 value={st.errorDirection}
@@ -407,7 +420,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
                 onChange={(v) => setStyle({ errorDirection: v })}
               />
             </Field>
-            <NumField label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.1} max={20} disabled={errorOff} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
+            <NumField label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={40} disabled={errorOff} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
           </GroupBox>
 
           <CalculationOptions
@@ -425,7 +438,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
               <Field label="Color" overridden={ov('lineColor')}>
                 <ColorInput value={st.lineColor} disabled={!st.showLines} onChange={(v) => setStyle({ lineColor: v })} />
               </Field>
-              <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.1} max={20} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+              <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={40} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
               {chart.type === 'paired' && (
                 <Field label="Join across a missing value" hint="A row with a missing value: join the values either side of it. Nothing is made up for the missing one.">
                   <Check checked={chart.pairs.bridge} disabled={!st.showLines} onChange={(v) => run('Join across missing values', patchLook(chart.id, { pairs: { bridge: v } }))} />
@@ -438,7 +451,7 @@ function CategoryInspector({ chart, table }: { chart: Chart; table: DataTable })
               <Field label="Color" overridden={ov('lineColor')}>
                 <ColorInput value={st.lineColor} disabled={!st.showMeanLine} onChange={(v) => setStyle({ lineColor: v })} />
               </Field>
-              <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.1} max={20} disabled={!st.showMeanLine} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+              <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={40} disabled={!st.showMeanLine} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
             </GroupBox>
           )}
 

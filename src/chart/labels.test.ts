@@ -35,11 +35,11 @@ describe('label defaults', () => {
     expect(DEFAULT_STYLE.showPointLabels).toBe(false);
     expect(DEFAULT_STYLE.pointLabelSource).toBe('rowTitle');
     expect(DEFAULT_STYLE.pointLabelPlacement).toBe('above-right');
-    expect(DEFAULT_STYLE.pointLabelOffsetXPt).toBe(3);
-    expect(DEFAULT_STYLE.pointLabelOffsetYPt).toBe(3);
+    expect(DEFAULT_STYLE.pointLabelOffsetXPt).toBe(6);
+    expect(DEFAULT_STYLE.pointLabelOffsetYPt).toBe(6);
     expect(DEFAULT_STYLE.pointLabelCollision).toBe('keep');
     expect(DEFAULT_STYLE.pointLabelLeader).toBe(false);
-    expect(DEFAULT_STYLE.pointLabelFontSizePt).toBe(11.2);
+    expect(DEFAULT_STYLE.pointLabelFontSizePt).toBe(22.4);
     expect(DEFAULT_STYLE.pointLabelBold).toBe(false);
     expect(DEFAULT_STYLE.pointLabelItalic).toBe(false);
     expect(DEFAULT_STYLE.pointLabelColor).toBeNull();
@@ -151,14 +151,14 @@ describe('sanitizeLabelStyle', () => {
         pointLabelDecimals: 2.6,
       }),
     );
-    expect(s.pointLabelFontSizePt).toBe(72);
+    expect(s.pointLabelFontSizePt).toBe(144);
     expect(s.pointLabelOffsetXPt).toBe(0);
-    expect(s.pointLabelOffsetYPt).toBe(-200);
+    expect(s.pointLabelOffsetYPt).toBe(-400);
     expect(s.pointLabelColor).toBeNull();
     expect(s.pointLabelDecimals).toBe(3);
     expect(sanitizeLabelStyle(style({ pointLabelDecimals: 99 })).pointLabelDecimals).toBe(10);
-    expect(sanitizeLabelStyle(style({ pointLabelFontSizePt: 0 })).pointLabelFontSizePt).toBe(4);
-    expect(sanitizeLabelStyle(style({ pointLabelFontSizePt: Number.NaN })).pointLabelFontSizePt).toBe(11.2);
+    expect(sanitizeLabelStyle(style({ pointLabelFontSizePt: 0 })).pointLabelFontSizePt).toBe(8);
+    expect(sanitizeLabelStyle(style({ pointLabelFontSizePt: Number.NaN })).pointLabelFontSizePt).toBe(22.4);
   });
 });
 
@@ -376,7 +376,7 @@ describe('collision handling', () => {
   it('repel: three coincident labels', () => {
     const list = ['a', 'b', 'c'].map((id) => anchor(id, 50, 50, { collision: 'repel' }));
     const m = layoutLabels(list, opts());
-    expect(m.items.map((i) => i.box)).toEqual([box(56, 32, 66, 44), box(56, 20, 66, 32), box(68, 32, 78, 44)]);
+    expect(m.items.map((i) => i.box)).toEqual([box(56, 32, 66, 44), box(56, 20, 66, 32), box(70, 32, 80, 44)]);
     expect(m.report.overlapping).toBe(0);
     expect(m.report.moved).toBe(2);
   });
@@ -384,11 +384,11 @@ describe('collision handling', () => {
     const list = Array.from({ length: 9 }, (_, i) => anchor(`p${i}`, 50, 50, { collision: 'repel', leader: true }));
     const m = layoutLabels(list, opts());
     const ninth = m.items[8];
-    expect(ninth.box).toEqual(box(68, 20, 78, 32));
+    expect(ninth.box).toEqual(box(70, 20, 80, 32));
     expect(ninth.code).toBe('moved');
-    expect(ninth.leader?.x1).toBeCloseTo(52.1213, 4);
-    expect(ninth.leader?.y1).toBeCloseTo(47.8787, 4);
-    expect(ninth.leader?.x2).toBeCloseTo(68, 10);
+    expect(ninth.leader?.x1).toBeCloseTo(52.2299, 3);
+    expect(ninth.leader?.y1).toBeCloseTo(47.9931, 3);
+    expect(ninth.leader?.x2).toBeCloseTo(70, 10);
     expect(ninth.leader?.y2).toBeCloseTo(32, 10);
     expect(m.items[0].leader).toBeNull();
     expect(m.report.overlapping).toBe(0);
@@ -398,7 +398,7 @@ describe('collision handling', () => {
     // the north slot of b is covered by another point's symbol
     const other = { id: 'z', box: box(56, 20, 66, 32) };
     const own = { id: 'b', box: box(56, 20, 66, 32) };
-    expect(layoutLabels(list, opts({ symbols: [other] })).items[1].box).toEqual(box(68, 32, 78, 44));
+    expect(layoutLabels(list, opts({ symbols: [other] })).items[1].box).toEqual(box(70, 32, 80, 44));
     expect(layoutLabels(list, opts({ symbols: [own] })).items[1].box).toEqual(box(56, 20, 66, 32));
   });
   it('repel falls back to labels-only avoidance, then keeps the position', () => {
@@ -576,8 +576,8 @@ describe('buildPointLabels', () => {
   it('above-right anchor uses the symbol extent', () => {
     const m = build([pt('a', 200, 100)]);
     const b = m.items[0].box;
-    expect(b.x0).toBeCloseTo(200 + 3 + 3, 9);
-    expect(b.y1).toBeCloseTo(100 - 3 - 3, 9);
+    expect(b.x0).toBeCloseTo(200 + 3 + 6, 9);
+    expect(b.y1).toBeCloseTo(100 - 3 - 6, 9);
   });
   it('custom offset is taken from the point centre', () => {
     const m = build([pt('a', 200, 100, { pointLabelPlacement: 'custom', pointLabelOffsetXPt: 10, pointLabelOffsetYPt: -20 })]);

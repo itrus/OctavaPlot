@@ -6,12 +6,14 @@ import { AXIS_LIMITS } from '../../model/axis';
 import { FONT_FAMILIES } from '../../model/look';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
 import { newId } from '../../model/ids';
+import { capabilitiesOf } from '../../model/capabilities';
 import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../model/colorVision';
 import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../model/palettes';
 import type { Chart, Group, Id } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import {
   addAnnotation,
+  addReferenceLine,
   applyPalette,
   composeCommands,
   patchAnnotation,
@@ -20,11 +22,16 @@ import {
   patchChart,
   patchLegend,
   patchLook,
+  patchReferenceLine,
   removeAnnotation,
+  removeReferenceLine,
   setDisplayName,
   setGroupOnGraph,
   setLegendItemVisible,
 } from '../../state/commands';
+import { LINE_STYLES } from '../../model/look';
+import type { LineStyle } from '../../model/types';
+import { DialogShell, trapTab } from '../DialogShell';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, SubHeading, TextInput } from './controls';
 import { BarLabelSection, hasBarLabels } from './LookControls';
 
@@ -51,7 +58,7 @@ export function TextSections({ chart, groups, yName, dual, axes = true }: { char
         <Field label="Chart title">
           <TextInput value={chart.title} disabled={!chart.showTitle} onChange={(v) => setChart('Chart title', { title: v }, 'chart:title')} />
         </Field>
-        <NumField label="Title size" unit="pt" value={chart.titleFontSizePt} min={4} max={72} disabled={!chart.showTitle} onCommit={(v) => setChart('Title size', { titleFontSizePt: v }, 'chart:titlesize')} />
+        <NumField label="Title size" unit="pt" value={chart.titleFontSizePt} min={8} max={144} disabled={!chart.showTitle} onCommit={(v) => setChart('Title size', { titleFontSizePt: v }, 'chart:titlesize')} />
         {axes && (
           <>
         <Field label="X axis title">
@@ -87,8 +94,8 @@ export function TextSections({ chart, groups, yName, dual, axes = true }: { char
         <Field label="Text colour">
           <ColorInput value={chart.textColor} ariaLabel="Text colour" onChange={(v) => run('Text colour', patchLook(chart.id, { textColor: v }))} />
         </Field>
-        <NumField label="Tick label size" unit="pt" value={chart.yAxis.tickFontSizePt} min={4} max={48} onCommit={(v) => run('Tick label size', patchBothAxes(chart.id, { tickFontSizePt: v }), 'axis:tf')} />
-        <NumField label="Axis title size" unit="pt" value={chart.yAxis.titleFontSizePt} min={4} max={48} onCommit={(v) => run('Axis title size', patchBothAxes(chart.id, { titleFontSizePt: v }), 'axis:ts')} />
+        <NumField label="Tick label size" unit="pt" value={chart.yAxis.tickFontSizePt} min={8} max={96} onCommit={(v) => run('Tick label size', patchBothAxes(chart.id, { tickFontSizePt: v }), 'axis:tf')} />
+        <NumField label="Axis title size" unit="pt" value={chart.yAxis.titleFontSizePt} min={8} max={96} onCommit={(v) => run('Axis title size', patchBothAxes(chart.id, { titleFontSizePt: v }), 'axis:ts')} />
         <Field label="Bold chart title">
           <Check checked={chart.titleBold} onChange={(v) => run('Bold chart title', patchLook(chart.id, { titleBold: v }))} />
         </Field>
@@ -205,16 +212,59 @@ export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[]
   );
 }
 
+/** Lines at chosen values of the axes: a threshold, a target, a control level. */
+function ReferenceLinesSection({ chart }: { chart: Chart }) {
+  const { run } = useApp();
+  const lines = capabilitiesOf(chart.type).referenceLines;
+  if (lines === 'none') return null;
+  const hasX = lines === 'xy';
+  const add = (axis: 'x' | 'y') => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis, value: 0, color: '#cc0000', widthPt: 2, style: 'dashed', label: '', showLabel: false }));
+  return (
+    <Section title="Reference lines">
+      <div className="button-row">
+        <button onClick={() => add('y')}>+ Line at a Y value</button>
+        {hasX && <button onClick={() => add('x')}>+ Line at an X value</button>}
+      </div>
+      {chart.referenceLines.length === 0 && <div className="muted small">A reference line is drawn across the plot at a value of an axis. A value outside the axis range is not drawn, and a notice says so.</div>}
+      {chart.referenceLines.map((l, i) => {
+        const set = (label: string, patch: Parameters<typeof patchReferenceLine>[2], key?: string) => run(label, patchReferenceLine(chart.id, l.id, patch), key === undefined ? undefined : `ref:${l.id}:${key}`);
+        return (
+          <div key={l.id} className="annotation-card selected">
+            <NumField label={`${l.axis.toUpperCase()} value (line ${i + 1})`} value={l.value} onCommit={(v) => set('Reference line value', { value: v }, 'value')} />
+            <Field label="Label">
+              <TextInput value={l.label} onChange={(v) => set('Reference line label', { label: v }, 'label')} />
+            </Field>
+            <Field label="Show label">
+              <Check checked={l.showLabel} onChange={(v) => set('Show reference line label', { showLabel: v })} />
+            </Field>
+            <Field label="Colour">
+              <ColorInput value={l.color} onChange={(v) => set('Reference line colour', { color: v }, 'color')} />
+            </Field>
+            <NumField label="Thickness" unit="pt" value={l.widthPt} min={0.2} max={40} onCommit={(v) => set('Reference line thickness', { widthPt: v }, 'width')} />
+            <Field label="Pattern">
+              <SelectInput<LineStyle> value={l.style} options={LINE_STYLES.map((o) => ({ value: o.value, label: o.label }))} onChange={(v) => set('Reference line pattern', { style: v })} />
+            </Field>
+            <div className="button-row">
+              <button onClick={() => run('Delete reference line', removeReferenceLine(chart.id, l.id))}>Delete line</button>
+            </div>
+          </div>
+        );
+      })}
+    </Section>
+  );
+}
+
 export function AnnotationsTab({ chart }: { chart: Chart }) {
   const { run, selection, setSelection } = useApp();
   return (
     <div className="tab-body">
       {hasBarLabels(chart.type) && <BarLabelSection chart={chart} />}
+      <ReferenceLinesSection chart={chart} />
       <div className="button-row">
         <button
           onClick={() => {
             const id = newId('ann');
-            run('Add annotation', addAnnotation(chart.id, { id, text: 'Text', xFrac: 0.4, yFrac: 0.08, fontSizePt: 14, color: '#000000' }));
+            run('Add annotation', addAnnotation(chart.id, { id, text: 'Text', xFrac: 0.4, yFrac: 0.08, fontSizePt: 28, color: '#000000' }));
             setSelection({ kind: 'annotation', annotationId: id });
           }}
         >
@@ -225,7 +275,21 @@ export function AnnotationsTab({ chart }: { chart: Chart }) {
       {chart.annotations.map((a) => {
         const isSel = selection.kind === 'annotation' && selection.annotationId === a.id;
         return (
-          <div key={a.id} className={`annotation-card${isSel ? ' selected' : ''}`}>
+          <div
+            key={a.id}
+            className={`annotation-card${isSel ? ' selected' : ''}`}
+            onKeyDown={(e) => {
+              // Arrow keys nudge the selected annotation (1% of the chart, 0.1% with Alt, 5% with Shift); typing in a field is left alone.
+              const t = e.target as HTMLElement;
+              if (!isSel || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || !e.key.startsWith('Arrow')) return;
+              e.preventDefault();
+              const step = e.shiftKey ? 0.05 : e.altKey ? 0.001 : 0.01;
+              const dx = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0;
+              const dy = e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0;
+              const clamp = (v: number) => Math.min(1, Math.max(0, Math.round(v * 1000) / 1000));
+              run('Move annotation', patchAnnotation(chart.id, a.id, { xFrac: clamp(a.xFrac + dx), yFrac: clamp(a.yFrac + dy) }), `ann:${a.id}:nudge`);
+            }}
+          >
             <button className="list-item" onClick={() => setSelection({ kind: 'annotation', annotationId: a.id })}>
               {a.text.split('\n')[0] || '(empty)'}
             </button>
@@ -234,7 +298,9 @@ export function AnnotationsTab({ chart }: { chart: Chart }) {
                 <Field label="Text">
                   <textarea rows={2} value={a.text} onChange={(e) => run('Edit annotation text', patchAnnotation(chart.id, a.id, { text: e.target.value }), `ann:${a.id}:text`)} />
                 </Field>
-                <NumField label="Size" unit="pt" value={a.fontSizePt} min={4} max={96} onCommit={(v) => run('Annotation size', patchAnnotation(chart.id, a.id, { fontSizePt: v }), `ann:${a.id}:size`)} />
+                <NumField label="Left" unit="% of chart width" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Position of the left edge of the text; arrow keys nudge a selected annotation (Shift 5%, Alt 0.1%)" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:x`)} />
+                <NumField label="Top" unit="% of chart height" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:y`)} />
+                <NumField label="Size" unit="pt" value={a.fontSizePt} min={8} max={192} onCommit={(v) => run('Annotation size', patchAnnotation(chart.id, a.id, { fontSizePt: v }), `ann:${a.id}:size`)} />
                 <Field label="Colour">
                   <ColorInput value={a.color} onChange={(v) => run('Annotation colour', patchAnnotation(chart.id, a.id, { color: v }), `ann:${a.id}:color`)} />
                 </Field>
@@ -338,7 +404,8 @@ function PaletteInfo({ paletteId }: { paletteId: string | null }) {
     <>
       <button className="icon-btn palette-info" aria-label="About this palette" title="About this palette" onClick={() => setOpen(true)}>i</button>
       {open && (
-        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
+        <DialogShell>
+        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)} onKeyDown={(e) => (e.key === 'Escape' ? setOpen(false) : trapTab(e))}>
           <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Colour palettes" tabIndex={-1} ref={(el) => el?.focus()}>
             <div className="modal-head">
               <strong>Colour palettes</strong>
@@ -375,6 +442,7 @@ function PaletteInfo({ paletteId }: { paletteId: string | null }) {
             </div>
           </div>
         </div>
+        </DialogShell>
       )}
     </>
   );

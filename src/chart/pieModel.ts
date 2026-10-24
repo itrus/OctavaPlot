@@ -162,8 +162,8 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   // Room for the labels round the pie when they are written outside it: the widest one that can occur, and one line.
   const biggest = Math.max(1, ...shown.flatMap((p) => p.g.observations.map((o) => (o.value !== null && Number.isFinite(o.value) ? o.value : 0))));
   const widest = Math.max(0, ...shown.map((p) => measureText(sliceLabelText(opts.labels, p.label, biggest, 1, opts.percentDigits) ?? '', labelPt, false, false, chart.fontFamily)));
-  const roomX = opts.labels === 'none' ? 6 : 8 + widest;
-  const roomY = opts.labels === 'none' ? 6 : 8 + labelPt * 1.2;
+  const roomX = opts.labels === 'none' ? 12 : 16 + widest;
+  const roomY = opts.labels === 'none' ? 12 : 16 + labelPt * 1.2;
   const { cols, rows: rowsDown, diameter } = pieGrid(Math.max(1, rows.length), plot.width, plot.height, roomX, roomY, titleBand);
   const cellW = plot.width / cols;
   const cellH = plot.height / rowsDown;
@@ -204,7 +204,7 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
       const mid = (a0 + a1) / 2;
       const content = sliceLabelText(opts.labels, p.label, w, fraction, opts.percentDigits);
       // The text sits outside the circle, on the side of its slice.
-      const pt = at(cx, cy, r + 8, mid);
+      const pt = at(cx, cy, r + 16, mid);
       const text = content === null ? null : { x: pt.x, y: pt.y, anchor: Math.abs(pt.x - cx) < r * 0.2 ? ('middle' as const) : pt.x > cx ? ('start' as const) : ('end' as const), content };
       return { id, groupId: p.g.id, label: p.label, value: w, fraction, path: slicePath(cx, cy, r, rInner, a0, a1), style: p.style, text };
     });

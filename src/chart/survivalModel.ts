@@ -91,12 +91,14 @@ export const numberAtRisk = (km: KaplanMeier, t: number): number => km.times.fil
 /**
  * Pointwise confidence interval of the estimate at a step (spec 15: Greenwood standard error). Plain: S +/- z SE with
  * SE = S sqrt(Greenwood sum), clipped to 0..1. Log-log: S^exp(+/- z SE_ll) with SE_ll = sqrt(Greenwood sum) / |ln S|,
- * which stays inside 0..1. Where the estimate is 0 or 1, or the variance is not finite, the interval is the estimate.
+ * which stays inside 0..1. Where a limit is undefined (the estimate is 0, the variance is not finite, or the log-log transform
+ * is taken at 1) there is no interval: null, and the band stops at the last finite bound (spec 15.2).
  */
-export function survivalInterval(step: Pick<SurvivalStep, 'survival' | 'greenwood'>, level: number, method: SurvivalBandMethod): [number, number] {
+export function survivalInterval(step: Pick<SurvivalStep, 'survival' | 'greenwood'>, level: number, method: SurvivalBandMethod): [number, number] | null {
   const s = step.survival;
   const g = step.greenwood;
-  if (!(s > 0 && s < 1) || !Number.isFinite(g) || !(level > 0 && level < 1)) return [s, s];
+  if (!(level > 0 && level < 1) || !(s >= 0 && s <= 1) || s === 0 || !Number.isFinite(g)) return null;
+  if (s === 1) return method === 'plain' ? [1, 1] : null;
   const z = normalQuantile(1 - (1 - level) / 2);
   if (method === 'plain') {
     const se = s * Math.sqrt(g);
@@ -152,8 +154,8 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   // 2. Scales: time from 0, fraction 0 to 1.
   const allT = raw.flatMap((r) => [...r.km.steps.map((x) => x.time), ...r.km.marks.map((m) => m.time)]);
   const linear = { scale: 'linear' as const, reverse: false };
-  const xAxis = resolveAxis({ values: allT.length ? [0, ...allT] : [], includeZero: true, min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 60))) }, { ...chart.xAxis, ...linear });
-  const yAxis = resolveAxis({ values: [0, 1], includeZero: true, min: chart.yAxis.min ?? 0, max: chart.yAxis.max ?? 1, majorInterval: chart.yAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(H / 50))) }, { ...chart.yAxis, ...linear });
+  const xAxis = resolveAxis({ values: allT.length ? [0, ...allT] : [], includeZero: true, min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) }, { ...chart.xAxis, ...linear });
+  const yAxis = resolveAxis({ values: [0, 1], includeZero: true, min: chart.yAxis.min ?? 0, max: chart.yAxis.max ?? 1, majorInterval: chart.yAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(H / 100))) }, { ...chart.yAxis, ...linear });
   warnings.push(...xAxis.warnings.map((w) => w.replace(/^Y /, 'X ').replace(/ Y limit/, ' X limit')), ...yAxis.warnings);
 
   // The at-risk table sits under the plot: one row per group and a heading, at the ticks of the time axis.
@@ -217,14 +219,21 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
       const upper: Array<[number, number]> = [[Math.max(0, x0), 1]];
       const lower: Array<[number, number]> = [[Math.max(0, x0), 1]];
       let prev: [number, number] = [1, 1];
+      let end = lastTime;
       for (const st of r.km.steps) {
-        const [lo, hi] = survivalInterval(st, opts.level, opts.method);
+        const interval = survivalInterval(st, opts.level, opts.method);
+        if (!interval) {
+          // No finite limit from here on: the band stops where the last one was, not extrapolated.
+          end = st.time;
+          break;
+        }
+        const [lo, hi] = interval;
         upper.push([st.time, prev[1]], [st.time, hi]);
         lower.push([st.time, prev[0]], [st.time, lo]);
         prev = [lo, hi];
       }
-      upper.push([lastTime, prev[1]]);
-      lower.push([lastTime, prev[0]]);
+      upper.push([end, prev[1]]);
+      lower.push([end, prev[0]]);
       const pt = ([t, v]: [number, number]) => `${n2(xScale(t))},${n2(yScale(level(v)))}`;
       bandPath = `M${upper.map(pt).join('L')}L${[...lower].reverse().map(pt).join('L')}Z`;
     }

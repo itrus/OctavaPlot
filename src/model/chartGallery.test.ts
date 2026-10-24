@@ -35,11 +35,11 @@ describe('graph gallery', () => {
     }
   });
 
-  it('planned graphs say which preset of the specification they are', () => {
+  it('planned graphs say which preset of the catalogue they are', () => {
     for (const k of KINDS) for (const i of galleryItems(k).filter((x) => x.type === null)) expect(i.spec).toMatch(/^[a-z_]+\.[a-z_]+$/);
   });
 
-  it('names the specification preset of every graph that is still planned', () => {
+  it('names the catalogue preset of every graph that is still planned', () => {
     const planned = KINDS.flatMap((k) => galleryItems(k).filter((i) => i.type === null));
     expect(planned.every((i) => !!i.spec)).toBe(true);
   });

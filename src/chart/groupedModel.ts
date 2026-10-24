@@ -4,7 +4,7 @@ import { resolveStyle } from '../model/style';
 import { resolveSummary } from '../model/summary';
 import { layoutOf, xySeries } from '../model/tableLayout';
 import type { Chart, ChartStyle, DataTable, Id } from '../model/types';
-import { chartPx2Pt, n2 } from '../model/units';
+import { chartPx2Pt, extent, n2 } from '../model/units';
 import { computeGroupStats, type GroupStats } from '../stats/summary';
 import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
 import { computeLayout, type Layout } from './layout';
@@ -154,7 +154,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       // A floating bar spans the replicate values, or the interval of values entered as limits.
       let span: [number, number] | null = null;
       if (floating) {
-        if (reps.length > 0) span = [Math.min(...reps.map((x) => x.value)), Math.max(...reps.map((x) => x.value))];
+        if (reps.length > 0) span = extent(reps.map((x) => x.value));
         else if (stats?.interval.status === 'ok' && stats.interval.lower !== null && stats.interval.upper !== null) span = [stats.interval.lower, stats.interval.upper];
       }
       return { row: r, ci, value, stats, count: contingency ? (values[0] ?? undefined) : undefined, reps, span };
@@ -174,7 +174,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       ? raw.flatMap((r) => r.cells.flatMap((c) => (c.value === null ? [] : floating ? (c.span ? [...c.span, c.value] : []) : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars, r.style.errorDirection) : [c.value]), ...(showDots(r.style) ? c.reps.map((x) => x.value) : [])])))
       : stackedTotals;
   const horizontal = chart.orientation === 'horizontal' && supportsHorizontal(chart.type);
-  const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? W / 60 : H / 50)));
+  const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? W / 120 : H / 100)));
   // Log scales suit values side by side or on lines, not stacked parts or percentages, so those stay linear.
   const axisCfg = arrangement === 'side' ? chart.yAxis : { ...chart.yAxis, scale: 'linear' as const, reverse: false };
   const yAxis = resolveAxis({

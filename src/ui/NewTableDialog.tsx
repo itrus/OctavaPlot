@@ -118,12 +118,13 @@ function GroupedSketch({ layout }: { layout: ReplicateLayout }) {
 
 function ContingencySketch() {
   const label = 62;
-  const cw = (W - label) / 3;
+  // The outcomes only: a Total column would count every subject twice if it were plotted with the others.
+  const cw = (W - label) / 2;
   const cells: Cell[] = [{ x: 0, y: 0, w: label, h: ROW, head: true }];
-  ['Cured', 'Not cured', 'Total'].forEach((t, i) => cells.push({ x: label + i * cw, y: 0, w: cw, h: ROW, text: t, head: true }));
+  ['Cured', 'Not cured'].forEach((t, i) => cells.push({ x: label + i * cw, y: 0, w: cw, h: ROW, text: t, head: true }));
   ['Treated', 'Control'].forEach((t, r) => {
     cells.push({ x: 0, y: (1 + r) * ROW, w: label, h: ROW, text: t });
-    ['38', '12', '50'].forEach((v, c) => cells.push({ x: label + c * cw, y: (1 + r) * ROW, w: cw, h: ROW, text: r === 0 ? v : ['21', '29', '50'][c], muted: true }));
+    (r === 0 ? ['38', '12'] : ['21', '29']).forEach((v, c) => cells.push({ x: label + c * cw, y: (1 + r) * ROW, w: cw, h: ROW, text: v, muted: true }));
   });
   return <Sketch cells={cells} rows={3} />;
 }
@@ -131,9 +132,10 @@ function ContingencySketch() {
 function SurvivalSketch() {
   const cw = (W - 22) / 3;
   const cells: Cell[] = [{ x: 0, y: 0, w: 22, h: ROW, head: true }];
-  ['Time (days)', 'Event (1/0)', 'Group'].forEach((t, i) => cells.push({ x: 22 + i * cw, y: 0, w: cw, h: ROW, text: t, head: true }));
+  // One column per group: a 1 (event) or 0 (censored) in the column of the group the subject belongs to, the other left empty.
+  ['Time (days)', 'Control', 'Treated'].forEach((t, i) => cells.push({ x: 22 + i * cw, y: 0, w: cw, h: ROW, text: t, head: true }));
   cells.push(...rowNumbers(1, 3, ROW));
-  [['12', '1', 'Control'], ['25', '0', 'Control'], ['31', '1', 'Treated']].forEach((row, r) => row.forEach((v, c) => cells.push({ x: 22 + c * cw, y: (r + 1) * ROW, w: cw, h: ROW, text: v, muted: true })));
+  [['12', '1', ''], ['25', '0', ''], ['31', '', '1']].forEach((row, r) => row.forEach((v, c) => cells.push({ x: 22 + c * cw, y: (r + 1) * ROW, w: cw, h: ROW, text: v, muted: true })));
   return <Sketch cells={cells} rows={4} />;
 }
 

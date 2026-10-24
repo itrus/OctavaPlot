@@ -5,14 +5,31 @@ import type { DataTable } from '../model/types';
 
 const NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 const COMMA_DECIMAL_RE = /^[+-]?\d+,\d+$/;
+/** A comma followed by exactly three digits reads as a decimal comma and as a thousands separator alike. */
+const AMBIGUOUS_COMMA_RE = /^[+-]?\d{1,3},\d{3}$/;
+/** Whole thousands written with points and a decimal comma: 1.234,5 */
+const POINT_THOUSANDS_RE = /^[+-]?\d{1,3}(\.\d{3})+(,\d+)?$/;
+const LEADING_POINT_DECIMAL_RE = /^[+-]?\d*\.\d+/;
+
+/** How numbers are written: by the decimal point, by the decimal comma, or either (a comma is taken as a decimal comma). */
+export type DecimalSeparator = 'auto' | 'point' | 'comma';
 
 type CellParse = { ok: true; value: number | null } | { ok: false; message: string };
 
 /** Empty text = missing observation (null). Anything else must be a finite number. */
-export function parseCell(text: string): CellParse {
+export function parseCell(text: string, separator: DecimalSeparator = 'auto'): CellParse {
   let t = text.trim();
   if (t === '') return { ok: true, value: null };
-  if (COMMA_DECIMAL_RE.test(t)) t = t.replace(',', '.');
+  if (separator === 'comma') {
+    if (POINT_THOUSANDS_RE.test(t)) t = t.replace(/\./g, '').replace(',', '.');
+    else if (COMMA_DECIMAL_RE.test(t)) t = t.replace(',', '.');
+    else if (LEADING_POINT_DECIMAL_RE.test(t) && !/[eE]/.test(t)) return { ok: false, message: `"${t}" uses a decimal point, but the decimal separator is set to comma (Settings)` };
+  } else if (COMMA_DECIMAL_RE.test(t)) {
+    if (separator === 'point') return { ok: false, message: `"${t}" uses a comma: write a decimal point, or set the decimal separator to comma in Settings` };
+    // Automatic: 1,5 is 1.5, but 1,234 could be 1.234 or one thousand two hundred thirty-four: it is not guessed.
+    if (AMBIGUOUS_COMMA_RE.test(t)) return { ok: false, message: `"${t}" is ambiguous (decimal comma or thousands separator): set the decimal separator in Settings` };
+    t = t.replace(',', '.');
+  }
   if (!NUMBER_RE.test(t)) return { ok: false, message: `"${text.trim()}" is not a number` };
   const value = Number(t);
   if (!Number.isFinite(value)) return { ok: false, message: `"${text.trim()}" is not a finite number` };
@@ -87,7 +104,7 @@ type BlockParse =
  * text, however numeric it looks) and the rest are values; titles is empty otherwise. Atomic:
  * any bad value rejects the whole block.
  */
-export function parseClipboardBlock(text: string, withTitles: boolean): BlockParse {
+export function parseClipboardBlock(text: string, withTitles: boolean, separator: DecimalSeparator = 'auto'): BlockParse {
   const titles: string[] = [];
   const matrix: Array<Array<number | null>> = [];
   const problems: string[] = [];
@@ -95,7 +112,7 @@ export function parseClipboardBlock(text: string, withTitles: boolean): BlockPar
     if (withTitles) titles.push(sanitizeRowTitle(fields[0]));
     const row: Array<number | null> = [];
     for (let c = withTitles ? 1 : 0; c < fields.length; c++) {
-      const p = parseCell(fields[c]);
+      const p = parseCell(fields[c], separator);
       if (p.ok) row.push(p.value);
       else {
         row.push(null);
@@ -104,6 +121,10 @@ export function parseClipboardBlock(text: string, withTitles: boolean): BlockPar
     }
     matrix.push(row);
   });
+  // Rows of unequal length are padded with missing values (an empty cell pastes as empty), so the block is a rectangle and
+  // no old value survives under a short row.
+  const width = matrix.reduce((m, r) => Math.max(m, r.length), 0);
+  for (const r of matrix) while (r.length < width) r.push(null);
   if (problems.length > 0) {
     return { ok: false, message: `Paste rejected, non-numeric values found (${problems.join('; ')}).` };
   }
@@ -178,12 +199,12 @@ type PasteResult = ({ ok: true } & PastePlan) | { ok: false; message: string };
  * One value (or title) over a larger selection fills it. A selection that spans the title column
  * and value cells is refused.
  */
-export function planPaste(text: string, b: CellBounds): PasteResult {
+export function planPaste(text: string, b: CellBounds, separator: DecimalSeparator = 'auto'): PasteResult {
   if (b.c0 < 0 && b.c1 >= 0) {
     return { ok: false, message: 'Paste rejected, the selection mixes the Row title column and value cells. Select one or the other.' };
   }
   const titleMode = b.c0 < 0;
-  const parsed = parseClipboardBlock(text, titleMode);
+  const parsed = parseClipboardBlock(text, titleMode, separator);
   if (!parsed.ok) return parsed;
   let { titles, matrix } = parsed;
   if (titleMode) {

@@ -153,3 +153,13 @@ describe('series of sub-columns on a graph', () => {
     expect(() => parseProject(JSON.stringify(file))).toThrow(/blocks of 4/);
   });
 });
+
+describe('supplied summaries', () => {
+  it('gives no error bar for a %CV with a mean of 0, and no made-up N', () => {
+    const z = suppliedStats('mean-cv-n', [0, 50, 4])!.stats;
+    expect(z.interval.status).toBe('none');
+    expect(suppliedStats('mean-sd-n', [10, 2, 2.5])!.stats.n).toBe(0);
+    expect(suppliedStats('mean-sd-n', [10, 2, -3])!.stats.n).toBe(0);
+    expect(suppliedStats('mean-sd-n', [10, 2, 6])!.stats.n).toBe(6);
+  });
+});

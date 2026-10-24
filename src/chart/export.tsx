@@ -7,9 +7,43 @@ import { buildAnyModel, ChartCanvas } from './anyModel';
  * selection outlines, hover helpers and hit-test attributes cannot leak in.
  * Output stays vector: paths, text and symbols.
  */
-export function chartToSvgString(chart: Chart, table: DataTable, fit?: FitSettings): string {
-  const markup = renderToStaticMarkup(<ChartCanvas chart={chart} any={buildAnyModel(chart, table, fit)} cssWidth={`${chart.widthPx}px`} cssHeight={`${chart.heightPx}px`} />);
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${markup}\n`;
+/**
+ * `metadata` (what the Export SVG command asks for) adds the title, the description and the chart-specific id prefixes that make
+ * the file self-describing and safe to place beside other exports; without it the drawing is the bare renderer output.
+ */
+export function chartToSvgString(chart: Chart, table: DataTable, fit?: FitSettings, options: { metadata?: boolean } = {}): string {
+  const any = buildAnyModel(chart, table, fit);
+  const markup = renderToStaticMarkup(<ChartCanvas chart={chart} any={any} cssWidth={`${chart.widthPx}px`} cssHeight={`${chart.heightPx}px`} />);
+  const described = options.metadata ? describeSvg(prefixIds(markup, chart.id), chart, table, any.model.warnings) : markup;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${described}\n`;
+}
+
+const escapeXml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const safeId = (id: string) => `octp-${id.replace(/[^A-Za-z0-9_-]/g, '')}`;
+
+/**
+ * Gives every id in the drawing (clip paths, patterns) a prefix taken from the chart, so two exported drawings placed in
+ * one page cannot take each other's clips; the references to them follow.
+ */
+function prefixIds(markup: string, chartId: string): string {
+  const prefix = `${safeId(chartId)}-`;
+  const ids = new Set([...markup.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]));
+  let out = markup;
+  for (const id of ids) {
+    out = out.split(` id="${id}"`).join(` id="${prefix}${id}"`).split(`url(#${id})`).join(`url(#${prefix}${id})`).split(`href="#${id}"`).join(`href="#${prefix}${id}"`);
+  }
+  return out;
+}
+
+/** Adds a title and a description to the opening of the <svg>, so the file says what it shows (and a reader can announce it). */
+function describeSvg(markup: string, chart: Chart, table: DataTable, notices: readonly string[]): string {
+  const end = markup.indexOf('>');
+  if (!markup.startsWith('<svg') || end < 0) return markup;
+  const title = (chart.showTitle && chart.title.trim() !== '' ? chart.title : chart.name).trim() || 'Chart';
+  const desc = `${chart.type} chart of the table "${table.name}"${notices.length > 0 ? `. Notices: ${notices.join(' ')}` : ''}`;
+  const base = safeId(chart.id);
+  const head = `${markup.slice(0, end).replace('<svg', '<svg role="img"')} aria-labelledby="${base}-title ${base}-desc">`;
+  return `${head}<title id="${base}-title">${escapeXml(title)}</title><desc id="${base}-desc">${escapeXml(desc)}</desc>${markup.slice(end + 1)}`;
 }
 
 /** Rasterise at `scale` x the chart's nominal CSS pixel size (96 px/in). */

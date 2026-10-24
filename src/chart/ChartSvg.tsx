@@ -4,6 +4,8 @@ import { n2 } from '../model/units';
 import { BarLabelText } from './BarLabelText';
 import { axisGaps, axisPieces } from './axisScale';
 import { Turned, AnnotationLayer, axisLineD, Backgrounds, BreakMarks, ChartTitles, type EditorState, FrameBox, PlotClip, ScaleBar, SELECT_COLOR } from './ChartParts';
+import { ReferenceLinesLayer } from './ReferenceLinesLayer';
+import { referenceLinesOf } from './referenceLines';
 import { BarMark, KeyMark } from './FillMarks';
 import { GridLines } from './GridLines';
 import { hitAttrs } from './hitTest';
@@ -108,7 +110,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
         {groups.map((g) => g.errorBar && (
           <g key={g.errorBar.id} {...hit('error', g.groupId, g.errorBar.id)}>
             <path d={g.errorBar.d} fill="none" stroke={g.errorBar.color} strokeWidth={g.errorBar.strokeWidth} strokeLinecap="butt" />
-            {ed && <path d={g.errorBar.d} fill="none" stroke="transparent" strokeWidth={8} />}
+            {ed && <path d={g.errorBar.d} fill="none" stroke="transparent" strokeWidth={16} />}
           </g>
         ))}
         {groups.map((g) => g.meanLine && (
@@ -159,6 +161,8 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
       {/* Right gridlines: dashed when the left grid is also drawn, so the two sets stay distinguishable. */}
       {y2R && <GridLines dir="h" grid={chart.grid} major={y2R.ticks} minor={y2R.minorTicks ?? []} showMajor={y2a.showGrid} showMinor={y2a.showMinorGrid} at={y2Scale} from={plot.x} to={plot.x + plot.width} fallbackDash={ya.visible && ya.showGrid ? '3 3' : undefined} />}
 
+      <ReferenceLinesLayer lines={referenceLinesOf(chart, { family: 'category', model }).placed} fontSizePt={ya.tickFontSizePt} />
+
       {/* Data marks, clipped to the plotting region. Error bars are independent of bars and symbols. */}
       <g clipPath="url(#plot-clip)">
         {onTop ? (
@@ -191,7 +195,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
       {ya.visible && (
         <g stroke={chart.axisColor} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y')}>
           <path d={axisLineD('y', plot.x, plot.y, plotBottom, valuePieces)} />
-          {ed && <path d={axisLineD('y', plot.x, plot.y, plotBottom, valuePieces)} stroke="transparent" strokeWidth={14} />}
+          {ed && <path d={axisLineD('y', plot.x, plot.y, plotBottom, valuePieces)} stroke="transparent" strokeWidth={28} />}
           <BreakMarks along="y" fixed={plot.x} gaps={valueGaps} mark={ya.breakMark} color={chart.axisColor} width={ya.lineWidthPt} />
           {tickPaths('left', plot.x, ya, y.ticks, y.minorTicks ?? [], model.yScale).map((p) => (
             <path key={p.key} d={p.d} strokeLinecap="butt" />
@@ -217,7 +221,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
       {y2R && (
         <g stroke={chart.axisColor} strokeWidth={y2a.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y2')}>
           <path d={`M${n2(plotRight)},${n2(plot.y)}V${n2(plotBottom)}`} />
-          {ed && <path d={`M${n2(plotRight)},${n2(plot.y)}V${n2(plotBottom)}`} stroke="transparent" strokeWidth={14} />}
+          {ed && <path d={`M${n2(plotRight)},${n2(plot.y)}V${n2(plotBottom)}`} stroke="transparent" strokeWidth={28} />}
           {tickPaths('right', plotRight, y2a, y2R.ticks, y2R.minorTicks ?? [], y2Scale).map((p) => (
             <path key={p.key} d={p.d} strokeLinecap="butt" />
           ))}
@@ -242,7 +246,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
       {xa.visible && (
         <g stroke={chart.axisColor} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'x')}>
           <path d={`M${n2(plot.x)},${n2(categoryAxisY)}H${n2(plot.x + plot.width)}`} />
-          {ed && <path d={`M${n2(plot.x)},${n2(categoryAxisY)}H${n2(plot.x + plot.width)}`} stroke="transparent" strokeWidth={14} />}
+          {ed && <path d={`M${n2(plot.x)},${n2(categoryAxisY)}H${n2(plot.x + plot.width)}`} stroke="transparent" strokeWidth={28} />}
           {groups.map((g) => (
             <path key={g.groupId} d={tickPath('bottom', g.centerX, categoryAxisY, xa)} strokeLinecap="butt" />
           ))}
@@ -270,7 +274,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
           {ya.visible && (
             <g stroke={chart.axisColor} strokeWidth={ya.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'y')}>
               <path d={axisLineD('x', plotBottom, plot.x, plotRight, clipX)} />
-              {ed && <path d={axisLineD('x', plotBottom, plot.x, plotRight, clipX)} stroke="transparent" strokeWidth={14} />}
+              {ed && <path d={axisLineD('x', plotBottom, plot.x, plotRight, clipX)} stroke="transparent" strokeWidth={28} />}
               <BreakMarks along="x" fixed={plotBottom} gaps={onPage(valueGaps)} mark={ya.breakMark} color={chart.axisColor} width={ya.lineWidthPt} />
               {tickPaths('bottom', plotBottom, ya, y.ticks, y.minorTicks ?? [], valueX).map((p) => (
                 <path key={p.key} d={p.d} strokeLinecap="butt" />
@@ -295,7 +299,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
           {xa.visible && (
             <g stroke={chart.axisColor} strokeWidth={xa.lineWidthPt} fill="none" strokeLinecap="square" {...hit('axis', undefined, 'x')}>
               <path d={`M${n2(categoryAxisX)},${n2(plot.y)}V${n2(plotBottom)}`} />
-              {ed && <path d={`M${n2(categoryAxisX)},${n2(plot.y)}V${n2(plotBottom)}`} stroke="transparent" strokeWidth={14} />}
+              {ed && <path d={`M${n2(categoryAxisX)},${n2(plot.y)}V${n2(plotBottom)}`} stroke="transparent" strokeWidth={28} />}
               {groups.map((g) => (
                 <path key={g.groupId} d={tickPath('left', categoryY(g.centerX), categoryAxisX, xa)} strokeLinecap="butt" />
               ))}
@@ -348,7 +352,7 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
           {model.labels.items.map((it) => {
             const color = it.color ?? chart.textColor;
             return it.leader ? (
-              <path key={`leader-${it.id}`} d={`M${n2(it.leader.x1)},${n2(it.leader.y1)}L${n2(it.leader.x2)},${n2(it.leader.y2)}`} fill="none" stroke={color} strokeWidth={0.5} />
+              <path key={`leader-${it.id}`} d={`M${n2(it.leader.x1)},${n2(it.leader.y1)}L${n2(it.leader.x2)},${n2(it.leader.y2)}`} fill="none" stroke={color} strokeWidth={1} />
             ) : null;
           })}
           {model.labels.items.map((it) => {
@@ -378,11 +382,11 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
       {/* Editor-only selection overlay: never rendered in export. */}
       {ed && selectedPoint &&
         groups.flatMap((g) => g.points.filter((p) => p.id === selectedPoint)).map((p) => (
-          <circle key={`ring-${p.id}`} data-editor-only cx={n2(p.cx)} cy={n2(p.cy)} r={n2(p.size / 2 + 3)} fill="none" stroke={SELECT_COLOR} strokeWidth={1.2} pointerEvents="none" />
+          <circle key={`ring-${p.id}`} data-editor-only cx={n2(p.cx)} cy={n2(p.cy)} r={n2(p.size / 2 + 6)} fill="none" stroke={SELECT_COLOR} strokeWidth={2.4} pointerEvents="none" />
         ))}
       {ed && selectedPoint &&
         model.labels.items.filter((it) => it.id === selectedPoint).map((it) => (
-          <rect key={`label-sel-${it.id}`} data-editor-only x={n2(it.box.x0 - 2)} y={n2(it.box.y0 - 2)} width={n2(it.box.x1 - it.box.x0 + 4)} height={n2(it.box.y1 - it.box.y0 + 4)} fill="none" stroke={SELECT_COLOR} strokeWidth={1} strokeDasharray="3 2" pointerEvents="none" />
+          <rect key={`label-sel-${it.id}`} data-editor-only x={n2(it.box.x0 - 4)} y={n2(it.box.y0 - 4)} width={n2(it.box.x1 - it.box.x0 + 8)} height={n2(it.box.y1 - it.box.y0 + 8)} fill="none" stroke={SELECT_COLOR} strokeWidth={2} strokeDasharray="6 4" pointerEvents="none" />
         ))}
 
       {ed && selectedGroup &&
@@ -399,8 +403,8 @@ export const ChartSvg = forwardRef<SVGSVGElement, Props>(function ChartSvg({ cha
               fill={SELECT_COLOR}
               fillOpacity={0.07}
               stroke={SELECT_COLOR}
-              strokeWidth={1}
-              strokeDasharray="4 3"
+              strokeWidth={2}
+              strokeDasharray="8 6"
               pointerEvents="none"
             />
           ))}

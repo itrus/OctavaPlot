@@ -1,4 +1,5 @@
 import { leadingColumns, usesSeriesBlocks } from './chartTypes';
+import { withoutExcluded } from './exclusion';
 import { applyOrder } from './groupOrder';
 import { tableSeriesWidth, xySeries } from './tableLayout';
 import type { Chart, DataTable, Group, Id, Project } from './types';
@@ -40,6 +41,11 @@ export function graphSources(p: Project, chart: Chart): GraphSource[] {
  * Without hidden or added data sets this is the chart's own table itself.
  */
 export function effectiveTable(p: Project, chart: Chart): DataTable | undefined {
+  const table = effectiveTableWithExcluded(p, chart);
+  return table && withoutExcluded(table);
+}
+
+function effectiveTableWithExcluded(p: Project, chart: Chart): DataTable | undefined {
   const own = tableById(p, chart.dataTableId);
   if (!own) return undefined;
   if (chart.hiddenGroupIds.length === 0 && chart.extraGroups.length === 0 && chart.groupOrder.length === 0) return own;
@@ -49,6 +55,7 @@ export function effectiveTable(p: Project, chart: Chart): DataTable | undefined 
   const blocks = usesSeriesBlocks(own.kind);
   if (blocks) for (const s of xySeries(own)) if (hidden.has(s.id)) s.columns.forEach((c) => hiddenColumns.add(c.id));
   const picked: Group[] = blocks ? own.groups.filter((g) => !hiddenColumns.has(g.id)) : own.groups.filter((g) => !hidden.has(g.id));
+  const ownCount = picked.length;
   for (const e of chart.extraGroups) {
     const g = tableById(p, e.tableId)?.groups.find((x) => x.id === e.groupId);
     if (g && e.tableId !== chart.dataTableId && !blocks) {
@@ -56,11 +63,13 @@ export function effectiveTable(p: Project, chart: Chart): DataTable | undefined 
       picked.push({ ...g, name: `${tableById(p, e.tableId)!.name}: ${g.name}` });
     }
   }
+  const ownPaletteEnd = Math.max(-1, ...own.groups.map((g) => g.paletteIndex)) + 1;
   const rowCount = Math.max(own.rowCount, ...picked.map((g) => g.observations.length));
   const unordered = picked.map((g, i) => ({
     ...g,
-    // Colours follow position on this graph, so data sets from different tables do not share a colour by accident.
-    paletteIndex: i,
+    // A data set of the graph's own table keeps its colour whatever is hidden or reordered; data sets added from other
+    // tables take fresh colours after the table's own, so they do not share a colour by accident.
+    paletteIndex: i < ownCount ? g.paletteIndex : ownPaletteEnd + (i - ownCount),
     observations:
       g.observations.length === rowCount
         ? g.observations

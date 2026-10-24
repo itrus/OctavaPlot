@@ -4,7 +4,7 @@ import { newId } from '../model/ids';
 import type { AnalysisKind, ChartType, Id, TableKind, ViewRef } from '../model/types';
 import type { ChartVariant } from '../model/chartVariant';
 import { useApp } from '../state/AppContext';
-import { addAnalysis, addChart, addDataTable, renameItem, type NewTableOptions } from '../state/commands';
+import { addAnalysis, addChart, addDataTable, duplicateAnalysis, duplicateChart, duplicateTable, removeChart, removeTable, renameItem, removeAnalysis, type NewTableOptions } from '../state/commands';
 import { NewAnalysisDialog } from './NewAnalysisDialog';
 import { NewGraphDialog } from './NewGraphDialog';
 import { analysesOf } from '../model/analysis';
@@ -28,7 +28,7 @@ const LOCKED_SECTIONS = ['Layouts'] as const;
 
 export function Navigator() {
   const [renaming, setRenaming] = useState<string | null>(null);
-  const { project, view, setView, run, settings } = useApp();
+  const { project, view, setView, run, settings, setStatus } = useApp();
   const [open, setOpen] = useState<Record<Folder, boolean>>({ tables: true, results: true, graphs: true });
 
   const currentTableId =
@@ -53,6 +53,42 @@ export function Navigator() {
     run('New graph', addChart(id, tableId, { widthPx: settings.defaultChartWidthPx, heightPx: settings.defaultChartHeightPx }, type, variant));
     setView({ kind: 'chart', id });
     setDialog(null);
+  };
+
+  // Duplicate and delete act on the item on screen; both can be undone.
+  const current = view.kind === 'table' ? project.dataTables.find((t) => t.id === view.id) : view.kind === 'chart' ? project.charts.find((c) => c.id === view.id) : (project.analyses ?? []).find((a) => a.id === view.id);
+  const duplicateCurrent = () => {
+    if (!current) return;
+    if (view.kind === 'table') {
+      const id = newId('table');
+      run('Duplicate table', duplicateTable(view.id, id));
+      setView({ kind: 'table', id });
+    } else if (view.kind === 'chart') {
+      const id = newId('chart');
+      run('Duplicate graph', duplicateChart(view.id, id));
+      setView({ kind: 'chart', id });
+    } else {
+      const id = newId('analysis');
+      run('Duplicate analysis', duplicateAnalysis(view.id, id));
+      setView({ kind: 'analysis', id });
+    }
+    setStatus(`Duplicated ${current.name}.`);
+  };
+  const deleteCurrent = () => {
+    if (!current) return;
+    if (view.kind === 'table') {
+      if (project.dataTables.length <= 1) return;
+      const graphs = project.charts.filter((c) => c.dataTableId === view.id).length;
+      const results = (project.analyses ?? []).filter((a) => a.dataTableId === view.id).length;
+      run('Delete table', removeTable(view.id));
+      setStatus(`Deleted ${current.name}${graphs + results > 0 ? ` with ${graphs} graph${graphs === 1 ? '' : 's'} and ${results} result${results === 1 ? '' : 's'} that used it` : ''}. Undo (Ctrl+Z) restores it.`);
+    } else if (view.kind === 'chart') {
+      run('Delete graph', removeChart(view.id));
+      setStatus(`Deleted ${current.name}. Undo (Ctrl+Z) restores it.`);
+    } else {
+      run('Delete analysis', removeAnalysis(view.id));
+      setStatus(`Deleted ${current.name}. Undo (Ctrl+Z) restores it.`);
+    }
   };
 
   const folder = (key: Folder, title: string) => (
@@ -124,6 +160,12 @@ export function Navigator() {
             </button>
           ))}
         </div>
+        {current && (
+          <div className="nav-actions" role="group" aria-label={`Actions for ${current.name}`}>
+            <button onClick={duplicateCurrent} title="Make a copy of the item on screen">Duplicate</button>
+            <button onClick={deleteCurrent} disabled={view.kind === 'table' && project.dataTables.length <= 1} title={view.kind === 'table' ? 'Delete this table and the graphs and results that use it (can be undone)' : 'Delete this item (can be undone)'}>Delete</button>
+          </div>
+        )}
       </div>
       {/* In the page body, not in the (sliding) panel, so the dialog is positioned against the window. */}
       {dialog === 'table' && createPortal(<NewTableDialog defaultSample={!settings.newProjectEmpty} onCreate={createTable} onClose={() => setDialog(null)} />, document.body)}

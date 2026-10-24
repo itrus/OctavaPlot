@@ -34,14 +34,14 @@ export const FRAME_STYLES: ReadonlyArray<{ value: FrameStyle; label: string }> =
   { value: 'box', label: 'Box' },
 ];
 
-export const GRID_LIMITS = { widthPt: { min: 0.1, max: 5 } } as const;
+export const GRID_LIMITS = { widthPt: { min: 0.2, max: 10 } } as const;
 
 const LINES = valuesOf(LINE_STYLES);
 const FRAMES = valuesOf(FRAME_STYLES);
 export const LINE_ORDERS: ReadonlyArray<LineOrder> = ['auto', 'onTop', 'underneath'];
 const ORIENTATIONS: readonly ChartOrientation[] = ['vertical', 'horizontal'];
 
-/** Lengths of the dashes and gaps of each pattern, in units of the line's width (a line thinner than 1 pt counts as 1 pt). */
+/** Lengths of the dashes and gaps of each pattern, in units of the line's width (a line thinner than 2 pt counts as 2 pt). */
 const DASHES: Record<LineStyle, readonly number[]> = {
   solid: [],
   longDash: [8, 4],
@@ -52,8 +52,8 @@ const DASHES: Record<LineStyle, readonly number[]> = {
 };
 
 /** Dash pattern of a line style at a line width (undefined = solid). */
-export const dashOf = (style: LineStyle, widthPt = 1): string | undefined => {
-  const unit = Math.max(1, widthPt);
+export const dashOf = (style: LineStyle, widthPt = 2): string | undefined => {
+  const unit = Math.max(2, widthPt);
   const lengths = DASHES[style];
   return lengths.length === 0 ? undefined : lengths.map((n) => Number((n * unit).toFixed(2))).join(' ');
 };
@@ -61,8 +61,8 @@ export const dashOf = (style: LineStyle, widthPt = 1): string | undefined => {
 /** The attributes that draw a series line in its pattern: round ends for a solid line, square-cut ones so dashes and dots stay what they are. */
 export const linePattern = (s: { lineStyle: LineStyle; lineWidthPt: number }) => ({ strokeDasharray: dashOf(s.lineStyle, s.lineWidthPt), strokeLinecap: s.lineStyle === 'solid' ? ('round' as const) : ('butt' as const) });
 
-/** Width of the colour key in the legend, pt: 18 for a rectangle, 10 for a square (its height is 10). */
-export const legendKeyWidthPt = (shape: LegendKeyShape): number => (shape === 'square' ? 10 : 18);
+/** Width of the colour key in the legend, pt: 36 for a rectangle, 20 for a square (its height is 20). */
+export const legendKeyWidthPt = (shape: LegendKeyShape): number => (shape === 'square' ? 20 : 36);
 
 type Look = Pick<Chart, 'origin' | 'orientation' | 'lineOrder' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
 

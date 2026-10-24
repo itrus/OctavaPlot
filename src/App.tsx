@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { effectiveTable } from './model/chartTable';
 import { AppProvider, useApp } from './state/AppContext';
-import { parseProjectWithNotes, stringifyProject } from './state/serialize';
+import { PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile } from './state/projectFile';
 import { Navigator } from './ui/Navigator';
+import { Splitter } from './ui/Splitter';
 import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIcon } from './ui/icons';
 import { setProjectName } from './state/commands';
 import { InfoDialog } from './ui/InfoDialog';
@@ -34,11 +35,29 @@ function PanelIcon({ side }: { side: 'left' | 'right' }) {
 }
 
 function Shell() {
-  const { project, view, run, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, zoom, setZoom, tableZoom, setTableZoom, settings, requestFit, inspectorNav } = useApp();
+  const { project, view, run, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, autosaveOk, zoom, setZoom, tableZoom, setTableZoom, settings, requestFit, inspectorNav } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   // Panels are only hidden (never unmounted), so their selections and edits survive a collapse.
   const [navOpen, setNavOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
+  // Panel widths (px), changed with the splitters; a narrow window starts with the panels folded away.
+  const [navW, setNavW] = useState(250);
+  const [inspW, setInspW] = useState(360);
+  useEffect(() => {
+    const narrow = window.matchMedia('(max-width: 1100px)');
+    const veryNarrow = window.matchMedia('(max-width: 800px)');
+    const apply = () => {
+      if (narrow.matches) setNavOpen(false);
+      if (veryNarrow.matches) setInspectorOpen(false);
+    };
+    apply();
+    narrow.addEventListener('change', apply);
+    veryNarrow.addEventListener('change', apply);
+    return () => {
+      narrow.removeEventListener('change', apply);
+      veryNarrow.removeEventListener('change', apply);
+    };
+  }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   // Clicking a chart element brings up its settings, even when the inspector was collapsed.
@@ -66,17 +85,19 @@ function Shell() {
   }, [undo, redo]);
 
   const saveProject = async () => {
-    const json = stringifyProject(project);
-    const suggested = exportFileName(project.name, 'json', settings.timestampExports);
+    // What is written is this snapshot: edits made while the file is being written stay unsaved.
+    const snapshot = project;
+    const json = projectToFileText(snapshot);
+    const suggested = exportFileName(project.name, PROJECT_EXTENSION.slice(1), settings.timestampExports);
     // Browsers with the File System Access API ask where to save and under what name; others download the suggested name.
     const picker = (window as unknown as { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
     if (picker) {
       try {
-        const handle = await picker({ suggestedName: suggested, types: [{ description: 'OctavaPlot project', accept: { 'application/json': ['.json'] } }] });
+        const handle = await picker({ suggestedName: suggested, types: [{ description: 'OctavaPlot project', accept: { [PROJECT_MIME]: [PROJECT_EXTENSION] } }] });
         const writable = await handle.createWritable();
         await writable.write(json);
         await writable.close();
-        markSaved();
+        markSaved(snapshot);
         setStatus(`Project saved as ${handle.name}.`);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return; // the dialog was cancelled
@@ -84,8 +105,8 @@ function Shell() {
       }
       return;
     }
-    downloadBlob(new Blob([json], { type: 'application/json' }), suggested);
-    markSaved();
+    downloadBlob(new Blob([json], { type: PROJECT_MIME }), suggested);
+    markSaved(snapshot);
     setStatus(`Project saved to ${suggested}.`);
   };
 
@@ -98,7 +119,7 @@ function Shell() {
 
   const openProject = async (file: File) => {
     try {
-      const { project: p, notes } = parseProjectWithNotes(await file.text());
+      const { project: p, notes } = await readProjectFile(file);
       replaceProject(p);
       setStatus(
         notes.length === 0
@@ -123,7 +144,7 @@ function Shell() {
       className="app"
       data-nav={navOpen ? 'open' : 'closed'}
       data-insp={chart && inspectorOpen ? 'open' : 'closed'}
-      style={{ '--nav-w': navOpen ? '250px' : '0px', '--insp-w': chart && inspectorOpen ? '360px' : '0px' } as CSSProperties}
+      style={{ '--nav-w': navOpen ? `${navW}px` : '0px', '--insp-w': chart && inspectorOpen ? `${inspW}px` : '0px', '--nav-px': `${navW}px`, '--insp-px': `${inspW}px` } as CSSProperties}
     >
       <header className="topbar">
         <button
@@ -155,7 +176,7 @@ function Shell() {
         <input
           ref={fileRef}
           type="file"
-          accept=".json,application/json"
+          accept={PROJECT_EXTENSION}
           hidden
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -178,6 +199,8 @@ function Shell() {
         </button>
       </header>
       <Navigator />
+      {navOpen && <Splitter side="nav" width={navW} min={180} max={480} onWidth={setNavW} label="Resize the navigation panel" />}
+      {chart && inspectorOpen && <Splitter side="insp" width={inspW} min={260} max={640} onWidth={setInspW} label="Resize the inspector" />}
       <main className="workspace">
         <Suspense fallback={<div className="empty">Loading…</div>}>
           {table && <DataTableView table={table} />}
@@ -193,6 +216,7 @@ function Shell() {
       )}
       <footer className="statusbar">
         <span className="statusbar-message" role="status">{status}</span>
+        {settings.autosave && !autosaveOk && <span className="statusbar-warning" role="alert">Autosave failed: save the project to a file. Retrying…</span>}
         {(chart || table) && (
           <span className="zoom">
             <button className="icon-btn" aria-label="Zoom out" onClick={() => setActiveZoom(Math.max(0.25, Math.round((activeZoom - 0.25) * 100) / 100))}>−</button>

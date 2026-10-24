@@ -41,7 +41,7 @@ export function barFillFixture(opts: { opacity?: boolean } = {}): Project {
   const commands = groups.map((g, i) => {
     const patch: Partial<ChartStyle> =
       i < BAR_FILL_PATTERN_COUNT
-        ? { ...common, barFillMode: 'pattern', barPattern: FILL_PATTERNS[i], barPatternSpacingPt: 6, barPatternWidthPt: 1 }
+        ? { ...common, barFillMode: 'pattern', barPattern: FILL_PATTERNS[i], barPatternSpacingPt: 12, barPatternWidthPt: 2 }
         : i === BAR_FILL_PATTERN_COUNT
           ? { ...common, barFillMode: 'solid' }
           : { ...common, barFillMode: 'none' };

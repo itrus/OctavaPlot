@@ -28,7 +28,9 @@ export interface FitModel {
 }
 
 const mean = (a: readonly number[]) => a.reduce((s, v) => s + v, 0) / a.length;
-const range = (a: readonly number[]): [number, number] => [Math.min(...a), Math.max(...a)];
+const minOf = (a: readonly number[]) => a.reduce((m, v) => (v < m ? v : m), Infinity);
+const maxOf = (a: readonly number[]) => a.reduce((m, v) => (v > m ? v : m), -Infinity);
+const range = (a: readonly number[]): [number, number] => [minOf(a), maxOf(a)];
 const trendSign = (xs: readonly number[], ys: readonly number[]) => {
   const mx = mean(xs);
   const my = mean(ys);
@@ -120,8 +122,8 @@ export const FIT_MODELS: readonly FitModel[] = [
     paramNames: () => ['c (baseline)', 'A (height)', 'mu (centre)', 'sigma (width)'],
     fn: (x, p) => p[0] + p[1] * Math.exp(-0.5 * ((x - p[2]) / p[3]) ** 2),
     init: (xs, ys) => {
-      const base = Math.min(...ys);
-      const top = Math.max(...ys);
+      const base = minOf(ys);
+      const top = maxOf(ys);
       const at = xs[ys.indexOf(top)];
       const [x0, x1] = range(xs);
       return [base, top - base, at, Math.max((x1 - x0) / 6, 1e-12)];
@@ -137,7 +139,7 @@ export const FIT_MODELS: readonly FitModel[] = [
     paramNames: () => ['c (offset)', 'V (maximum)', 'K (half-saturation)'],
     fn: (x, p) => p[0] + (p[1] * x) / (p[2] + x),
     init: (xs, ys) => {
-      const top = Math.max(...ys);
+      const top = maxOf(ys);
       return [0, top, Math.max(mean(xs), 1e-12)];
     },
     lower: () => [-INF, -INF, 1e-12],
@@ -268,6 +270,8 @@ export interface FitResult {
 export interface FitOptions {
   model: FitModelId;
   degree?: number;
+  /** Confidence level of the parameter intervals and of the bands (default 0.95). */
+  level?: number;
   maxIterations?: number;
   relativeTolerance?: number;
 }
@@ -346,18 +350,97 @@ function levenbergMarquardt(model: FitModel, xs: readonly number[], ys: readonly
   return { p, converged: false };
 }
 
-/** Least squares for a model that is linear in its parameters (a line or a polynomial), by normal equations on scaled columns. */
-function linearLeastSquares(xs: readonly number[], ys: readonly number[], degree: number): { p: number[]; design: Mat } | null {
+/** Inverse of an upper-triangular matrix. */
+function invertUpper(r: Mat): Mat {
+  const n = r.length;
+  const inv: Mat = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  for (let j = 0; j < n; j++) {
+    inv[j][j] = 1 / r[j][j];
+    for (let i = j - 1; i >= 0; i--) {
+      let s = 0;
+      for (let k = i + 1; k <= j; k++) s += r[i][k] * inv[k][j];
+      inv[i][j] = -s / r[i][i];
+    }
+  }
+  return inv;
+}
+
+/** Least squares of y on the columns of `design` by Householder QR; null when the columns are (numerically) dependent. */
+function qrLeastSquares(design: Mat, y: readonly number[]): { b: number[]; unscaledCov: Mat } | null {
+  const n = design.length;
+  const m = design[0].length;
+  const a = design.map((row) => [...row]);
+  const q = [...y];
+  const colNorm = Array.from({ length: m }, (_, k) => Math.sqrt(a.reduce((s, row) => s + row[k] * row[k], 0)));
+  for (let k = 0; k < m; k++) {
+    let norm = 0;
+    for (let i = k; i < n; i++) norm += a[i][k] * a[i][k];
+    norm = Math.sqrt(norm);
+    if (!(norm > 1e-12 * Math.max(colNorm[k], 1e-300))) return null;
+    const alpha = a[k][k] > 0 ? -norm : norm;
+    const v = new Array<number>(n).fill(0);
+    for (let i = k; i < n; i++) v[i] = a[i][k];
+    v[k] -= alpha;
+    let vv = 0;
+    for (let i = k; i < n; i++) vv += v[i] * v[i];
+    if (vv === 0) continue;
+    for (let c = k; c < m; c++) {
+      let dot = 0;
+      for (let i = k; i < n; i++) dot += v[i] * a[i][c];
+      const f = (2 * dot) / vv;
+      for (let i = k; i < n; i++) a[i][c] -= f * v[i];
+    }
+    let dot = 0;
+    for (let i = k; i < n; i++) dot += v[i] * q[i];
+    const f = (2 * dot) / vv;
+    for (let i = k; i < n; i++) q[i] -= f * v[i];
+  }
+  const r: Mat = Array.from({ length: m }, (_, i) => Array.from({ length: m }, (_, j) => (j >= i ? a[i][j] : 0)));
+  for (let k = 0; k < m; k++) if (!(Math.abs(r[k][k]) > 1e-12 * Math.max(colNorm[k], 1e-300))) return null;
+  const b = new Array<number>(m).fill(0);
+  for (let i = m - 1; i >= 0; i--) {
+    let s = q[i];
+    for (let k = i + 1; k < m; k++) s -= r[i][k] * b[k];
+    b[i] = s / r[i][i];
+  }
+  const rInv = invertUpper(r);
+  const unscaledCov: Mat = Array.from({ length: m }, (_, i) => Array.from({ length: m }, (_, j) => rInv[i].reduce((s, v, k) => s + v * rInv[j][k], 0)));
+  return { b, unscaledCov };
+}
+
+const binomial = (n: number, k: number) => {
+  let c = 1;
+  for (let i = 1; i <= k; i++) c = (c * (n - k + i)) / i;
+  return c;
+};
+
+/** The linear fit in the centred, scaled variable u = (x - centre) / scale; `transform` takes its coefficients to those in x. */
+interface LinearFit {
+  p: number[];
+  transform: Mat;
+  b: number[];
+  unscaledCov: Mat;
+  centre: number;
+  scale: number;
+}
+
+/**
+ * Least squares for a model that is linear in its parameters. X is centred and scaled first so that a shifted origin or other
+ * units do not matter; the fit is by QR, and the coefficients are returned in the original X.
+ */
+function linearLeastSquares(xs: readonly number[], ys: readonly number[], degree: number): LinearFit | null {
   const cols = degree + 1;
-  const design: Mat = xs.map((x) => Array.from({ length: cols }, (_, k) => x ** k));
-  // Scale each column to unit size so the normal equations are not ill-conditioned by x^k.
-  const scale = Array.from({ length: cols }, (_, k) => Math.max(1e-300, ...design.map((row) => Math.abs(row[k]))));
-  const scaled = design.map((row) => row.map((v, k) => v / scale[k]));
-  const a = jtj(scaled);
-  const b = Array.from({ length: cols }, (_, k) => scaled.reduce((s, row, i) => s + row[k] * ys[i], 0));
-  const sol = solve(a, b);
-  if (!sol) return null;
-  return { p: sol.map((v, k) => v / scale[k]), design };
+  const centre = mean(xs);
+  const scale = xs.reduce((m, x) => Math.max(m, Math.abs(x - centre)), 0) || 1;
+  const design: Mat = xs.map((x) => Array.from({ length: cols }, (_, k) => ((x - centre) / scale) ** k));
+  const ls = qrLeastSquares(design, ys);
+  if (!ls) return null;
+  // Values that are all equal have the constant as their exact fit: rounding noise must not make a sloped curve of it.
+  if (ys.every((v) => v === ys[0])) ls.b = ls.b.map((_, k) => (k === 0 ? ys[0] : 0));
+  // a_i = sum_j b_j scale^-j C(j,i) (-centre)^(j-i)
+  const transform: Mat = Array.from({ length: cols }, (_, i) => Array.from({ length: cols }, (_, j) => (j >= i ? (binomial(j, i) * (-centre) ** (j - i)) / scale ** j : 0)));
+  const p = transform.map((row) => row.reduce((s, t, j) => s + t * ls.b[j], 0));
+  return { p, transform, b: ls.b, unscaledCov: ls.unscaledCov, centre, scale };
 }
 
 /**
@@ -378,24 +461,47 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
   const ys = pts.map((q) => q.y);
   if (new Set(xs).size < Math.min(needed, 2)) return { failed: true, message: 'The points have the same X: no curve can be fitted.' };
 
+  const level = options.level !== undefined && options.level > 0 && options.level < 1 ? options.level : 0.95;
   let params: number[];
   let converged = true;
-  let jac: Mat;
+  /** Evaluates the curve, the gradient with respect to the working parameters, and their covariance (unit sigma). */
+  let evalAt: (x: number, q: readonly number[]) => number;
+  let gradientAt: (x: number) => number[];
+  let unscaledCov: Mat | null;
+  /** Takes the covariance of the working parameters to that of the reported ones. */
+  let toReported: (c: Mat) => Mat;
+  let working: number[];
   if (model.linear) {
     const ls = linearLeastSquares(xs, ys, degree);
     if (!ls) return { failed: true, message: 'The fit is singular: the points do not fix the parameters.' };
     params = ls.p;
-    jac = ls.design;
+    working = ls.b;
+    evalAt = (x, q) => model.fn((x - ls.centre) / ls.scale, q);
+    gradientAt = (x) => Array.from({ length: p }, (_, k) => ((x - ls.centre) / ls.scale) ** k);
+    unscaledCov = ls.unscaledCov;
+    toReported = (c) => ls.transform.map((ti) => ls.transform.map((tj) => ti.reduce((s, a, k) => s + a * tj.reduce((t, bb, l) => t + c[k][l] * bb, 0), 0)));
   } else {
+    // Work in parameters divided by their starting size, so that no parameter is small against the finite-difference step.
     const start = model.init(xs, ys, degree);
-    const lo = model.lower ? model.lower(p) : new Array<number>(p).fill(-Infinity);
-    const hi = model.upper ? model.upper(p) : new Array<number>(p).fill(Infinity);
-    const r = levenbergMarquardt(model, xs, ys, start, lo, hi, options.maxIterations ?? MAX_ITERATIONS, options.relativeTolerance ?? REL_TOL);
-    params = r.p;
+    const yScale = Math.max(maxOf(ys.map(Math.abs)), 1e-300);
+    const scales = start.map((v) => (Math.abs(v) > 0 && Number.isFinite(v) ? Math.abs(v) : yScale));
+    const scaledModel: FitModel = { ...model, fn: (x, t) => model.fn(x, t.map((v, i) => v * scales[i])) };
+    const lo = (model.lower ? model.lower(p) : new Array<number>(p).fill(-Infinity)).map((v, i) => v / scales[i]);
+    const hi = (model.upper ? model.upper(p) : new Array<number>(p).fill(Infinity)).map((v, i) => v / scales[i]);
+    const r = levenbergMarquardt(scaledModel, xs, ys, start.map((v, i) => v / scales[i]), lo, hi, options.maxIterations ?? MAX_ITERATIONS, options.relativeTolerance ?? REL_TOL);
+    working = r.p;
+    params = r.p.map((v, i) => v * scales[i]);
     converged = r.converged;
-    jac = numericJacobian(model, xs, params);
+    evalAt = (x, q) => scaledModel.fn(x, q);
+    gradientAt = (x) => numericJacobian(scaledModel, [x], working)[0];
+    const inv0 = invert(jtj(numericJacobian(scaledModel, xs, working)));
+    unscaledCov = inv0;
+    toReported = (c) => c.map((row, i) => row.map((v, j) => v * scales[i] * scales[j]));
   }
-  const rss = cost(model, xs, ys, params);
+  const predict = (x: number) => evalAt(x, working);
+  let rss = 0;
+  for (let i = 0; i < xs.length; i++) rss += (ys[i] - predict(xs[i])) ** 2;
+  if (!Number.isFinite(rss)) rss = Infinity;
   if (!Number.isFinite(rss)) return { failed: true, message: 'The fit did not give a curve (the values overflowed).' };
   const n = xs.length;
   const df = n - p;
@@ -404,35 +510,31 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
   const tss = ys.reduce((s, v) => s + (v - my) ** 2, 0);
   const rSquared = tss > 0 ? 1 - rss / tss : null;
 
-  // Covariance of the parameters: sigma^2 (J'J)^-1; unavailable without degrees of freedom or when J'J is singular.
-  const inv = df > 0 ? invert(jtj(jac)) : null;
-  const cov = inv && sigma !== null ? inv.map((row) => row.map((v) => v * sigma * sigma)) : null;
-  const se = (k: number): number | null => (cov && cov[k][k] >= 0 ? Math.sqrt(cov[k][k]) : null);
-  const tcrit = (level: number) => studentTQuantileUpper((1 - level) / 2, df);
+  // Covariance of the parameters: sigma^2 (J'J)^-1. Unavailable without degrees of freedom, when J'J is singular, and
+  // when the fit did not settle (a local approximation about a point that is not the minimum says nothing true).
+  const cov = converged && df > 0 && unscaledCov && sigma !== null ? unscaledCov.map((row) => row.map((v) => v * sigma * sigma)) : null;
+  const reportedCov = cov ? toReported(cov) : null;
+  const se = (k: number): number | null => (reportedCov && reportedCov[k][k] >= 0 ? Math.sqrt(reportedCov[k][k]) : null);
+  const tcrit = (lv: number) => studentTQuantileUpper((1 - lv) / 2, df);
+  const t0 = tcrit(level);
   const out: FitParam[] = names.map((name, k) => {
     const s = se(k);
-    const t = tcrit(0.95);
-    return { name, value: params[k], se: s, lower: s !== null && Number.isFinite(t) ? params[k] - t * s : null, upper: s !== null && Number.isFinite(t) ? params[k] + t * s : null };
+    return { name, value: params[k], se: s, lower: s !== null && Number.isFinite(t0) ? params[k] - t0 * s : null, upper: s !== null && Number.isFinite(t0) ? params[k] + t0 * s : null };
   });
 
-  const predict = (x: number) => model.fn(x, params);
-  const gradient = (x: number): number[] => {
-    if (model.linear) return Array.from({ length: p }, (_, k) => x ** k);
-    return numericJacobian(model, [x], params)[0];
-  };
-  const halfWidth = (x: number, kind: 'confidence' | 'prediction', level: number): number | null => {
-    if (!cov || sigma === null || !(level > 0 && level < 1)) return null;
-    const g = gradient(x);
+  const halfWidth = (x: number, kind: 'confidence' | 'prediction', lv: number): number | null => {
+    if (!cov || sigma === null || !(lv > 0 && lv < 1)) return null;
+    const g = gradientAt(x);
     let v = 0;
     for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) v += g[a] * cov[a][b] * g[b];
     if (!(v >= 0)) return null;
-    const t = tcrit(level);
+    const t = tcrit(lv);
     if (!Number.isFinite(t)) return null;
     return t * Math.sqrt(kind === 'prediction' ? v + sigma * sigma : v);
   };
 
   let message: string | null = null;
-  if (!converged) message = 'The fit did not settle within the iterations allowed: the curve is shown, but it may not be the best one.';
+  if (!converged) message = 'The fit did not settle within the iterations allowed: a provisional curve is shown, with no errors or bands, because they would not be valid.';
   else if (df <= 0) message = 'There are no degrees of freedom left (as many parameters as points): no error or band can be given.';
   else if (!cov) message = 'The parameters are not fixed independently by the data (singular covariance): no error or band can be given.';
   if (dropped > 0) message = `${message ? `${message} ` : ''}${dropped} point${dropped === 1 ? ' was' : 's were'} left out (missing, or X not above 0).`;

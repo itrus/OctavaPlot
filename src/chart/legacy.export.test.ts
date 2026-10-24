@@ -3,26 +3,51 @@ import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../model/defaults';
 import type { ChartType } from '../model/types';
-import { CHART_DRAW_SCALE } from '../model/units';
 import { patchStyle, setChartType } from '../state/commands';
 import { chartToSvgString } from './export';
 
 /**
- * Golden exports of the legacy renderer. Stored files are raw; both sides are
- * compared after rounding every decimal token to 6 places, so last-digit
- * floating-point differences never fail the gate. Never regenerate with -u.
+ * Golden exports of the legacy renderer. Stored files are raw. Never regenerate with -u.
  *
- * The goldens predate pixel sizes (they carry width="160mm"). The fixture below keeps their geometry
- * (160 x 120 mm = 453.54 x 340.16 pt, no chart title); the root element's CSS size attributes, the only
- * part that changed, are left out of the comparison.
+ * The goldens predate pixel sizes (they carry width="160mm") and were drawn at half the size lengths are drawn at now
+ * (every length in pt is twice as large). The fixture below is the legacy chart at twice the size, with the legacy line
+ * weights doubled (160 x 120 mm = 453.54 x 340.16 pt, no chart title). The root element's CSS size attributes, the only
+ * part that changed, are left out of the comparison, and the drawing is brought back to the goldens' scale before it is
+ * compared; numbers are compared to 0.011, as the drawing is rounded to 0.01 at twice the scale.
  */
-const normalize = (s: string): string =>
-  s
-    .replace(/(<svg [^>]*?) width="[^"]*" height="[^"]*"/, '$1')
-    .replace(/-?\d+\.\d+(e-?\d+)?/g, (m) => Number(m).toFixed(6));
+const withoutCssSize = (s: string): string => s.replace(/(<svg [^>]*?) width="[^"]*" height="[^"]*"/, '$1');
 
-// Charts are drawn at CHART_DRAW_SCALE x, so the legacy 160 x 120 mm geometry needs twice its pixel size.
-const legacyPx = (mm: number) => ((mm * 96) / 25.4) * CHART_DRAW_SCALE;
+// The goldens are half the size of the drawing now, so the legacy 160 x 120 mm geometry needs twice its pixel size.
+const LEGACY_SCALE = 2;
+const legacyPx = (mm: number) => ((mm * 96) / 25.4) * LEGACY_SCALE;
+
+const NUMBER = /-?\d+(?:\.\d+)?(?:e-?\d+)?/g;
+const halve = (text: string, keep: (index: number) => boolean = () => false): string => {
+  let i = -1;
+  return text.replace(NUMBER, (m) => (keep(++i) ? m : String(Number(m) / LEGACY_SCALE)));
+};
+/** Path data with every length halved; the rotation and the two flags of an arc are not lengths. */
+const halvePath = (d: string): string =>
+  d.replace(/([a-zA-Z])([^a-zA-Z]*)/g, (_, cmd: string, args: string) => cmd + (cmd === 'a' || cmd === 'A' ? halve(args, (i) => i % 7 >= 2 && i % 7 <= 4) : halve(args)));
+const LENGTHS = /^(x|y|x1|y1|x2|y2|cx|cy|r|rx|ry|width|height|viewBox|font-size|stroke-width|stroke-dasharray)$/;
+/** The drawing brought back to the scale the goldens were made at. */
+const atLegacyScale = (svg: string): string =>
+  withoutCssSize(svg).replace(/([a-zA-Z-]+)="([^"]*)"/g, (m, name: string, value: string) => {
+    if (name !== 'd' && name !== 'transform' && !LENGTHS.test(name)) return m;
+    if (name === 'd') return `d="${halvePath(value)}"`;
+    if (name === 'transform') return `transform="${/rotate\(/.test(value) ? halve(value, (i) => i === 0) : /matrix\(/.test(value) ? halve(value, (i) => i < 4) : halve(value)}"`;
+    return `${name}="${halve(value)}"`;
+  });
+
+/** Same text, and every number within 0.011 of the golden's. */
+function expectSameDrawing(actual: string, golden: string): void {
+  const numbersOf = (s: string) => (s.match(NUMBER) ?? []).map(Number);
+  const reference = withoutCssSize(golden);
+  expect(actual.replace(NUMBER, '#')).toBe(reference.replace(NUMBER, '#'));
+  const [a, g] = [numbersOf(actual), numbersOf(reference)];
+  const off = a.findIndex((v, i) => Math.abs(v - g[i]) > 0.011);
+  expect(off === -1 ? null : { index: off, actual: a[off], golden: g[off] }).toBeNull();
+}
 
 /** Example project with stable ids, assigned by object spread only. */
 function frozenExample(type: ChartType) {
@@ -47,11 +72,11 @@ function frozenExample(type: ChartType) {
       showTitle: false,
       legend: { ...c.legend, visible: false },
       paletteId: 'classic',
-      xAxis: { ...c.xAxis, lineWidthPt: 2.1 },
-      yAxis: { ...c.yAxis, lineWidthPt: 2.1 },
-      y2Axis: { ...c.y2Axis, lineWidthPt: 2.1 },
+      xAxis: { ...c.xAxis, lineWidthPt: 2.1 * LEGACY_SCALE },
+      yAxis: { ...c.yAxis, lineWidthPt: 2.1 * LEGACY_SCALE },
+      y2Axis: { ...c.y2Axis, lineWidthPt: 2.1 * LEGACY_SCALE },
       // The line weights and grey palette the goldens were made with, before the weights were harmonised.
-      defaults: { ...c.defaults, barBorderWidthPt: 1, barPatternWidthPt: 0.5, symbolBorderWidthPt: 0.75, errorLineWidthPt: 1, lineWidthPt: 1.5 },
+      defaults: { ...c.defaults, barBorderWidthPt: 2, barPatternWidthPt: 1, symbolBorderWidthPt: 1.5, errorLineWidthPt: 2, lineWidthPt: 3 },
     })),
   };
   p = setChartType(p.charts[0].id, type)(p);
@@ -69,7 +94,7 @@ const snapshotPath = (type: ChartType): string => resolve(__dirname, '__snapshot
 
 describe('legacy export goldens', () => {
   for (const type of ['bar', 'scatter', 'mean'] as const) {
-    it(`${type} matches its golden after number normalisation`, () => {
+    it(`${type} matches its golden at the legacy scale`, () => {
       const actual = svgOf(type);
       const file = snapshotPath(type);
       if (!existsSync(file)) {
@@ -79,7 +104,7 @@ describe('legacy export goldens', () => {
       const stored = readFileSync(file, 'utf8');
       expect(stored.startsWith('<?xml')).toBe(true);
       expect(stored.trimEnd().endsWith('</svg>')).toBe(true);
-      expect(normalize(actual)).toBe(normalize(stored));
+      expectSameDrawing(atLegacyScale(actual), stored);
     });
   }
 

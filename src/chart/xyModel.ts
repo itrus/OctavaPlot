@@ -10,7 +10,7 @@ import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeom
 import { computeLayout, type Layout } from './layout';
 import { curveYValues, drawFit, runFit, type FittedCurve } from './fitCurve';
 import { displayName } from './model';
-import { axisMapper, onAxis, resolveAxis } from './axisScale';
+import { axisMapper, inBreak, onAxis, polylinesThroughBreaks, resolveAxis } from './axisScale';
 import type { YAxisScale } from './scales';
 
 /** One plotted point of an XY series: a single Y value, or the centre of replicate / supplied-summary values. */
@@ -99,8 +99,12 @@ export interface XyModel {
  */
 const nearZero = (values: number[]): boolean => {
   if (values.length === 0) return false;
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const v of values) {
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
   return lo >= 0 && lo <= 0.25 * hi;
 };
 
@@ -135,14 +139,17 @@ export function suppliedStats(format: SummaryFormat, values: ReadonlyArray<numbe
     else lower = upper = null;
   } else {
     const raw = info.error === 'sd' ? get('SD') : info.error === 'sem' ? get('SEM') : info.error === 'cv' ? get('%CV') : get('+/- error');
-    const err = raw === null ? null : info.error === 'cv' ? (Math.abs(mean) * raw) / 100 : raw;
+    // A %CV is relative to the mean: with a mean of 0 it fixes no SD, so there is no error to draw.
+    const err = raw === null ? null : info.error === 'cv' ? (mean === 0 ? null : (Math.abs(mean) * raw) / 100) : raw;
     if (err !== null && err >= 0) {
       lower = mean - err;
       upper = mean + err;
       spread = info.error === 'sem' ? 'sem' : info.error === 'plusMinus' ? 'range' : 'sd';
     }
   }
-  const n = get('N');
+  // N is a count of subjects: a positive whole number, else it is unknown (0) and not made up.
+  const rawN = get('N');
+  const n = rawN !== null && Number.isInteger(rawN) && rawN > 0 ? rawN : null;
   const stats: GroupStats = {
     n: n ?? 0,
     missing: 0,
@@ -225,7 +232,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     min: chart.xAxis.min,
     max: chart.xAxis.max,
     majorInterval: chart.xAxis.majorInterval,
-    tickCountHint: Math.max(3, Math.min(10, Math.round(W / 60))),
+    tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))),
   }, chart.xAxis);
   const yAxis = resolveAxis({
     values: allY,
@@ -233,7 +240,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     min: chart.yAxis.min,
     max: chart.yAxis.max,
     majorInterval: chart.yAxis.majorInterval,
-    tickCountHint: Math.max(3, Math.min(10, Math.round(H / 50))),
+    tickCountHint: Math.max(3, Math.min(10, Math.round(H / 100))),
   }, chart.yAxis);
   warnings.push(...xAxis.warnings.map((w) => w.replace(/^Y /, 'X ').replace(/ Y limit/, ' X limit')));
   warnings.push(...yAxis.warnings);
@@ -266,14 +273,19 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     // A point with no position on a log axis (X or Y at or below 0) is left out and counted.
     const drawn = r.pts.filter((p) => onAxis(xAxis, p.x) && onAxis(yAxis, p.y));
     offAxis += r.pts.length - drawn.length;
-    const points: XyPoint[] = drawn.map((p) => ({ ...p, px: xScale(p.x), py: yScale(p.y) }));
+    // A value inside a gap of a broken axis has no place on it: it is not drawn, and the line is cut at the gap's edge.
+    const points: XyPoint[] = drawn.filter((p) => !inBreak(xAxis, p.x) && !inBreak(yAxis, p.y)).map((p) => ({ ...p, px: xScale(p.x), py: yScale(p.y) }));
     // A run ends where a row between two drawn points is missing (Y or X), so a gap is a gap in the line.
-    let d = '';
+    const seq: Array<{ x: number; y: number } | null> = [];
     let prevRow = -2;
-    for (const p of points) {
-      d += `${p.row === prevRow + 1 ? 'L' : 'M'}${n2(p.px)},${n2(p.py)}`;
+    for (const p of drawn) {
+      if (p.row !== prevRow + 1) seq.push(null);
+      seq.push({ x: p.x, y: p.y });
       prevRow = p.row;
     }
+    const d = polylinesThroughBreaks(seq, xAxis, yAxis)
+      .map((part) => part.map((q, i) => `${i === 0 ? 'M' : 'L'}${n2(xScale(q.x))},${n2(yScale(q.y))}`).join(''))
+      .join('');
     // Error bars: one stem with caps per point that has an interval, built by the same code as the category charts.
     let errorPath = '';
     let errorMeaning: string | null = null;

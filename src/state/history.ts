@@ -24,6 +24,10 @@ type HistoryAction =
   | { type: 'redo' }
   | { type: 'replace'; project: Project };
 
+/** A coalesce key tied to the page and selection it was made on, so edits to different objects never merge. */
+export const scopeCoalesceKey = (scope: { view: { kind: string; id: string }; selection: unknown }, key: string | undefined): string | undefined =>
+  key === undefined ? undefined : `${scope.view.kind}:${scope.view.id}|${JSON.stringify(scope.selection)}|${key}`;
+
 const COALESCE_MS = 800;
 const MAX_HISTORY = 200;
 

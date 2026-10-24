@@ -21,24 +21,24 @@ const style = (patch: Partial<ChartStyle> = {}): ChartStyle => ({ ...DEFAULT_STY
 
 describe('spacing and width rules', () => {
   it('accepts values inside the limits and the cross rule', () => {
-    expect(spacingError(4, 0.5)).toBeNull();
-    expect(widthError(0.5, 4, 'horizontal')).toBeNull();
-    expect(spacingError(1, 1)).toBeNull();
+    expect(spacingError(8, 1)).toBeNull();
+    expect(widthError(1, 8, 'horizontal')).toBeNull();
+    expect(spacingError(2, 2)).toBeNull();
   });
   it('labels the P limit', () => {
-    expect(spacingError(0.5, 0.1)).toContain('P limit');
-    expect(spacingError(60, 0.5)).toContain('P limit');
-    expect(widthError(6, 50, 'horizontal')).toContain('P limit');
-    expect(widthError(0.05, 4, 'horizontal')).toContain('P limit');
+    expect(spacingError(1, 0.2)).toContain('P limit');
+    expect(spacingError(120, 1)).toContain('P limit');
+    expect(widthError(12, 100, 'horizontal')).toContain('P limit');
+    expect(widthError(0.1, 8, 'horizontal')).toContain('P limit');
   });
   it('rejects non-positive and non-finite values', () => {
-    expect(spacingError(0, 0.5)).toContain('positive');
-    expect(widthError(Number.NaN, 4, 'dots')).toContain('positive');
+    expect(spacingError(0, 1)).toContain('positive');
+    expect(widthError(Number.NaN, 8, 'dots')).toContain('positive');
   });
   it('enforces the spacing and width cross rule both ways', () => {
-    expect(spacingError(2, 3)).toContain('at least');
-    expect(widthError(3, 2, 'horizontal')).toContain('Line width must not exceed');
-    expect(widthError(3, 2, 'dots')).toContain('Dot diameter must not exceed');
+    expect(spacingError(4, 6)).toContain('at least');
+    expect(widthError(6, 4, 'horizontal')).toContain('Line width must not exceed');
+    expect(widthError(6, 4, 'dots')).toContain('Dot diameter must not exceed');
   });
   it('labels the width control by pattern', () => {
     expect(widthLabel('dots')).toBe('Dot diameter');

@@ -2,15 +2,15 @@ import type { Chart, ChartStyle, ChartType, PointLabelCollision, PointLabelPlace
 import { measureText } from './text';
 
 /** Point-label constants (P: spec 23 L1539 leaves label behaviour unspecified). */
-const LABEL_BOUNDS_INSET_PT = 2;
+const LABEL_BOUNDS_INSET_PT = 4;
 const LABEL_LINE_HEIGHT = 1.2;
 const LABEL_BASELINE = 0.9;
 const LABEL_EPS = 1e-6;
 const REPEL_MAX_RING = 6;
-const LEADER_MIN_GAP_PT = 1;
+const LEADER_MIN_GAP_PT = 2;
 export const MAX_LABELS = 5000;
-export const LABEL_FONT_LIMITS = { min: 4, max: 72 } as const;
-export const LABEL_OFFSET_LIMITS = { min: -200, max: 200 } as const;
+export const LABEL_FONT_LIMITS = { min: 8, max: 144 } as const;
+export const LABEL_OFFSET_LIMITS = { min: -400, max: 400 } as const;
 export const LABEL_DECIMALS_LIMITS = { min: 0, max: 10 } as const;
 export const LABEL_AUTO_COLOR = '#000000';
 
@@ -74,7 +74,7 @@ export function sanitizeLabelStyle<T extends ChartStyle>(style: T): T {
     typeof v === 'number' && Number.isFinite(v) ? clamp(v, lo, hi) : fallback;
   out.pointLabelFontSizePt = num(
     style.pointLabelFontSizePt,
-    11.2,
+    22.4,
     LABEL_FONT_LIMITS.min,
     LABEL_FONT_LIMITS.max,
   );
@@ -94,7 +94,7 @@ export function sanitizeLabelStyle<T extends ChartStyle>(style: T): T {
 }
 
 /** Extra gap between neighbouring slots when a repelled label steps outwards (P). */
-const LABEL_REPEL_GAP_PT = 2;
+const LABEL_REPEL_GAP_PT = 4;
 
 /** Axis-aligned box in pt: x0 <= x1 (left, right), y0 <= y1 (top, bottom). */
 export interface Box {
@@ -301,7 +301,7 @@ export class BoxGrid {
   private readonly tags: string[] = [];
   private readonly cell: number;
 
-  constructor(cell = 32) {
+  constructor(cell = 64) {
     this.cell = cell;
   }
 
@@ -638,7 +638,7 @@ export function anyLabelsRequested(chart: Chart): boolean {
 
 /**
  * Label model for all points. Labels sit at the displayed symbol centres; an empty text means
- * unlabelled. Bounds are the plot inset by 2 pt (named placements) and the chart inset by 2 pt (custom).
+ * unlabelled. Bounds are the plot inset by 4 pt (named placements) and the chart inset by 4 pt (custom).
  */
 export function buildPointLabels(input: BuildPointLabelsInput): PointLabelModel {
   const anchors: LabelAnchor[] = [];

@@ -153,6 +153,22 @@ describe('the curve fit in the Results', () => {
     expect(sheet.corner).toContain('Straight line');
     expect(curveFitSheet(table, { ...analysis, level: 0.9 }).rows.some((r) => r.label === '90% CI lower limit')).toBe(true);
   });
+  it('widens the intervals of the sheet and of the graph labels with the level, and copies at full precision', () => {
+    const width = (level: number) => {
+      const sheet = curveFitSheet(table, { ...analysis, level });
+      const lo = sheet.rows.find((r) => r.key === 'p1lo')!;
+      const hi = sheet.rows.find((r) => r.key === 'p1hi')!;
+      return Number(hi.exact![0]) - Number(lo.exact![0]);
+    };
+    expect(width(0.99)).toBeGreaterThan(width(0.95));
+    expect(width(0.95)).toBeGreaterThan(width(0.9));
+    const sheet = curveFitSheet(table, analysis);
+    const slope = sheet.rows.find((r) => r.key === 'p1')!;
+    const m = buildXyModel(createChart(table.id, undefined, 'xyScatter'), table, { ...NO_FIT_SETTINGS, model: 'linear' });
+    expect(Number(slope.exact![0])).toBe(m.series[0].fit!.summary!.params[1].value);
+    const at = (level: number) => buildXyModel(createChart(table.id, undefined, 'xyScatter'), table, { ...NO_FIT_SETTINGS, model: 'linear', level }).series[0].fit!.summary!.params[1];
+    expect(at(0.99).upper! - at(0.99).lower!).toBeGreaterThan(at(0.9).upper! - at(0.9).lower!);
+  });
   it('follows the model, and says why a series could not be fitted', () => {
     const hill = curveFitSheet(table, { ...analysis, model: 'hill_4pl' });
     expect(hill.rows.filter((r) => !r.blank && !r.indent).map((r) => r.label)).toEqual(expect.arrayContaining(['bottom', 'top', 'h (Hill slope)']));
@@ -176,5 +192,28 @@ describe('writing a fit', () => {
   it('is written as lines: a parameter with its interval, then R²', () => {
     const lines = fitLines({ modelLabel: 'm', formula: 'f', params: [{ name: 'A', value: 1.23456, se: 0.1, lower: 1, upper: 1.5 }, { name: 'B', value: 2, se: null, lower: null, upper: null }], n: 5, df: 3, rSquared: 0.98765, converged: true, message: null }, 0.95);
     expect(lines).toEqual(['A = 1.235 (95% CI 1 to 1.5)', 'B = 2', 'R² = 0.9877']);
+  });
+});
+
+describe('fit caching', () => {
+  it('does not fit again for a style edit, and fits only the series whose data changed', async () => {
+    const { fitStats } = await import('./fitCurve');
+    const { buildAnyModelCached } = await import('./anyModel');
+    const table = createXyTable('XY', true);
+    const chart = createChart(table.id, undefined, 'xyScatter');
+    const fit = { ...NO_FIT_SETTINGS, model: 'linear' as const, level: 0.93 };
+    const before = fitStats.calculated;
+    buildXyModel(chart, table, fit);
+    const first = fitStats.calculated - before;
+    expect(first).toBeGreaterThan(0);
+    // A style change (new chart object, same data): zero fits.
+    buildXyModel({ ...chart, title: 'Another title', widthPx: chart.widthPx + 10 }, table, fit);
+    expect(fitStats.calculated - before).toBe(first);
+    // A data edit in one series: one fit.
+    const edited = { ...table, groups: table.groups.map((g, i) => (i === 1 ? { ...g, observations: g.observations.map((o, r) => (r === 0 ? { ...o, value: (o.value ?? 0) + 5 } : o)) } : g)) };
+    buildXyModel(chart, edited, fit);
+    expect(fitStats.calculated - before).toBe(first + 1);
+    // The drawing and the inspector share one model.
+    expect(buildAnyModelCached(chart, table, fit)).toBe(buildAnyModelCached(chart, table, { ...fit }));
   });
 });

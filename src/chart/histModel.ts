@@ -44,11 +44,11 @@ export function buildHistModel(chart: Chart, table: DataTable): XyModel {
   const allY = histogram ? bins.flatMap((b) => b?.heights ?? []) : ecdf.flatMap((e) => (e ? e.steps.map((s) => s.f * scaleOf(e.n)) : []));
   const linear = { scale: 'linear' as const, reverse: false };
   const xAxis = resolveAxis(
-    { values: allX, includeZero: false, min: chart.xAxis.min ?? (histogram && edges.length > 1 ? edges[0] : null), max: chart.xAxis.max ?? (histogram && edges.length > 1 ? edges[edges.length - 1] : null), majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 60))) },
+    { values: allX, includeZero: false, min: chart.xAxis.min ?? (histogram && edges.length > 1 ? edges[0] : null), max: chart.xAxis.max ?? (histogram && edges.length > 1 ? edges[edges.length - 1] : null), majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) },
     { ...chart.xAxis, ...linear },
   );
   const yAxis = resolveAxis(
-    { values: allY.length ? [0, ...allY] : [], includeZero: true, min: chart.yAxis.min, max: chart.yAxis.max, majorInterval: chart.yAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(H / 50))) },
+    { values: allY.length ? [0, ...allY] : [], includeZero: true, min: chart.yAxis.min, max: chart.yAxis.max, majorInterval: chart.yAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(H / 100))) },
     { ...chart.yAxis, ...linear },
   );
   warnings.push(...xAxis.warnings.map((w) => w.replace(/^Y /, 'X ').replace(/ Y limit/, ' X limit')), ...yAxis.warnings);

@@ -61,13 +61,13 @@ describe('line patterns', () => {
   it('every pattern has dashes in units of the line width, and solid has none', async () => {
     const { dashOf, LINE_STYLES, linePattern } = await import('../model/look');
     expect(LINE_STYLES.map((l) => l.value)).toEqual(['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot']);
-    expect(dashOf('solid', 2.6)).toBeUndefined();
+    expect(dashOf('solid', 5.2)).toBeUndefined();
     // Gridlines (thin) keep the patterns they always had.
-    expect(dashOf('dashed')).toBe('4 3');
-    expect(dashOf('dotted', 0.5)).toBe('1 2');
+    expect(dashOf('dashed')).toBe('8 6');
+    expect(dashOf('dotted', 1)).toBe('2 4');
     // A thicker line has longer dashes, so the pattern keeps its look.
-    expect(dashOf('dashDot', 2)).toBe('12 6 2 6');
-    expect(dashOf('dashDotDot', 1)).toBe('6 3 1 3 1 3');
+    expect(dashOf('dashDot', 4)).toBe('24 12 4 12');
+    expect(dashOf('dashDotDot', 2)).toBe('12 6 2 6 2 6');
     expect(linePattern({ lineStyle: 'solid', lineWidthPt: 2 }).strokeLinecap).toBe('round');
     expect(linePattern({ lineStyle: 'dotted', lineWidthPt: 2 }).strokeLinecap).toBe('butt');
   });
@@ -78,9 +78,9 @@ describe('line patterns', () => {
     expect(chartToSvgString(chart, table)).not.toContain('stroke-dasharray');
     const dotted = patchStyle(chart.id, 'all', { lineStyle: 'dashDot' })(project);
     const svg = chartToSvgString(dotted.charts[0], table);
-    expect(svg).toContain('stroke-dasharray="15.6 7.8 2.6 7.8"');
+    expect(svg).toContain('stroke-dasharray="31.2 15.6 5.2 15.6"');
     // The plot lines and the two legend keys.
-    expect((svg.match(/stroke-dasharray="15.6 7.8 2.6 7.8"/g) ?? []).length).toBe(4);
+    expect((svg.match(/stroke-dasharray="31.2 15.6 5.2 15.6"/g) ?? []).length).toBe(4);
     const back = parseProject(stringifyProject(dotted)).charts[0];
     expect(resolveStyle(back, back.layers[0], { id: 'g', paletteIndex: 0 }).lineStyle).toBe('dashDot');
   });

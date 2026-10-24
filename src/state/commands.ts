@@ -35,9 +35,11 @@ import type {
   DataTable,
   Group,
   Id,
+  Observation,
   JitterConfig,
   LegendConfig,
   Project,
+  ReferenceLine,
   ReplicateLayout,
   SummarySpec,
   SurvivalOptions,
@@ -450,6 +452,17 @@ export const patchAnnotation = (chartId: Id, annotationId: Id, patch: Partial<An
 export const removeAnnotation = (chartId: Id, annotationId: Id): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, annotations: c.annotations.filter((a) => a.id !== annotationId) }));
 
+// ---------------------------------------------------------------- reference lines
+
+export const addReferenceLine = (chartId: Id, line: ReferenceLine): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, referenceLines: [...c.referenceLines, line] }));
+
+export const patchReferenceLine = (chartId: Id, lineId: Id, patch: Partial<Omit<ReferenceLine, 'id'>>): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, referenceLines: c.referenceLines.map((l) => (l.id === lineId ? { ...l, ...patch } : l)) }));
+
+export const removeReferenceLine = (chartId: Id, lineId: Id): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, referenceLines: c.referenceLines.filter((l) => l.id !== lineId) }));
+
 // ---------------------------------------------------------------- project items
 
 /** "Data 1", "Data 2", ... (or "XY 1", ...): the lowest number not yet used with this prefix. */
@@ -590,3 +603,98 @@ export const renameItem = (kind: 'table' | 'chart' | 'analysis', id: Id, name: s
   if (kind === 'chart') return mapChart(p, id, (c) => (c.name === next ? c : { ...c, name: next }));
   return { ...p, analyses: (p.analyses ?? []).map((a) => (a.id === id && a.name !== next ? { ...a, name: next } : a)) };
 };
+
+// ---------------------------------------------------------------------------------------------------------------
+// Duplicating and deleting the items of the project. Every one is a command, so it can be undone.
+
+/** A name for a copy: "Name (copy)", then "Name (copy 2)" ... that no other item of the list has. */
+const copyName = (name: string, existing: string[]): string => {
+  const used = new Set(existing);
+  let candidate = `${name} (copy)`;
+  for (let i = 2; used.has(candidate); i++) candidate = `${name} (copy ${i})`;
+  return candidate;
+};
+
+/** A copy of a data table with new IDs throughout (so its graphs and styling are not shared with the original). */
+export const duplicateTable = (tableId: Id, copyId: Id): Command => (p) => {
+  const t = p.dataTables.find((x) => x.id === tableId);
+  if (!t) return p;
+  const copy: DataTable = {
+    ...t,
+    id: copyId,
+    name: copyName(t.name, p.dataTables.map((x) => x.name)),
+    rows: t.rows.map((r) => ({ ...r, id: newId('row') })),
+    groups: t.groups.map((g) => ({ ...g, id: newId('group'), observations: g.observations.map((o) => ({ ...o, id: newId('obs') })) })),
+  };
+  return { ...p, dataTables: [...p.dataTables, copy] };
+};
+
+/**
+ * Delete a data table together with what depends on it: its graphs and results, and the data sets other graphs took from it.
+ * The last table of a project cannot be deleted.
+ */
+export const removeTable = (tableId: Id): Command => (p) => {
+  if (p.dataTables.length <= 1 || !p.dataTables.some((t) => t.id === tableId)) return p;
+  const goneAnalyses = new Set((p.analyses ?? []).filter((a) => a.dataTableId === tableId).map((a) => a.id));
+  const analyses = (p.analyses ?? []).filter((a) => !goneAnalyses.has(a.id));
+  return {
+    ...p,
+    dataTables: p.dataTables.filter((t) => t.id !== tableId),
+    charts: p.charts
+      .filter((c) => c.dataTableId !== tableId)
+      .map((c) => ({
+        ...c,
+        extraGroups: c.extraGroups.filter((e) => e.tableId !== tableId),
+        fit: c.fit.analysisId !== null && goneAnalyses.has(c.fit.analysisId) ? { ...c.fit, analysisId: null } : c.fit,
+      })),
+    ...(analyses.length > 0 ? { analyses } : { analyses: undefined }),
+  };
+};
+
+/** A copy of a graph (same data table, same settings) with new IDs for it and its layers. */
+export const duplicateChart = (chartId: Id, copyId: Id): Command => (p) => {
+  const c = p.charts.find((x) => x.id === chartId);
+  if (!c) return p;
+  const copy: Chart = { ...c, id: copyId, name: copyName(c.name, p.charts.map((x) => x.name)), layers: c.layers.map((l) => ({ ...l, id: newId('layer') })) };
+  return { ...p, charts: [...p.charts, copy] };
+};
+
+export const removeChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId) ? { ...p, charts: p.charts.filter((c) => c.id !== chartId) } : p);
+
+/** A copy of an analysis (same table and settings). */
+export const duplicateAnalysis = (analysisId: Id, copyId: Id): Command => (p) => {
+  const a = (p.analyses ?? []).find((x) => x.id === analysisId);
+  if (!a) return p;
+  return { ...p, analyses: [...(p.analyses ?? []), { ...a, id: copyId, name: copyName(a.name, (p.analyses ?? []).map((x) => x.name)) }] };
+};
+
+/** A cell of a table by its column (index into the groups) and row. */
+interface CellRef {
+  row: number;
+  col: number;
+}
+
+/**
+ * Exclude cells from every chart and calculation (with a reason), or include them again. The values stay in the table.
+ * A cell that is empty, or already as asked, is left alone; the same table when nothing changes.
+ */
+export const setExcluded = (tableId: Id, cells: CellRef[], excluded: boolean, reason = ''): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    let changed = false;
+    const groups = t.groups.map((g, ci) => {
+      const rows = cells.filter((c) => c.col === ci && c.row >= 0 && c.row < t.rowCount).map((c) => c.row);
+      if (rows.length === 0) return g;
+      let observations: Observation[] | null = null;
+      for (const r of rows) {
+        const o = (observations ?? g.observations)[r];
+        if (excluded ? o.value === null || (o.excluded === true && (o.excludedReason ?? '') === reason) : o.excluded !== true) continue;
+        observations = observations ?? g.observations.slice();
+        const { excluded: _e, excludedReason: _r, ...rest } = o;
+        observations[r] = excluded ? { ...rest, excluded: true, ...(reason !== '' ? { excludedReason: reason } : {}) } : rest;
+      }
+      if (!observations) return g;
+      changed = true;
+      return { ...g, observations };
+    });
+    return changed ? { ...t, groups } : t;
+  });

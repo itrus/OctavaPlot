@@ -56,8 +56,8 @@ export interface HeatModel {
 }
 
 /** Room taken at the right by the colour bar and its numbers, pt. */
-const BAR_ROOM = 64;
-const BAR_WIDTH = 12;
+const BAR_ROOM = 128;
+const BAR_WIDTH = 24;
 const STRIPS = 64;
 
 const nice = (v: number): string => String(Number(v.toPrecision(3)));
@@ -102,8 +102,15 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   if (undefinedCount > 0) warnings.push(`${undefinedCount} cell${undefinedCount === 1 ? ' has' : 's have'} no ${o.method === 'zscore' ? 'z-score' : 'min-max value'} (their ${o.normalise === 'row' ? 'row' : 'column'} has no spread) and ${undefinedCount === 1 ? 'is' : 'are'} shown as missing.`);
   const range = matrixRange(values);
   const palette = HEAT_PALETTES.find((p) => p.value === o.palette)!;
-  const lo = o.min ?? range?.[0] ?? 0;
-  const hi = o.max ?? range?.[1] ?? 1;
+  let lo = o.min ?? range?.[0] ?? 0;
+  let hi = o.max ?? range?.[1] ?? 1;
+  if (!(hi > lo)) {
+    // A limit set by hand can collide with the other, automatic, end: the whole resolved range must be valid.
+    warnings.push('The colour range limits conflict with the data (the minimum is not below the maximum); using the automatic range.');
+    lo = range?.[0] ?? 0;
+    hi = range?.[1] ?? 1;
+    if (!(hi > lo)) [lo, hi] = [lo - 0.5, lo + 0.5];
+  }
   const centre = o.centre ?? (o.normalise !== 'none' && o.method !== 'minmax' ? 0 : (lo + hi) / 2);
   const scale: HeatScale = { palette: o.palette, reverse: o.reverse, lo, hi, centre };
   const colourOf = (v: number) => paletteColour(o.palette, scalePosition(Math.min(hi, Math.max(lo, v)), scale, palette.diverging), o.reverse);
@@ -163,11 +170,11 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   // 5. The colour bar: high at the top.
   let bar: HeatBar | null = null;
   if (showBar) {
-    const rect: Rect = { x: plot.x + plot.width + 14, y: plot.y, width: BAR_WIDTH, height: plot.height };
+    const rect: Rect = { x: plot.x + plot.width + 28, y: plot.y, width: BAR_WIDTH, height: plot.height };
     const strips = Array.from({ length: STRIPS }, (_, i) => {
       const frac = 1 - (i + 0.5) / STRIPS;
       const v = lo + frac * (hi - lo);
-      return { y: rect.y + (i * rect.height) / STRIPS, height: rect.height / STRIPS + 0.3, fill: colourOf(v) };
+      return { y: rect.y + (i * rect.height) / STRIPS, height: rect.height / STRIPS + 0.6, fill: colourOf(v) };
     });
     const tickValues = d3Ticks(lo, hi, 5).filter((t) => t >= lo && t <= hi);
     bar = { rect, lo, hi, diverging: palette.diverging, strips, ticks: tickValues.map((value) => ({ value, y: rect.y + rect.height * (1 - (value - lo) / (hi - lo || 1)) })) };

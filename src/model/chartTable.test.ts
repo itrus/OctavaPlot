@@ -68,3 +68,15 @@ describe('chart defaults', () => {
     expect(c.extraGroups).toEqual([]);
   });
 });
+
+describe('colours of data sets', () => {
+  it('stay with their data set when another is hidden', () => {
+    let p = twoTables();
+    const own = p.dataTables[0];
+    const before = effectiveTable(p, p.charts[0])!.groups.map((g) => g.paletteIndex);
+    p = setGroupOnGraph(p.charts[0].id, own.id, own.groups[0].id, false)(p);
+    const after = effectiveTable(p, p.charts[0])!.groups;
+    expect(after.map((g) => g.name)).toEqual(['Group B', 'Group C', 'Group D']);
+    expect(after.map((g) => g.paletteIndex)).toEqual(before.slice(1));
+  });
+});

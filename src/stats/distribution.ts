@@ -124,6 +124,8 @@ export function densityProfile(values: ReadonlyArray<number | null | undefined>,
   const s = sortedFinite(values);
   const n = s.length;
   if (n < 3) return null;
+  // All values equal: no density can be drawn, whatever bandwidth is set by hand.
+  if (s[0] === s[n - 1]) return null;
   const h = opts.bandwidth !== null && opts.bandwidth > 0 ? opts.bandwidth : densityBandwidth(s, opts.smoothing);
   if (!(h > 0) || !Number.isFinite(h)) return null;
   const grid = Math.max(64, Math.round(opts.grid ?? VIOLIN_GRID));

@@ -47,7 +47,7 @@ export const PieChartSvg = forwardRef<SVGSVGElement, Props>(function PieChartSvg
                 />
               ),
           )}
-          {ed && selectedGroup && pie.slices.map((s) => s.groupId === selectedGroup && s.path !== '' && <path key={`sel-${s.id}`} data-editor-only d={s.path} fill="none" stroke={SELECT_COLOR} strokeWidth={1.5} strokeDasharray="3 2" pointerEvents="none" />)}
+          {ed && selectedGroup && pie.slices.map((s) => s.groupId === selectedGroup && s.path !== '' && <path key={`sel-${s.id}`} data-editor-only d={s.path} fill="none" stroke={SELECT_COLOR} strokeWidth={3} strokeDasharray="6 4" pointerEvents="none" />)}
           {pie.slices.map(
             (s) =>
               s.text && (
@@ -83,7 +83,7 @@ export const PieChartSvg = forwardRef<SVGSVGElement, Props>(function PieChartSvg
             const w = keyWidthOf(chart.legend);
             return (
               <g key={part.groupId} {...hit('legend', part.groupId)}>
-                <rect x={n2(it.x)} y={n2(it.y - 5)} width={w} height={10} fill={part.style.barFill} fillOpacity={part.style.barOpacity} stroke={part.style.barBorderColor} strokeWidth={part.style.barBorderWidthPt} />
+                <rect x={n2(it.x)} y={n2(it.y - 10)} width={w} height={20} fill={part.style.barFill} fillOpacity={part.style.barOpacity} stroke={part.style.barBorderColor} strokeWidth={part.style.barBorderWidthPt} />
                 <text x={n2(it.x + w + LEGEND_KEY.gap)} y={n2(it.y)} dy="0.35em" fontSize={layout.legend!.fontSizePt} fill={chart.textColor}>
                   {it.label}
                 </text>

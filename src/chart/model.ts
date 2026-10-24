@@ -249,7 +249,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
   }));
   const pools = populateAxes(rangeRows, chart.type);
   const dual = pools.secondaryInUse;
-  const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? widthPt / 60 : heightPt / 50)));
+  const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? widthPt / 120 : heightPt / 100)));
   const axisScaleFor = (binding: AxisBinding): YAxisScale => {
     const config = axisConfigFor(chart, binding);
     const pool = pools[binding];
@@ -479,7 +479,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
       });
       if (opts.showMean && pre.summary) {
         const my = toY(pre.summary.mean);
-        if (Number.isFinite(my)) points.push({ id: `${group.id}:mean`, groupId: group.id, observationId: null, row: -1, value: pre.summary.mean, cx: centerX, cy: my, shape: 'plus', size: style.symbolSizePt, color: style.symbolColor, fillOpacity: style.symbolFillOpacity, borderColor: style.symbolBorderColor, borderWidth: Math.max(style.symbolBorderWidthPt, 1) });
+        if (Number.isFinite(my)) points.push({ id: `${group.id}:mean`, groupId: group.id, observationId: null, row: -1, value: pre.summary.mean, cx: centerX, cy: my, shape: 'plus', size: style.symbolSizePt, color: style.symbolColor, fillOpacity: style.symbolFillOpacity, borderColor: style.symbolBorderColor, borderWidth: Math.max(style.symbolBorderWidthPt, 2) });
       }
       if (dist?.note) warnings.push(`${name}: ${dist.note}.`);
     }

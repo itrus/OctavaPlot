@@ -3,7 +3,7 @@ import type { DataTable, TableKind } from '../model/types';
 import { useApp } from '../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../model/rows';
 import { newId } from '../model/ids';
-import { addAnalysis, addGroup, addRows, composeCommands, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../state/commands';
+import { addAnalysis, addGroup, addRows, composeCommands, setExcluded, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../util/download';
 import { ExportIcon, ImportIcon } from './icons';
 import { importCsv, isCsvFile, tableToCsv } from './csv';
@@ -47,6 +47,9 @@ const bounds = (s: Sel) => ({
 interface CellProps {
   row: number;
   col: number;
+  /** The value is kept but not used by any chart or calculation. */
+  excluded?: boolean;
+  reason?: string;
   /** Cell width in px at the current zoom. */
   width: number;
   text: string;
@@ -64,10 +67,16 @@ interface CellProps {
 
 const Cell = memo(function Cell(p: CellProps) {
   const isTitle = p.col < 0;
-  const cls = `cell${isTitle ? ' cell-title' : ''}${p.inRange ? ' in-range' : ''}${p.active ? ' active' : ''}${p.invalid ? ' invalid' : ''}`;
+  const cls = `cell${isTitle ? ' cell-title' : ''}${p.inRange ? ' in-range' : ''}${p.active ? ' active' : ''}${p.invalid ? ' invalid' : ''}${p.excluded ? ' excluded' : ''}`;
   return (
     <div
       className={cls}
+      id={`grid-cell-${p.row}-${p.col}`}
+      role="gridcell"
+      aria-colindex={p.col + 2}
+      aria-selected={p.inRange}
+      aria-invalid={p.invalid || undefined}
+      title={p.excluded ? `Excluded${p.reason ? `: ${p.reason}` : ''} (kept in the table, not used)` : undefined}
       style={{ width: p.width }}
       onMouseDown={(e) => p.onDown(p.row, p.col, e)}
       onMouseEnter={() => p.onEnter(p.row, p.col)}
@@ -221,7 +230,7 @@ export function DataTableView({ table }: { table: DataTable }) {
         run('Edit row title', setRowTitles(table.id, [{ row: ed.row, title: ed.text }]));
       }
     } else {
-      const parsed = parseCell(ed.text);
+      const parsed = parseCell(ed.text, settings.decimalSeparator);
       if (!parsed.ok) {
         setMessage({ kind: 'error', text: `Row ${ed.row + 1}, ${table.groups[ed.col]?.name ?? 'column'}: ${parsed.message}. Enter a number or leave the cell empty.` });
         if (mode === 'blur') {
@@ -274,7 +283,7 @@ export function DataTableView({ table }: { table: DataTable }) {
       if (e.button !== 0) return;
       if (editRef.current && editRef.current.col >= 0 && (editRef.current.row !== row || editRef.current.col !== col)) {
         // Clicking elsewhere commits (or rejects) the current edit first. Title edits have nothing to reject.
-        const parsed = parseCell(editRef.current.text);
+        const parsed = parseCell(editRef.current.text, settings.decimalSeparator);
         if (!parsed.ok) {
           e.preventDefault();
           return;
@@ -330,6 +339,22 @@ export function DataTableView({ table }: { table: DataTable }) {
     } else run('Clear cells', setCells(table.id, edits));
   };
 
+  // ---- excluding values: kept in the table, left out of every chart and calculation
+  const selectedCells = () => {
+    const { r0, r1, c0, c1 } = bounds(sel);
+    const cells: Array<{ row: number; col: number }> = [];
+    for (let r = r0; r <= r1; r++) for (let c = Math.max(0, c0); c <= c1; c++) cells.push({ row: r, col: c });
+    return cells;
+  };
+  const excludeSelection = (excluded: boolean) => {
+    const cells = selectedCells();
+    if (cells.length === 0) return;
+    const reason = excluded ? (window.prompt('Why are these values excluded? (optional, kept with the table)', '') ?? null) : '';
+    if (reason === null) return; // cancelled
+    run(excluded ? 'Exclude values' : 'Include values', setExcluded(table.id, cells, excluded, reason.trim()));
+    setMessage({ kind: 'info', text: excluded ? 'Excluded the selected values: they stay in the table but no chart or calculation uses them.' : 'Included the selected values again.' });
+  };
+
   // ---- CSV
   const exportCsv = () => {
     downloadBlob(new Blob([tableToCsv(table)], { type: 'text/csv;charset=utf-8' }), exportFileName(table.name, 'csv', settings.timestampExports));
@@ -340,7 +365,7 @@ export function DataTableView({ table }: { table: DataTable }) {
       setMessage({ kind: 'error', text: `${file.name} is not a CSV file. Choose a .csv file.` });
       return;
     }
-    const result = importCsv(await file.text());
+    const result = importCsv(await file.text(), settings.decimalSeparator);
     if (!result.ok) {
       setMessage({ kind: 'error', text: `Could not import ${file.name}: ${result.message}` });
       return;
@@ -370,7 +395,7 @@ export function DataTableView({ table }: { table: DataTable }) {
     clearSelection();
   };
   const pasteText = (text: string) => {
-    const plan = planPaste(text, bounds(sel));
+    const plan = planPaste(text, bounds(sel), settings.decimalSeparator);
     if (!plan.ok) {
       setMessage({ kind: 'error', text: plan.message });
       return;
@@ -427,7 +452,16 @@ export function DataTableView({ table }: { table: DataTable }) {
       case 'ArrowLeft': e.preventDefault(); moveTo(f.r, f.c - 1, e.shiftKey); return;
       case 'ArrowRight': e.preventDefault(); moveTo(f.r, f.c + 1, e.shiftKey); return;
       case 'Enter': e.preventDefault(); moveTo(sel.ar + (e.shiftKey ? -1 : 1), sel.ac, false); return;
-      case 'Tab': e.preventDefault(); moveTo(sel.ar, sel.ac + (e.shiftKey ? -1 : 1), false); return;
+      case 'Tab': {
+        // Tab walks the cells (to the next row at the end of one); from the last cell (Shift+Tab: the first) it leaves the grid.
+        const lastCol = nCols - 1;
+        const [r, c] = [sel.ar, sel.ac];
+        if (e.shiftKey ? r === 0 && c <= -1 : r === nRows - 1 && c === lastCol) return;
+        e.preventDefault();
+        if (e.shiftKey) moveTo(c <= -1 ? r - 1 : r, c <= -1 ? lastCol : c - 1, false);
+        else moveTo(c === lastCol ? r + 1 : r, c === lastCol ? -1 : c + 1, false);
+        return;
+      }
       case 'F2': e.preventDefault(); startEdit(sel.fr, sel.fc); return;
       case 'Delete':
       case 'Backspace': e.preventDefault(); clearSelection(); return;
@@ -480,6 +514,9 @@ export function DataTableView({ table }: { table: DataTable }) {
         <span className="sep" />
         <UndoRedo />
         <span className="sep" />
+        <button onClick={() => excludeSelection(true)} title="Keep the selected values in the table but leave them out of every chart and calculation">Exclude</button>
+        <button onClick={() => excludeSelection(false)} title="Use the selected values again">Include</button>
+        <span className="sep" />
         <button className="icon-text" onClick={() => csvRef.current?.click()} title="Replace this table with the contents of a .csv file (Undo restores it)">
           <ImportIcon /> Import CSV
         </button>
@@ -521,7 +558,11 @@ export function DataTableView({ table }: { table: DataTable }) {
         onCopy={onCopy}
         onCut={onCut}
         onPaste={onPaste}
+        role="grid"
         aria-label="Data table"
+        aria-rowcount={nRows + 1}
+        aria-colcount={nCols + 2}
+        aria-activedescendant={`grid-cell-${sel.fr}-${sel.fc}`}
       >
         <textarea
           ref={catcherRef}
@@ -531,10 +572,12 @@ export function DataTableView({ table }: { table: DataTable }) {
           onPaste={onCatcherPaste}
         />
         <div className="grid-inner" style={{ width: STICKY_W + nCols * COL_W, height: HEADER_H + nRows * ROW_H }}>
-          <div className="grid-header" style={{ height: HEADER_H }}>
+          <div className="grid-header" style={{ height: HEADER_H }} role="row" aria-rowindex={1}>
             <div className="corner" style={{ width: ROWNUM_W }} onClick={() => setSel({ ar: 0, ac: 0, fr: nRows - 1, fc: nCols - 1 })} title="Select all" />
             <div
               className="title-head"
+              role="columnheader"
+              aria-colindex={1}
               style={{ width: TITLE_W, lineHeight: `${HEADER_H}px` }}
               onClick={() => setSel({ ar: 0, ac: -1, fr: nRows - 1, fc: -1 })}
               title="Select the Row title column"
@@ -546,7 +589,7 @@ export function DataTableView({ table }: { table: DataTable }) {
               const series = blocks && c >= lead && k % blockWidth === 0 ? seriesList[k / blockWidth] : undefined;
               if (blocks && c >= lead) {
                 return (
-                  <div className="col-head two-row" style={{ width: COL_W }} key={g.id}>
+                  <div className="col-head two-row" style={{ width: COL_W }} key={g.id} role="columnheader" aria-colindex={c + 2}>
                     {series && (
                       <div className="series-head" style={{ width: COL_W * blockWidth }}>
                         <span className="axis-tag" title="A Y series">Y</span>
@@ -578,7 +621,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                 );
               }
               return (
-              <div className={`col-head${blocks ? ' two-row' : ''}`} style={{ width: COL_W }} key={g.id}>
+              <div className={`col-head${blocks ? ' two-row' : ''}`} style={{ width: COL_W }} key={g.id} role="columnheader" aria-colindex={c + 2}>
                 <div className="col-head-top">
                   {kindText.tags && <span className="axis-tag" title={c < lead ? kindText.tags.lead[1] : kindText.tags.rest[1]}>{c < lead ? kindText.tags.lead[0] : kindText.tags.rest[0]}</span>}
                   <input
@@ -606,8 +649,9 @@ export function DataTableView({ table }: { table: DataTable }) {
           </div>
           <div className="grid-rows" style={{ top: HEADER_H + first * ROW_H }}>
           {rowIdx.map((r) => (
-            <div className="grid-row" style={{ height: ROW_H }} key={r}>
+            <div className="grid-row" style={{ height: ROW_H }} key={r} role="row" aria-rowindex={r + 2}>
               <div
+                role="rowheader"
                 className={`rownum${r >= r0 && r <= r1 ? ' in-range' : ''}`}
                 style={{ width: ROWNUM_W }}
                 onClick={() => setSel({ ar: r, ac: 0, fr: r, fc: nCols - 1 })}
@@ -644,6 +688,8 @@ export function DataTableView({ table }: { table: DataTable }) {
                     active={r === sel.fr && c === sel.fc}
                     editing={isEditing}
                     invalid={!!(invalidCell && invalidCell.row === r && invalidCell.col === c)}
+                    excluded={g.observations[r].excluded === true}
+                    reason={g.observations[r].excludedReason}
                     onDown={onDown}
                     onEnter={onEnter}
                     onDouble={onDouble}

@@ -49,3 +49,10 @@ describe('CSV', () => {
     expect(importCsv('only a header').ok).toBe(false);
   });
 });
+
+describe('malformed quotes', () => {
+  it('rejects text right after a closing quote, with its line', () => {
+    expect(importCsv('a,b\r\n"1"2,3\r\n')).toEqual({ ok: false, message: expect.stringContaining('line 2') });
+    expect(importCsv('a,b\r\n"1",3\r\n').ok).toBe(true);
+  });
+});

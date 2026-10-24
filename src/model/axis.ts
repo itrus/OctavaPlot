@@ -3,11 +3,11 @@ import type { AxisBreak, AxisConfig, AxisScaleKind, BreakMark, NumberFormatKind,
 
 /** Limits of the axis settings (P). */
 export const AXIS_LIMITS = {
-  tickLengthPt: { min: 0, max: 30 },
+  tickLengthPt: { min: 0, max: 60 },
   minorTicks: { min: 0, max: 9 },
   decimals: { min: 0, max: 10 },
   affixLength: 24,
-  offsetPt: { min: 0, max: 60 },
+  offsetPt: { min: 0, max: 120 },
 } as const;
 
 export const BREAK_MARKS: ReadonlyArray<{ value: BreakMark; label: string }> = [

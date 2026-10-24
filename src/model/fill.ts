@@ -34,14 +34,14 @@ const FILL_MODES: readonly FillMode[] = ['none', 'solid', 'pattern'];
 
 /** Resolver and Inspector limits (P). The file sanitiser keeps values outside them; the resolver clamps. */
 export const FILL_LIMITS = {
-  spacingPt: { min: 1, max: 50 },
-  widthPt: { min: 0.1, max: 5 },
+  spacingPt: { min: 2, max: 100 },
+  widthPt: { min: 0.2, max: 10 },
 } as const;
 
 /** Fallbacks used when a stored value is unusable (the defaults, P). */
-const FALLBACK_SPACING_PT = 4;
-const FALLBACK_WIDTH_PT = 0.5;
-const LEGEND_KEY_MAX_SPACING_PT = 4;
+const FALLBACK_SPACING_PT = 8;
+const FALLBACK_WIDTH_PT = 1;
+const LEGEND_KEY_MAX_SPACING_PT = 8;
 
 /** Fully resolved fill: everything a renderer needs, all values valid. */
 export interface FillSpec {
@@ -109,7 +109,7 @@ export function resolveBarFill(style: FillStyleInput): FillSpec {
   };
 }
 
-/** Legend key fill: the 18x10 pt key is small, so spacing is capped at 4 pt and marks at half the spacing (P). */
+/** Legend key fill: the 36x20 pt key is small, so spacing is capped at 8 pt and marks at half the spacing (P). */
 export function legendKeyFill(fill: FillSpec): FillSpec {
   const spacingPt = Math.min(fill.spacingPt, LEGEND_KEY_MAX_SPACING_PT);
   return { ...fill, spacingPt, markWidthPt: Math.min(fill.markWidthPt, spacingPt / 2) };

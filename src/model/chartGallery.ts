@@ -3,7 +3,7 @@ import type { ChartType, TableKind } from './types';
 
 /**
  * The gallery of graphs offered for each table type, grouped into tabs. A graph with a `type` can be made now; one
- * without is a planned preset from the specification (section 3), shown locked so the whole catalogue is visible.
+ * without is a planned preset from the preset catalogue (docs/calculation-contracts.md), shown locked so the whole catalogue is visible.
  */
 export interface GalleryItem {
   /** Unique key; also selects the thumbnail. */
@@ -12,7 +12,7 @@ export interface GalleryItem {
   description: string;
   /** The chart type to create, or null while the graph is planned. */
   type: ChartType | null;
-  /** The specification's preset ID, for planned graphs. */
+  /** The preset ID, for planned graphs. */
   spec?: string;
   /** How the chart is set up beyond its type. */
   variant?: ChartVariant;

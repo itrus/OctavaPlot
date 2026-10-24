@@ -11,7 +11,7 @@ export const HEAT_PALETTES: ReadonlyArray<{ value: HeatPalette; label: string; d
   { value: 'grayscale', label: 'Grayscale', diverging: false },
 ];
 
-export const HEAT_LIMITS = { cellGapPt: { min: 0, max: 20 }, decimals: { min: 0, max: 8 } } as const;
+export const HEAT_LIMITS = { cellGapPt: { min: 0, max: 40 }, decimals: { min: 0, max: 8 } } as const;
 
 const PALETTES = valuesOf(HEAT_PALETTES);
 const BYS: ReadonlyArray<HeatmapOptions['normalise']> = ['none', 'row', 'column'];

@@ -1,6 +1,6 @@
 import type { DataTable } from '../model/types';
 import { sanitizeRowTitle } from '../model/rows';
-import { parseCell } from './cellText';
+import { parseCell, type DecimalSeparator } from './cellText';
 
 /** First header cell that marks the row title column in an exported file. */
 const ROW_TITLE_HEADER = 'Row title';
@@ -48,6 +48,12 @@ export function parseCsv(text: string): string[][] {
           continue;
         }
         inQuotes = false;
+        // After a closing quote only a separator or the end may follow: anything else would silently change the value.
+        const next = src[i + 1];
+        if (next !== undefined && next !== ',' && next !== '\r' && next !== '\n') {
+          const line = src.slice(0, i).split(/\r\n|\r|\n/).length;
+          throw new Error(`Unexpected text after a closing quote on line ${line} (a quoted field must be followed by a comma or the end of the line).`);
+        }
       } else field += c;
     } else if (c === '"' && field === '') inQuotes = true;
     else if (c === ',') {
@@ -78,7 +84,7 @@ type CsvImport = { ok: true; data: ImportedTable } | { ok: false; message: strin
 const colLabel = (name: string, c: number) => (name.trim() !== '' ? `"${name.trim()}"` : `column ${c + 1}`);
 
 /** Interpret CSV text as table data. The first line holds the group names; a first column headed "Row title" holds row titles. */
-export function importCsv(text: string): CsvImport {
+export function importCsv(text: string, separator: DecimalSeparator = 'auto'): CsvImport {
   let records: string[][];
   try {
     records = parseCsv(text);
@@ -100,7 +106,7 @@ export function importCsv(text: string): CsvImport {
     }
     const row: Array<number | null> = [];
     for (let c = 0; c < width; c++) {
-      const parsed = parseCell(body[r][c + offset] ?? '');
+      const parsed = parseCell(body[r][c + offset] ?? '', separator);
       if (!parsed.ok) return { ok: false, message: `Line ${r + 2}, ${colLabel(header[c + offset], c)}: ${parsed.message}. Use numbers or leave the cell empty.` };
       row.push(parsed.value);
     }

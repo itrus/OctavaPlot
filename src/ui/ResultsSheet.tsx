@@ -6,13 +6,13 @@ import { copyText } from '../util/download';
 type Cell = [number, number];
 
 /** The sheet as a grid of text: the headings, then the rows that hold values (the gaps between groups are not cells). */
-const gridOf = (sheet: Sheet): string[][] => [[sheet.corner, ...sheet.columns.map((c) => c.label)], ...sheet.rows.filter((r) => !r.blank).map((r) => [r.label, ...r.cells])];
+const gridOf = (sheet: Sheet, exact = false): string[][] => [[sheet.corner, ...sheet.columns.map((c) => c.label)], ...sheet.rows.filter((r) => !r.blank).map((r) => [r.label, ...(exact ? (r.exact ?? r.cells) : r.cells)])];
 
 const quote = (s: string) => (/["\t\r\n,]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 const oneLine = (s: string) => s.replace(/[\t\r\n]+/g, ' ');
 
 /** The cells as text: tab-separated for pasting into a spreadsheet, or as the lines of a CSV file. */
-export const sheetText = (sheet: Sheet, separator: '\t' | ','): string => gridOf(sheet).map((cells) => cells.map(separator === ',' ? quote : oneLine).join(separator)).join(separator === ',' ? '\r\n' : '\n');
+export const sheetText = (sheet: Sheet, separator: '\t' | ','): string => gridOf(sheet, true).map((cells) => cells.map(separator === ',' ? quote : oneLine).join(separator)).join(separator === ',' ? '\r\n' : '\n');
 
 /**
  * Selecting cells of a results sheet like those of a data table: click or drag to select, Shift+click to extend, the
@@ -20,6 +20,7 @@ export const sheetText = (sheet: Sheet, separator: '\t' | ','): string => gridOf
  */
 export function useSheetSelection(sheet: Sheet, onStatus: (text: string) => void) {
   const grid = useMemo(() => gridOf(sheet), [sheet]);
+  const exactGrid = useMemo(() => gridOf(sheet, true), [sheet]);
   const [sel, setSel] = useState<{ anchor: Cell; focus: Cell } | null>(null);
   const [dragging, setDragging] = useState(false);
   const rowsN = grid.length;
@@ -32,7 +33,7 @@ export function useSheetSelection(sheet: Sheet, onStatus: (text: string) => void
     c1: Math.min(colsN - 1, Math.max(sel.anchor[1], sel.focus[1])),
   };
   const inRange = (r: number, c: number) => !!range && r >= range.r0 && r <= range.r1 && c >= range.c0 && c <= range.c1;
-  const selectedText = () => (range ? grid.slice(range.r0, range.r1 + 1).map((row) => row.slice(range.c0, range.c1 + 1).map(oneLine).join('\t')).join('\n') : '');
+  const selectedText = () => (range ? exactGrid.slice(range.r0, range.r1 + 1).map((row) => row.slice(range.c0, range.c1 + 1).map(oneLine).join('\t')).join('\n') : '');
 
   const press = (r: number, c: number, extend: boolean) => {
     setDragging(true);

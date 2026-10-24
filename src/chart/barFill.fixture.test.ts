@@ -75,15 +75,15 @@ describe('bar fill visual fixture', () => {
     for (const bad of ['<pattern', '<image', '<desc', 'pointer-events', 'data-hit']) expect(s).not.toContain(bad);
   });
 
-  it('X8d legend keys cap the spacing at 4 pt and the mark at half of it', () => {
+  it('X8d legend keys cap the spacing at 8 pt and the mark at half of it', () => {
     const style = project.charts[0].defaults;
     const group = modelOf(project).groups[0].bar!.fillSpec;
-    expect(group.spacingPt).toBe(6);
+    expect(group.spacingPt).toBe(12);
     const key = legendKeyFill(group);
-    expect(key.spacingPt).toBe(4);
-    expect(key.markWidthPt).toBe(1);
-    expect(legendKeyFill(resolveBarFill({ ...style, barPatternSpacingPt: 6, barPatternWidthPt: 5 })).markWidthPt).toBe(2);
-    expect(legendKeyFill({ ...group, spacingPt: 3 }).spacingPt).toBe(3);
+    expect(key.spacingPt).toBe(8);
+    expect(key.markWidthPt).toBe(2);
+    expect(legendKeyFill(resolveBarFill({ ...style, barPatternSpacingPt: 12, barPatternWidthPt: 10 })).markWidthPt).toBe(4);
+    expect(legendKeyFill({ ...group, spacingPt: 6 }).spacingPt).toBe(6);
   });
 
   it('X8e the opacity variant puts one group opacity on each pattern bar and key', () => {

@@ -103,20 +103,16 @@ describe('persistence', () => {
     const p = patchAxis(f.charts[0].id, 'y2Axis', { title: 'Right', min: 0 })(f);
     expect(parseProject(stringifyProject(p))).toEqual(p);
   });
-  it('an old file without the feature loads and exports identically', () => {
+  it('a file without the right axis loads and exports identically', () => {
     const p = createExampleProject();
     const old = JSON.parse(stringifyProject(p)) as Any;
     for (const c of old.project.charts) {
       delete c.y2Axis;
-      c.defaults.yAxis = 'primary';
       delete c.defaults.axisBinding;
-      for (const l of c.layers) l.style.yAxis = 'primary';
     }
     const loaded = parseProject(JSON.stringify(old));
     expect(loaded.charts[0].y2Axis).toEqual(p.charts[0].y2Axis);
-    expect('yAxis' in loaded.charts[0].defaults).toBe(false);
     expect(loaded.charts[0].defaults.axisBinding).toBe('primary');
-    expect('yAxis' in loaded.charts[0].layers[0].style).toBe(false);
     expect(normalize(svgOf(loaded))).toBe(normalize(svgOf(p)));
   });
   it('partial or invalid y2Axis in a file falls back to defaults', () => {
@@ -146,7 +142,7 @@ describe('right axis rendering', () => {
   const modelOf = (p: Project) => buildChartModel(p.charts[0], p.dataTables[0]);
   const withY2 = (p: Project, patch: Partial<Project['charts'][0]['y2Axis']>) => patchAxis(p.charts[0].id, 'y2Axis', patch)(p);
   const rightTicks = (svg: string, x: string) =>
-    [...svg.matchAll(/<path d="M([\d.]+),([\d.]+)h5\.6"/g)].filter((m) => m[1] === x);
+    [...svg.matchAll(/<path d="M([\d.]+),([\d.]+)h11.2"/g)].filter((m) => m[1] === x);
   const rightLabels = (svg: string) => [...svg.matchAll(/<text x="([\d.]+)"[^>]*text-anchor="start"[^>]*>([^<]*)<\/text>/g)];
 
   it('draws the line and one outward tick per right tick at the high edge', () => {
@@ -164,7 +160,7 @@ describe('right axis rendering', () => {
     const m = modelOf(p);
     const labels = rightLabels(svgOf(p));
     expect(labels.map((l) => l[2])).toEqual(m.y2!.ticks.map(m.y2!.tickLabel));
-    const x = n2(m.layout.plot.x + m.layout.plot.width + 5.6 + 3);
+    const x = n2(m.layout.plot.x + m.layout.plot.width + 11.2 + 6);
     for (const l of labels) expect(Number(l[1])).toBeCloseTo(Number(x), 2);
     expect(svgOf(p)).toContain('font-weight="bold"');
   });

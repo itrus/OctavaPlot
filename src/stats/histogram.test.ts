@@ -93,3 +93,14 @@ describe('empirical cumulative distribution (spec 22.1)', () => {
     expect(ecdfSteps([], 'atOrBelow')).toEqual({ steps: [], n: 0 });
   });
 });
+
+describe('bin edges of large values', () => {
+  it('keeps distinct edges (no 12-digit rounding)', () => {
+    const edges = binEdges([1e12, 1e12 + 1, 1e12 + 2], 1);
+    expect(new Set(edges).size).toBe(edges.length);
+    for (let i = 1; i < edges.length; i++) expect(edges[i]).toBeGreaterThan(edges[i - 1]);
+    const { counts } = countBins([1e12, 1e12 + 1, 1e12 + 2], edges);
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(3);
+    expect(binHeights(counts, edges, 3, 'density', 'off').every(Number.isFinite)).toBe(true);
+  });
+});

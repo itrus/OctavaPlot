@@ -6,6 +6,21 @@ import { AnnotationLayer, Backgrounds, ChartTitles, type EditorState, PlotClip }
 import type { HeatModel } from './heatmapModel';
 import { hitAttrs } from './hitTest';
 import { X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP } from './layout';
+import { measureText } from './text';
+
+const SMALLEST_LABEL_PT = 8;
+
+/**
+ * The font size at which a cell's text fits both its width and its height, or null when even the smallest legible size does
+ * not fit: a label that cannot be read is left out (its value stays in the tooltip), not squeezed or spilled over the neighbours.
+ */
+export function fitCellLabel(text: string, widthPt: number, heightPt: number, maxFontPt: number, family?: string): number | null {
+  const room = Math.min(maxFontPt, heightPt * 0.8);
+  if (!(room >= SMALLEST_LABEL_PT) || !(widthPt > 0)) return null;
+  const wide = measureText(text, room, false, false, family);
+  const size = wide <= widthPt * 0.95 ? room : (room * widthPt * 0.95) / wide;
+  return size >= SMALLEST_LABEL_PT ? size : null;
+}
 
 interface Props {
   chart: Chart;
@@ -33,16 +48,19 @@ export const HeatmapSvg = forwardRef<SVGSVGElement, Props>(function HeatmapSvg({
       <PlotClip plot={plot} />
       <Backgrounds chart={chart} width={W} height={H} plot={plot} hit={hit} />
 
-      {cells.map((c) => (
+      {cells.map((c) => {
+        const labelSize = c.text ? fitCellLabel(c.text, c.width, c.height, chart.legend.fontSizePt, chart.fontFamily) : null;
+        return (
         <g key={c.id}>
           <rect x={n2(c.x)} y={n2(c.y)} width={n2(c.width)} height={n2(c.height)} fill={c.fill} {...hit('bar', c.seriesId, c.id)} />
-          {c.text && (
-            <text x={n2(c.x + c.width / 2)} y={n2(c.y + c.height / 2)} dy="0.35em" textAnchor="middle" fontSize={Math.min(chart.legend.fontSizePt, Math.max(4, c.height * 0.6))} fill={c.textColour} pointerEvents="none">
+          {c.text && labelSize !== null && (
+            <text x={n2(c.x + c.width / 2)} y={n2(c.y + c.height / 2)} dy="0.35em" textAnchor="middle" fontSize={n2(labelSize)} fill={c.textColour} pointerEvents="none">
               {c.text}
             </text>
           )}
         </g>
-      ))}
+        );
+      })}
 
       {/* Row labels on the left, column labels along the bottom. */}
       {ya.visible &&
@@ -82,11 +100,11 @@ export const HeatmapSvg = forwardRef<SVGSVGElement, Props>(function HeatmapSvg({
           {bar.strips.map((s, i) => (
             <rect key={i} x={n2(bar.rect.x)} y={n2(s.y)} width={n2(bar.rect.width)} height={n2(s.height)} fill={s.fill} />
           ))}
-          <rect x={n2(bar.rect.x)} y={n2(bar.rect.y)} width={n2(bar.rect.width)} height={n2(bar.rect.height)} fill="none" stroke={chart.axisColor} strokeWidth={0.75} />
+          <rect x={n2(bar.rect.x)} y={n2(bar.rect.y)} width={n2(bar.rect.width)} height={n2(bar.rect.height)} fill="none" stroke={chart.axisColor} strokeWidth={1.5} />
           {bar.ticks.map((t) => (
             <g key={t.value}>
-              <path d={`M${n2(bar.rect.x + bar.rect.width)},${n2(t.y)}h3`} stroke={chart.axisColor} strokeWidth={0.75} fill="none" />
-              <text x={n2(bar.rect.x + bar.rect.width + 6)} y={n2(t.y)} dy="0.35em" fontSize={chart.legend.fontSizePt} fill={chart.textColor}>
+              <path d={`M${n2(bar.rect.x + bar.rect.width)},${n2(t.y)}h6`} stroke={chart.axisColor} strokeWidth={1.5} fill="none" />
+              <text x={n2(bar.rect.x + bar.rect.width + 12)} y={n2(t.y)} dy="0.35em" fontSize={chart.legend.fontSizePt} fill={chart.textColor}>
                 {String(Number(t.value.toPrecision(6)))}
               </text>
             </g>

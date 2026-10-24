@@ -1,9 +1,21 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useState, type ReactNode } from 'react';
 import { formatNum, sliderStep, snapToStep } from '../numberFormat';
 import { WheelRange } from '../WheelRange';
 
+/** The text typed in the inspector's search box: only the settings that match it are shown (empty: all of them). */
+export const InspectorSearchContext = createContext('');
+
+/** True when a setting with this label (or hint) is shown for the search text. */
+const matchesSearch = (query: string, ...texts: Array<string | undefined>): boolean => {
+  const q = query.trim().toLowerCase();
+  return q === '' || texts.some((t) => t?.toLowerCase().includes(q));
+};
+
 export function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [openState, setOpen] = useState(defaultOpen);
+  // While searching, every section is open: a match must not hide inside a folded one.
+  const searching = useContext(InspectorSearchContext).trim() !== '';
+  const open = openState || searching;
   return (
     <section className="insp-section">
       <button className="insp-section-head" onClick={() => setOpen(!open)} aria-expanded={open}>
@@ -13,6 +25,24 @@ export function Section({ title, defaultOpen = true, children }: { title: string
       {open && <div className="insp-section-body">{children}</div>}
     </section>
   );
+}
+
+/** What a control inside a Field needs to be tied to it: the label, and the error and note that describe it. */
+interface FieldLink {
+  labelId: string;
+  describedBy: string | undefined;
+  invalid: boolean;
+}
+const FieldContext = createContext<FieldLink | null>(null);
+
+/** The attributes that make a control part of its Field for assistive technology (an explicit aria-label wins). */
+function useFieldAria(ariaLabel?: string): { 'aria-label'?: string; 'aria-labelledby'?: string; 'aria-describedby'?: string; 'aria-invalid'?: true } {
+  const link = useContext(FieldContext);
+  return {
+    ...(ariaLabel ? { 'aria-label': ariaLabel } : link ? { 'aria-labelledby': link.labelId } : {}),
+    ...(link?.describedBy ? { 'aria-describedby': link.describedBy } : {}),
+    ...(link?.invalid ? { 'aria-invalid': true as const } : {}),
+  };
 }
 
 export function Field({
@@ -31,18 +61,26 @@ export function Field({
   /** Muted explanation under the control, e.g. why it is disabled. */
   note?: string | null;
 }) {
+  const query = useContext(InspectorSearchContext);
+  const id = useId();
+  const [labelId, errorId, noteId, hintId] = [`${id}-label`, `${id}-error`, `${id}-note`, `${id}-hint`];
+  const describedBy = [error ? errorId : null, note ? noteId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined;
+  if (!matchesSearch(query, label, hint)) return null;
   return (
-    <div className="field">
-      <div className="field-row">
-        <span className="field-label" title={hint}>
-          {label}
-          {overridden && <span className="override-dot" title="Overridden for this group" />}
-        </span>
-        <span className="field-control">{children}</span>
+    <FieldContext.Provider value={{ labelId, describedBy, invalid: !!error }}>
+      <div className="field">
+        <div className="field-row">
+          <span className="field-label" id={labelId} title={hint}>
+            {label}
+            {overridden && <span className="override-dot" title="Overridden for this group" />}
+          </span>
+          <span className="field-control">{children}</span>
+        </div>
+        {hint && <span id={hintId} hidden>{hint}</span>}
+        {error && <div className="field-error" id={errorId} role="alert">{error}</div>}
+        {note && <div className="field-note" id={noteId}>{note}</div>}
       </div>
-      {error && <div className="field-error" role="alert">{error}</div>}
-      {note && <div className="field-note">{note}</div>}
-    </div>
+    </FieldContext.Provider>
   );
 }
 
@@ -63,7 +101,8 @@ export function Check({
   ariaLabel?: string;
   title?: string;
 }) {
-  return <input type="checkbox" checked={checked} disabled={disabled} aria-label={ariaLabel} title={title} onChange={(e) => onChange(e.target.checked)} />;
+  const aria = useFieldAria(ariaLabel);
+  return <input type="checkbox" checked={checked} disabled={disabled} {...aria} title={title} onChange={(e) => onChange(e.target.checked)} />;
 }
 
 export function ColorInput({
@@ -79,7 +118,8 @@ export function ColorInput({
   ariaLabel?: string;
   title?: string;
 }) {
-  return <input type="color" value={value} disabled={disabled} aria-label={ariaLabel} title={title} onChange={(e) => onChange(e.target.value)} />;
+  const aria = useFieldAria(ariaLabel);
+  return <input type="color" value={value} disabled={disabled} {...aria} title={title} onChange={(e) => onChange(e.target.value)} />;
 }
 
 export function SelectInput<T extends string>({
@@ -93,8 +133,9 @@ export function SelectInput<T extends string>({
   onChange: (v: T) => void;
   disabled?: boolean;
 }) {
+  const aria = useFieldAria();
   return (
-    <select value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as T)}>
+    <select value={value} disabled={disabled} {...aria} onChange={(e) => onChange(e.target.value as T)}>
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
@@ -105,7 +146,8 @@ export function SelectInput<T extends string>({
 }
 
 export function TextInput({ value, onChange, placeholder, disabled }: { value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean }) {
-  return <input type="text" value={value} placeholder={placeholder} disabled={disabled} onChange={(e) => onChange(e.target.value)} />;
+  const aria = useFieldAria();
+  return <input type="text" value={value} placeholder={placeholder} disabled={disabled} {...aria} onChange={(e) => onChange(e.target.value)} />;
 }
 
 interface NumProps {
@@ -178,6 +220,7 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
           type="text"
           inputMode="decimal"
           aria-label={label}
+          aria-invalid={error ? true : undefined}
           className={error ? 'invalid' : ''}
           value={text}
           disabled={disabled}

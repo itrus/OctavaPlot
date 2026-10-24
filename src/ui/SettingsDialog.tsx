@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../model/defaults';
 import { useApp } from '../state/AppContext';
-import type { ExportFormat } from '../state/settings';
+import type { DecimalSeparator } from './cellText';
+import { PNG_SCALES, type ExportFormat } from '../state/settings';
+import { DialogShell, trapTab } from './DialogShell';
 import { Check, Field, NumField, Section, SelectInput } from './inspector/controls';
 
 /** Centralised application preferences. They apply to the app and to new charts, not to a saved project. */
@@ -20,7 +22,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <DialogShell>
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onKeyDown={trapTab}>
       <div className="modal" role="dialog" aria-modal="true" aria-label="Settings" tabIndex={-1} ref={ref}>
         <div className="modal-head">
           <strong>Settings</strong>
@@ -39,6 +42,19 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <Check checked={settings.newProjectEmpty} onChange={(v) => updateSettings({ newProjectEmpty: v })} ariaLabel="New projects and tables start empty" />
             </Field>
           </Section>
+          <Section title="Numbers in tables">
+            <Field label="Decimal separator" hint="How typed, pasted and imported numbers are read. Automatic takes 1,5 as 1.5 but refuses 1,234, which could be 1.234 or 1234.">
+              <SelectInput<DecimalSeparator>
+                value={settings.decimalSeparator}
+                options={[
+                  { value: 'auto', label: 'Automatic (decimal point or comma)' },
+                  { value: 'point', label: 'Point: 1,234.5 (a comma is refused)' },
+                  { value: 'comma', label: 'Comma: 1.234,5 (a point is refused)' },
+                ]}
+                onChange={(v) => updateSettings({ decimalSeparator: v })}
+              />
+            </Field>
+          </Section>
           <Section title="Export">
             <Field label="Add date and time to file names" hint="Exported JSON, CSV, PNG and SVG files get a suffix like _261022_1435 (yymmdd_HHMM)">
               <Check checked={settings.timestampExports} onChange={(v) => updateSettings({ timestampExports: v })} ariaLabel="Add date and time to file names" />
@@ -53,6 +69,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 onChange={(v) => updateSettings({ exportFormat: v })}
               />
             </Field>
+            <Field label="PNG resolution" hint="Pixels per pixel of the chart: 300 dpi and 600 dpi are the usual print resolutions">
+              <SelectInput<string>
+                value={String(settings.pngScale)}
+                options={PNG_SCALES.map((v) => ({ value: String(v), label: `${v}× (${Math.round(v * 96)} dpi): ${Math.round(settings.defaultChartWidthPx * v)} × ${Math.round(settings.defaultChartHeightPx * v)} px for a new chart` }))}
+                onChange={(v) => updateSettings({ pngScale: Number(v) })}
+              />
+            </Field>
           </Section>
           <Section title="New charts">
             <NumField label="Default width" unit="px" step={10} slider={false} value={settings.defaultChartWidthPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => updateSettings({ defaultChartWidthPx: v })} />
@@ -62,5 +85,6 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
+    </DialogShell>
   );
 }

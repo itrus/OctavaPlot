@@ -34,8 +34,8 @@ export function axisLineD(along: 'x' | 'y', fixed: number, from: number, to: num
   return ranges.map(([a, b]) => (along === 'y' ? `M${n2(fixed)},${n2(a)}V${n2(b)}` : `M${n2(a)},${n2(fixed)}H${n2(b)}`)).join('');
 }
 
-const MARK_HALF = 4;
-const MARK_SLANT = 3;
+const MARK_HALF = 8;
+const MARK_SLANT = 6;
 
 /** The marks at the ends of the gaps of a broken axis: one slash or two, across the axis line. */
 export function BreakMarks({ along, fixed, gaps, mark, color, width }: { along: 'x' | 'y'; fixed: number; gaps: Array<[number, number]>; mark: BreakMark; color: string; width: number }) {
@@ -43,7 +43,7 @@ export function BreakMarks({ along, fixed, gaps, mark, color, width }: { along: 
   const slash = (p: number, shift: number) =>
     along === 'y' ? `M${n2(fixed - MARK_HALF)},${n2(p + shift + MARK_SLANT)}L${n2(fixed + MARK_HALF)},${n2(p + shift - MARK_SLANT)}` : `M${n2(p + shift - MARK_SLANT)},${n2(fixed + MARK_HALF)}L${n2(p + shift + MARK_SLANT)},${n2(fixed - MARK_HALF)}`;
   const at = gaps.flatMap(([a, b]) => [a, b]);
-  const d = at.map((p) => (mark === 'doubleSlash' ? slash(p, -1.5) + slash(p, 1.5) : slash(p, 0))).join('');
+  const d = at.map((p) => (mark === 'doubleSlash' ? slash(p, -3) + slash(p, 3) : slash(p, 0))).join('');
   return <path d={d} stroke={color} strokeWidth={width} fill="none" strokeLinecap="butt" />;
 }
 
@@ -105,7 +105,7 @@ export interface EditorState {
 
 function annotationBox(a: Annotation, x: number, y: number) {
   const lines = a.text.split('\n');
-  const w = Math.max(...lines.map((l) => measureText(l, a.fontSizePt)), 4);
+  const w = Math.max(...lines.map((l) => measureText(l, a.fontSizePt)), 8);
   const h = lines.length * a.fontSizePt * 1.2;
   return { x, y, w, h, lines };
 }
@@ -123,7 +123,7 @@ export function AnnotationLayer({ chart, editor, width, height, hit }: { chart: 
         const box = annotationBox(a, x, y);
         return (
           <g key={a.id} {...hit('annotation', undefined, undefined, a.id)}>
-            {ed && <rect x={n2(box.x - 3)} y={n2(box.y - 3)} width={n2(box.w + 6)} height={n2(box.h + 6)} fill="transparent" />}
+            {ed && <rect x={n2(box.x - 6)} y={n2(box.y - 6)} width={n2(box.w + 12)} height={n2(box.h + 12)} fill="transparent" />}
             <text x={n2(x)} fontSize={a.fontSizePt} fill={a.color}>
               {box.lines.map((line, i) => (
                 <tspan key={i} x={n2(x)} y={n2(y + a.fontSizePt * 0.9 + i * a.fontSizePt * 1.2)}>
@@ -132,7 +132,7 @@ export function AnnotationLayer({ chart, editor, width, height, hit }: { chart: 
               ))}
             </text>
             {selected === a.id && (
-              <rect data-editor-only x={n2(box.x - 3)} y={n2(box.y - 3)} width={n2(box.w + 6)} height={n2(box.h + 6)} fill="none" stroke={SELECT_COLOR} strokeWidth={1} strokeDasharray="3 2" pointerEvents="none" />
+              <rect data-editor-only x={n2(box.x - 6)} y={n2(box.y - 6)} width={n2(box.w + 12)} height={n2(box.h + 12)} fill="none" stroke={SELECT_COLOR} strokeWidth={2} strokeDasharray="6 4" pointerEvents="none" />
             )}
           </g>
         );
@@ -142,7 +142,7 @@ export function AnnotationLayer({ chart, editor, width, height, hit }: { chart: 
 }
 
 /** Gap between a scale bar and the corner of the plotting region it stands in, pt. */
-const BAR_INSET = 10;
+const BAR_INSET = 20;
 
 /**
  * The scale bar of a hidden axis: a line as long as one major tick interval, with that interval written beside it, in
@@ -159,12 +159,12 @@ export function ScaleBar({ chart, axis, along, scale, map, plot }: { chart: Char
   const yBottom = plot.y + plot.height - BAR_INSET;
   const font = axis.tickFontSizePt;
   const stroke = { stroke: chart.axisColor, strokeWidth: axis.lineWidthPt, strokeLinecap: 'butt' as const, fill: 'none' };
-  const caps = 3;
+  const caps = 6;
   if (along === 'x') {
     return (
       <g>
         <path d={`M${n2(x0)},${n2(yBottom)}H${n2(x0 + length)}M${n2(x0)},${n2(yBottom - caps)}v${caps * 2}M${n2(x0 + length)},${n2(yBottom - caps)}v${caps * 2}`} {...stroke} />
-        <text x={n2(x0 + length / 2)} y={n2(yBottom - caps - 3)} textAnchor="middle" fontSize={font} fontWeight={axis.tickBold ? 'bold' : undefined} fill={chart.textColor}>
+        <text x={n2(x0 + length / 2)} y={n2(yBottom - caps - 6)} textAnchor="middle" fontSize={font} fontWeight={axis.tickBold ? 'bold' : undefined} fill={chart.textColor}>
           {label}
         </text>
       </g>
@@ -173,7 +173,7 @@ export function ScaleBar({ chart, axis, along, scale, map, plot }: { chart: Char
   return (
     <g>
       <path d={`M${n2(x0)},${n2(yBottom)}V${n2(yBottom - length)}M${n2(x0 - caps)},${n2(yBottom)}h${caps * 2}M${n2(x0 - caps)},${n2(yBottom - length)}h${caps * 2}`} {...stroke} />
-      <text x={n2(x0 + caps + 4)} y={n2(yBottom - length / 2)} dy="0.35em" fontSize={font} fontWeight={axis.tickBold ? 'bold' : undefined} fill={chart.textColor}>
+      <text x={n2(x0 + caps + 8)} y={n2(yBottom - length / 2)} dy="0.35em" fontSize={font} fontWeight={axis.tickBold ? 'bold' : undefined} fill={chart.textColor}>
         {label}
       </text>
     </g>

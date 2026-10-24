@@ -163,3 +163,20 @@ describe('an XY chart with broken axes', () => {
     expect(svg).not.toContain('NaN');
   });
 });
+
+describe('lines across axis breaks (cut in data coordinates)', () => {
+  it('splits a segment where it enters and leaves the gap, at the exact data values', async () => {
+    const { polylinesThroughBreaks, dataGaps } = await import('./axisScale');
+    const y = resolveAxis(input([0, 100]), cfg([{ from: 20, to: 80 }]));
+    const x = resolveAxis(input([0, 10], { max: 10, majorInterval: 2 }), cfg([]));
+    expect(dataGaps(y)).toEqual([[20, 80]]);
+    const parts = polylinesThroughBreaks([{ x: 0, y: 0 }, { x: 10, y: 100 }], x, y);
+    expect(parts).toHaveLength(2);
+    expect(parts[0][0]).toEqual({ x: 0, y: 0 });
+    expect(parts[0][1].x).toBeCloseTo(2, 10);
+    expect(parts[0][1].y).toBeCloseTo(20, 10);
+    expect(parts[1][0].x).toBeCloseTo(8, 10);
+    expect(parts[1][0].y).toBeCloseTo(80, 10);
+    expect(parts[1][1]).toEqual({ x: 10, y: 100 });
+  });
+});

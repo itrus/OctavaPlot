@@ -94,7 +94,7 @@ describe('actions', () => {
   it('seeds Custom offsets from the drawn label, rounded and clamped', () => {
     const s = style();
     expect(seedCustomOffsets(s, { cx: 100, cy: 50 }, { x0: 103.04, y0: 33.26, x1: 120, y1: 45 })).toEqual({ pointLabelOffsetXPt: 3, pointLabelOffsetYPt: -16.7 });
-    expect(seedCustomOffsets(s, { cx: 0, cy: 0 }, { x0: 900, y0: -900, x1: 1, y1: 1 })).toEqual({ pointLabelOffsetXPt: 200, pointLabelOffsetYPt: -200 });
+    expect(seedCustomOffsets(s, { cx: 0, cy: 0 }, { x0: 900, y0: -900, x1: 1, y1: 1 })).toEqual({ pointLabelOffsetXPt: 400, pointLabelOffsetYPt: -400 });
   });
   it('seeds from the style when no label is drawn', () => {
     const out = seedCustomOffsets(style({ pointLabelOffsetXPt: 3, pointLabelOffsetYPt: 3, pointLabelFontSizePt: 10 }), null, null);

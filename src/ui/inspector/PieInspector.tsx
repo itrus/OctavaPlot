@@ -96,7 +96,7 @@ export function PieInspector({ chart, table }: { chart: Chart; table: DataTable 
                   unit="pt"
                   value={parts[0]?.style.barBorderWidthPt ?? 0}
                   min={0}
-                  max={20}
+                  max={40}
                   onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderWidthPt: v }), 'style:all:border')}
                 />
                 <Field label="Border color">

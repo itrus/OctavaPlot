@@ -8,13 +8,19 @@
 const PT_PER_INCH = 72;
 const CSS_PX_PER_INCH = 96;
 
-/**
- * Charts are drawn at twice the size their pixel dimensions suggest: the SVG viewBox is half the chart's size
- * in pt, so every font, line, symbol and margin (all in pt) comes out 2x larger on the page and in exports.
- */
-export const CHART_DRAW_SCALE = 2;
-export const chartPx2Pt = (px: number): number => pxToPt(px) / CHART_DRAW_SCALE;
-const pxToPt = (px: number): number => (px * PT_PER_INCH) / CSS_PX_PER_INCH;
+/** The size of a chart in pt (the SVG viewBox) from its size in CSS pixels. */
+export const chartPx2Pt = (px: number): number => (px * PT_PER_INCH) / CSS_PX_PER_INCH;
 
 /** Compact number for SVG attributes (avoids float noise in exported files). */
 export const n2 = (v: number): string => String(Math.round(v * 100) / 100);
+
+/** Smallest and largest of a list without spreading it into arguments (which overflows the stack for very long lists). */
+export function extent(values: readonly number[]): [number, number] {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const v of values) {
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  return [lo, hi];
+}

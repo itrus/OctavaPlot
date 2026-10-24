@@ -1,26 +1,29 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { ChartType } from '../model/types';
+import { DialogShell, trapTab } from './DialogShell';
 
 /** A small modal with a title, a body and Cancel / confirm buttons. Focus is taken once, when it opens. */
 export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled, wide, children }: { title: string; confirmLabel: string; onConfirm: () => void; onClose: () => void; confirmDisabled?: boolean; wide?: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => ref.current?.focus(), []);
-  const latest = useRef({ onConfirm, onClose });
-  latest.current = { onConfirm, onClose };
+  const latest = useRef({ onConfirm, onClose, confirmDisabled });
+  latest.current = { onConfirm, onClose, confirmDisabled };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') latest.current.onClose();
       else if (e.key === 'Enter' && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLButtonElement && e.target.getAttribute('role') !== 'radio')) {
         // A card is a radio button: Enter on it confirms the choice instead of selecting it again.
         e.preventDefault();
-        latest.current.onConfirm();
+        // Enter does what the confirm button does: nothing while that is disabled.
+        if (!latest.current.confirmDisabled) latest.current.onConfirm();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <DialogShell>
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onKeyDown={trapTab}>
       <div className={`modal modal-wide${wide ? ' modal-xwide' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
         <div className="modal-head">
           <strong>{title}</strong>
@@ -33,6 +36,7 @@ export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled
         </div>
       </div>
     </div>
+    </DialogShell>
   );
 }
 

@@ -100,3 +100,9 @@ describe('violin densities', () => {
     expect(Math.max(eachMax(byCount[0]), eachMax(byCount[1]))).toBe(1);
   });
 });
+
+describe('constant samples', () => {
+  it('have no density whatever the bandwidth', () => {
+    expect(densityProfile([4, 4, 4, 4], { smoothing: 'medium' as never, bandwidth: 1, trim: 'tails' })).toBeNull();
+  });
+});

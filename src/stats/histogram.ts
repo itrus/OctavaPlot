@@ -28,7 +28,8 @@ export function autoBinWidth(sorted: readonly number[]): number {
   return niceWidth(range / bins);
 }
 
-const clean = (v: number): number => Number(v.toPrecision(12));
+/** Removes floating-point noise (0.30000000000000004) only; 15 digits keep edges of large values apart. */
+const clean = (v: number): number => Number(v.toPrecision(15));
 
 /**
  * Equal-width bin edges that cover the values: the first edge a multiple of the width (or of `anchor`, an edge that is
@@ -42,9 +43,18 @@ export function binEdges(sorted: readonly number[], width: number, anchor: numbe
   let first = origin + Math.floor((lo - origin) / width + 1e-9) * width;
   if (first > lo) first -= width;
   const edges = [clean(first)];
-  while (edges[edges.length - 1] <= hi + width * 1e-9 && edges.length <= maxBins) edges.push(clean(first + edges.length * width));
+  // Edges must strictly increase: a width below the resolution of the values cannot make bins.
+  const next = (k: number) => {
+    const e = clean(first + k * width);
+    return e > edges[edges.length - 1] ? e : null;
+  };
+  while (edges[edges.length - 1] <= hi + width * 1e-9 && edges.length <= maxBins) {
+    const e = next(edges.length);
+    if (e === null) break;
+    edges.push(e);
+  }
   // The last edge must lie above the largest value, unless the largest is exactly on it (the final bin includes its edge).
-  if (edges.length < 2) edges.push(clean(first + width));
+  if (edges.length < 2) edges.push(clean(first + width) > edges[0] ? clean(first + width) : edges[0] + Math.max(Math.abs(edges[0]) * Number.EPSILON * 4, Number.MIN_VALUE));
   return edges;
 }
 

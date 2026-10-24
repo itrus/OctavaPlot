@@ -1,5 +1,6 @@
 import { suppliedStats } from '../chart/xyModel';
 import { fitCurve, fitModelById, isFailure, type FitResult } from '../stats/fit';
+import { withoutExcluded } from './exclusion';
 import { layoutOf, xySeries } from './tableLayout';
 import type { Analysis, DataTable, Id } from './types';
 
@@ -10,6 +11,8 @@ export interface SheetRow {
   key: string;
   label: string;
   cells: string[];
+  /** The same cells at full precision, for copying and files; the cells are rounded for the screen. */
+  exact?: string[];
   /** A gap between groups of rows. */
   blank?: boolean;
   indent?: boolean;
@@ -22,7 +25,8 @@ export interface Sheet {
 }
 
 /** What a curve is fitted to, for each Y series: every replicate on its own, or the single Y or entered mean of each row. */
-export function fitObservations(table: DataTable): Array<{ id: Id; label: string; obs: Array<{ x: number; y: number }> }> {
+export function fitObservations(source: DataTable): Array<{ id: Id; label: string; obs: Array<{ x: number; y: number }> }> {
+  const table = withoutExcluded(source);
   if (table.kind !== 'xy' || table.groups.length === 0) return [];
   const layout = layoutOf(table);
   const xs = table.groups[0].observations.map((o) => o.value);
@@ -45,14 +49,16 @@ export function fitObservations(table: DataTable): Array<{ id: Id; label: string
   });
 }
 
-/** Six significant digits: enough to copy into another program without the rounding of the screen showing. */
+/** Six significant digits for the screen. */
 const num = (v: number | null | undefined): string => (v === null || v === undefined || !Number.isFinite(v) ? '' : String(Number(v.toPrecision(6))));
+/** The number as it is held (shortest text that reads back as the same double), for copying and files. */
+const full = (v: number | null | undefined): string => (v === null || v === undefined || !Number.isFinite(v) ? '' : String(v));
 
 /** The fits of every series of the table with the model and level of the analysis. */
-export function fitsOf(table: DataTable, analysis: Pick<Analysis, 'model' | 'degree'>): Array<{ id: Id; label: string; result: FitResult | null; failure: string | null }> {
+export function fitsOf(table: DataTable, analysis: Pick<Analysis, 'model' | 'degree' | 'level'>): Array<{ id: Id; label: string; result: FitResult | null; failure: string | null }> {
   const model = analysis.model ?? 'linear';
   return fitObservations(table).map((s) => {
-    const r = fitCurve(s.obs, { model, degree: analysis.degree });
+    const r = fitCurve(s.obs, { model, degree: analysis.degree, level: analysis.level });
     return isFailure(r) ? { id: s.id, label: s.label, result: null, failure: r.message } : { id: s.id, label: s.label, result: r, failure: null };
   });
 }
@@ -62,24 +68,26 @@ export function curveFitSheet(table: DataTable, analysis: Analysis): Sheet {
   const fits = fitsOf(table, analysis);
   const pct = `${Number((analysis.level * 100).toPrecision(3))}%`;
   const each = (f: (r: FitResult) => string, otherwise = ''): string[] => fits.map((x) => (x.result ? f(x.result) : otherwise));
+  /** A row of numbers: rounded for the screen, whole for copying. */
+  const numbers = (key: string, label: string, pick: (r: FitResult) => number | null | undefined, indent = false): SheetRow => ({ key, label, indent, cells: each((r) => num(pick(r))), exact: each((r) => full(pick(r))) });
   const gap = (key: string): SheetRow => ({ key, label: '', cells: fits.map(() => ''), blank: true });
   const rows: SheetRow[] = [
     { key: 'equation', label: 'Equation', cells: fits.map(() => model.formula) },
     gap('g1'),
     { key: 'n', label: 'Number of points', cells: each((r) => String(r.n)) },
     { key: 'df', label: 'Degrees of freedom', cells: each((r) => String(r.df)) },
-    { key: 'r2', label: 'R squared', cells: each((r) => num(r.rSquared)) },
-    { key: 'ss', label: 'Sum of squares', cells: each((r) => num(r.rss)) },
-    { key: 'syx', label: 'Sy.x (residual SD)', cells: each((r) => num(r.sigma)) },
+    numbers('r2', 'R squared', (r) => r.rSquared),
+    numbers('ss', 'Sum of squares', (r) => r.rss),
+    numbers('syx', 'Sy.x (residual SD)', (r) => r.sigma),
     { key: 'conv', label: 'Converged', cells: each((r) => (r.converged ? 'Yes' : 'No')) },
     gap('g2'),
   ];
   const names = fits.find((f) => f.result)?.result?.params.map((p) => p.name) ?? model.paramNames(analysis.degree ?? 2);
   names.forEach((name, i) => {
-    rows.push({ key: `p${i}`, label: name, cells: each((r) => num(r.params[i]?.value)) });
-    rows.push({ key: `p${i}se`, label: 'Std. error', indent: true, cells: each((r) => num(r.params[i]?.se)) });
-    rows.push({ key: `p${i}lo`, label: `${pct} CI lower limit`, indent: true, cells: each((r) => num(r.params[i]?.lower)) });
-    rows.push({ key: `p${i}hi`, label: `${pct} CI upper limit`, indent: true, cells: each((r) => num(r.params[i]?.upper)) });
+    rows.push(numbers(`p${i}`, name, (r) => r.params[i]?.value));
+    rows.push(numbers(`p${i}se`, 'Std. error', (r) => r.params[i]?.se, true));
+    rows.push(numbers(`p${i}lo`, `${pct} CI lower limit`, (r) => r.params[i]?.lower, true));
+    rows.push(numbers(`p${i}hi`, `${pct} CI upper limit`, (r) => r.params[i]?.upper, true));
   });
   rows.push(gap('g3'));
   rows.push({ key: 'notes', label: 'Notes', cells: fits.map((f) => f.failure ?? f.result?.message ?? '') });

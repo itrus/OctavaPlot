@@ -64,7 +64,7 @@ describe('lines and error bars over or under the symbols', () => {
     const auto = chartToSvgString(chartOf(p), table);
     const top = chartToSvgString(chartOf(patchLook('c', { lineOrder: 'onTop' })(p)), table);
     // The first line of the series (a stroked path without fill) comes before the first symbol in auto, after it on top.
-    const firstLine = (svg: string) => indexOf(svg, /fill="none" stroke="#[0-9a-f]{6}" stroke-width="2\.6"/i);
+    const firstLine = (svg: string) => indexOf(svg, /fill="none" stroke="#[0-9a-f]{6}" stroke-width="5.2"/i);
     const firstSymbol = (svg: string) => indexOf(svg, /<path d="M[\d.\-]+,[\d.\-]+a/);
     expect(firstLine(auto)).toBeGreaterThan(-1);
     expect(firstLine(auto)).toBeLessThan(firstSymbol(auto));

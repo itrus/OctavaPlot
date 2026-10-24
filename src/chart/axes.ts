@@ -1,3 +1,4 @@
+import { capabilitiesOf } from '../model/capabilities';
 import type { AxisBinding, AxisConfig, Chart, ChartStyle, ChartType } from '../model/types';
 import type { GroupStats } from '../stats/summary';
 import { rangeValuesFor } from './errorGeometry';
@@ -98,7 +99,7 @@ interface BindingSelectState {
 
 export function bindingSelectState(type: ChartType, style: { axisBinding?: unknown }): BindingSelectState {
   return {
-    offered: type === 'bar' || type === 'scatter' || type === 'mean',
+    offered: capabilitiesOf(type).secondaryAxis,
     value: bindingOf(style),
     options: AXIS_BINDINGS.map((value) => ({ value, label: AXIS_SHORT[value] })),
   };

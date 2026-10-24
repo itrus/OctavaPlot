@@ -8,6 +8,10 @@ export interface Observation {
   id: Id;
   /** null = missing observation (never zero). */
   value: number | null;
+  /** The value is kept but not used by any chart or calculation (see model/exclusion.ts). */
+  excluded?: boolean;
+  /** Why it is excluded, for the record. */
+  excludedReason?: string;
 }
 
 export interface Group {
@@ -456,6 +460,20 @@ export interface JitterConfig {
   widthFraction: number;
 }
 
+/** A line across the plotting region at a value of an axis (a threshold, a target, a control level). */
+export interface ReferenceLine {
+  id: Id;
+  /** Which axis the value is on: X (a vertical line) or Y (a horizontal one). */
+  axis: 'x' | 'y';
+  value: number;
+  color: string;
+  widthPt: number;
+  style: LineStyle;
+  /** Text written at the end of the line. */
+  label: string;
+  showLabel: boolean;
+}
+
 export interface Annotation {
   id: Id;
   text: string;
@@ -547,6 +565,8 @@ export interface Chart {
   defaults: ChartStyle;
   layers: ChartLayer[];
   annotations: Annotation[];
+  /** Lines at chosen values of the axes. */
+  referenceLines: ReferenceLine[];
 }
 
 /** The analyses of the Results section: descriptive statistics of each column, and curve fits of an XY table. */
@@ -570,7 +590,7 @@ export interface Project {
   name: string;
   dataTables: DataTable[];
   charts: Chart[];
-  /** Absent in files from before analyses existed. */
+  /** Absent when there are none. */
   analyses?: Analysis[];
 }
 

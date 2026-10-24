@@ -1,0 +1,747 @@
+{
+  "format": "octavaplot-project",
+  "version": 1,
+  "project": {
+    "id": "example-project",
+    "name": "Example",
+    "dataTables": [
+      {
+        "id": "table-1",
+        "name": "Data 1",
+        "kind": "column",
+        "rowCount": 20,
+        "rows": [
+          {
+            "id": "row-0",
+            "title": ""
+          },
+          {
+            "id": "row-1",
+            "title": ""
+          },
+          {
+            "id": "row-2",
+            "title": ""
+          },
+          {
+            "id": "row-3",
+            "title": ""
+          },
+          {
+            "id": "row-4",
+            "title": ""
+          },
+          {
+            "id": "row-5",
+            "title": ""
+          },
+          {
+            "id": "row-6",
+            "title": ""
+          },
+          {
+            "id": "row-7",
+            "title": ""
+          },
+          {
+            "id": "row-8",
+            "title": ""
+          },
+          {
+            "id": "row-9",
+            "title": ""
+          },
+          {
+            "id": "row-10",
+            "title": ""
+          },
+          {
+            "id": "row-11",
+            "title": ""
+          },
+          {
+            "id": "row-12",
+            "title": ""
+          },
+          {
+            "id": "row-13",
+            "title": ""
+          },
+          {
+            "id": "row-14",
+            "title": ""
+          },
+          {
+            "id": "row-15",
+            "title": ""
+          },
+          {
+            "id": "row-16",
+            "title": ""
+          },
+          {
+            "id": "row-17",
+            "title": ""
+          },
+          {
+            "id": "row-18",
+            "title": ""
+          },
+          {
+            "id": "row-19",
+            "title": ""
+          }
+        ],
+        "groups": [
+          {
+            "id": "group-0",
+            "name": "Group A",
+            "title": "",
+            "paletteIndex": 0,
+            "observations": [
+              {
+                "id": "obs-0-0",
+                "value": 1.1
+              },
+              {
+                "id": "obs-0-1",
+                "value": 1.2
+              },
+              {
+                "id": "obs-0-2",
+                "value": 1.3
+              },
+              {
+                "id": "obs-0-3",
+                "value": 1.2
+              },
+              {
+                "id": "obs-0-4",
+                "value": 1.4
+              },
+              {
+                "id": "obs-0-5",
+                "value": null
+              },
+              {
+                "id": "obs-0-6",
+                "value": null
+              },
+              {
+                "id": "obs-0-7",
+                "value": null
+              },
+              {
+                "id": "obs-0-8",
+                "value": null
+              },
+              {
+                "id": "obs-0-9",
+                "value": null
+              },
+              {
+                "id": "obs-0-10",
+                "value": null
+              },
+              {
+                "id": "obs-0-11",
+                "value": null
+              },
+              {
+                "id": "obs-0-12",
+                "value": null
+              },
+              {
+                "id": "obs-0-13",
+                "value": null
+              },
+              {
+                "id": "obs-0-14",
+                "value": null
+              },
+              {
+                "id": "obs-0-15",
+                "value": null
+              },
+              {
+                "id": "obs-0-16",
+                "value": null
+              },
+              {
+                "id": "obs-0-17",
+                "value": null
+              },
+              {
+                "id": "obs-0-18",
+                "value": null
+              },
+              {
+                "id": "obs-0-19",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "group-1",
+            "name": "Group B",
+            "title": "",
+            "paletteIndex": 1,
+            "observations": [
+              {
+                "id": "obs-1-0",
+                "value": 1.4
+              },
+              {
+                "id": "obs-1-1",
+                "value": 1.7
+              },
+              {
+                "id": "obs-1-2",
+                "value": 1.6
+              },
+              {
+                "id": "obs-1-3",
+                "value": 1.8
+              },
+              {
+                "id": "obs-1-4",
+                "value": 1.5
+              },
+              {
+                "id": "obs-1-5",
+                "value": null
+              },
+              {
+                "id": "obs-1-6",
+                "value": null
+              },
+              {
+                "id": "obs-1-7",
+                "value": null
+              },
+              {
+                "id": "obs-1-8",
+                "value": null
+              },
+              {
+                "id": "obs-1-9",
+                "value": null
+              },
+              {
+                "id": "obs-1-10",
+                "value": null
+              },
+              {
+                "id": "obs-1-11",
+                "value": null
+              },
+              {
+                "id": "obs-1-12",
+                "value": null
+              },
+              {
+                "id": "obs-1-13",
+                "value": null
+              },
+              {
+                "id": "obs-1-14",
+                "value": null
+              },
+              {
+                "id": "obs-1-15",
+                "value": null
+              },
+              {
+                "id": "obs-1-16",
+                "value": null
+              },
+              {
+                "id": "obs-1-17",
+                "value": null
+              },
+              {
+                "id": "obs-1-18",
+                "value": null
+              },
+              {
+                "id": "obs-1-19",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "group-2",
+            "name": "Group C",
+            "title": "",
+            "paletteIndex": 2,
+            "observations": [
+              {
+                "id": "obs-2-0",
+                "value": 1.8
+              },
+              {
+                "id": "obs-2-1",
+                "value": 2
+              },
+              {
+                "id": "obs-2-2",
+                "value": 1.9
+              },
+              {
+                "id": "obs-2-3",
+                "value": 2.1
+              },
+              {
+                "id": "obs-2-4",
+                "value": 2.2
+              },
+              {
+                "id": "obs-2-5",
+                "value": null
+              },
+              {
+                "id": "obs-2-6",
+                "value": null
+              },
+              {
+                "id": "obs-2-7",
+                "value": null
+              },
+              {
+                "id": "obs-2-8",
+                "value": null
+              },
+              {
+                "id": "obs-2-9",
+                "value": null
+              },
+              {
+                "id": "obs-2-10",
+                "value": null
+              },
+              {
+                "id": "obs-2-11",
+                "value": null
+              },
+              {
+                "id": "obs-2-12",
+                "value": null
+              },
+              {
+                "id": "obs-2-13",
+                "value": null
+              },
+              {
+                "id": "obs-2-14",
+                "value": null
+              },
+              {
+                "id": "obs-2-15",
+                "value": null
+              },
+              {
+                "id": "obs-2-16",
+                "value": null
+              },
+              {
+                "id": "obs-2-17",
+                "value": null
+              },
+              {
+                "id": "obs-2-18",
+                "value": null
+              },
+              {
+                "id": "obs-2-19",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "group-3",
+            "name": "Group D",
+            "title": "",
+            "paletteIndex": 3,
+            "observations": [
+              {
+                "id": "obs-3-0",
+                "value": 2.1
+              },
+              {
+                "id": "obs-3-1",
+                "value": 2.4
+              },
+              {
+                "id": "obs-3-2",
+                "value": 2.3
+              },
+              {
+                "id": "obs-3-3",
+                "value": 2.5
+              },
+              {
+                "id": "obs-3-4",
+                "value": 2.2
+              },
+              {
+                "id": "obs-3-5",
+                "value": null
+              },
+              {
+                "id": "obs-3-6",
+                "value": null
+              },
+              {
+                "id": "obs-3-7",
+                "value": null
+              },
+              {
+                "id": "obs-3-8",
+                "value": null
+              },
+              {
+                "id": "obs-3-9",
+                "value": null
+              },
+              {
+                "id": "obs-3-10",
+                "value": null
+              },
+              {
+                "id": "obs-3-11",
+                "value": null
+              },
+              {
+                "id": "obs-3-12",
+                "value": null
+              },
+              {
+                "id": "obs-3-13",
+                "value": null
+              },
+              {
+                "id": "obs-3-14",
+                "value": null
+              },
+              {
+                "id": "obs-3-15",
+                "value": null
+              },
+              {
+                "id": "obs-3-16",
+                "value": null
+              },
+              {
+                "id": "obs-3-17",
+                "value": null
+              },
+              {
+                "id": "obs-3-18",
+                "value": null
+              },
+              {
+                "id": "obs-3-19",
+                "value": null
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "chart-1",
+        "name": "Graph 1",
+        "dataTableId": "table-1",
+        "type": "bar",
+        "widthPx": 1024,
+        "heightPx": 768,
+        "hiddenGroupIds": [],
+        "groupOrder": [],
+        "groupGaps": {},
+        "extraGroups": [],
+        "survival": {
+          "band": false,
+          "level": 0.95,
+          "method": "loglog",
+          "atRisk": false,
+          "eventSymbols": false,
+          "errorBars": false
+        },
+        "aspect": "free",
+        "paletteId": "aaas",
+        "title": "Graph 1",
+        "showTitle": true,
+        "titleFontSizePt": 33.6,
+        "fontFamily": "Arial, Helvetica, sans-serif",
+        "textColor": "#000000",
+        "titleBold": true,
+        "titleOffsetPt": 0,
+        "axisColor": "#000000",
+        "plotColor": "#ffffff",
+        "pageColor": "#ffffff",
+        "frame": "none",
+        "grid": {
+          "color": "#d0d0d0",
+          "widthPt": 1,
+          "style": "solid",
+          "minorColor": "#e6e6e6",
+          "minorWidthPt": 0.5,
+          "minorStyle": "solid"
+        },
+        "orientation": "vertical",
+        "lineOrder": "auto",
+        "origin": {
+          "x": null,
+          "y": null
+        },
+        "bars": {
+          "gapPct": null,
+          "beforePct": null,
+          "afterPct": null,
+          "baseline": null
+        },
+        "barLabels": {
+          "show": "none",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": "",
+          "sizePt": 22.4,
+          "color": null
+        },
+        "distribution": {
+          "whisker": "minmax",
+          "tukeyK": 1.5,
+          "boxWidth": 0.65,
+          "violinWidth": 0.8,
+          "showMedian": true,
+          "showMean": false,
+          "points": "none",
+          "smoothing": "medium",
+          "bandwidth": null,
+          "trim": "sample",
+          "normalisation": "width",
+          "showQuartiles": true
+        },
+        "pairs": {
+          "bridge": false
+        },
+        "heatmap": {
+          "palette": "viridis",
+          "reverse": false,
+          "min": null,
+          "max": null,
+          "centre": null,
+          "normalise": "none",
+          "method": "zscore",
+          "summary": "mean",
+          "showValues": false,
+          "decimals": null,
+          "cellGapPt": 0,
+          "transpose": false,
+          "colourbar": true,
+          "missingColour": "#d9d9d9"
+        },
+        "histogram": {
+          "binning": "auto",
+          "binWidth": null,
+          "firstEdge": null,
+          "frequency": "count",
+          "cumulative": "off",
+          "arrangement": "overlay",
+          "gapPct": 0,
+          "ecdfDirection": "atOrBelow",
+          "ecdfUnits": "fraction",
+          "ecdfSymbols": false,
+          "ecdfExtend": true
+        },
+        "fit": {
+          "analysisId": null,
+          "band": "none",
+          "extend": false,
+          "showParameters": false
+        },
+        "pie": {
+          "startAngle": 0,
+          "direction": "clockwise",
+          "hole": 0.5,
+          "labels": "percent",
+          "percentDigits": 1,
+          "showTotal": false,
+          "totalPrefix": "Total = "
+        },
+        "xAxis": {
+          "title": "",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "yAxis": {
+          "title": "Value",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "y2Axis": {
+          "title": "",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "legend": {
+          "visible": true,
+          "keyShape": "rectangle",
+          "position": "right",
+          "fontSizePt": 22.4,
+          "hiddenGroupIds": []
+        },
+        "displayNames": {},
+        "jitter": {
+          "enabled": true,
+          "widthFraction": 0.4
+        },
+        "defaults": {
+          "showBars": true,
+          "barFill": "#d9d9d9",
+          "barOpacity": 1,
+          "barBorderColor": "#000000",
+          "barBorderWidthPt": 0,
+          "barFillMode": "solid",
+          "barPattern": "horizontal",
+          "barPatternSpacingPt": 8,
+          "barPatternWidthPt": 2,
+          "barPatternColor": null,
+          "barPatternBackground": "#ffffff",
+          "showSymbols": false,
+          "symbolColor": "#000000",
+          "symbolShape": "circle",
+          "symbolSizePt": 12,
+          "symbolFillOpacity": 1,
+          "symbolBorderColor": "#000000",
+          "symbolBorderWidthPt": 3,
+          "showErrorBars": true,
+          "errorDirection": "both",
+          "errorCap": "bar",
+          "errorCapWidthPt": 10,
+          "errorLineWidthPt": 5.2,
+          "errorColor": "#000000",
+          "showLines": false,
+          "showMeanLine": false,
+          "lineColor": "#000000",
+          "lineWidthPt": 5.2,
+          "lineStyle": "solid",
+          "axisBinding": "primary",
+          "showPointLabels": false,
+          "pointLabelSource": "rowTitle",
+          "pointLabelPlacement": "above-right",
+          "pointLabelOffsetXPt": 6,
+          "pointLabelOffsetYPt": 6,
+          "pointLabelCollision": "keep",
+          "pointLabelLeader": false,
+          "pointLabelFontSizePt": 22.4,
+          "pointLabelBold": false,
+          "pointLabelItalic": false,
+          "pointLabelColor": null,
+          "pointLabelDecimals": null
+        },
+        "layers": [
+          {
+            "id": "layer-0",
+            "name": "Data",
+            "style": {
+              "showBars": true,
+              "showSymbols": true,
+              "showLines": false,
+              "showMeanLine": false
+            },
+            "groupOverrides": {},
+            "objectOverrides": {},
+            "summary": {
+              "centre": "mean",
+              "spread": "none",
+              "confidenceLevel": 0.95,
+              "smallSamplePolicy": "drawCentre",
+              "invalidPolicy": "omit"
+            },
+            "groupSummary": {}
+          }
+        ],
+        "annotations": [],
+        "referenceLines": []
+      }
+    ]
+  }
+}

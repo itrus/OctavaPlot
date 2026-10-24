@@ -144,7 +144,7 @@ export function buildViolin(c: Common & { halfWidth: number; profile: DensityPro
   if (opts.showQuartiles) {
     for (const [name, p] of [['q1', 0.25], ['q3', 0.75]] as const) {
       const d = across(quantile6(sorted, p));
-      if (d) lines.push({ id: `${id}:${name}`, d, color: lineColor, strokeWidth: lineWidthPt, dash: '4 3' });
+      if (d) lines.push({ id: `${id}:${name}`, d, color: lineColor, strokeWidth: lineWidthPt, dash: '8 6' });
     }
   }
   if (opts.showMedian) {

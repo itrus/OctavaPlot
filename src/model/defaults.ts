@@ -40,7 +40,7 @@ export const BAR_PALETTE = ['#d9d9d9', '#a6a6a6', '#737373', '#f2f2f2', '#595959
 
 /** The layer style a chart of this type starts with: its preset, and for survival curves a plus sign as the censor mark. */
 export const initialLayerStyle = (type: ChartType): Partial<ChartStyle> =>
-  type === 'survival' || type === 'cumulativeEvent' ? { ...TYPE_PRESETS[type], symbolShape: 'plus', symbolSizePt: 9, symbolBorderWidthPt: 2 } : { ...TYPE_PRESETS[type] };
+  type === 'survival' || type === 'cumulativeEvent' ? { ...TYPE_PRESETS[type], symbolShape: 'plus', symbolSizePt: 18, symbolBorderWidthPt: 4 } : { ...TYPE_PRESETS[type] };
 
 /** Axis titles a new chart of this type starts with. */
 function axisTitlesFor(type: ChartType): { x: string; y: string } {
@@ -77,7 +77,7 @@ export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, met
 export const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4 };
 
 /** Line weight shared by the axes, bar borders, error bars and connecting lines, so they read as one family. */
-const AXIS_LINE_PT = 2.6;
+const AXIS_LINE_PT = 5.2;
 /** Box plots and violins (spec 10): min-max whiskers, medium smoothing, equal maximum width. */
 const DEFAULT_DISTRIBUTION: DistributionOptions = {
   whisker: 'minmax',
@@ -103,13 +103,13 @@ const DEFAULT_HISTOGRAM: HistogramOptions = { binning: 'auto', binWidth: null, f
 /** Pies and doughnuts (spec 14): the first part starts at the top, clockwise, labels with the share to one decimal. */
 const DEFAULT_PIE: PieOptions = { startAngle: 0, direction: 'clockwise', hole: 0.5, labels: 'percent', percentDigits: 1, showTotal: false, totalPrefix: 'Total = ' };
 /** Labels on bars are off until asked for. */
-export const DEFAULT_BAR_LABELS: BarLabels = { show: 'none', decimals: null, thousands: false, prefix: '', suffix: '', sizePt: 11.2, color: null };
+export const DEFAULT_BAR_LABELS: BarLabels = { show: 'none', decimals: null, thousands: false, prefix: '', suffix: '', sizePt: 22.4, color: null };
 /** Automatic column layout: the spacing the column charts always had. */
 const DEFAULT_BARS: BarLayout = { gapPct: null, beforePct: null, afterPct: null, baseline: null };
 /** Gridlines: thin and light, and lighter still for the minor ones (P). */
-const DEFAULT_GRID: GridStyle = { color: '#d0d0d0', widthPt: 0.5, style: 'solid', minorColor: '#e6e6e6', minorWidthPt: 0.25, minorStyle: 'solid' };
+const DEFAULT_GRID: GridStyle = { color: '#d0d0d0', widthPt: 1, style: 'solid', minorColor: '#e6e6e6', minorWidthPt: 0.5, minorStyle: 'solid' };
 /** Major tick length, pt (spec 20.2); the layout constant has the same value. */
-export const TICK_LENGTH_PT = 5.6;
+export const TICK_LENGTH_PT = 11.2;
 
 export const DEFAULT_STYLE: ChartStyle = {
   showBars: true,
@@ -119,21 +119,21 @@ export const DEFAULT_STYLE: ChartStyle = {
   barBorderWidthPt: 0,
   barFillMode: 'solid',
   barPattern: 'horizontal',
-  barPatternSpacingPt: 4,
-  barPatternWidthPt: 1,
+  barPatternSpacingPt: 8,
+  barPatternWidthPt: 2,
   barPatternColor: null,
   barPatternBackground: '#ffffff',
   showSymbols: false,
   symbolColor: '#000000',
   symbolShape: 'circle',
-  symbolSizePt: 6,
+  symbolSizePt: 12,
   symbolFillOpacity: 1,
   symbolBorderColor: '#000000',
-  symbolBorderWidthPt: 1.5,
+  symbolBorderWidthPt: 3,
   showErrorBars: true,
   errorDirection: 'both',
   errorCap: 'bar',
-  errorCapWidthPt: 5,
+  errorCapWidthPt: 10,
   errorLineWidthPt: AXIS_LINE_PT,
   errorColor: '#000000',
   showLines: false,
@@ -146,11 +146,11 @@ export const DEFAULT_STYLE: ChartStyle = {
   showPointLabels: false,
   pointLabelSource: 'rowTitle',
   pointLabelPlacement: 'above-right',
-  pointLabelOffsetXPt: 3,
-  pointLabelOffsetYPt: 3,
+  pointLabelOffsetXPt: 6,
+  pointLabelOffsetYPt: 6,
   pointLabelCollision: 'keep',
   pointLabelLeader: false,
-  pointLabelFontSizePt: 11.2,
+  pointLabelFontSizePt: 22.4,
   pointLabelBold: false,
   pointLabelItalic: false,
   pointLabelColor: null,
@@ -208,8 +208,8 @@ const defaultAxis = (title: string): AxisConfig => ({
   tickLabelOffsetPt: 0,
   visible: true,
   lineWidthPt: AXIS_LINE_PT,
-  tickFontSizePt: 13.3,
-  titleFontSizePt: 14,
+  tickFontSizePt: 26.6,
+  titleFontSizePt: 28,
   min: null,
   max: null,
   majorInterval: null,
@@ -257,7 +257,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     paletteId: DEFAULT_PALETTE_ID,
     title: 'Graph 1',
     showTitle: true,
-    titleFontSizePt: 16.8,
+    titleFontSizePt: 33.6,
     fontFamily: FONT_FAMILY,
     textColor: '#000000',
     titleBold: true,
@@ -280,14 +280,15 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     pie: { ...DEFAULT_PIE },
     xAxis: defaultAxis(titles.x),
     yAxis: defaultAxis(titles.y),
-    // Sizes 13.3/14 are inherited from the left axis (P, not D).
+    // Sizes 26.6/28 are inherited from the left axis (P, not D).
     y2Axis: defaultAxis(''),
-    legend: { visible: true, keyShape: 'rectangle', position: 'right', fontSizePt: 11.2, hiddenGroupIds: [] },
+    legend: { visible: true, keyShape: 'rectangle', position: 'right', fontSizePt: 22.4, hiddenGroupIds: [] },
     displayNames: {},
     jitter: { ...DEFAULT_JITTER },
     defaults: { ...DEFAULT_STYLE },
     layers: [layer],
     annotations: [],
+    referenceLines: [],
   };
 }
 

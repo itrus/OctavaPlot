@@ -29,6 +29,12 @@ Local React + TypeScript + Vite + D3 app for editing data tables and the charts 
 
 Deployed from `main` by GitHub Actions. Data stays in your browser's `localStorage`, so do not enter patient-linked data.
 
+## Project file (.oplot)
+
+A project is saved as a `.oplot` file: UTF-8 JSON, not compressed, signed or encrypted, so it can be read and diffed with any text tool. The envelope is `{ "format": "octavaplot-project", "version": 1, "project": { ... } }`, with one version number; this app reads version 1 only. A file is refused, and the open project kept, when it is not named `*.oplot`, is over 64 MB, is not UTF-8 JSON, has another format or version, or holds a damaged project; a value of the wrong type is reset to its default and listed in the status bar. Lengths in `...Pt` keys are true points, the chart size is in px. Autosave in the browser stores the same text.
+
+The full description (contents, units, what is checked, what is not stored, privacy) is in [docs/FILE_FORMAT.md](docs/FILE_FORMAT.md); a small example is [tests/fixtures/example.oplot](tests/fixtures/example.oplot).
+
 ## Run
 
 Requires Node.js 26.
@@ -54,11 +60,11 @@ npm test         # unit tests (vitest)
 | `src/chart/hatch.ts`, `labels.ts`, `axes.ts`, `errorGeometry.ts`, `distributionGeom.ts`, `columns.ts`, `barLabels.ts` | Fill pattern marks, point-label layout, axis binding, error-bar geometry, box and violin shapes, column positions, labels above bars |
 | `src/chart/hitTest.ts` | Hit testing / selection helpers (editor only) |
 | `src/chart/export.tsx` | SVG / PNG export (rendered without editor state) |
-| `src/state/` | Commands, undo/redo history, JSON save/load, autosave, settings |
+| `src/state/` | Commands, undo/redo history, project file (.oplot), autosave, settings |
 | `src/ui/` | Navigator, data table, graph view, formatting inspector (`ui/inspector/`) |
 | `src/testing/` | Fixtures and checks used by the tests only; nothing in the app imports them |
 
-Style precedence: object override > group override > layer override > (group palette) > chart defaults. Chart internal unit is the point (1 in = 72 pt = 25.4 mm); the SVG viewBox is in pt.
+Style precedence: object override > group override > layer override > (group palette) > chart defaults. Chart internal unit is the point (1 in = 72 pt = 25.4 mm); the SVG viewBox is in pt. Sizes in the Inspector are true points: a 12 pt font is 12 pt tall in an export of the stated pixel size (96 px = 1 in, so 1 pt = 4/3 px). Project files from before version 3 stored half of every length in pt (the chart was drawn at twice its size); they are doubled on load.
 
 ## Table types and chart types
 
@@ -78,7 +84,40 @@ Survival curves use the product-limit estimate (events are counted before censor
 
 XY charts follow spec §3.1 and §7: symbols and a path layer per series, a numeric X axis with Auto/Manual limits, input-order paths that break at a missing value (never bridged, never zero), and the automatic range including zero only when the data starts near it. `src/model/chartTypes.ts` is the catalogue; adding a chart type means adding it there, a preset in `defaults.ts`, and its drawing.
 
-**New Graph…** shows a gallery per graph family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. Graphs that are not built yet (box and violin, heat maps, parts of a whole, bars at numeric X, fitted curves, and so on: the presets of specification section 3) are shown locked with their thumbnail and their specification preset ID, so the whole range is visible. The catalogue is `src/model/chartGallery.ts`; to make a planned graph available, give its entry a `type`.
+**New Graph…** shows a gallery per graph family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. The gallery has 56 entries: 39 can be made now (24 chart types, some offered as several presets) and 17 are planned presets of the catalogue in docs/calculation-contracts.md (bars and areas at numeric X, spikes, vectors, bubbles, repeated measures, offset traces, smooth curves, aligned, nested, interleaved and separated dots, grouped and three-way variants, grouped box and violin). The planned ones are shown locked with their thumbnail and their preset ID, so the whole range is visible. The catalogue is `src/model/chartGallery.ts`; to make a planned graph available, give its entry a `type`.
+
+## What each chart type can do
+
+The table below is generated from the capability registry (`src/model/capabilities.ts`) and checked against it by a test, so it cannot drift from the code: a control that a drawing does not honour is not offered.
+
+<!-- capabilities:start -->
+| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Survival options |
+|---|---|---|---|---|---|
+| Bar chart | yes | Y | yes | – | – |
+| Scatter dot plot | yes | Y | yes | – | – |
+| Mean with error bars | yes | Y | yes | – | – |
+| Box and whiskers | yes | Y | – | – | – |
+| Floating bars (min to max) | yes | Y | – | – | – |
+| Before and after | yes | Y | – | – | – |
+| Histogram | – | X and Y | – | – | – |
+| Cumulative distribution | – | X and Y | – | – | – |
+| Violin plot | yes | Y | – | – | – |
+| XY scatter | – | X and Y | – | yes | – |
+| Line | – | X and Y | – | yes | – |
+| Line with symbols | – | X and Y | – | yes | – |
+| Grouped bars | yes | Y | – | – | – |
+| Stacked bars | yes | Y | – | – | – |
+| Floating bars (min to max) | yes | Y | – | – | – |
+| Heat map | – | – | – | – | – |
+| Lines over categories | – | Y | – | – | – |
+| Pie charts | – | – | – | – | – |
+| Doughnut charts | – | – | – | – | – |
+| Side-by-side bars | yes | Y | – | – | – |
+| Stacked bars | yes | Y | – | – | – |
+| 100% stacked bars | yes | Y | – | – | – |
+| Survival curve | – | X and Y | – | – | yes |
+| Cumulative events | – | X and Y | – | – | yes |
+<!-- capabilities:end -->
 
 ## Box plots, violins, columns and axes
 
@@ -134,15 +173,18 @@ The series of XY, grouped, contingency and survival graphs can be put in another
 - "All groups" edits clear conflicting per-group overrides of the same property.
 - Switching graph type only changes the visibility presets (bars/symbols/lines/mean line); data, colours and axis settings are kept.
 - Undo/redo covers data and formatting; Ctrl+Z / Ctrl+Y when not typing in a text field.
-- Project JSON save/open, autosave to `localStorage`, SVG export (vector), PNG export at 1–8×.
+- Project save/open as `.oplot` files, autosave to `localStorage` (a failed autosave is shown in the status bar and retried; the copy found at start-up is kept as a backup), SVG export (vector, with a title, a description and ids that cannot collide with another export), PNG export at 1×, 2×, 3.125× (300 dpi), 4× or 6.25× (600 dpi) of the chart's size (Settings → Export).
+- Numbers are read by the decimal separator of Settings → Numbers in tables; in the automatic setting a comma is a decimal comma, but `1,234` is refused as ambiguous. A pasted block with rows of different lengths is padded with missing values.
+- Tables, graphs and results can be duplicated and deleted from the navigator (deleting a table takes its graphs and results with it); both can be undone, and the panels can be resized by their edges.
+- A curve fit gives no errors or bands when the fit did not converge; its parameter intervals and bands are at the confidence level chosen, and the Results are copied at full precision.
 
 ## Limitations
 
-Reference lines at chosen values and cm units are not built; tables and graphs can be added but not deleted or renamed; group colours default to grayscale; values display as stored (typed `1.10` shows `1.1`).
+Reference lines are drawn on XY, survival, histogram, column and grouped charts (not on pie or heat maps) and cm units are not built; layers beyond the first of a chart are kept but not drawn; observations have no subject or exclusion roles yet; the default colours are those of the Science (AAAS) palette; values display as stored (typed `1.10` shows `1.1`).
 
 ## Evidence labels
 
-D = stated in the specification (`scientific_plotting_specification.md`). P = proposal made here because the specification gives no value. U = unverified.
+D = stated in a public source (see `docs/calculation-contracts.md`). P = proposal made here because no source gives a value. U = unverified.
 ## Calculation settings
 
 Summary settings (centre, spread, confidence level, small-sample policy, invalid-value policy) are calculation settings, stored in `summary` and `groupSummary`, not in the style hierarchy. Appearance (colour, cap, direction) stays in style.
@@ -152,9 +194,9 @@ Summary settings (centre, spread, confidence level, small-sample policy, invalid
 - Median CI is exact, from binomial order statistics, for n <= 20000 (`MEDIAN_CI_EXACT_MAX_N`). Its coverage is at least the requested level and is usually higher; for n = 5 and n = 6 the interval is the widest available (smallest to largest value) and its actual coverage is reported, not the nominal level. Above 20000 the interval is unavailable and a notice says so.
 - Missing cells are never counted. Invalid values are left out or reject the data set, per the invalid-value policy. The "Hide summary when too few values" option maps to the reject policy for small samples (P).
 
-## Project file version 2
+## Project file versions
 
-Saved files carry `version: 2` and hold the summary settings. Version 1 files open and are migrated: a legacy `errorType` of sd or sem becomes the spread of the summary, and the legacy field is dropped. Older builds refuse version 2 files. Invalid stored values are stripped on load and reported as notes.
+Saved files carry `version: 3`. Version 2 added the summary settings; version 3 stores lengths in true points (earlier files stored half of every length in pt and are doubled on load). Version 1 files open and are migrated: a legacy `errorType` of sd or sem becomes the spread of the summary, and the legacy field is dropped. Older builds refuse newer files. Invalid stored values are stripped on load and reported as notes; excluded values, annotations and reference lines are checked field by field.
 
 ## Fill pattern
 
@@ -173,14 +215,13 @@ The data table has an optional Row title column (undoable, copy and paste aware)
 Released under the [GNU General Public License v3.0](LICENSE).
 ## Compliance note
 
-Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved JSON files. The Business Associate Agreements in place cover Google Workspace and Microsoft 365 only, not this app or the browser. Do not enter patient identifiers (not verified whether sample identifiers are acceptable). There is no autosave off-switch yet.
+Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. The Business Associate Agreements in place cover Google Workspace and Microsoft 365 only, not this app or the browser. Do not enter patient identifiers (not verified whether sample identifiers are acceptable). Autosave can be switched off in Settings.
 
 ## Not yet implemented
 
 - Label sources other than row title and value.
 - Dragging labels to custom positions.
 - Chart description for informational notices.
-- Autosave off-switch.
 
 ## Manual verification checklist
 

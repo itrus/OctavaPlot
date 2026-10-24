@@ -82,7 +82,7 @@ export function DistributionControls({ chart, lineColor, lineWidthPt, onLine }: 
       <Field label="Line colour" hint="Whiskers, median and quartile lines">
         <ColorInput value={lineColor} ariaLabel="Line colour" onChange={(v) => onLine({ lineColor: v })} />
       </Field>
-      <NumField label="Line thickness" unit="pt" value={lineWidthPt} min={0.1} max={20} onCommit={(v) => onLine({ lineWidthPt: v })} />
+      <NumField label="Line thickness" unit="pt" value={lineWidthPt} min={0.2} max={40} onCommit={(v) => onLine({ lineWidthPt: v })} />
       <Field label={floating ? 'Line at the centre' : 'Median line'}>
         <Check checked={d.showMedian} onChange={(v) => set(floating ? 'Centre line' : 'Median line', { showMedian: v })} />
       </Field>
