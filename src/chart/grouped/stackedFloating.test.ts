@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createGroupedTable } from '../model/defaults';
-import type { DataTable } from '../model/types';
-import { patchLook } from '../state/commands';
-import { chartToSvgString } from './export';
+import { createChart, createColumnTable, createGroupedTable } from '../../model/defaults';
+import type { DataTable } from '../../model/types';
+import { patchLook } from '../../state/commands';
+import { chartToSvgString } from '../export/export';
 import { buildGroupedModel } from './groupedModel';
-import { buildChartModel } from './model';
+import { buildColumnModel } from '../column/columnModel';
 
 describe('stacked bars of a grouped table', () => {
   // Male: 4.2 and 3.1, Female: 6.5 and 5.2 (two series, two categories).
@@ -69,7 +69,7 @@ describe('floating bars', () => {
   it('run from the smallest to the largest value, with a line at the mean', () => {
     const t = table();
     const chart = createChart(t.id, undefined, 'floating');
-    const m = buildChartModel(chart, t);
+    const m = buildColumnModel(chart, t);
     const g = m.groups[0];
     expect(g.bar!.y).toBeCloseTo(m.yScale(12), 6);
     expect(g.bar!.y + g.bar!.height).toBeCloseTo(m.yScale(2), 6);
@@ -81,13 +81,13 @@ describe('floating bars', () => {
     const t = table();
     const chart = createChart(t.id, undefined, 'floating');
     chart.layers[0] = { ...chart.layers[0], summary: { ...chart.layers[0].summary, centre: 'median' } };
-    const m = buildChartModel(chart, t);
+    const m = buildColumnModel(chart, t);
     expect(m.groups[0].dist!.lines[0].d).toContain(String(Math.round(m.yScale(5) * 100) / 100));
   });
   it('include the smallest and largest value in the axis, and draw no bar for an empty column', () => {
     const t = table();
     const chart = createChart(t.id, undefined, 'floating');
-    const m = buildChartModel(chart, t);
+    const m = buildColumnModel(chart, t);
     expect(m.y.domain[1]).toBeGreaterThanOrEqual(12);
     expect(m.groups[2].dist).toBeNull();
     expect(m.groups[2].bar).toBeNull();
@@ -97,7 +97,7 @@ describe('floating bars', () => {
     const base = createChart(t.id, undefined, 'floating');
     const flipped = patchLook(base.id, { orientation: 'horizontal' })({ id: 'p', name: 'p', dataTables: [t], charts: [base] });
     const c = { ...flipped.charts[0], distribution: { ...flipped.charts[0].distribution, points: 'all' as const } };
-    const m = buildChartModel(c, t);
+    const m = buildColumnModel(c, t);
     expect(m.orient.horizontal).toBe(true);
     expect(m.groups[0].points).toHaveLength(5);
     expect(chartToSvgString(c, t)).not.toContain('NaN');

@@ -1,27 +1,27 @@
 import { forwardRef } from 'react';
-import { chartFamily } from '../model/chartTypes';
+import { chartFamily } from '../model/graph/chartTypes';
 import type { Chart, DataTable, FitSettings } from '../model/types';
-import { ChartSvg, type EditorState } from './ChartSvg';
-import { GroupedChartSvg } from './GroupedChartSvg';
-import { buildGroupedModel, type GroupedModel } from './groupedModel';
-import { buildChartModel, type ChartModel } from './model';
-import { buildHeatModel, type HeatModel } from './heatmapModel';
-import { HeatmapSvg } from './HeatmapSvg';
-import { buildHistModel } from './histModel';
-import { buildPieModel, type PieModel } from './pieModel';
-import { PieChartSvg } from './PieChartSvg';
-import { buildSurvivalModel } from './survivalModel';
-import { XyChartSvg } from './XyChartSvg';
-import { referenceLineNotices, referenceLinesOf } from './referenceLines';
-import { buildXyModel, type XyModel } from './xyModel';
+import { ColumnChartSvg, type EditorState } from './column/ColumnChartSvg';
+import { GroupedChartSvg } from './grouped/GroupedChartSvg';
+import { buildGroupedModel, type GroupedModel } from './grouped/groupedModel';
+import { buildColumnModel, type ColumnModel } from './column/columnModel';
+import { buildHeatModel, type HeatModel } from './heatmap/heatmapModel';
+import { HeatmapSvg } from './heatmap/HeatmapSvg';
+import { buildHistogramModel } from './histogram/histogramModel';
+import { buildPieModel, type PieModel } from './pie/pieModel';
+import { PieChartSvg } from './pie/PieChartSvg';
+import { buildSurvivalModel } from './survival/survivalModel';
+import { XyChartSvg } from './xy/XyChartSvg';
+import { referenceLineNotices, referenceLinesOf } from './shared/scene/referenceLines';
+import { buildXyModel, type XyModel } from './xy/xyModel';
 
 /** The model of a chart, tagged with the family that decides how it is drawn and which inspector edits it. */
 export type AnyModel =
-  | { family: 'category'; model: ChartModel }
-  | { family: 'xy' | 'survival' | 'hist'; model: XyModel }
+  | { family: 'column'; model: ColumnModel }
+  | { family: 'xy' | 'survival' | 'histogram'; model: XyModel }
   | { family: 'grouped'; model: GroupedModel }
-  | { family: 'whole'; model: PieModel }
-  | { family: 'heat'; model: HeatModel };
+  | { family: 'pie'; model: PieModel }
+  | { family: 'heatmap'; model: HeatModel };
 
 export function buildAnyModel(chart: Chart, table: DataTable, fit?: FitSettings): AnyModel {
   const built = buildAnyModelUnchecked(chart, table, fit);
@@ -38,14 +38,14 @@ function buildAnyModelUnchecked(chart: Chart, table: DataTable, fit?: FitSetting
       return { family, model: buildSurvivalModel(chart, table) };
     case 'grouped':
       return { family, model: buildGroupedModel(chart, table) };
-    case 'whole':
+    case 'pie':
       return { family, model: buildPieModel(chart, table) };
-    case 'hist':
-      return { family, model: buildHistModel(chart, table) };
-    case 'heat':
+    case 'histogram':
+      return { family, model: buildHistogramModel(chart, table) };
+    case 'heatmap':
       return { family, model: buildHeatModel(chart, table) };
     default:
-      return { family: 'category', model: buildChartModel(chart, table) };
+      return { family: 'column', model: buildColumnModel(chart, table) };
   }
 }
 
@@ -78,9 +78,9 @@ interface CanvasProps {
 /** Draws whichever kind of chart the model is for. */
 export const ChartCanvas = forwardRef<SVGSVGElement, CanvasProps>(function ChartCanvas({ chart, any, editor, cssWidth, cssHeight }, ref) {
   const common = { chart, editor, cssWidth, cssHeight };
-  if (any.family === 'category') return <ChartSvg ref={ref} model={any.model} {...common} />;
+  if (any.family === 'column') return <ColumnChartSvg ref={ref} model={any.model} {...common} />;
   if (any.family === 'grouped') return <GroupedChartSvg ref={ref} model={any.model} {...common} />;
-  if (any.family === 'whole') return <PieChartSvg ref={ref} model={any.model} {...common} />;
-  if (any.family === 'heat') return <HeatmapSvg ref={ref} model={any.model} {...common} />;
+  if (any.family === 'pie') return <PieChartSvg ref={ref} model={any.model} {...common} />;
+  if (any.family === 'heatmap') return <HeatmapSvg ref={ref} model={any.model} {...common} />;
   return <XyChartSvg ref={ref} model={any.model} {...common} />;
 });

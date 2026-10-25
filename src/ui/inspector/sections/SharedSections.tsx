@@ -1,16 +1,15 @@
 import { useMemo, useState } from 'react';
-import { displayName } from '../../chart/model';
-import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../model/aspect';
-import { graphSources, type GraphSource } from '../../model/chartTable';
-import { AXIS_LIMITS } from '../../model/axis';
-import { FONT_FAMILIES } from '../../model/look';
-import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
-import { newId } from '../../model/ids';
-import { capabilitiesOf } from '../../model/capabilities';
-import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../model/colorVision';
-import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../model/palettes';
-import type { Chart, Group, Id } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../../model/graph/aspect';
+import { graphSources, type GraphSource } from '../../../model/table/chartTable';
+import { AXIS_LIMITS } from '../../../model/graph/axis';
+import { FONT_FAMILIES } from '../../../model/graph/look';
+import { CHART_PX_MAX, CHART_PX_MIN } from '../../../model/defaults';
+import { newId } from '../../../model/ids';
+import { capabilitiesOf } from '../../../model/graph/capabilities';
+import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../../model/graph/colorVision';
+import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../../model/graph/palettes';
+import type { Chart, Group, Id } from '../../../model/types';
+import { useApp } from '../../../state/AppContext';
 import {
   addAnnotation,
   addReferenceLine,
@@ -28,12 +27,13 @@ import {
   setDisplayName,
   setGroupOnGraph,
   setLegendItemVisible,
-} from '../../state/commands';
-import { LINE_STYLES } from '../../model/look';
-import type { LineStyle } from '../../model/types';
-import { DialogShell, trapTab } from '../DialogShell';
-import { Check, ColorInput, Field, NumField, Section, SelectInput, SubHeading, TextInput } from './controls';
+} from '../../../state/commands';
+import { LINE_STYLES } from '../../../model/graph/look';
+import type { LineStyle } from '../../../model/types';
+import { DialogShell, trapTab } from '../../dialogs/DialogShell';
+import { Check, ColorInput, Field, NumField, Section, SelectInput, SubHeading, TextInput } from '../common/controls';
 import { BarLabelSection, hasBarLabels } from './LookControls';
+import { displayName } from '../../../chart/shared/parts/names';
 
 /**
  * Inspector pieces that do not depend on the kind of chart: titles and fonts, size and shape, legend, annotations and

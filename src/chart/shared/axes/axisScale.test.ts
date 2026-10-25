@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createXyTable } from '../model/defaults';
-import { sanitizeAxis } from '../model/axis';
-import type { AxisConfig } from '../model/types';
+import { createChart, createColumnTable, createXyTable } from '../../../model/defaults';
+import { sanitizeAxis } from '../../../model/graph/axis';
+import type { AxisConfig } from '../../../model/types';
 import { axisMapper, linearMinorTicks, logMinorTicks, makeFormatter, onAxis, resolveAxis } from './axisScale';
-import { buildChartModel } from './model';
-import { buildXyModel } from './xyModel';
-import { chartToSvgString } from './export';
+import { buildColumnModel } from '../../column/columnModel';
+import { buildXyModel } from '../../xy/xyModel';
+import { chartToSvgString } from '../../export/export';
 
 const base = createChart('t').yAxis;
 const cfg = (patch: Partial<AxisConfig> = {}): AxisConfig => ({ ...base, ...patch });
@@ -114,7 +114,7 @@ describe('charts on a log axis', () => {
     table.groups[1].observations.slice(0, 2).forEach((o, i) => (o.value = [0, 5][i]));
     const chart = createChart(table.id, undefined, 'bar');
     chart.yAxis = { ...chart.yAxis, scale: 'log10' };
-    const m = buildChartModel(chart, table);
+    const m = buildColumnModel(chart, table);
     expect(m.y.domain[0]).toBeGreaterThan(0);
     expect(chartToSvgString(chart, table)).not.toContain('NaN');
     expect(m.warnings.join(' ')).toMatch(/log axis/);

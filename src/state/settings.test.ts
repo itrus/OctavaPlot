@@ -16,7 +16,7 @@ describe('sanitizeSettings', () => {
 
   it('keeps valid values', () => {
     const s = sanitizeSettings({ autosave: false, newProjectEmpty: true, timestampExports: false, exportFormat: 'svg', defaultChartWidthPx: 800, defaultChartHeightPx: 500 });
-    expect(s).toEqual({ autosave: false, newProjectEmpty: true, timestampExports: false, exportFormat: 'svg', exportDpi: 600, decimalSeparator: 'auto', defaultChartWidthPx: 800, defaultChartHeightPx: 500 });
+    expect(s).toEqual({ autosave: false, newProjectEmpty: true, timestampExports: false, exportFormat: 'svg', exportDpi: 600, pngDpi: 96, decimalSeparator: 'auto', defaultChartWidthPx: 800, defaultChartHeightPx: 500 });
   });
 
   it('replaces invalid values with defaults and clamps sizes', () => {
@@ -27,6 +27,8 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ exportDpi: 300 }).exportDpi).toBe(300);
     expect(sanitizeSettings({ exportDpi: 123 }).exportDpi).toBe(600);
     expect(sanitizeSettings({ exportDpi: '300' }).exportDpi).toBe(600);
+    expect(sanitizeSettings({ pngDpi: 300 }).pngDpi).toBe(300);
+    expect(sanitizeSettings({ pngDpi: 72 }).pngDpi).toBe(96);
     expect(s.defaultChartWidthPx).toBe(100);
     expect(s.defaultChartHeightPx).toBe(DEFAULT_SETTINGS.defaultChartHeightPx);
   });

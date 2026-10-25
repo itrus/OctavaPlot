@@ -1,16 +1,16 @@
 import { useMemo } from 'react';
-import { analysesOf, analysisKindApplies, analysisColumns, analysisTypeInfo } from '../model/analysis';
-import { curveFitSheet, type Sheet } from '../model/curveFit';
-import { FIT_LIMITS } from '../model/fitOptions';
-import { newId } from '../model/ids';
-import type { Analysis } from '../model/types';
-import { describeValues, descriptiveRows, formatResult } from '../stats/descriptive';
-import { FIT_MODELS, fitModelById, type FitModelId } from '../stats/fit';
-import { useApp } from '../state/AppContext';
-import { addChart, composeCommands, patchAnalysis, patchLook, removeAnalysis } from '../state/commands';
-import { copyText, downloadBlob, exportFileName } from '../util/download';
-import { NumField } from './inspector/controls';
-import { ExportIcon } from './icons';
+import { analysesOf, analysisKindApplies, analysisColumns, analysisTypeInfo } from '../../model/project/analysis';
+import { curveFitSheet, type Sheet } from '../../model/project/curveFit';
+import { FIT_LIMITS } from '../../model/options/fitOptions';
+import { newId } from '../../model/ids';
+import type { Analysis } from '../../model/types';
+import { describeValues, descriptiveRows, formatResult } from '../../stats/descriptive';
+import { FIT_MODELS, fitModelById, type FitModelId } from '../../stats/fit';
+import { useApp } from '../../state/AppContext';
+import { addChart, composeCommands, patchAnalysis, patchLook, removeAnalysis } from '../../state/commands';
+import { copyText, downloadBlob, exportFileName } from '../../util/download';
+import { NumField } from '../inspector/common/controls';
+import { ExportIcon } from '../components/icons';
 import { SheetTable, sheetText, useSheetSelection } from './ResultsSheet';
 
 const LEVELS = [0.9, 0.95, 0.99] as const;

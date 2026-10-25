@@ -1,5 +1,5 @@
 import { color, interpolateBlues, interpolateGreys, interpolateMagma, interpolateRgb, interpolateViridis } from 'd3';
-import type { HeatPalette } from '../model/types';
+import type { HeatPalette } from '../../model/types';
 
 /** Colour scales of a heat map (spec 13.1), each from t = 0 (the low end) to t = 1 (the high end). */
 

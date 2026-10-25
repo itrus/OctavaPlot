@@ -1,12 +1,11 @@
-import type { ReactNode } from 'react';
-import type { Annotation, AxisConfig, Chart, Selection } from '../model/types';
-import { n2 } from '../model/units';
+import type { Annotation, AxisConfig, Chart, Selection } from '../../../model/types';
+import { n2 } from '../../../model/units';
 import { backgroundElements, plotClipElement, titleElements } from './chrome';
 import type { hitAttrs } from './hitTest';
-import type { Layout, Rect } from './layout';
+import type { Layout, Rect } from '../parts/layout';
 import { SceneElements } from './SceneElements';
 import { svgId } from './svgIds';
-import { measureText } from './text';
+import { measureText } from '../parts/text';
 
 /**
  * Pieces every kind of chart draws the same way: the backgrounds, the clip of the plotting region and the titles. They are made by the chrome functions (chrome.ts) as scene elements; these components only
@@ -83,9 +82,4 @@ export function AnnotationLayer({ chart, editor, width, height, hit }: { chart: 
       })}
     </>
   );
-}
-
-/** Shapes of a horizontal chart, turned into place by the model's matrix; a vertical chart draws them as they are. */
-export function Turned({ matrix, children }: { matrix: string | null; children: ReactNode }) {
-  return matrix ? <g transform={matrix}>{children}</g> : <>{children}</>;
 }

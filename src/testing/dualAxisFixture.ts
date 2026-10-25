@@ -1,6 +1,6 @@
 import { createChart, createGroup } from '../model/defaults';
 import { newId } from '../model/ids';
-import { createRows } from '../model/rows';
+import { createRows } from '../model/table/rows';
 import type { AxisBinding, Id, Project } from '../model/types';
 import { composeCommands, patchStyle, patchSummary } from '../state/commands';
 

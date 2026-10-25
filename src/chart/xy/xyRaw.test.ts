@@ -1,14 +1,14 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import { layerRows, layersOf } from '../model/layers';
-import type { Chart, Project } from '../model/types';
-import { addChart, addDataTable, patchSummary } from '../state/commands';
-import { calcStats } from '../stats/calcCache';
-import { buildAnyModel, ChartCanvas } from './anyModel';
-import { RAW_POINT_SCALE } from './scene';
+import { createExampleProject } from '../../model/defaults';
+import { layerRows, layersOf } from '../../model/graph/layers';
+import type { Chart, Project } from '../../model/types';
+import { addChart, addDataTable, patchSummary } from '../../state/commands';
+import { calcStats } from '../../stats/calcCache';
+import { buildAnyModel, ChartCanvas } from '../anyModel';
 import { buildXyModel } from './xyModel';
+import { RAW_POINT_SCALE } from './xyScene';
 
 const project = (kind: 'replicates' | 'single', patch: (c: Chart) => Chart = (c) => c): Project => {
   const layout = kind === 'replicates' ? ({ kind: 'replicates', n: 3 } as const) : undefined;

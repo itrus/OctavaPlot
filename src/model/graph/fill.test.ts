@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createChart, createExampleProject, DEFAULT_STYLE, PRESET_KEYS, TYPE_PRESETS } from './defaults';
+import { createChart, createExampleProject, DEFAULT_STYLE, PRESET_KEYS, TYPE_PRESETS } from '../defaults';
 import {
   describeBarFillUi,
   FILL_LIMITS,
@@ -12,9 +12,9 @@ import {
   sanitizeFillKeys,
 } from './fill';
 import { resolveStyle } from './style';
-import type { ChartStyle } from './types';
-import { patchStyle, resetStyle, setChartType } from '../state/commands';
-import { parseProject, parseProjectWithNotes, stringifyProject } from '../state/serialize';
+import type { ChartStyle } from '../types';
+import { patchStyle, resetStyle, setChartType } from '../../state/commands';
+import { parseProject, parseProjectWithNotes, stringifyProject } from '../../state/serialize';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = Record<string, any>;
@@ -243,6 +243,6 @@ describe('import guard', () => {
   it('fill.ts imports only types', () => {
     const src = readFileSync(new URL('./fill.ts', import.meta.url), 'utf8');
     const imports = src.split('\n').filter((l) => /^import /.test(l));
-    expect(imports).toEqual(["import type { ChartStyle, FillMode, FillPattern } from './types';"]);
+    expect(imports).toEqual(["import type { ChartStyle, FillMode, FillPattern } from '../types';"]);
   });
 });

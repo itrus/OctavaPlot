@@ -1,11 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { Chart, DataTable, FitSettings } from '../model/types';
-import { chartPx2Pt } from '../model/units';
-import { buildAnyModel, ChartCanvas } from './anyModel';
+import type { Chart, DataTable, FitSettings } from '../../model/types';
+import { chartPx2Pt } from '../../model/units';
+import { buildAnyModel, ChartCanvas } from '../anyModel';
 import { buildPdf, rgbaToFlateRgb } from './pdf';
+import { withPngDpi } from './pngDpi';
 
 /**
- * Export renders the same declarative <ChartSvg> without editor state, so
+ * Export renders the same declarative <ColumnChartSvg> without editor state, so
  * selection outlines, hover helpers and hit-test attributes cannot leak in.
  * Output stays vector: paths, text and symbols.
  */
@@ -48,12 +49,13 @@ function describeSvg(markup: string, chart: Chart, table: DataTable, notices: re
   return `${head}<title id="${base}-title">${escapeXml(title)}</title><desc id="${base}-desc">${escapeXml(desc)}</desc>${markup.slice(end + 1)}`;
 }
 
-/** Rasterise at `scale` x the chart's nominal CSS pixel size (96 px/in). */
-export async function chartToPngBlob(chart: Chart, table: DataTable, scale: number, fit?: FitSettings): Promise<Blob> {
-  const canvas = await chartToCanvas(chart, table, scale, fit);
-  return new Promise((resolve, reject) =>
+/** Rasterise at `dpi` dots per inch (96 is the chart's own size in CSS pixels); the resolution is written into the file. */
+export async function chartToPngBlob(chart: Chart, table: DataTable, dpi: number, fit?: FitSettings): Promise<Blob> {
+  const canvas = await chartToCanvas(chart, table, dpi / 96, fit);
+  const png = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encoding failed.'))), 'image/png'),
   );
+  return new Blob([withPngDpi(new Uint8Array(await png.arrayBuffer()), dpi) as BlobPart], { type: 'image/png' });
 }
 
 /** A one-page PDF the size of the chart (1 px = 0.75 pt) holding a picture of it at `dpi` dots per inch; see pdf.ts. */

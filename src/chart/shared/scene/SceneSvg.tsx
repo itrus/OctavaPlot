@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { SELECT_COLOR } from './ChartParts';
 import { hitAttrs } from './hitTest';
+import { SceneElements } from './SceneElements';
 import type { Scene } from './scene';
 
 /**
@@ -37,6 +38,7 @@ export function SceneSvg({ scene, editor, selectedGroup }: { scene: Scene; edito
               </Fragment>
             );
           })}
+          {layer.elements && <SceneElements nodes={layer.elements} editor={editor} />}
         </Fragment>
       ))}
     </>

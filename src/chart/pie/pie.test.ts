@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createContingencyTable } from '../model/defaults';
-import type { DataTable, Project } from '../model/types';
-import { patchLook, setCells, setChartType } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
+import { createChart, createContingencyTable } from '../../model/defaults';
+import type { DataTable, Project } from '../../model/types';
+import { patchLook, setCells, setChartType } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
 import { buildPieModel, pieGrid, percentText, sliceLabelText, slicePath } from './pieModel';
-import { pieTooltipLines } from './tooltip';
+import { pieTooltipLines } from '../tooltip';
 
 const setup = (type: 'pie' | 'doughnut' = 'pie') => {
   const table: DataTable = createContingencyTable('Outcomes', true); // Treated 38/12, Control 21/29

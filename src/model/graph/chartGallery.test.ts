@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { CHART_TYPES, chartTypesFor } from './chartTypes';
 import { GALLERY, availableItems, galleryItems } from './chartGallery';
-import type { TableKind } from './types';
+import { applyVariant } from './chartVariant';
+import { createChart } from '../defaults';
+import type { TableKind } from '../types';
 
 const KINDS: TableKind[] = ['xy', 'column', 'grouped', 'contingency', 'survival'];
 
@@ -43,6 +45,14 @@ describe('graph gallery', () => {
     const planned = KINDS.flatMap((k) => galleryItems(k).filter((i) => i.type === null));
     expect(planned.every((i) => !!i.spec)).toBe(true);
   });
+  it('makes aligned dots as the dot plot without sideways spreading', () => {
+    const aligned = galleryItems('column').find((i) => i.id === 'cat.aligned');
+    expect(aligned?.type).toBe('scatter');
+    const chart = applyVariant(createChart('t', { widthPx: 400, heightPx: 300 }, 'scatter'), aligned?.variant);
+    expect(chart.jitter.enabled).toBe(false);
+    expect(createChart('t', { widthPx: 400, heightPx: 300 }, 'scatter').jitter.enabled).toBe(true);
+  });
+
   it('offers the horizontal versions of the grouped and contingency bars', () => {
     const horizontal = [...availableItems('grouped'), ...availableItems('contingency')].filter((i) => i.variant?.orientation === 'horizontal').map((i) => i.type);
     expect(horizontal.sort()).toEqual(['contingencyBars', 'contingencyPercent', 'contingencyStacked', 'groupedBar', 'groupedStacked']);

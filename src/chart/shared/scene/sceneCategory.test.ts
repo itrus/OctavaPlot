@@ -1,10 +1,10 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import type { Chart, ChartType, Project, TableKind } from '../model/types';
-import { addAnnotation, addChart, addDataTable, addReferenceLine } from '../state/commands';
-import { buildAnyModel, ChartCanvas } from './anyModel';
+import { createExampleProject } from '../../../model/defaults';
+import type { Chart, ChartType, Project, TableKind } from '../../../model/types';
+import { addAnnotation, addChart, addDataTable, addReferenceLine } from '../../../state/commands';
+import { buildAnyModel, ChartCanvas } from '../../anyModel';
 import type { ChromeScene } from './scene';
 import type { SceneElement } from './sceneElement';
 import { SceneElements } from './SceneElements';

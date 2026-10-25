@@ -1,7 +1,7 @@
-import { withoutExcluded } from './exclusion';
-import { layoutOf, subLabels, tableSeriesWidth, xySeries } from './tableLayout';
-import { leadingColumns } from './chartTypes';
-import type { Analysis, AnalysisKind, DataTable, Id, Project, TableKind } from './types';
+import { withoutExcluded } from '../table/exclusion';
+import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../table/tableLayout';
+import { leadingColumns } from '../graph/chartTypes';
+import type { Analysis, AnalysisKind, DataTable, Id, Project, TableKind } from '../types';
 
 interface AnalysisTypeInfo {
   kind: AnalysisKind;

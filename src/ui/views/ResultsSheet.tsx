@@ -1,6 +1,6 @@
 import { useMemo, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
-import type { Sheet } from '../model/curveFit';
-import { copyText } from '../util/download';
+import type { Sheet } from '../../model/project/curveFit';
+import { copyText } from '../../util/download';
 
 /** A cell of the sheet: row 0 and column 0 are the headings. */
 type Cell = [number, number];

@@ -1,4 +1,4 @@
-import type { BarLabels } from '../model/types';
+import type { BarLabels } from '../../../model/types';
 import { formatLabelValue } from './labels';
 
 /** A text drawn beside a bar: the value or the sample size, above the bar and its error bar (below a bar that points down). */

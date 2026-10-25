@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable } from '../model/defaults';
-import type { DataTable, Project } from '../model/types';
-import { patchAxis, patchDistribution, setCells, setChartType } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { boxSummary, quantile6 } from '../stats/distribution';
-import { chartToSvgString } from './export';
-import { buildChartModel } from './model';
+import { createChart, createColumnTable } from '../../model/defaults';
+import type { DataTable, Project } from '../../model/types';
+import { patchAxis, patchDistribution, setCells, setChartType } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { boxSummary, quantile6 } from '../../stats/distribution';
+import { chartToSvgString } from '../export/export';
+import { buildColumnModel } from './columnModel';
 
 /** One data set per column; values given per column. */
 const setup = (columns: Array<Array<number | null>>, type: 'box' | 'violin') => {
@@ -21,7 +21,7 @@ const plain = [10, 12, 13, 15, 16, 18, 21, 22];
 describe('box plot chart', () => {
   it('draws the quartile box, the median and the whiskers from the raw values', () => {
     const { table, chart } = setup([plain, withOutlier], 'box');
-    const m = buildChartModel(chart, table);
+    const m = buildColumnModel(chart, table);
     const g = m.groups[0];
     const s = boxSummary(plain, 'minmax')!;
     expect(g.dist!.shape).toBe('box');
@@ -36,7 +36,7 @@ describe('box plot chart', () => {
   it('makes the axis show the whiskers and the dots it draws', () => {
     const { p, table } = setup([plain, withOutlier], 'box');
     const id = p.charts[0].id;
-    const top = (c: Project) => buildChartModel(c.charts[0], table).y.domain[1];
+    const top = (c: Project) => buildColumnModel(c.charts[0], table).y.domain[1];
     expect(top(p)).toBeGreaterThanOrEqual(30);
     const tukey = patchDistribution(id, { whisker: 'tukey' })(p);
     expect(top(tukey)).toBeLessThan(30);
@@ -47,31 +47,31 @@ describe('box plot chart', () => {
     const { p, table } = setup([plain, withOutlier], 'box');
     const id = p.charts[0].id;
     const outside = patchDistribution(id, { whisker: 'tukey', points: 'outside' })(p);
-    const m = buildChartModel(outside.charts[0], table);
+    const m = buildColumnModel(outside.charts[0], table);
     expect(m.groups[0].points).toHaveLength(0);
     expect(m.groups[1].points.map((q) => q.value)).toEqual([30]);
     const all = patchDistribution(id, { points: 'all' })(p);
-    expect(buildChartModel(all.charts[0], table).groups[1].points).toHaveLength(withOutlier.length);
+    expect(buildColumnModel(all.charts[0], table).groups[1].points).toHaveLength(withOutlier.length);
     const mean = patchDistribution(id, { showMean: true })(p);
-    expect(buildChartModel(mean.charts[0], table).groups[0].points.at(-1)).toMatchObject({ value: 15.875, shape: 'plus' });
+    expect(buildColumnModel(mean.charts[0], table).groups[0].points.at(-1)).toMatchObject({ value: 15.875, shape: 'plus' });
   });
   it('draws only the median and the range for fewer than 4 values', () => {
     const { table, chart } = setup([[2, 5, 9]], 'box');
-    const g = buildChartModel(chart, table).groups[0];
+    const g = buildColumnModel(chart, table).groups[0];
     expect(g.dist!.shape).toBe('range');
     expect(g.bar).toBeNull();
     expect(g.dist!.lines.map((l) => l.id.split(':').pop())).toEqual(['range', 'median']);
   });
   it('draws nothing for a data set without values, and no NaN anywhere', () => {
     const { table, chart } = setup([plain], 'box');
-    const m = buildChartModel(chart, table);
+    const m = buildColumnModel(chart, table);
     expect(m.groups[1].dist).toBeNull();
     expect(chartToSvgString(chart, table)).not.toContain('NaN');
   });
   it('leaves out values of 0 or less on a log axis and says so', () => {
     const { p, table } = setup([[0, 3, 4, 5, 9, 12], plain], 'box');
     const log = patchAxis(p.charts[0].id, 'yAxis', { scale: 'log10' })(p).charts[0];
-    const m = buildChartModel(log, table);
+    const m = buildColumnModel(log, table);
     expect(m.warnings.join(' ')).toMatch(/1 value is 0 or less on a log axis/);
     expect(chartToSvgString(log, table)).not.toContain('NaN');
   });
@@ -80,7 +80,7 @@ describe('box plot chart', () => {
 describe('violin chart', () => {
   it('draws a mirrored outline with the quartiles and the median across it', () => {
     const { table, chart } = setup([plain, withOutlier], 'violin');
-    const g = buildChartModel(chart, table).groups[0];
+    const g = buildColumnModel(chart, table).groups[0];
     expect(g.dist!.shape).toBe('violin');
     expect(g.dist!.outline).toMatch(/^M.*Z$/);
     expect(g.dist!.lines.map((l) => l.id.split(':').pop())).toEqual(['q1', 'q3', 'median']);
@@ -89,13 +89,13 @@ describe('violin chart', () => {
   });
   it('is symmetric about the middle of its column', () => {
     const { table, chart } = setup([plain], 'violin');
-    const g = buildChartModel(chart, table).groups[0];
+    const g = buildColumnModel(chart, table).groups[0];
     const xs = [...g.dist!.outline!.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => Number(m[1]));
     expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(g.centerX, 1);
   });
   it('shows the values and says why when there is no density', () => {
     const { table, chart } = setup([[4, 4, 4, 4], [1, 2]], 'violin');
-    const m = buildChartModel(chart, table);
+    const m = buildColumnModel(chart, table);
     expect(m.groups[0].dist!.shape).toBe('points');
     expect(m.groups[0].points).toHaveLength(4);
     expect(m.groups[1].points).toHaveLength(2);
@@ -105,9 +105,9 @@ describe('violin chart', () => {
   it('never gets wider than its share of a column, whatever the smoothing', () => {
     const { p, table } = setup([plain], 'violin');
     const id = p.charts[0].id;
-    const slot = buildChartModel(p.charts[0], table).groups[0].slotWidth;
+    const slot = buildColumnModel(p.charts[0], table).groups[0].slotWidth;
     for (const level of ['light', 'medium', 'heavy'] as const) {
-      const g = buildChartModel(patchDistribution(id, { smoothing: level })(p).charts[0], table).groups[0];
+      const g = buildColumnModel(patchDistribution(id, { smoothing: level })(p).charts[0], table).groups[0];
       const xs = [...g.dist!.outline!.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => Number(m[1]));
       expect((Math.max(...xs) - Math.min(...xs)) / 2).toBeLessThanOrEqual((slot * 0.8) / 2 + 0.01);
     }
@@ -119,9 +119,9 @@ describe('box and violin settings', () => {
     const { p, table } = setup([plain], 'box');
     const next = setChartType(p.charts[0].id, 'violin')(p);
     expect(next.charts[0].type).toBe('violin');
-    expect(buildChartModel(next.charts[0], table).groups[0].dist!.kind).toBe('violin');
+    expect(buildColumnModel(next.charts[0], table).groups[0].dist!.kind).toBe('violin');
     const back = setChartType(p.charts[0].id, 'bar')(next);
-    expect(buildChartModel(back.charts[0], table).groups[0].bar).not.toBeNull();
+    expect(buildColumnModel(back.charts[0], table).groups[0].bar).not.toBeNull();
   });
   it('are kept in a saved file; bad values fall back, and old files get the defaults', () => {
     const { p } = setup([plain], 'box');

@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import type { ChartType } from '../model/types';
-import { patchStyle, setChartType } from '../state/commands';
+import { createExampleProject } from '../../model/defaults';
+import type { ChartType } from '../../model/types';
+import { patchStyle, setChartType } from '../../state/commands';
 import { chartToSvgString } from './export';
 
 /**
@@ -20,7 +20,9 @@ const withoutCssSize = (s: string): string => s.replace(/(<svg [^>]*?) width="[^
 // The stable ids (see svgIds.ts) were added after the goldens were made. They are additions, not changes of the drawing, so
 // they are left out of the comparison; every other attribute, and the clip ids the goldens have, are compared as before.
 const STABLE_IDS = / id="(?:page|plot-area|(?:chart|x-axis|y-axis|y2-axis)-title|x-axis|y-axis|legend|at-risk-table|fit-parameters|annotation-[^"]*|reference-line-[^"]*)"/g;
-const withoutStableIds = (s: string): string => s.replace(STABLE_IDS, '');
+// The marks have ids too (a layer's, and the observation's it draws): `<series>-bars`, `<series>-points-<observation>` and the like.
+const MARK_IDS = / id="[^"]*-(?:bars|distribution|pairLines|line|errorBars|meanLine|rawPoints|points)(?:-[^"]*)?"/g;
+const withoutStableIds = (s: string): string => s.replace(STABLE_IDS, '').replace(MARK_IDS, '');
 
 // The goldens are half the size of the drawing now, so the legacy 160 x 120 mm geometry needs twice its pixel size.
 const LEGACY_SCALE = 2;
@@ -117,13 +119,23 @@ describe('legacy export goldens', () => {
     for (const type of ['bar', 'scatter', 'mean'] as const) expect(svgOf(type)).toBe(svgOf(type));
   });
 
-  it('contains no internal ids or editor attributes', () => {
+  it('contains no internal ids or editor attributes, apart from the ids of the marks, which are made from them', () => {
     for (const type of ['bar', 'scatter', 'mean'] as const) {
       const svg = svgOf(type);
-      expect(svg).not.toMatch(/(grp|obs|table|chart|layer|project)_/);
+      // An id says what it draws (see svgIds.ts); nowhere else does the drawing name an internal object.
+      expect(svg.replace(/ id="[^"]*"/g, '')).not.toMatch(/(grp|obs|table|chart|layer|project)_/);
       for (const bad of ['data-hit', 'data-editor-only', 'pointer-events', '<pattern', '<image', 'fill-marks', '<desc', '<title']) {
         expect(svg).not.toContain(bad);
       }
+    }
+  });
+
+  it('gives every mark an id that is valid in XML and used once', () => {
+    for (const type of ['bar', 'scatter', 'mean'] as const) {
+      const ids = [...svgOf(type).matchAll(/ id="([^"]*)"/g)].map((m) => m[1]);
+      expect(new Set(ids).size).toBe(ids.length);
+      for (const id of ids) expect(id).toMatch(/^[A-Za-z_][A-Za-z0-9_.-]*$/);
+      expect(ids.some((id) => id.endsWith('-bars') || id.includes('-points-'))).toBe(true);
     }
   });
 

@@ -1,6 +1,6 @@
-import { FIT_MODELS } from '../stats/fit';
-import { bool, clamp, oneOf, record } from './sanitize';
-import type { Analysis, ChartFit, FitSettings, Id } from './types';
+import { FIT_MODELS } from '../../stats/fit';
+import { bool, clamp, oneOf, record } from '../sanitize';
+import type { Analysis, ChartFit, FitSettings, Id } from '../types';
 
 /** Settings of fitted curves (spec 17): what a chart shows of a curve fit, and how a curve fit is read from its analysis. */
 

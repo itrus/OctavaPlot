@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createXyTable } from '../model/defaults';
-import { resolveStyle } from '../model/style';
-import type { SymbolShape } from '../model/types';
-import { patchStyle } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
+import { createChart, createColumnTable, createXyTable } from '../../../model/defaults';
+import { resolveStyle } from '../../../model/graph/style';
+import type { SymbolShape } from '../../../model/types';
+import { patchStyle } from '../../../state/commands';
+import { parseProject, stringifyProject } from '../../../state/serialize';
+import { chartToSvgString } from '../../export/export';
 import { SYMBOL_SHAPE_OPTIONS, symbolPath } from './symbols';
 
 describe('symbols', () => {
@@ -59,7 +59,7 @@ describe('symbol fill opacity', () => {
 
 describe('line patterns', () => {
   it('every pattern has dashes in units of the line width, and solid has none', async () => {
-    const { dashOf, LINE_STYLES, linePattern } = await import('../model/look');
+    const { dashOf, LINE_STYLES, linePattern } = await import('../../../model/graph/look');
     expect(LINE_STYLES.map((l) => l.value)).toEqual(['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot']);
     expect(dashOf('solid', 5.2)).toBeUndefined();
     // Gridlines (thin) keep the patterns they always had.

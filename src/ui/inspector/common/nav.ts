@@ -1,13 +1,5 @@
-import type { HitTarget } from '../../chart/hitTest';
-
-export type InspectorTab = 'appearance' | 'datasets' | 'annotations';
-export type AppearanceSection = 'style' | 'axes' | 'frame' | 'text' | 'layout' | 'legend';
-
-/** A place in the inspector: a tab and, for Appearance, one of its sections. */
-export interface InspectorTarget {
-  tab: InspectorTab;
-  section?: AppearanceSection;
-}
+import type { HitTarget } from '../../../chart/shared/scene/hitTest';
+import type { InspectorTarget, InspectorTab, AppearanceSection } from '../../../state/inspectorNav';
 
 /** The inspector page that holds the settings of a clicked chart element; null when it has none (the background). */
 export function inspectorTargetFor(hit: HitTarget): InspectorTarget | null {

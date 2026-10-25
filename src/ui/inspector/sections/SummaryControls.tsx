@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { CentreKind, InvalidPolicy, SmallSamplePolicy, SpreadKind } from '../../model/types';
+import type { CentreKind, InvalidPolicy, SmallSamplePolicy, SpreadKind } from '../../../model/types';
 import {
   centreName,
   confidencePercentText,
   describeSummaryControls,
   parseConfidencePercent,
   spreadSelectModel,
-} from '../../stats/describe';
-import { Check, Field, SelectInput } from './controls';
+} from '../../../stats/describe';
+import { Check, Field, SelectInput } from '../common/controls';
 
 const CENTRES: CentreKind[] = ['mean', 'geometricMean', 'median'];
 

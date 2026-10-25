@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { emptyPointLabelModel } from '../../chart/labels';
-import { DEFAULT_STYLE } from '../../model/defaults';
-import type { ChartStyle } from '../../model/types';
+import { emptyPointLabelModel } from '../../../chart/shared/parts/labels';
+import { DEFAULT_STYLE } from '../../../model/defaults';
+import type { ChartStyle } from '../../../model/types';
 import {
   CENTRE_OFFSET_REASON,
   CUSTOM_OFFSET_NOTE,

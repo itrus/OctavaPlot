@@ -1,4 +1,4 @@
-import { FONT_FAMILY } from '../model/defaults';
+import { FONT_FAMILY } from '../../../model/defaults';
 
 let ctx: CanvasRenderingContext2D | null | undefined;
 

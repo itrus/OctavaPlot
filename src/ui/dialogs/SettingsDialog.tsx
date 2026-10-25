@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { CHART_PX_MAX, CHART_PX_MIN } from '../model/defaults';
-import { useApp } from '../state/AppContext';
-import type { DecimalSeparator } from './cellText';
-import { EXPORT_DPI_CHOICES, type ExportDpi, type ExportFormat } from '../state/settings';
+import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
+import { useApp } from '../../state/AppContext';
+import { EXPORT_DPI_CHOICES, PNG_DPI_CHOICES, type ExportDpi, type ExportFormat, type PngDpi } from '../../state/settings';
 import { DialogShell, trapTab } from './DialogShell';
-import { Check, Field, NumField, SelectInput } from './inspector/controls';
+import { Check, Field, NumField, SelectInput } from '../inspector/common/controls';
+import type { DecimalSeparator } from '../../model/types';
 
 const TABS = [
   { id: 'general', label: 'General' },
@@ -103,6 +103,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                   </button>
                 ))}
               </span>
+            </Field>
+            <Field label="PNG resolution" hint="Resolution of the PNG of a graph, written into the file. 96 dpi is the size of the graph on screen; 300 dpi is 3.1 times as wide. SVG has no resolution.">
+              <SelectInput<string>
+                value={String(settings.pngDpi)}
+                options={PNG_DPI_CHOICES.map((d) => ({ value: String(d), label: d === 96 ? '96 dpi (screen size)' : `${d} dpi` }))}
+                onChange={(v) => updateSettings({ pngDpi: Number(v) as PngDpi })}
+              />
             </Field>
             <Field label="PDF resolution" hint="Resolution of the picture in a PDF, and of the PNG of a layout page. A4 at 600 dpi is 4960 × 7016 px and takes a few seconds; SVG has no resolution.">
               <SelectInput<string>

@@ -1,12 +1,12 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import { layerRows, layersAvailable, layersOf } from '../model/layers';
-import type { ChartType, Project } from '../model/types';
-import { addChart, addDataTable, patchLayerStyle, patchSurvival, setLayerHidden } from '../state/commands';
-import { calcStats } from '../stats/calcCache';
-import { buildAnyModel, ChartCanvas } from './anyModel';
+import { createExampleProject } from '../../model/defaults';
+import { layerRows, layersOf } from '../../model/graph/layers';
+import type { ChartType, Project } from '../../model/types';
+import { addChart, addDataTable, patchLayerStyle, patchSurvival, setLayerHidden } from '../../state/commands';
+import { calcStats } from '../../stats/calcCache';
+import { buildAnyModel, ChartCanvas } from '../anyModel';
 import { BAND_OPACITY, buildSurvivalModel } from './survivalModel';
 
 const project = (type: ChartType = 'survival'): Project => addChart('c', 't', undefined, type)(addDataTable('t', 'survival', { sample: true })(createExampleProject()));
@@ -21,8 +21,11 @@ const full = (p: Project): Project => patchSurvival('c', { band: true, errorBars
 const count = (svg: string, text: string) => svg.split(text).length - 1;
 
 describe('survival curves drawn from layers', () => {
-  it('are available, for both kinds of curve', () => {
-    for (const type of ['survival', 'cumulativeEvent'] as const) expect(layersAvailable(chartOf(project(type)))).toBe(true);
+  it('are there, for both kinds of curve', () => {
+    for (const type of ['survival', 'cumulativeEvent'] as const) {
+      const p = project(type);
+      expect(layersOf(chartOf(p), p.dataTables[0]).length).toBeGreaterThan(0);
+    }
   });
 
   it('have the band, the curve, the error bars, the censor marks and the at-risk table, in that order', () => {

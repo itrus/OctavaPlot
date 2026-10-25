@@ -8,7 +8,7 @@ export interface Observation {
   id: Id;
   /** null = missing observation (never zero). */
   value: number | null;
-  /** The value is kept but not used by any chart or calculation (see model/exclusion.ts). */
+  /** The value is kept but not used by any chart or calculation (see model/table/exclusion.ts). */
   excluded?: boolean;
   /** Why it is excluded, for the record. */
   excludedReason?: string;
@@ -82,11 +82,15 @@ export type ChartType =
   | 'xyScatter'
   | 'xyLine'
   | 'xyLineSymbols'
+  | 'xySpikes'
+  | 'xyArea'
   | 'groupedBar'
   | 'groupedLine'
   | 'heatmap'
   | 'groupedStacked'
   | 'groupedFloating'
+  | 'groupedBox'
+  | 'groupedViolin'
   | 'contingencyBars'
   | 'pie'
   | 'doughnut'
@@ -522,7 +526,7 @@ export interface Chart {
   id: Id;
   name: string;
   dataTableId: Id;
-  /** The graph this one was made like and still follows: its format settings that this graph has not changed itself (see model/chartLink.ts). */
+  /** The graph this one was made like and still follows: its format settings that this graph has not changed itself (see model/graph/chartLink.ts). */
   linkedTo?: Id;
   type: ChartType;
   /** Chart size in CSS pixels (1 px = 0.75 pt). */
@@ -538,7 +542,7 @@ export interface Chart {
   survival: SurvivalOptions;
   /** Shape lock: with 4:3 or square, changing the width or the height moves the other one too. */
   aspect: ChartAspect;
-  /** Last palette applied to the data sets (see model/palettes.ts); null = colours set by hand. */
+  /** Last palette applied to the data sets (see model/graph/palettes.ts); null = colours set by hand. */
   paletteId: string | null;
   title: string;
   showTitle: boolean;
@@ -586,19 +590,29 @@ export interface Chart {
   annotations: Annotation[];
   /** Lines at chosen values of the axes. */
   referenceLines: ReferenceLine[];
-  /** IDs of layers (see model/layers.ts) that are not drawn. Hiding changes nothing that is calculated. */
+  /** IDs of layers (see model/graph/layers.ts) that are not drawn. Hiding changes nothing that is calculated. */
   hiddenLayerIds: Id[];
-  /** Look of single layers, keyed by layer ID (see model/layers.ts); a value that is absent is the series' own. */
+  /** Layers whose values the axis range is not fitted to (the layer is still drawn); see rangeContribution in model/graph/layers.ts. */
+  rangeExcludedLayerIds: Id[];
+  /** The order of the data layers, lowest first, once the user has moved one; empty: the order of the chart type. See applyLayerOrder (model/graph/layers.ts). */
+  layerOrder: Id[];
+  /** Look of single layers, keyed by layer ID (see model/graph/layers.ts); a value that is absent is the series' own. */
   layerStyles: Record<Id, Partial<LayerStyle>>;
 }
 
-/** What a layer can be given of its own: the fit curve its colour, thickness and pattern, the fit band its colour and opacity. */
+/**
+ * What a part of a chart (a layer) can be given of its own, over the look of its series: a colour, a thickness, a pattern, an
+ * opacity and, for points, a symbol. Which of them a kind of layer takes is in STYLABLE_LAYERS (model/graph/layers.ts).
+ */
 export interface LayerStyle {
   color: string;
+  /** Line thickness, or the border thickness of a symbol. */
   widthPt: number;
   lineStyle: LineStyle;
   /** Fill opacity, 0 to 1. */
   opacity: number;
+  /** The symbol of a points layer. */
+  shape?: SymbolShape;
 }
 
 /** The analyses of the Results section: descriptive statistics of each column, and curve fits of an XY table. */
@@ -682,4 +696,11 @@ export type Selection =
   | { kind: 'point'; groupId: Id; pointId: Id }
   | { kind: 'annotation'; annotationId: Id };
 
-export type ViewRef = { kind: 'table'; id: Id } | { kind: 'chart'; id: Id } | { kind: 'analysis'; id: Id } | { kind: 'layout'; id: Id };
+/** How numbers are written: by the decimal point, by the decimal comma, or either (a comma is taken as a decimal comma). */
+export type DecimalSeparator = 'auto' | 'point' | 'comma';
+
+/** The folders of the navigator: Data Tables, Results, Graphs, Layouts. */
+export type FolderKey = 'tables' | 'results' | 'graphs' | 'layouts';
+
+/** A page of the project, or the overview of a folder (all its pages as thumbnails). */
+export type ViewRef = { kind: 'table'; id: Id } | { kind: 'chart'; id: Id } | { kind: 'analysis'; id: Id } | { kind: 'layout'; id: Id } | { kind: 'folder'; id: FolderKey };

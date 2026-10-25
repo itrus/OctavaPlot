@@ -20,7 +20,7 @@ Labels: **D** = documented by a public source (GraphPad Prism user guide, ggpris
 
 ## 2. Preset catalogue
 
-`src/model/chartGallery.ts` uses these IDs for planned graphs.
+`src/model/graph/chartGallery.ts` uses these IDs for planned graphs.
 
 | Group | Preset IDs |
 |---|---|

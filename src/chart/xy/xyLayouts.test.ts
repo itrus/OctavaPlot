@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createExampleProject, createXyTable } from '../model/defaults';
-import { effectiveTable, graphSources } from '../model/chartTable';
-import { SUMMARY_FORMATS, seriesWidth, subLabels, xySeries } from '../model/tableLayout';
-import type { ReplicateLayout, SummaryFormat } from '../model/types';
-import { addDataTable, addGroup, patchSummary, removeSeries, renameSeries, setCells, setGroupOnGraph } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
-import { buildXyModel, suppliedStats } from './xyModel';
+import { createChart, createExampleProject, createXyTable } from '../../model/defaults';
+import { effectiveTable, graphSources } from '../../model/table/chartTable';
+import { SUMMARY_FORMATS, seriesWidth, subLabels, xySeries } from '../../model/table/tableLayout';
+import type { ReplicateLayout, SummaryFormat } from '../../model/types';
+import { addDataTable, addGroup, patchSummary, removeSeries, renameSeries, setCells, setGroupOnGraph } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
+import { buildXyModel } from './xyModel';
+import { suppliedStats } from '../../model/table/suppliedStats';
 
 const projectOf = (layout: ReplicateLayout) => {
   const table = createXyTable('XY 1', true, layout);

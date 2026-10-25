@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { emptyPointLabelModel, type PointLabelGeom, type PointLabelModel } from '../../chart/labels';
-import { DEFAULT_STYLE, createExampleProject } from '../../model/defaults';
-import type { ChartStyle, Selection } from '../../model/types';
+import { emptyPointLabelModel, type PointLabelGeom, type PointLabelModel } from '../../../chart/shared/parts/labels';
+import { DEFAULT_STYLE, createExampleProject } from '../../../model/defaults';
+import type { ChartStyle, Selection } from '../../../model/types';
 import {
   KEEP_LABEL_PATCH,
   MEAN_POINT_REASON,

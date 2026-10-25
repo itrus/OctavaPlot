@@ -1,5 +1,5 @@
 import type { Project } from '../model/types';
-import { syncLinks } from '../model/chartLink';
+import { syncLinks } from '../model/graph/chartLink';
 import type { Command } from './commands';
 
 /** Undo/redo for the project (data edits and chart formatting share one history). */

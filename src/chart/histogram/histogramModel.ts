@@ -1,28 +1,32 @@
-import { resolveStyle } from '../model/style';
-import { NO_FIT_SETTINGS } from '../model/fitOptions';
-import type { Chart, DataTable } from '../model/types';
-import { chartPx2Pt, n2 } from '../model/units';
-import { autoBinWidth, binEdges, binHeights, countBins, ecdfSteps } from '../stats/histogram';
-import { sortedFinite } from '../stats/distribution';
-import { axisMapper, resolveAxis } from './axisScale';
-import { computeLayout } from './layout';
-import { displayName } from './model';
-import type { XyModel, XyPoint, XySeries } from './xyModel';
+import { layersOf } from '../../model/graph/layers';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
+import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
+import type { Chart, DataTable } from '../../model/types';
+import { chartPx2Pt, n2 } from '../../model/units';
+import { autoBinWidth, binEdges, binHeights, countBins, ecdfSteps } from '../../stats/histogram';
+import { sortedFinite } from '../../stats/distribution';
+import { axisMapper, resolveAxis } from '../shared/axes/axisScale';
+import { computeLayout } from '../shared/parts/layout';
+import type { XyModel, XyPoint, XySeries } from '../xy/xyModel';
+import { displayName } from '../shared/parts/names';
+import { attachLazyScene } from '../xy/xyScene';
 
 /**
  * Model of histograms and cumulative distributions of a column table: one series for each data set, the values on a
  * numeric X axis. It has the shape of an XY chart's model (numeric X, numeric Y, series), so the same drawing and the same
  * axis settings serve it; the bars of a histogram are the series' `bars`, the steps of a distribution its line.
  */
-export function buildHistModel(chart: Chart, table: DataTable): XyModel {
+export function buildHistogramModel(chart: Chart, table: DataTable): XyModel {
   const [W, H] = [chartPx2Pt(chart.widthPx), chartPx2Pt(chart.heightPx)];
-  const layer = chart.layers[0];
+  const layer = dataLayer(chart);
   const opts = chart.histogram;
   const histogram = chart.type === 'histogram';
   const warnings: string[] = [];
 
   const data = table.groups.map((g, i) => {
-    const style = resolveStyle(chart, layer, { id: g.id, paletteIndex: g.paletteIndex ?? i });
+    // The symbols of a cumulative distribution are asked for by its own setting as well as by the style of the data set.
+    const own = resolveStyle(chart, layer, { id: g.id, paletteIndex: g.paletteIndex ?? i });
+    const style = !histogram && opts.ecdfSymbols && !own.showSymbols ? { ...own, showSymbols: true } : own;
     const values = sortedFinite(g.observations.map((o) => o.value));
     return { g, style, values, label: displayName(chart, g.id, g.name) };
   });
@@ -122,5 +126,7 @@ export function buildHistModel(chart: Chart, table: DataTable): XyModel {
   if (histogram && opts.cumulative !== 'off' && opts.frequency === 'density') warnings.push('A cumulative histogram of a density shows the cumulative fraction.');
   if (histogram && edges.length > 400) warnings.push('There are very many bins; set a larger bin width.');
 
-  return { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit: NO_FIT_SETTINGS };
+  const model: XyModel = { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit: NO_FIT_SETTINGS, layers: layersOf(chart, table) };
+  attachLazyScene(chart, model);
+  return model;
 }

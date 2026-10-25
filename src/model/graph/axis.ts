@@ -1,5 +1,5 @@
-import { bool, clamp, oneOf, record, text, valuesOf } from './sanitize';
-import type { AxisBreak, AxisConfig, AxisScaleKind, BreakMark, NumberFormatKind, TickDirection } from './types';
+import { bool, clamp, oneOf, record, text, valuesOf } from '../sanitize';
+import type { AxisBreak, AxisConfig, AxisScaleKind, BreakMark, NumberFormatKind, TickDirection } from '../types';
 
 /** Limits of the axis settings (P). */
 export const AXIS_LIMITS = {

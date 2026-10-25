@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createXyTable } from '../model/defaults';
-import type { Project, ReferenceLine } from '../model/types';
-import { addReferenceLine } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { buildAnyModel } from './anyModel';
-import { chartToSvgString } from './export';
+import { createChart, createColumnTable, createXyTable } from '../../../model/defaults';
+import type { Project, ReferenceLine } from '../../../model/types';
+import { addReferenceLine } from '../../../state/commands';
+import { parseProject, stringifyProject } from '../../../state/serialize';
+import { buildAnyModel } from '../../anyModel';
+import { chartToSvgString } from '../../export/export';
 import { referenceLineNotices, referenceLinesOf } from './referenceLines';
 
 const line = (patch: Partial<ReferenceLine> = {}): ReferenceLine => ({ id: 'r1', axis: 'y', value: 50, color: '#cc0000', widthPt: 1, style: 'dashed', opacity: 1, label: 'Target', showLabel: true, ...patch });

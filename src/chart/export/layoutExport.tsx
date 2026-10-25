@@ -1,10 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { analysesOf } from '../model/analysis';
-import { resolveFit } from '../model/fitOptions';
-import { arrangeLayout, type Arranged, type NaturalSize } from '../model/layout';
-import type { Layout, Project } from '../model/types';
-import { chartPx2Pt, n2 } from '../model/units';
-import { buildAnyModelCached, ChartCanvas } from './anyModel';
+import { analysesOf } from '../../model/project/analysis';
+import { resolveFit } from '../../model/options/fitOptions';
+import { arrangeLayout, type Arranged, type NaturalSize } from '../../model/project/layout';
+import type { Layout, Project } from '../../model/types';
+import { chartPx2Pt, n2 } from '../../model/units';
+import { buildAnyModelCached, ChartCanvas } from '../anyModel';
 import { buildPdf, rgbaToFlateRgb } from './pdf';
 
 /**

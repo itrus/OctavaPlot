@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import type { ChartType } from '../model/types';
+import type { ChartType } from '../../model/types';
 import { DialogShell, trapTab } from './DialogShell';
 
 /** A small modal with a title, a body and Cancel / confirm buttons. Focus is taken once, when it opens. */

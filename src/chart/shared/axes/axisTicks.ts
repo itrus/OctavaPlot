@@ -1,6 +1,6 @@
-import { numberStartPt } from '../model/axis';
-import type { AxisConfig } from '../model/types';
-import { n2 } from '../model/units';
+import { numberStartPt } from '../../../model/graph/axis';
+import type { AxisConfig } from '../../../model/types';
+import { n2 } from '../../../model/units';
 
 /** The side of the plotting region an axis is drawn on. Ticks point outwards: left, up-left... see SIGN. */
 type AxisSide = 'left' | 'right' | 'bottom';

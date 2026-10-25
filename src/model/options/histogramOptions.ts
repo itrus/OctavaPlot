@@ -1,5 +1,5 @@
-import { bool, clamp, numberOrNull, oneOf, record } from './sanitize';
-import type { HistogramOptions } from './types';
+import { bool, clamp, numberOrNull, oneOf, record } from '../sanitize';
+import type { HistogramOptions } from '../types';
 
 /** Settings of histograms and cumulative distributions (spec 11). */
 

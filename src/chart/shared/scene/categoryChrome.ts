@@ -1,25 +1,23 @@
-import { linePattern } from '../model/look';
-import type { Chart } from '../model/types';
-import { n2 } from '../model/units';
-import { axisGaps, axisPieces } from './axisScale';
-import { crossingPosition } from './axisTicks';
-import { backgroundElements, categoryAxisElements, frameElement, gridElements, legendElements, numericAxisElements, plotClipElement, referenceLineElements, scaleBarElement, secondaryAxisElements, titleElements } from './chrome';
-import { keyMarkElement } from './fillElements';
-import type { GroupedModel } from './groupedModel';
-import type { Layout, LegendItemLayout } from './layout';
-import type { ChartModel, Orientation } from './model';
-import { referenceLinesOf, type PlacedReferenceLine } from './referenceLines';
+import type { Orientation } from '../parts/orientation';
+import type { YAxisScale } from '../axes/scales';
+import type { PlacedReferenceLine } from './referenceLines';
+import type { Layout, LegendItemLayout } from '../parts/layout';
+import { type SceneElement, el } from './sceneElement';
+import type { Chart, ChartStyle } from '../../../model/types';
 import type { ChromeScene } from './scene';
-import { el, type SceneElement } from './sceneElement';
-import type { YAxisScale } from './scales';
-import { symbolPath } from './symbols';
+import { axisGaps, axisPieces } from '../axes/axisScale';
+import { crossingPosition } from '../axes/axisTicks';
+import { backgroundElements, categoryAxisElements, frameElement, gridElements, legendElements, numericAxisElements, plotClipElement, referenceLineElements, scaleBarElement, secondaryAxisElements, titleElements } from './chrome';
+import { linePattern } from '../../../model/graph/look';
+import { n2 } from '../../../model/units';
+import { symbolPath } from '../parts/symbols';
 
 /**
  * The chrome of the charts over categories (bars, dots and means of columns; bars and lines of grouped and contingency
  * tables): what is behind the data and what is in front of it. Both kinds are drawn in the vertical drawing of the model and
  * turned into place for horizontal columns, and both have the same value axis, category axis, titles and legend.
  */
-interface CategoryChromeInput {
+export interface CategoryChromeInput {
   widthPt: number;
   heightPt: number;
   layout: Layout;
@@ -34,7 +32,7 @@ interface CategoryChromeInput {
   keysOf: (item: LegendItemLayout, keyWidth: number) => { groupId: string; keys: SceneElement[] };
 }
 
-function compileCategoryChrome(chart: Chart, c: CategoryChromeInput): ChromeScene {
+export function compileCategoryChrome(chart: Chart, c: CategoryChromeInput): ChromeScene {
   const { widthPt: W, heightPt: H, layout, orient, y, yScale, y2, categories } = c;
   const { plot } = layout;
   const xa = chart.xAxis;
@@ -84,7 +82,7 @@ function compileCategoryChrome(chart: Chart, c: CategoryChromeInput): ChromeScen
 }
 
 /** The line and the symbol that stand for a data set in the legend. */
-function lineAndSymbolKeys(style: ChartModel['groups'][number]['style'], x: number, y: number, w: number): SceneElement[] {
+export function lineAndSymbolKeys(style: ChartStyle, x: number, y: number, w: number): SceneElement[] {
   const out: SceneElement[] = [];
   if (style.showLines) {
     const pattern = linePattern(style);
@@ -96,49 +94,3 @@ function lineAndSymbolKeys(style: ChartModel['groups'][number]['style'], x: numb
   return out;
 }
 
-/** The chrome of a chart of columns (bar, scatter, mean, box, violin, floating, paired). */
-export function compileCategoryScene(chart: Chart, model: ChartModel): ChromeScene {
-  const y2a = chart.y2Axis;
-  // model.y2 is null while no data set is bound to the right axis; a hidden right axis draws nothing.
-  const y2 = model.y2 && model.y2Scale && y2a.visible ? { scale: model.y2, map: model.y2Scale } : null;
-  return compileCategoryChrome(chart, {
-    widthPt: model.widthPt,
-    heightPt: model.heightPt,
-    layout: model.layout,
-    orient: model.orient,
-    y: model.y,
-    yScale: model.yScale,
-    y2,
-    categories: model.groups.map((g) => ({ key: g.groupId, centerX: g.centerX, label: g.label })),
-    references: referenceLinesOf(chart, { family: 'category', model }).placed,
-    keysOf: (it, w) => {
-      const g = model.groups[model.legendGroups[it.index]];
-      // A bar is a filled key; the others are the line and the symbol, together in a group.
-      return { groupId: g.groupId, keys: g.style.showBars ? [keyMarkElement(g.style, it.x, it.y, chart.id, g.groupId, w)] : [el('g', [], { children: lineAndSymbolKeys(g.style, it.x, it.y, w) })] };
-    },
-  });
-}
-
-/** The chrome of a chart of grouped or contingency bars or lines. */
-export function compileGroupedScene(chart: Chart, model: GroupedModel): ChromeScene {
-  return compileCategoryChrome(chart, {
-    widthPt: model.widthPt,
-    heightPt: model.heightPt,
-    layout: model.layout,
-    orient: model.orient,
-    y: model.y,
-    yScale: model.yScale,
-    y2: null,
-    categories: model.categories.map((cat) => ({ key: cat.row, centerX: cat.centerX, label: cat.label })),
-    references: referenceLinesOf(chart, { family: 'grouped', model }).placed,
-    keysOf: (it, w) => {
-      const s = model.series[model.legendSeries[it.index]];
-      const st = s.style;
-      // Bars are a filled key; lines are the line and the symbol.
-      const keys = !model.asLines
-        ? [el('rect', [['x', n2(it.x)], ['y', n2(it.y - 10)], ['width', w], ['height', 20], ['fill', st.barFill], ['stroke', st.barBorderWidthPt > 0 ? st.barBorderColor : 'none'], ['stroke-width', st.barBorderWidthPt], ['stroke-opacity', st.barBorderOpacity < 1 ? st.barBorderOpacity : undefined]])]
-        : lineAndSymbolKeys(st, it.x, it.y, w);
-      return { groupId: s.groupId, keys };
-    },
-  });
-}

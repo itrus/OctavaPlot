@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject, DEFAULT_STYLE } from '../model/defaults';
-import { permuteRows } from '../testing/tableChecks';
-import type { ChartStyle } from '../model/types';
-import { resolveStyle } from '../model/style';
-import { clearSummaryOverrides, composeCommands, patchStyle, patchSummary, resetStyle, setChartType, setCells } from '../state/commands';
-import { addGroup, patchAxis, setDisplayName, setRowTitles } from '../state/commands';
-import { buildChartModel } from './model';
-import { resolveYAxis } from './scales';
+import { createExampleProject, DEFAULT_STYLE } from '../../model/defaults';
+import { permuteRows } from '../../testing/tableChecks';
+import type { ChartStyle } from '../../model/types';
+import { resolveStyle } from '../../model/graph/style';
+import { clearSummaryOverrides, composeCommands, patchStyle, patchSummary, resetStyle, setChartType, setCells } from '../../state/commands';
+import { addGroup, patchAxis, setDisplayName, setRowTitles } from '../../state/commands';
+import { buildColumnModel } from './columnModel';
+import { resolveYAxis } from '../shared/axes/scales';
 
 describe('resolveYAxis', () => {
   it('includes zero for bars and covers error endpoints', () => {
@@ -48,36 +48,36 @@ describe('style hierarchy and chart model', () => {
     const t = p.dataTables[0];
     const cells = t.groups[0].observations.map((_, row) => ({ row, col: 0, value: row === 0 ? 2 : null }));
     p = setCells(t.id, cells)(p);
-    const m = buildChartModel(p.charts[0], p.dataTables[0]);
+    const m = buildColumnModel(p.charts[0], p.dataTables[0]);
     expect(m.groups[0].errorBar).toBeNull();
     expect(m.groups[1].errorBar).not.toBeNull();
     expect(m.warnings.some((w) => /SD is undefined for n = 1/.test(w))).toBe(true);
   });
 
   it('draws mean +/- SD, differs for SEM, and nothing for none or the default', () => {
-    const none = buildChartModel(chart0, table);
+    const none = buildColumnModel(chart0, table);
     expect(none.groups.every((g) => g.errorBar === null)).toBe(true);
-    const sd = buildChartModel(patchSummary(chart0.id, 'all', { spread: 'sd' })(project).charts[0], table);
-    const sem = buildChartModel(patchSummary(chart0.id, 'all', { spread: 'sem' })(project).charts[0], table);
+    const sd = buildColumnModel(patchSummary(chart0.id, 'all', { spread: 'sd' })(project).charts[0], table);
+    const sem = buildColumnModel(patchSummary(chart0.id, 'all', { spread: 'sem' })(project).charts[0], table);
     expect(sd.groups.every((g) => g.errorBar !== null)).toBe(true);
     expect(sd.groups[0].errorBar!.d).not.toBe(sem.groups[0].errorBar!.d);
-    expect(buildChartModel(patchSummary(chart0.id, 'all', { spread: 'none' })(project).charts[0], table).groups[0].errorBar).toBeNull();
+    expect(buildColumnModel(patchSummary(chart0.id, 'all', { spread: 'none' })(project).charts[0], table).groups[0].errorBar).toBeNull();
   });
 
   it('applies the spread per data set and Global clears the overrides', () => {
     const g = table.groups[0];
     let p = patchSummary(chart0.id, g.id, { spread: 'sd' })(project);
-    let m = buildChartModel(p.charts[0], table);
+    let m = buildColumnModel(p.charts[0], table);
     expect(m.groups[0].errorBar).not.toBeNull();
     expect(m.groups[1].errorBar).toBeNull();
     p = patchSummary(chart0.id, 'all', { spread: 'sem' })(p);
     expect(p.charts[0].layers[0].groupSummary).toEqual({});
-    m = buildChartModel(p.charts[0], table);
+    m = buildColumnModel(p.charts[0], table);
     expect(m.groups.every((x) => x.errorBar !== null)).toBe(true);
   });
 
   it('draws a CI bar and widens the scale to its endpoints', () => {
-    const ci = buildChartModel(patchSummary(chart0.id, 'all', { spread: 'ci' })(project).charts[0], table);
+    const ci = buildColumnModel(patchSummary(chart0.id, 'all', { spread: 'ci' })(project).charts[0], table);
     expect(ci.groups.every((x) => x.errorBar !== null)).toBe(true);
     expect(ci.y.domain[1]).toBeGreaterThanOrEqual(Math.max(...ci.groups.map((g) => g.stats.interval.upper ?? 0)));
   });
@@ -89,7 +89,7 @@ describe('style hierarchy and chart model', () => {
     const reset = composeCommands(resetStyle(chart0.id, g.id, table), clearSummaryOverrides(chart0.id, g.id))(p);
     expect(reset.charts[0].layers[0].groupSummary).toEqual({});
     expect(resolveStyle(reset.charts[0], reset.charts[0].layers[0], g).barFill).not.toBe('#ff0000');
-    expect(buildChartModel(reset.charts[0], table).groups[0].errorBar).toBeNull();
+    expect(buildColumnModel(reset.charts[0], table).groups[0].errorBar).toBeNull();
   });
 
   it('errorType is no longer a style key', () => {
@@ -105,17 +105,17 @@ describe('style hierarchy and chart model', () => {
     const c = p.charts[0];
     expect(p.dataTables).toBe(project.dataTables);
     expect(resolveStyle(c, c.layers[0], g).barFill).toBe('#ff0000');
-    const m = buildChartModel(c, p.dataTables[0]);
+    const m = buildColumnModel(c, p.dataTables[0]);
     expect(m.groups[0].points).toHaveLength(5);
     expect(m.groups[0].bar).toBeNull();
-    const back = buildChartModel(setChartType(c.id, 'bar')(p).charts[0], p.dataTables[0]);
+    const back = buildColumnModel(setChartType(c.id, 'bar')(p).charts[0], p.dataTables[0]);
     expect(back.groups[0].bar).not.toBeNull();
   });
 
   it('changing presentation settings does not change summaries', () => {
-    const a = buildChartModel(chart0, table);
+    const a = buildColumnModel(chart0, table);
     const p = patchStyle(chart0.id, 'all', { symbolSizePt: 20, barFill: '#00ff00' })(project);
-    const b = buildChartModel(p.charts[0], table);
+    const b = buildColumnModel(p.charts[0], table);
     expect(b.groups.map((g) => g.summary)).toEqual(a.groups.map((g) => g.summary));
   });
 });
@@ -126,7 +126,7 @@ describe('summary pipeline (S15)', () => {
   const chartId = project.charts[0].id;
   const setGroup = (p: typeof project, col: number, values: (number | null)[]) =>
     setCells(p.dataTables[0].id, values.map((value, row) => ({ row, col, value })))(p);
-  const model = (p: typeof project) => buildChartModel(p.charts[0], p.dataTables[0]);
+  const model = (p: typeof project) => buildColumnModel(p.charts[0], p.dataTables[0]);
 
   it('centre moves the bar, marker, mean line and connector (median, geometric)', () => {
     let p = setGroup(project, 0, [1, 2, 3, 4, 100]);
@@ -278,7 +278,7 @@ describe('point labels in the chart model', () => {
   const base = (): P => setChartType(createExampleProject().charts[0].id, 'scatter')(createExampleProject());
   const labelled = (p: P, patch: Partial<ChartStyle> = {}): P =>
     patchStyle(p.charts[0].id, 'all', { showSymbols: true, showPointLabels: true, ...patch })(p);
-  const build = (p: P) => buildChartModel(p.charts[0], p.dataTables[0]);
+  const build = (p: P) => buildColumnModel(p.charts[0], p.dataTables[0]);
   const fmt = (v: number | null) => String(Number((v as number).toPrecision(6)));
 
   it('is off by default and always present', () => {

@@ -1,11 +1,11 @@
-import type { FillSpec } from '../model/fill';
-import { legendKeyFill, resolveBarFill } from '../model/fill';
-import type { ChartStyle } from '../model/types';
-import { n2 } from '../model/units';
+import type { FillSpec } from '../../../model/graph/fill';
+import { legendKeyFill, resolveBarFill } from '../../../model/graph/fill';
+import type { ChartStyle } from '../../../model/types';
+import { n2 } from '../../../model/units';
 import { marksToPathData, patternMarks, type PatternMarks, type Rect } from './hatch';
 import { LEGEND_KEY } from './layout';
-import type { BarGeom } from './model';
-import { el, type SceneElement } from './sceneElement';
+import { el, type SceneElement } from '../scene/sceneElement';
+import type { BarGeom } from './barGeom';
 
 /** Extra half-height (pt) of the editor-only hit rect over a bar that renders with no height. */
 const ZERO_BAR_HIT_PAD_PT = 8;

@@ -1,9 +1,9 @@
-import type { FitSettings } from '../model/types';
-import { n2 } from '../model/units';
-import { cachedCalc } from '../stats/calcCache';
-import { FIT_ALGORITHM_VERSION, fitCurve, fitModelById, isFailure, type FitFailure, type FitModelId, type FitParam, type FitResult } from '../stats/fit';
-import { inBreak, onAxis, polylinesThroughBreaks } from './axisScale';
-import type { YAxisScale } from './scales';
+import type { FitSettings } from '../../model/types';
+import { n2 } from '../../model/units';
+import { cachedCalc } from '../../stats/calcCache';
+import { FIT_ALGORITHM_VERSION, fitCurve, fitModelById, isFailure, type FitFailure, type FitModelId, type FitParam, type FitResult } from '../../stats/fit';
+import { inBreak, onAxis, polylinesThroughBreaks } from '../shared/axes/axisScale';
+import type { YAxisScale } from '../shared/axes/scales';
 
 /** The fitted curve of one XY series, ready to draw (spec 17). */
 

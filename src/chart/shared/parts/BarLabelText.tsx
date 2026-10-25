@@ -1,7 +1,7 @@
-import type { BarLabels } from '../model/types';
-import { n2 } from '../model/units';
+import type { BarLabels } from '../../../model/types';
+import { n2 } from '../../../model/units';
 import type { BarLabelGeom } from './barLabels';
-import type { Orientation } from './model';
+import type { Orientation } from './orientation';
 
 /**
  * The label of one bar: centred above it (below a bar that points down), in the chart's text colour unless the labels

@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject, DEFAULT_STYLE } from '../model/defaults';
-import { resolveSummary } from '../model/summary';
-import type { Project } from '../model/types';
-import { statsFor } from '../stats/summary';
-import { patchAxis, patchBothAxes, patchStyle, removeGroup } from '../state/commands';
-import { parseProject, parseProjectWithNotes, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
+import { createExampleProject, DEFAULT_STYLE } from '../../model/defaults';
+import { resolveSummary } from '../../model/graph/summary';
+import type { Project } from '../../model/types';
+import { statsFor } from '../../stats/summary';
+import { patchAxis, patchBothAxes, patchStyle, removeGroup } from '../../state/commands';
+import { parseProject, parseProjectWithNotes, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { n2 } from '../model/units';
-import { ChartSvg } from './ChartSvg';
-import { buildChartModel } from './model';
-import { bindLeft, bindRight, DUAL_AXIS_DATA, dualAxisFixture } from '../testing/dualAxisFixture';
+import { n2 } from '../../model/units';
+import { ColumnChartSvg } from './ColumnChartSvg';
+import { buildColumnModel } from './columnModel';
+import { bindLeft, bindRight, DUAL_AXIS_DATA, dualAxisFixture } from '../../testing/dualAxisFixture';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = Record<string, any>;
@@ -139,7 +139,7 @@ describe('right axis settings', () => {
 });
 
 describe('right axis rendering', () => {
-  const modelOf = (p: Project) => buildChartModel(p.charts[0], p.dataTables[0]);
+  const modelOf = (p: Project) => buildColumnModel(p.charts[0], p.dataTables[0]);
   const withY2 = (p: Project, patch: Partial<Project['charts'][0]['y2Axis']>) => patchAxis(p.charts[0].id, 'y2Axis', patch)(p);
   const rightTicks = (svg: string, x: string) =>
     [...svg.matchAll(/<path d="M([\d.]+),([\d.]+)h11.2"/g)].filter((m) => m[1] === x);
@@ -179,7 +179,7 @@ describe('right axis rendering', () => {
     const svg = svgOf(p);
     expect(svg).not.toContain('data-');
     const html = renderToStaticMarkup(
-      createElement(ChartSvg, { chart: p.charts[0], model: modelOf(p), editor: { selection: { kind: 'chart' } as never }, cssWidth: '1px', cssHeight: '1px' }),
+      createElement(ColumnChartSvg, { chart: p.charts[0], model: modelOf(p), editor: { selection: { kind: 'chart' } as never }, cssWidth: '1px', cssHeight: '1px' }),
     );
     // Axes are clickable in the editor (they open the axis settings); only the editor render carries the attribute.
     expect(html).toContain('data-hit="axis"');

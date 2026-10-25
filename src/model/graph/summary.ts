@@ -4,8 +4,8 @@
  * Defaults and the layer/group split are P (spec 1.2 L57).
  */
 
-import { DEFAULT_SUMMARY } from './defaults';
-import type { ChartLayer, Id, SummarySpec } from './types';
+import { DEFAULT_SUMMARY } from '../defaults';
+import type { ChartLayer, Id, SummarySpec } from '../types';
 
 export const SUMMARY_KEYS: ReadonlyArray<keyof SummarySpec> = [
   'centre',

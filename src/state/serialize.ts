@@ -1,19 +1,19 @@
 import { createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
-import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../chart/labels';
-import { CHART_TYPES, chartTypeInfo, defaultChartTypeFor } from '../model/chartTypes';
-import { leadingColumns } from '../model/chartTypes';
-import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../model/tableLayout';
-import { sanitizeFillKeys } from '../model/fill';
-import { sanitizeAxis } from '../model/axis';
-import { analysisTypeInfo } from '../model/analysis';
-import { FIT_MODEL_IDS, sanitizeDegree } from '../model/fitOptions';
-import { sanitizeLayerStyles } from '../model/layers';
-import { sanitizeLook } from '../model/look';
-import { applyOrder, sanitizeOrder } from '../model/groupOrder';
-import { foldGroupGaps } from '../model/columnOptions';
-import { createRows, sanitizeRowTitle } from '../model/rows';
-import { sanitizeSummary, sanitizeSummaryPatch } from '../model/summary';
-import { defaultLayout, sanitizeLayout } from '../model/layout';
+import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../chart/shared/parts/labels';
+import { CHART_TYPES, chartTypeInfo, defaultChartTypeFor } from '../model/graph/chartTypes';
+import { leadingColumns } from '../model/graph/chartTypes';
+import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../model/table/tableLayout';
+import { sanitizeFillKeys } from '../model/graph/fill';
+import { sanitizeAxis } from '../model/graph/axis';
+import { analysisTypeInfo } from '../model/project/analysis';
+import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
+import { sanitizeLayerStyles } from '../model/graph/layers';
+import { sanitizeLook } from '../model/graph/look';
+import { applyOrder, sanitizeOrder } from '../model/table/groupOrder';
+import { foldGroupGaps } from '../model/options/columnOptions';
+import { createRows, sanitizeRowTitle } from '../model/table/rows';
+import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
+import { defaultLayout, sanitizeLayout } from '../model/project/layout';
 import type { Analysis, Chart, ChartLayer, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SummarySpec } from '../model/types';
 
 /** The envelope of a project file (.oplot): this format and its one version. */
@@ -95,7 +95,7 @@ function parseTable(raw: unknown, path: string): DataTable {
       const oid = str(o.id, `${gp}.observations[${oi}].id`);
       if (obsIds.has(oid)) fail(`${gp}.observations[${oi}].id`, 'is duplicated');
       obsIds.add(oid);
-      // An excluded value is kept, with its reason, but not used (model/exclusion.ts).
+      // An excluded value is kept, with its reason, but not used (model/table/exclusion.ts).
       return { id: oid, value, ...(o.excluded === true ? { excluded: true as const, ...(typeof o.excludedReason === 'string' && o.excludedReason !== '' ? { excludedReason: o.excludedReason } : {}) } : {}) };
     });
     if (observations.length !== rowCount) fail(`${gp}.observations`, `must have ${rowCount} entries`);
@@ -352,10 +352,11 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
   const c = conform(c0, base as unknown as Obj, path, notes, new Set(['defaults', 'layers']));
   // Merged over the defaults: a value that is missing or not valid takes the default.
   const defaults = cleanStyle(c.defaults, `${path}.defaults`, notes);
-  const layers = arr(c.layers, `${path}.layers`).map((rl, i) =>
-    parseLayer(obj(rl, `${path}.layers[${i}]`), `${path}.layers[${i}]`, notes),
-  );
-  if (layers.length === 0) fail(`${path}.layers`, 'must contain at least one layer');
+  // A graph has one data layer (see dataLayer in model/graph/style.ts). A file with more says so; only the first is read.
+  const rawLayers = arr(c.layers, `${path}.layers`);
+  if (rawLayers.length === 0) fail(`${path}.layers`, 'must contain at least one layer');
+  const layers = [parseLayer(obj(rawLayers[0], `${path}.layers[0]`), `${path}.layers[0]`, notes)];
+  if (rawLayers.length > 1) notes.push(`${path}.layers: a graph has one layer in this version; the other ${rawLayers.length - 1} ${rawLayers.length === 2 ? 'was' : 'were'} not read.`);
   const legendIn = isObj(c.legend) ? c.legend : {};
   const chart: Chart = {
     ...base,
@@ -391,6 +392,8 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
       return r.styles;
     })(),
     hiddenLayerIds: Array.isArray(c.hiddenLayerIds) ? c.hiddenLayerIds.filter((id): id is string => typeof id === 'string') : [],
+    rangeExcludedLayerIds: Array.isArray(c.rangeExcludedLayerIds) ? c.rangeExcludedLayerIds.filter((id): id is string => typeof id === 'string') : [],
+    layerOrder: Array.isArray(c.layerOrder) ? [...new Set(c.layerOrder.filter((id): id is string => typeof id === 'string'))] : [],
     layers,
   };
   if (!(chart.widthPx > 0) || !(chart.heightPx > 0)) fail(`${path}`, 'must have positive widthPx and heightPx');

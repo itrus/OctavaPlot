@@ -21,6 +21,8 @@ export interface SceneElement {
   id?: string;
   /** Present only in the editor (a transparent twin that makes a thin line easy to hit). */
   editorOnly?: boolean;
+  /** Present only in the editor, while the series (data set) with this ID is selected (its glow, its frame). */
+  whenSelected?: string;
 }
 
 type Attrs = NonNullable<SceneElement['attrs']>;

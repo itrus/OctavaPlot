@@ -3,9 +3,9 @@
  * through the axis scale one by one, never as a transformed error length (spec 9.2 L679).
  */
 
-import type { ChartStyle, ErrorDirection, Id } from '../model/types';
-import { describeSpread } from '../stats/describe';
-import type { GroupStats } from '../stats/summary';
+import type { ChartStyle, ErrorDirection, Id } from '../../../model/types';
+import { describeSpread } from '../../../stats/describe';
+import type { GroupStats } from '../../../stats/summary';
 
 export interface ErrorBarGeom {
   id: Id;
@@ -82,12 +82,15 @@ function usableEnds(stats: GroupStats): { centre: number; lower: number; upper: 
 export function rangeValuesFor(stats: GroupStats, shown: boolean, direction: ErrorDirection): number[] {
   const values: number[] = [];
   if (stats.centre !== null && Number.isFinite(stats.centre)) values.push(stats.centre);
-  if (!shown) return values;
+  return [...values, ...errorEndValues(stats, shown, direction)];
+}
+
+/** The ends of the error bar that the axis has to hold: none when it is not shown or has no usable interval. */
+export function errorEndValues(stats: GroupStats, shown: boolean, direction: ErrorDirection): number[] {
+  if (!shown) return [];
   const ends = usableEnds(stats);
-  if (!ends) return values;
-  if (direction !== 'negative') values.push(ends.upper);
-  if (direction !== 'positive') values.push(ends.lower);
-  return values;
+  if (!ends) return [];
+  return [...(direction !== 'negative' ? [ends.upper] : []), ...(direction !== 'positive' ? [ends.lower] : [])];
 }
 
 /** Null when the bar is hidden, has no centre or interval, fails the consistency guard, or maps to non-finite pixels. */

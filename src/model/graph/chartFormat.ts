@@ -1,8 +1,8 @@
 import { chartTypeInfo, defaultChartTypeFor } from './chartTypes';
-import { createChart } from './defaults';
-import { newId } from './ids';
-import { xySeries } from './tableLayout';
-import type { AxisConfig, Chart, ChartLayer, DataTable, Id, SummarySpec } from './types';
+import { createChart } from '../defaults';
+import { newId } from '../ids';
+import { xySeries } from '../table/tableLayout';
+import type { AxisConfig, Chart, ChartLayer, DataTable, Id, SummarySpec } from '../types';
 
 /**
  * Which data set of `table` takes the style of which data set of `sourceTable`: matched by position. For an XY or survival
@@ -104,6 +104,8 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
     defaults: structuredClone(source.defaults),
     layers,
     hiddenLayerIds: source.hiddenLayerIds.flatMap((l) => mapId(l) ?? []),
+    rangeExcludedLayerIds: source.rangeExcludedLayerIds.flatMap((l) => mapId(l) ?? []),
+    layerOrder: source.layerOrder.flatMap((l) => mapId(l) ?? []),
     layerStyles: mapObjects(source.layerStyles),
   };
 }

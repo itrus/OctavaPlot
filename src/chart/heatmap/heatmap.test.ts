@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createGroupedTable } from '../model/defaults';
-import type { DataTable, HeatmapOptions, Project } from '../model/types';
-import { addChart, patchLook, setChartType } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
+import { createChart, createGroupedTable } from '../../model/defaults';
+import type { DataTable, HeatmapOptions, Project } from '../../model/types';
+import { addChart, patchLook, setChartType } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
 import { contrastColour, paletteColour, scalePosition } from './heatColours';
 import { buildHeatModel } from './heatmapModel';
-import { heatTooltipLines, tooltipFmt } from './tooltip';
+import { heatTooltipLines, tooltipFmt } from '../tooltip';
 
 // Series A: Male 4.2, Female 3.1; series B: Male 6.5, Female 5.2.
 const setup = (patch: Partial<HeatmapOptions> = {}, table: DataTable = createGroupedTable('Grouped', true)) => {
@@ -189,7 +189,7 @@ describe('colour range limits', () => {
 
 describe('cell labels', () => {
   it('fit the cell in width and height, shrink when needed, and are left out when they cannot be read', async () => {
-    const { fitCellLabel } = await import('./HeatmapSvg');
+    const { fitCellLabel } = await import('./heatMarks');
     expect(fitCellLabel('4.2', 120, 80, 20)).toBe(20);
     const narrow = fitCellLabel('123456.789', 60, 80, 20)!;
     expect(narrow).toBeLessThan(20);

@@ -1,4 +1,4 @@
-import { n2 } from '../model/units';
+import { n2 } from '../../../model/units';
 
 /**
  * Pure hatch-pattern geometry. A fill pattern is a lattice of line segments or

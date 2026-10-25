@@ -1,13 +1,13 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import type { Project } from '../model/types';
-import { patchAxis, patchStyle, setCells } from '../state/commands';
-import { ChartSvg } from './ChartSvg';
-import { chartToSvgString } from './export';
-import { fillClipId } from './FillMarks';
-import { buildChartModel } from './model';
+import { createExampleProject } from '../../model/defaults';
+import type { Project } from '../../model/types';
+import { patchAxis, patchStyle, setCells } from '../../state/commands';
+import { ColumnChartSvg } from './ColumnChartSvg';
+import { chartToSvgString } from '../export/export';
+import { fillClipId } from '../shared/parts/fillElements';
+import { buildColumnModel } from './columnModel';
 
 // These counts are of the bars alone, so the legend (on by default) is switched off.
 const example = createExampleProject();
@@ -19,9 +19,9 @@ const pattern = (p: Project, extra: Record<string, unknown> = {}) =>
   patchStyle(chartId, 'all', { barFillMode: 'pattern', barPattern: 'horizontal', barPatternSpacingPt: 6, ...extra })(p);
 const editorHtml = (p: Project): string =>
   renderToStaticMarkup(
-    createElement(ChartSvg, {
+    createElement(ColumnChartSvg, {
       chart: p.charts[0],
-      model: buildChartModel(p.charts[0], p.dataTables[0]),
+      model: buildColumnModel(p.charts[0], p.dataTables[0]),
       editor: { selection: { kind: 'chart' } as never },
       cssWidth: '1px',
       cssHeight: '1px',
@@ -89,7 +89,7 @@ describe('zero-height bars', () => {
   const zero = (extra?: Project) => setCol0(extra ?? base, 0);
   it('Z1 a zero bar renders as an opaque baseline path, in every fill mode', () => {
     for (const p of [zero(), pattern(zero()), patchStyle(chartId, 'all', { barFillMode: 'none' })(zero())]) {
-      const m = buildChartModel(p.charts[0], p.dataTables[0]);
+      const m = buildColumnModel(p.charts[0], p.dataTables[0]);
       const bar = m.groups[0].bar!;
       expect(bar.height).toBe(0);
       const s = svgOf(p);
@@ -114,7 +114,7 @@ describe('zero-height bars', () => {
 
   it('Z4 the threshold is the rounded height: below 0.005 pt is a baseline, above is a rect', () => {
     const p = patchAxis(chartId, 'yAxis', { min: 0, max: 1e6 })(base);
-    const plotH = buildChartModel(p.charts[0], p.dataTables[0]).layout.plot.height;
+    const plotH = buildColumnModel(p.charts[0], p.dataTables[0]).layout.plot.height;
     const per = (v: number) => (v / 1e6) * plotH;
     const vTiny = Math.floor(0.004 / (plotH / 1e6));
     const vBig = Math.ceil(0.02 / (plotH / 1e6));

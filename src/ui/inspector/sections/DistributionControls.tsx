@@ -1,9 +1,9 @@
-import { DISTRIBUTION_LIMITS } from '../../model/distributionOptions';
-import type { Chart, DistributionPoints, SmoothingLevel, ViolinNormalisationKind, WhiskerRuleKind } from '../../model/types';
-import { useApp } from '../../state/AppContext';
-import { patchDistribution } from '../../state/commands';
-import { WHISKER_RULES } from '../../stats/distribution';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SelectInput } from './controls';
+import { DISTRIBUTION_LIMITS } from '../../../model/options/distributionOptions';
+import type { Chart, DistributionPoints, SmoothingLevel, ViolinNormalisationKind, WhiskerRuleKind } from '../../../model/types';
+import { useApp } from '../../../state/AppContext';
+import { patchDistribution } from '../../../state/commands';
+import { WHISKER_RULES } from '../../../stats/distribution';
+import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SelectInput } from '../common/controls';
 
 const SMOOTHING: Array<{ value: SmoothingLevel; label: string }> = [
   { value: 'light', label: 'Light' },
@@ -22,7 +22,7 @@ export function DistributionControls({ chart, lineColor, lineWidthPt, lineOpacit
   const { run } = useApp();
   const d = chart.distribution;
   const set = (label: string, patch: Partial<Chart['distribution']>, key?: string) => run(label, patchDistribution(chart.id, patch), key);
-  const box = chart.type === 'box';
+  const box = chart.type === 'box' || chart.type === 'groupedBox';
   const floating = chart.type === 'floating';
   const w = DISTRIBUTION_LIMITS.width;
   const pointOptions: Array<{ value: DistributionPoints; label: string }> = box

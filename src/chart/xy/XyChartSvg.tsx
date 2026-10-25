@@ -1,12 +1,12 @@
 import { forwardRef } from 'react';
-import type { Chart } from '../model/types';
-import { n2 } from '../model/units';
-import { AnnotationLayer, type EditorState, SELECT_COLOR } from './ChartParts';
-import { hitAttrs } from './hitTest';
-import { SceneElements } from './SceneElements';
-import { SceneSvg } from './SceneSvg';
-import { compileXyScene } from './scene';
+import type { Chart } from '../../model/types';
+import { n2 } from '../../model/units';
+import { AnnotationLayer, type EditorState, SELECT_COLOR } from '../shared/scene/ChartParts';
+import { hitAttrs } from '../shared/scene/hitTest';
+import { SceneElements } from '../shared/scene/SceneElements';
+import { SceneSvg } from '../shared/scene/SceneSvg';
 import type { XyModel } from './xyModel';
+import { compileXyScene } from './xyScene';
 
 interface Props {
   chart: Chart;
@@ -36,13 +36,8 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
       <SceneElements nodes={scene.defs} editor={ed} />
       <SceneElements nodes={scene.back} editor={ed} />
 
-      {/* Data: bands, then lines, then symbols over them, clipped to the plotting region. */}
+      {/* Data: the bars of a histogram, bands, lines, then symbols over them, clipped to the plotting region. */}
       <g clipPath="url(#plot-clip)">
-        {series.map((s) =>
-          s.bars?.map((b) => (
-            <rect key={b.id} x={n2(b.x)} y={n2(b.y)} width={n2(b.width)} height={n2(b.height)} fill={s.style.barFill} fillOpacity={s.style.barOpacity} stroke={s.style.barBorderColor} strokeWidth={s.style.barBorderWidthPt} strokeOpacity={s.style.barBorderOpacity < 1 ? s.style.barBorderOpacity : undefined} {...hit('bar', s.groupId, b.id)} />
-          )),
-        )}
         <SceneSvg scene={scene} editor={ed} selectedGroup={selectedGroup} />
       </g>
 

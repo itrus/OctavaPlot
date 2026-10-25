@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildChartModel } from '../chart/model';
-import { historyReducer, initialHistory } from '../state/history';
-import { clearPointStyle, patchPointStyle, setChartType } from '../state/commands';
-import { createExampleProject } from './defaults';
-import { permuteRows } from '../testing/tableChecks';
+import { buildColumnModel } from '../../chart/column/columnModel';
+import { historyReducer, initialHistory } from '../../state/history';
+import { clearPointStyle, patchPointStyle, setChartType } from '../../state/commands';
+import { createExampleProject } from '../defaults';
+import { permuteRows } from '../../testing/tableChecks';
 import { LABEL_STYLE_KEYS, clearObjectKeys, patchAllGroups, patchObject, resetGroupStyle, resolveStyle } from './style';
-import type { ChartLayer } from './types';
+import type { ChartLayer } from '../types';
 
 const setup = () => {
   const p = createExampleProject();
@@ -114,7 +114,7 @@ describe('patchPointStyle and clearPointStyle', () => {
     const order = Array.from({ length: table.rowCount }, (_, i) => table.rowCount - 1 - i);
     const permuted = permuteRows(table, order);
     const project = { ...q, dataTables: [permuted] };
-    const model = buildChartModel(project.charts[0], permuted);
+    const model = buildColumnModel(project.charts[0], permuted);
     const pt = model.groups[0].points.find((x) => x.id === id);
     expect(pt?.row).toBe(table.rowCount - 1 - row0);
     expect(project.charts[0].layers[0].objectOverrides[id]?.showPointLabels).toBe(true);
@@ -125,7 +125,7 @@ describe('patchPointStyle and clearPointStyle', () => {
     const scatter = setChartType(chart.id, 'scatter')(p);
     const id = group.observations[0].id;
     const q = patchPointStyle(chart.id, id, { showPointLabels: true, pointLabelSource: 'value' })(scatter);
-    const model = buildChartModel(q.charts[0], q.dataTables[0]);
+    const model = buildColumnModel(q.charts[0], q.dataTables[0]);
     expect(model.labels.items.map((i) => i.id)).toEqual([id]);
   });
 });

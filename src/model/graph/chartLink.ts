@@ -1,5 +1,6 @@
 import { dataSetMap } from './chartFormat';
-import type { Chart, DataTable, Id, Project } from './types';
+import { dataLayer } from './style';
+import type { Chart, DataTable, Id, Project } from '../types';
 
 /**
  * Linked graphs. A graph made like another (see chartFormat.ts) stays linked to it: when the source's format changes, the
@@ -83,12 +84,12 @@ function followSource(child: Chart, before: Chart, after: Chart, sourceTable: Da
     // The style of each data set follows the data set in the same position of the source's table.
     const to = dataSetMap(sourceTable, table);
     const translate = (rec: Record<Id, unknown>): Record<Id, unknown> => Object.fromEntries(Object.entries(rec).flatMap(([k, v]) => (to.has(k) ? [[to.get(k)!, v] as const] : [])));
-    const [own0, before0, after0] = [child.layers[0], before.layers[0], after.layers[0]];
+    const [own0, before0, after0] = [dataLayer(child), dataLayer(before), dataLayer(after)];
     if (own0 && before0 && after0) {
       const style = merge3(own0.style, before0.style, after0.style);
       const groupOverrides = merge3(own0.groupOverrides, translate(before0.groupOverrides), translate(after0.groupOverrides));
       if (style !== own0.style || groupOverrides !== own0.groupOverrides) {
-        out.layers = [{ ...own0, style, groupOverrides }, ...child.layers.slice(1)];
+        out.layers = [{ ...own0, style, groupOverrides }];
       }
     }
   }

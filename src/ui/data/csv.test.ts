@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
+import { createExampleProject } from '../../model/defaults';
 import { importCsv, isCsvFile, parseCsv, tableToCsv } from './csv';
 
 describe('CSV', () => {

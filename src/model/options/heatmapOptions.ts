@@ -1,5 +1,5 @@
-import { bool, clamp, hex, numberOrNull, oneOf, record, valuesOf } from './sanitize';
-import type { HeatPalette, HeatmapOptions } from './types';
+import { bool, clamp, hex, numberOrNull, oneOf, record, valuesOf } from '../sanitize';
+import type { HeatPalette, HeatmapOptions } from '../types';
 
 /** Settings of heat maps (spec 13). */
 

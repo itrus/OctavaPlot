@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import type { Project } from '../model/types';
-import { patchAxis, patchStyle, setCells } from '../state/commands';
-import { dualAxisFixture } from '../testing/dualAxisFixture';
-import { patternMarks } from './hatch';
-import { buildChartModel, intersectRects } from './model';
+import { createExampleProject } from '../../model/defaults';
+import type { Project } from '../../model/types';
+import { patchAxis, patchStyle, setCells } from '../../state/commands';
+import { dualAxisFixture } from '../../testing/dualAxisFixture';
+import { patternMarks } from '../shared/parts/hatch';
+import { buildColumnModel, intersectRects } from './columnModel';
 
 const base = createExampleProject();
 const chartId = base.charts[0].id;
 const table = base.dataTables[0];
-const model = (p: Project) => buildChartModel(p.charts[0], p.dataTables[0]);
+const model = (p: Project) => buildColumnModel(p.charts[0], p.dataTables[0]);
 const pattern = (p: Project, extra: Record<string, unknown> = {}) =>
   patchStyle(chartId, 'all', { barFillMode: 'pattern', barPattern: 'horizontal', barPatternSpacingPt: 6, ...extra })(p);
 const setCol = (p: Project, col: number, f: (v: number) => number) => {
@@ -94,7 +94,7 @@ describe('bar fill geometry', () => {
 
   it('M9 a too-dense fill falls back to no marks and says how many it needs', () => {
     const chart = base.charts[0];
-    const big = buildChartModel(
+    const big = buildColumnModel(
       { ...chart, widthPx: 11340, heightPx: 11340, defaults: { ...chart.defaults, barFillMode: 'pattern', barPattern: 'dots', barPatternSpacingPt: 1 } },
       table,
     );

@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
-import type { GalleryItem } from '../model/chartGallery';
+import type { GalleryItem } from '../../model/graph/chartGallery';
 import { ChartSketch } from './NewItemDialogs';
 
 const SVG = { width: 84, height: 54, viewBox: '0 0 84 54', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, 'aria-hidden': true } as const;

@@ -1,9 +1,9 @@
-import type { YAxisScale } from '../../chart/scales';
-import { AXIS_LIMITS, AXIS_SCALES, BREAK_MARKS, MAX_BREAKS, NUMBER_FORMATS, TICK_DIRECTIONS } from '../../model/axis';
-import type { AxisBreak, AxisScaleKind, BreakMark, Chart, NumberFormatKind, TickDirection } from '../../model/types';
-import { useApp } from '../../state/AppContext';
-import { patchAxis, type AxisKey } from '../../state/commands';
-import { Check, Field, NumField, Section, SelectInput, TextInput } from './controls';
+import type { YAxisScale } from '../../../chart/shared/axes/scales';
+import { AXIS_LIMITS, AXIS_SCALES, BREAK_MARKS, MAX_BREAKS, NUMBER_FORMATS, TICK_DIRECTIONS } from '../../../model/graph/axis';
+import type { AxisBreak, AxisScaleKind, BreakMark, Chart, NumberFormatKind, TickDirection } from '../../../model/types';
+import { useApp } from '../../../state/AppContext';
+import { patchAxis, type AxisKey } from '../../../state/commands';
+import { Check, Field, NumField, Section, SelectInput, TextInput } from '../common/controls';
 
 const DECIMALS = ['auto', '0', '1', '2', '3', '4', '5', '6'] as const;
 

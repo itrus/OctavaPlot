@@ -1,8 +1,8 @@
-import { moveGroup, type MoveOp } from '../../model/groupOrder';
-import type { Chart, Id } from '../../model/types';
-import { useApp } from '../../state/AppContext';
-import { setGroupOrder } from '../../state/commands';
-import { SubHeading } from './controls';
+import { moveGroup, type MoveOp } from '../../../model/table/groupOrder';
+import type { Chart, Id } from '../../../model/types';
+import { useApp } from '../../../state/AppContext';
+import { setGroupOrder } from '../../../state/commands';
+import { SubHeading } from '../common/controls';
 
 /**
  * The order of the data sets on a column chart (left to right). Colours stay with

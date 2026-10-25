@@ -1,12 +1,12 @@
-import { FRAME_STYLES, GRID_LIMITS, LINE_STYLES } from '../../model/look';
-import type { BarLabelMode, Chart, FrameStyle, LineOrder, LineStyle } from '../../model/types';
-import { useApp } from '../../state/AppContext';
-import { patchLook } from '../../state/commands';
-import { AUTO_BAR_GAP_PCT, AUTO_BAR_OUTER_PCT, BAR_LIMITS } from '../../model/columnOptions';
-import { BAR_LABEL_MODES } from '../../model/columnOptions';
-import { BAR_LABEL_LIMITS } from '../../chart/barLabels';
-import { patchBarLabels, patchBars, patchBothAxes } from '../../state/commands';
-import { Check, ColorInput, Field, NumField, OptionalNumField, Section, SelectInput, TextInput } from './controls';
+import { FRAME_STYLES, GRID_LIMITS, LINE_STYLES } from '../../../model/graph/look';
+import type { BarLabelMode, Chart, FrameStyle, LineOrder, LineStyle } from '../../../model/types';
+import { useApp } from '../../../state/AppContext';
+import { patchLook } from '../../../state/commands';
+import { AUTO_BAR_GAP_PCT, AUTO_BAR_OUTER_PCT, BAR_LIMITS } from '../../../model/options/columnOptions';
+import { BAR_LABEL_MODES } from '../../../model/options/columnOptions';
+import { BAR_LABEL_LIMITS } from '../../../chart/shared/parts/barLabels';
+import { patchBarLabels, patchBars, patchBothAxes } from '../../../state/commands';
+import { Check, ColorInput, Field, NumField, OptionalNumField, Section, SelectInput, TextInput } from '../common/controls';
 
 /** A colour that can also be "none": the colour box is greyed out while it is. */
 function OptionalColour({ label, value, fallback, onChange }: { label: string; value: string | null; fallback: string; onChange: (v: string | null) => void }) {

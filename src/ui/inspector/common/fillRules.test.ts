@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STYLE } from '../../model/defaults';
-import type { ChartStyle } from '../../model/types';
+import { DEFAULT_STYLE } from '../../../model/defaults';
+import type { ChartStyle } from '../../../model/types';
 import {
   DEFAULT_PATTERN_BACKGROUND,
   backgroundDisplay,
@@ -113,7 +113,7 @@ describe('legacy and placement', () => {
     expect(patternColorDisplay(s)).toBe(s.barBorderColor);
   });
   it('keeps the pattern controls in the Bars (box, violin) box only', () => {
-    const src = readFileSync(new URL('./Inspector.tsx', import.meta.url), 'utf8');
+    const src = readFileSync(new URL('../ColumnInspector.tsx', import.meta.url), 'utf8');
     const start = src.indexOf('<GroupBox title={bodyTitle}');
     const end = src.indexOf('<GroupBox', start + 1);
     expect(start).toBeGreaterThan(0);

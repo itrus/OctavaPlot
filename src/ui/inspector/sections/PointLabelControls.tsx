@@ -1,6 +1,6 @@
-import type { ChartStyle, ChartType, PointLabelCollision, PointLabelSource } from '../../model/types';
-import { LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS, LABEL_DECIMALS_LIMITS, type Box, type PointLabelModel } from '../../chart/labels';
-import { Check, ColorInput, Field, GroupBox, NumField, SelectInput } from './controls';
+import type { ChartStyle, ChartType, PointLabelCollision, PointLabelSource } from '../../../model/types';
+import { LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS, LABEL_DECIMALS_LIMITS, type Box, type PointLabelModel } from '../../../chart/shared/parts/labels';
+import { Check, ColorInput, Field, GroupBox, NumField, SelectInput } from '../common/controls';
 import {
   KEEP_LABEL_PATCH,
   LABEL_MODE_OPTIONS,
@@ -10,7 +10,7 @@ import {
   pointPlacementAction,
   pointStatus,
   seedCustomOffsets,
-} from './pointOverrideUi';
+} from '../common/pointOverrideUi';
 import {
   COLLISION_OPTIONS,
   IDENTIFIER_NOTE,
@@ -20,7 +20,7 @@ import {
   labelStatusLines,
   placementPatch,
   suppressedRows,
-} from './pointLabelUi';
+} from '../common/pointLabelUi';
 
 /** "Label each point" and its options; the status block reports on the whole graph. */
 export function PointLabelControls({

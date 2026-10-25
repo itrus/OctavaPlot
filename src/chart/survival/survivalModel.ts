@@ -1,16 +1,16 @@
-import { isSurvivalChartType } from '../model/chartTypes';
-import { DEFAULT_BAND_OPACITY, layersOf } from '../model/layers';
-import { attachLazyScene } from './scene';
-import { resolveStyle } from '../model/style';
-import { xySeries } from '../model/tableLayout';
-import { NO_FIT_SETTINGS } from '../model/fitOptions';
-import type { Chart, DataTable, SurvivalBandMethod } from '../model/types';
-import { chartPx2Pt, n2 } from '../model/units';
-import { normalQuantile } from '../stats/special';
-import { computeLayout } from './layout';
-import { displayName } from './model';
-import { resolveAxis } from './axisScale';
-import type { AtRiskTable, XyModel, XyPoint, XySeries } from './xyModel';
+import { isSurvivalChartType } from '../../model/graph/chartTypes';
+import { DEFAULT_BAND_OPACITY, layersOf } from '../../model/graph/layers';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
+import { xySeries } from '../../model/table/tableLayout';
+import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
+import type { Chart, DataTable, SurvivalBandMethod } from '../../model/types';
+import { chartPx2Pt, n2 } from '../../model/units';
+import { normalQuantile } from '../../stats/special';
+import { computeLayout } from '../shared/parts/layout';
+import { resolveAxis } from '../shared/axes/axisScale';
+import type { AtRiskTable, XyModel, XyPoint, XySeries } from '../xy/xyModel';
+import { displayName } from '../shared/parts/names';
+import { attachLazyScene } from '../xy/xyScene';
 
 interface SurvivalStep {
   /** Time of an event (the estimate drops here). */
@@ -123,7 +123,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   if (!isSurvivalChartType(chart.type) || table.groups.length === 0) throw new Error('buildSurvivalModel needs a survival chart on a survival table');
   const cumulative = chart.type === 'cumulativeEvent';
   const [W, H] = [chartPx2Pt(chart.widthPx), chartPx2Pt(chart.heightPx)];
-  const layer = chart.layers[0];
+  const layer = dataLayer(chart);
   const opts = chart.survival;
   const warnings: string[] = [];
   const times = table.groups[0].observations.map((o) => o.value);

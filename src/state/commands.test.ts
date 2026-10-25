@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject, INITIAL_ROWS } from '../model/defaults';
-import { MAX_ROW_TITLE_CHARS } from '../model/rows';
+import { MAX_ROW_TITLE_CHARS } from '../model/table/rows';
 import { assertTableInvariants, permuteRows } from '../testing/tableChecks';
-import { groupObjectIds, resetGroupStyle } from '../model/style';
+import { groupObjectIds, resetGroupStyle } from '../model/graph/style';
 import type { Project } from '../model/types';
 import {
   addDataTable,

@@ -8,7 +8,7 @@
  * barPatternBackground is used instead (P).
  */
 
-import type { ChartStyle, FillMode, FillPattern } from './types';
+import type { ChartStyle, FillMode, FillPattern } from '../types';
 
 export const FILL_PATTERNS: readonly FillPattern[] = [
   'horizontal',

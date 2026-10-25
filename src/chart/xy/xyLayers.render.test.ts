@@ -1,14 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
-import { createChart, createXyTable } from '../model/defaults';
-import { NO_FIT_SETTINGS } from '../model/fitOptions';
-import { layersOf } from '../model/layers';
-import type { Chart, FitSettings } from '../model/types';
-import { calcStats } from '../stats/calcCache';
-import { buildAnyModel, ChartCanvas } from './anyModel';
-import { chartToSvgString } from './export';
-import { BAND_OPACITY } from './survivalModel';
+import { createChart, createXyTable } from '../../model/defaults';
+import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
+import { layersOf } from '../../model/graph/layers';
+import type { Chart, FitSettings } from '../../model/types';
+import { calcStats } from '../../stats/calcCache';
+import { buildAnyModel, ChartCanvas } from '../anyModel';
+import { chartToSvgString } from '../export/export';
+import { BAND_OPACITY } from '../survival/survivalModel';
 
 const table = createXyTable('XY', true);
 const base = createChart(table.id, undefined, 'xyLine');

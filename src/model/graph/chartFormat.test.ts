@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { addAnnotation, addChartLike, addDataTable, addReferenceLine, patchAxis, patchLook, patchStyle, removeChart, removeTable, setChartType, unlinkChart, type Command } from '../state/commands';
-import { historyReducer, initialHistory, type HistoryState } from '../state/history';
-import { parseProject, stringifyProject } from '../state/serialize';
+import { addAnnotation, addChartLike, addDataTable, addReferenceLine, patchAxis, patchLook, patchStyle, removeChart, removeTable, setChartType, unlinkChart, type Command } from '../../state/commands';
+import { historyReducer, initialHistory, type HistoryState } from '../../state/history';
+import { parseProject, stringifyProject } from '../../state/serialize';
 import { inheritChart } from './chartFormat';
-import { createExampleProject } from './defaults';
-import type { Project } from './types';
+import { createExampleProject } from '../defaults';
+import type { Project } from '../types';
 
 /** A styled graph of the example table (four data sets) and a second column table. */
 function setup(): { p: Project; sourceId: string; t2: string } {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createChart } from '../model/defaults';
-import type { AxisConfig } from '../model/types';
-import { TICK_LENGTH_PT as TICK_LENGTH } from '../model/defaults';
+import { createChart } from '../../../model/defaults';
+import type { AxisConfig } from '../../../model/types';
+import { TICK_LENGTH_PT as TICK_LENGTH } from '../../../model/defaults';
 import { AXIS_TITLE_GAP, Y_TICK_LABEL_GAP, computeLayout, type LayoutInput } from './layout';
 
 // Without a canvas measureText is len * fontSize * 0.58 (bold), so widths are exact.

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { setExcluded } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { analysisColumns } from './analysis';
+import { setExcluded } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { analysisColumns } from '../project/analysis';
 import { effectiveTable } from './chartTable';
-import { createExampleProject } from './defaults';
+import { createExampleProject } from '../defaults';
 import { excludedCount, withoutExcluded } from './exclusion';
 
 describe('excluded values', () => {

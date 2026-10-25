@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { buildAnyModelCached, ChartCanvas } from '../chart/anyModel';
-import { hitFromTarget, pointerToChartPt } from '../chart/hitTest';
-import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../chart/tooltip';
-import { analysesOf } from '../model/analysis';
-import { resolveFit } from '../model/fitOptions';
-import type { Chart, DataTable } from '../model/types';
-import { useApp } from '../state/AppContext';
-import { patchAnnotation, removeChart, resetAllDataSets, unlinkChart } from '../state/commands';
-import { downloadBlob, exportFileName } from '../util/download';
-import { DeleteIcon, ResetIcon } from './icons';
-import { inspectorTargetFor } from './inspector/nav';
+import { buildAnyModelCached, ChartCanvas } from '../../chart/anyModel';
+import { hitFromTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
+import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
+import { analysesOf } from '../../model/project/analysis';
+import { resolveFit } from '../../model/options/fitOptions';
+import type { Chart, DataTable } from '../../model/types';
+import { useApp } from '../../state/AppContext';
+import { patchAnnotation, removeChart, resetAllDataSets, unlinkChart } from '../../state/commands';
+import { exportPixels, fitsCanvas } from '../../chart/export/pngDpi';
+import { downloadBlob, exportFileName } from '../../util/download';
+import { DeleteIcon, ResetIcon } from '../components/icons';
+import { inspectorTargetFor } from '../inspector/common/nav';
 
 /** Space kept around the chart inside the canvas, in px. */
 const CANVAS_PAD = 24;
@@ -88,7 +89,7 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
       return;
     }
     const hit = hitFromTarget(e.target, svg);
-    const lines = any.family === 'category' ? tooltipLines(any.model, table, hit) : any.family === 'grouped' ? groupedTooltipLines(any.model, hit) : any.family === 'whole' ? pieTooltipLines(any.model, hit) : any.family === 'hist' ? histTooltipLines(any.model, hit) : any.family === 'heat' ? heatTooltipLines(any.model, hit) : xyTooltipLines(any.model, table, hit);
+    const lines = any.family === 'column' ? tooltipLines(any.model, table, hit) : any.family === 'grouped' ? groupedTooltipLines(any.model, hit) : any.family === 'pie' ? pieTooltipLines(any.model, hit) : any.family === 'histogram' ? histTooltipLines(any.model, hit) : any.family === 'heatmap' ? heatTooltipLines(any.model, hit) : xyTooltipLines(any.model, table, hit);
     const box = wrapRef.current?.getBoundingClientRect();
     if (lines && box) {
       // The tooltip is kept inside the chart area: it flips to the other side of the pointer near the right or bottom edge.
@@ -110,7 +111,7 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
   // The renderer behind export (react-dom/server) is loaded on first use, not at startup.
   const exportSvg = async () => {
     try {
-      const { chartToSvgString } = await import('../chart/export');
+      const { chartToSvgString } = await import('../../chart/export/export');
       downloadBlob(new Blob([chartToSvgString(chart, table, curve, { metadata: true })], { type: 'image/svg+xml' }), exportFileName(chart.name, 'svg', settings.timestampExports));
       setStatus('Exported SVG.');
     } catch (err) {
@@ -118,30 +119,29 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
     }
   };
   const exportPng = async () => {
-    const [pw, ph] = [chart.widthPx, chart.heightPx];
+    const { width: pw, height: ph } = exportPixels(chart, settings.pngDpi);
     // Browsers limit the size of a canvas; refuse a size that would fail or come out blank.
-    if (Math.max(pw, ph) > 16000 || pw * ph > 200_000_000) {
-      setStatus(`PNG export needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, or export SVG.`);
+    if (!fitsCanvas(pw, ph)) {
+      setStatus(`PNG export at ${settings.pngDpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, lower the PNG resolution in Settings, or export SVG.`);
       return;
     }
     try {
-      const { chartToPngBlob } = await import('../chart/export');
-      downloadBlob(await chartToPngBlob(chart, table, 1, curve), exportFileName(chart.name, 'png', settings.timestampExports));
-      setStatus(`Exported PNG, ${pw} × ${ph} px.`);
+      const { chartToPngBlob } = await import('../../chart/export/export');
+      downloadBlob(await chartToPngBlob(chart, table, settings.pngDpi, curve), exportFileName(chart.name, 'png', settings.timestampExports));
+      setStatus(`Exported PNG, ${pw} × ${ph} px (${settings.pngDpi} dpi).`);
     } catch (err) {
       setStatus(`PNG export failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
   const exportPdf = async () => {
-    const k = settings.exportDpi / 96;
-    const [pw, ph] = [Math.round(chart.widthPx * k), Math.round(chart.heightPx * k)];
-    if (Math.max(pw, ph) > 16000 || pw * ph > 200_000_000) {
+    const { width: pw, height: ph } = exportPixels(chart, settings.exportDpi);
+    if (!fitsCanvas(pw, ph)) {
       setStatus(`PDF export at ${settings.exportDpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, lower the PDF resolution in Settings, or export SVG.`);
       return;
     }
     try {
-      const { chartToPdfBlob } = await import('../chart/export');
+      const { chartToPdfBlob } = await import('../../chart/export/export');
       downloadBlob(await chartToPdfBlob(chart, table, settings.exportDpi, curve), exportFileName(chart.name, 'pdf', settings.timestampExports));
       setStatus(`Exported PDF, ${pw} × ${ph} px (${settings.exportDpi} dpi).`);
     } catch (err) {
@@ -189,7 +189,7 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
         <button
           className="icon-text toolbar-end"
           onClick={() => void (settings.exportFormat === 'svg' ? exportSvg() : settings.exportFormat === 'pdf' ? exportPdf() : exportPng())}
-          title={`Export as ${settings.exportFormat.toUpperCase()}, ${chart.widthPx} × ${chart.heightPx} px${settings.exportFormat === 'pdf' ? ` at ${settings.exportDpi} dpi` : ''} (the format is chosen in Settings)`}
+          title={`Export as ${settings.exportFormat.toUpperCase()}, ${settings.exportFormat === 'svg' ? `${chart.widthPx} × ${chart.heightPx} px` : (({ width, height }, dpi) => `${width} × ${height} px at ${dpi} dpi`)(exportPixels(chart, settings.exportFormat === 'pdf' ? settings.exportDpi : settings.pngDpi), settings.exportFormat === 'pdf' ? settings.exportDpi : settings.pngDpi)} (the format is chosen in Settings)`}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11" />

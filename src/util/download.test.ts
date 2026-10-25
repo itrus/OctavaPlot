@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { exportFileName, fileStamp, untitledProjectName } from './download';
+import { exportFileName } from './download';
+import { fileStamp, untitledProjectName } from './stamp';
 
 describe('export file names', () => {
   const when = new Date(2026, 9, 22, 14, 5);

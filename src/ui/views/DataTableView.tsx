@@ -1,15 +1,15 @@
 import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react';
-import type { DataTable, TableKind } from '../model/types';
-import { useApp } from '../state/AppContext';
-import { rowTitleAt, sanitizeRowTitle } from '../model/rows';
-import { newId } from '../model/ids';
-import { addAnalysis, addGroup, addRows, composeCommands, setExcluded, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../state/commands';
-import { copyText, downloadBlob, exportFileName } from '../util/download';
-import { AddColumnIcon, AddManyRowsIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon } from './icons';
-import { importCsv, isCsvFile, tableToCsv } from './csv';
-import { leadingColumns, usesSeriesBlocks } from '../model/chartTypes';
-import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../model/tableLayout';
-import { blockToText, formatCell, parseCell, planPaste, selectionStrings } from './cellText';
+import type { DataTable, TableKind } from '../../model/types';
+import { useApp } from '../../state/AppContext';
+import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
+import { newId } from '../../model/ids';
+import { addAnalysis, addGroup, addRows, composeCommands, setExcluded, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
+import { copyText, downloadBlob, exportFileName } from '../../util/download';
+import { AddColumnIcon, AddManyRowsIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon } from '../components/icons';
+import { importCsv, isCsvFile, tableToCsv } from '../data/csv';
+import { leadingColumns, usesSeriesBlocks } from '../../model/graph/chartTypes';
+import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../../model/table/tableLayout';
+import { blockToText, formatCell, parseCell, planPaste, selectionStrings } from '../data/cellText';
 
 // Sizes at 100% zoom, in px; the table multiplies them by its zoom.
 const BASE_ROW_H = 24;

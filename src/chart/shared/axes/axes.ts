@@ -1,7 +1,7 @@
-import { capabilitiesOf } from '../model/capabilities';
-import type { AxisBinding, AxisConfig, Chart, ChartStyle, ChartType } from '../model/types';
-import type { GroupStats } from '../stats/summary';
-import { rangeValuesFor } from './errorGeometry';
+import { capabilitiesOf } from '../../../model/graph/capabilities';
+import type { AxisBinding, AxisConfig, Chart, ChartStyle, ChartType } from '../../../model/types';
+import type { GroupStats } from '../../../stats/summary';
+import { rangeValuesFor } from '../parts/errorGeometry';
 
 /**
  * Value-axis helpers (pure). Binding is group level and Cartesian only (spec 5.3 L322); the left/right

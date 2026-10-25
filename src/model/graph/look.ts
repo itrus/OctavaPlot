@@ -1,13 +1,13 @@
 import { AXIS_LIMITS } from './axis';
-import { sanitizeBarLabels, sanitizeBars } from './columnOptions';
-import { FONT_FAMILY } from './defaults';
-import { sanitizeDistribution } from './distributionOptions';
-import { sanitizeHeatmap } from './heatmapOptions';
-import { sanitizeFit } from './fitOptions';
-import { sanitizeHistogram } from './histogramOptions';
-import { sanitizePie } from './pieOptions';
-import { bool, clamp, hex, numberOrNull, oneOf, optionalHex, record, valuesOf } from './sanitize';
-import type { Chart, ChartOrientation, FrameStyle, GridStyle, LegendKeyShape, LineOrder, LineStyle } from './types';
+import { sanitizeBarLabels, sanitizeBars } from '../options/columnOptions';
+import { FONT_FAMILY } from '../defaults';
+import { sanitizeDistribution } from '../options/distributionOptions';
+import { sanitizeHeatmap } from '../options/heatmapOptions';
+import { sanitizeFit } from '../options/fitOptions';
+import { sanitizeHistogram } from '../options/histogramOptions';
+import { sanitizePie } from '../options/pieOptions';
+import { bool, clamp, hex, numberOrNull, oneOf, optionalHex, record, valuesOf } from '../sanitize';
+import type { Chart, ChartOrientation, FrameStyle, GridStyle, LegendKeyShape, LineOrder, LineStyle } from '../types';
 
 /** How a chart looks as a whole: fonts, colours, frame, gridlines, direction (and the column and box settings it carries). */
 

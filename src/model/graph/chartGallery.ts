@@ -1,5 +1,5 @@
 import type { ChartVariant } from './chartVariant';
-import type { ChartType, TableKind } from './types';
+import type { ChartType, TableKind } from '../types';
 
 /**
  * The gallery of graphs offered for each table type, grouped into tabs. A graph with a `type` can be made now; one
@@ -36,8 +36,8 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('xyLineSymbols', 'Points and connecting line', 'Points joined in the order of the table, each marked.', 'xyLineSymbols'),
         item('xyLine', 'Connecting line', 'Points joined in the order of the table; no symbols.', 'xyLine'),
         item('xy.bars', 'Bars at numeric X', 'Bars placed at X values, with a baseline.', null, 'xy.bars'),
-        item('xy.area', 'Area under the curve', 'A filled area below, above or between curves.', null, 'xy.area'),
-        item('xy.spikes', 'Spikes', 'Thin lines from the baseline up to each point.', null, 'xy.spikes'),
+        item('xy.area', 'Area under the curve', 'A filled area below, above or between curves.', 'xyArea', 'xy.area'),
+        item('xy.spikes', 'Spikes', 'Thin lines from the baseline up to each point.', 'xySpikes', 'xy.spikes'),
         item('xy.vector', 'Vectors', 'Arrows from the origin or between two points.', null, 'xy.vector'),
         item('xy.bubble', 'Bubbles', 'Symbols sized or coloured by another column.', null, 'xy.bubble'),
         item('xy.trajectory', 'Repeated measures', 'One line per subject, for example before and after.', null, 'xy.trajectory'),
@@ -53,7 +53,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       label: 'Individual values',
       items: [
         item('scatter', 'Scatter dot plot', 'Every value as a dot, grouped by column, with an optional line at the mean.', 'scatter'),
-        item('cat.aligned', 'Aligned dots', 'Dots in a column without spreading them sideways.', null, 'category.aligned'),
+        item('cat.aligned', 'Aligned dots', 'Dots in a column without spreading them sideways.', 'scatter', 'category.aligned', { jitter: false }),
         item('paired', 'Before and after', 'The values of each subject joined by a line.', 'paired', 'category.paired'),
         item('cat.nested', 'Nested dots', 'Technical repeats inside each independent unit.', null, 'category.nested'),
       ],
@@ -92,7 +92,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'individual',
       label: 'Individual values',
       items: [
-        item('grp.scatterI', 'Interleaved scatter', 'Dots of every series side by side within each category.', null, 'category.grouped'),
+        item('grp.scatterI', 'Interleaved scatter', 'Dots of every series side by side within each category.', 'groupedBar', 'category.grouped', { dotsOnly: true }),
         item('grp.scatterS', 'Separated scatter', 'Dots of each series in its own group of columns.', null, 'category.grouped'),
         item('grp.paired', 'Before and after, grouped', 'Subject lines inside each category.', null, 'category.paired'),
       ],
@@ -131,8 +131,8 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'box',
       label: 'Box and violin',
       items: [
-        item('grp.box', 'Grouped box and whiskers', 'A box plot for every series in each category.', null, 'distribution.box'),
-        item('grp.violin', 'Grouped violin', 'A violin for every series in each category.', null, 'distribution.violin'),
+        item('grp.box', 'Grouped box and whiskers', 'A box plot for every series in each category.', 'groupedBox', 'distribution.box'),
+        item('grp.violin', 'Grouped violin', 'A violin for every series in each category.', 'groupedViolin', 'distribution.violin'),
       ],
     },
   ],

@@ -1,5 +1,5 @@
-import { leadingColumns } from './chartTypes';
-import type { DataTable, Group, Id, ReplicateLayout, SummaryFormat, TableKind } from './types';
+import { leadingColumns } from '../graph/chartTypes';
+import type { DataTable, Group, Id, ReplicateLayout, SummaryFormat, TableKind } from '../types';
 
 /** How the error was entered when a table holds values "already calculated elsewhere". */
 type SuppliedError = 'sd' | 'sem' | 'cv' | 'plusMinus' | 'limits';

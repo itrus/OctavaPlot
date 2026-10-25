@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { chartToSvgString } from '../chart/export';
-import { formatLabelValue } from '../chart/labels';
+import { chartToSvgString } from '../chart/export/export';
+import { formatLabelValue } from '../chart/shared/parts/labels';
 import { createExampleProject, DEFAULT_STYLE, DEFAULT_SUMMARY } from '../model/defaults';
 import type { Project } from '../model/types';
 import { AUTOSAVE_KEY, loadAutosave, parseProject, parseProjectWithNotes, saveAutosave, stringifyProject } from './serialize';

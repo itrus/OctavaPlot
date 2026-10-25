@@ -1,19 +1,19 @@
 import { format } from 'd3';
-import { rowTitleAt } from '../model/rows';
+import { rowTitleAt } from '../model/table/rows';
 import type { DataTable } from '../model/types';
 import { summaryTooltipLines } from '../stats/describe';
-import { AXIS_NAME } from './axes';
-import type { HitTarget } from './hitTest';
-import type { ChartModel } from './model';
-import type { GroupedModel } from './groupedModel';
-import type { HeatModel } from './heatmapModel';
-import { percentText, type PieModel } from './pieModel';
-import type { XyModel } from './xyModel';
+import { AXIS_NAME } from './shared/axes/axes';
+import type { HitTarget } from './shared/scene/hitTest';
+import type { ColumnModel } from './column/columnModel';
+import type { GroupedModel } from './grouped/groupedModel';
+import type { HeatModel } from './heatmap/heatmapModel';
+import { percentText, type PieModel } from './pie/pieModel';
+import type { XyModel } from './xy/xyModel';
 
 export const tooltipFmt = format('.4~g');
 
 /** Tooltip lines for a hit, or null when the hit has no data set. */
-export function tooltipLines(model: ChartModel, table: DataTable, hit: HitTarget): string[] | null {
+export function tooltipLines(model: ColumnModel, table: DataTable, hit: HitTarget): string[] | null {
   if (!hit.groupId || hit.kind === 'background' || hit.kind === 'annotation') return null;
   const g = model.groups.find((x) => x.groupId === hit.groupId);
   if (!g) return null;

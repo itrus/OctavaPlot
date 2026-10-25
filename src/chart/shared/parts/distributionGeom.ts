@@ -1,7 +1,7 @@
-import type { DistributionOptions, Id } from '../model/types';
-import { n2 } from '../model/units';
-import type { BoxSummary, DensityProfile } from '../stats/distribution';
-import { quantile6, sortedFinite } from '../stats/distribution';
+import type { DistributionOptions, Id } from '../../../model/types';
+import { n2 } from '../../../model/units';
+import type { BoxSummary, DensityProfile } from '../../../stats/distribution';
+import { quantile6, sortedFinite } from '../../../stats/distribution';
 
 
 /** A line of a box or a violin: median, whiskers, caps, quartile lines. */

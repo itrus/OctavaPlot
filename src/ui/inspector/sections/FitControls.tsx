@@ -1,12 +1,12 @@
-import { fitCountLine, fitLines, fitParametersText } from '../../chart/fitCurve';
-import type { XyModel } from '../../chart/xyModel';
-import { analysesOf } from '../../model/analysis';
-import { newId } from '../../model/ids';
-import type { Chart, ChartFit, DataTable } from '../../model/types';
-import { fitModelById } from '../../stats/fit';
-import { useApp } from '../../state/AppContext';
-import { addAnalysis, addAnnotation, composeCommands, patchLook } from '../../state/commands';
-import { Check, Field, GroupBox, SelectInput } from './controls';
+import { fitCountLine, fitLines, fitParametersText } from '../../../chart/xy/fitCurve';
+import type { XyModel } from '../../../chart/xy/xyModel';
+import { analysesOf } from '../../../model/project/analysis';
+import { newId } from '../../../model/ids';
+import type { Chart, ChartFit, DataTable } from '../../../model/types';
+import { fitModelById } from '../../../stats/fit';
+import { useApp } from '../../../state/AppContext';
+import { addAnalysis, addAnnotation, composeCommands, patchLook } from '../../../state/commands';
+import { Check, Field, GroupBox, SelectInput } from '../common/controls';
 
 /**
  * The fitted curve of an XY chart (spec 17). The model and its confidence level belong to a curve fit of the Results;

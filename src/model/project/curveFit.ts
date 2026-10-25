@@ -1,8 +1,8 @@
-import { suppliedStats } from '../chart/xyModel';
-import { fitCurve, fitModelById, isFailure, type FitResult } from '../stats/fit';
-import { withoutExcluded } from './exclusion';
-import { layoutOf, xySeries } from './tableLayout';
-import type { Analysis, DataTable, Id } from './types';
+import { fitCurve, fitModelById, isFailure, type FitResult } from '../../stats/fit';
+import { withoutExcluded } from '../table/exclusion';
+import { layoutOf, xySeries } from '../table/tableLayout';
+import type { Analysis, DataTable, Id } from '../types';
+import { suppliedStats } from '../table/suppliedStats';
 
 /** The Results of a curve fit: the numbers of each Y series of an XY table, as a sheet that can be shown, selected and copied. */
 

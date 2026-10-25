@@ -1,7 +1,8 @@
 /** Parsing and formatting of table cell text. Pure; unit-tested. */
 
-import { rowTitleAt, sanitizeRowTitle } from '../model/rows';
-import type { DataTable } from '../model/types';
+import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
+import type { DataTable } from '../../model/types';
+import type { DecimalSeparator } from '../../model/types';
 
 const NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 const COMMA_DECIMAL_RE = /^[+-]?\d+,\d+$/;
@@ -10,9 +11,6 @@ const AMBIGUOUS_COMMA_RE = /^[+-]?\d{1,3},\d{3}$/;
 /** Whole thousands written with points and a decimal comma: 1.234,5 */
 const POINT_THOUSANDS_RE = /^[+-]?\d{1,3}(\.\d{3})+(,\d+)?$/;
 const LEADING_POINT_DECIMAL_RE = /^[+-]?\d*\.\d+/;
-
-/** How numbers are written: by the decimal point, by the decimal comma, or either (a comma is taken as a decimal comma). */
-export type DecimalSeparator = 'auto' | 'point' | 'comma';
 
 type CellParse = { ok: true; value: number | null } | { ok: false; message: string };
 

@@ -1,4 +1,4 @@
-import type { FrameMm, Layout, LayoutArrangement, PageOrientation, PanelLabelStyle } from './types';
+import type { FrameMm, Layout, LayoutArrangement, PageOrientation, PanelLabelStyle } from '../types';
 
 /** A4 in mm; the renderer's unit is the point (1 in = 72 pt). */
 const A4_MM = { width: 210, height: 297 } as const;

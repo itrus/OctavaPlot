@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import type { Project } from '../model/types';
 import { patchStyle, setRowTitles } from '../state/commands';
 import { bindLeft, bindRight, dualAxisFixture } from '../testing/dualAxisFixture';
-import type { HitTarget } from './hitTest';
-import { buildChartModel } from './model';
+import type { HitTarget } from './shared/scene/hitTest';
+import { buildColumnModel } from './column/columnModel';
 import { tooltipLines } from './tooltip';
 
 const single = (): Project => {
   const p = dualAxisFixture({ bindRight: false });
   return patchStyle(p.charts[0].id, 'all', { showSymbols: true })(p);
 };
-const linesFor = (p: Project, hit: HitTarget) => tooltipLines(buildChartModel(p.charts[0], p.dataTables[0]), p.dataTables[0], hit);
+const linesFor = (p: Project, hit: HitTarget) => tooltipLines(buildColumnModel(p.charts[0], p.dataTables[0]), p.dataTables[0], hit);
 const gid = (p: Project, i = 0) => p.dataTables[0].groups[i].id;
 const withTitle = (p: Project, title: string): Project => setRowTitles(p.dataTables[0].id, [{ row: 0, title }])(p);
 const pointHit = (p: Project, kind: HitTarget['kind'] = 'point'): HitTarget => ({
@@ -28,7 +28,7 @@ describe('tooltipLines', () => {
   });
   it('bar hit on a single axis: title then summary lines, no Axis line', () => {
     const p = single();
-    const m = buildChartModel(p.charts[0], p.dataTables[0]);
+    const m = buildColumnModel(p.charts[0], p.dataTables[0]);
     const lines = linesFor(p, { kind: 'bar', groupId: gid(p) })!;
     expect(lines[0]).toBe(m.groups[0].label);
     expect(lines[1]).toMatch(/^n = /);
@@ -37,14 +37,14 @@ describe('tooltipLines', () => {
   it('has no Axis line while the right axis is unused', () => {
     const base = dualAxisFixture();
     const p = bindLeft(base, [gid(base, 2), gid(base, 3)]);
-    expect(buildChartModel(p.charts[0], p.dataTables[0]).y2).toBeNull();
+    expect(buildColumnModel(p.charts[0], p.dataTables[0]).y2).toBeNull();
     expect(linesFor(p, { kind: 'bar', groupId: gid(p, 2) })!.some((l) => l.startsWith('Axis:'))).toBe(false);
   });
   it('has an Axis line when data sets are bound right', () => {
     const p = dualAxisFixture();
     expect(linesFor(p, { kind: 'bar', groupId: gid(p, 0) })![1]).toBe('Axis: Left Y axis');
     expect(linesFor(p, { kind: 'bar', groupId: gid(p, 2) })![1]).toBe('Axis: Right Y axis');
-    const m = buildChartModel(p.charts[0], p.dataTables[0]);
+    const m = buildColumnModel(p.charts[0], p.dataTables[0]);
     expect(linesFor(p, { kind: 'bar', groupId: gid(p, 2) })![0]).toBe(m.groups[2].label);
   });
   it('shows Row title and Value for a raw point', () => {

@@ -1,5 +1,5 @@
 import { format, precisionFixed, ticks as d3Ticks } from 'd3';
-import { extent } from '../model/units';
+import { extent } from '../../../model/units';
 
 export interface YAxisInput {
   /** Every value that must be visible: means, valid error endpoints, raw points, etc. */

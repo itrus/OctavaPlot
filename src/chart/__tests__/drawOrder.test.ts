@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveTable } from '../model/chartTable';
-import { createChart, createColumnTable, createExampleProject } from '../model/defaults';
-import { xySeries } from '../model/tableLayout';
-import type { ChartType, Project, TableKind } from '../model/types';
-import { addChart, addDataTable, patchLook, setGroupOnGraph, setGroupOrder } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
-import { buildGroupedModel } from './groupedModel';
-import { buildSurvivalModel } from './survivalModel';
-import { buildXyModel } from './xyModel';
+import { effectiveTable } from '../../model/table/chartTable';
+import { createChart, createColumnTable, createExampleProject } from '../../model/defaults';
+import { xySeries } from '../../model/table/tableLayout';
+import type { ChartType, Project, TableKind } from '../../model/types';
+import { addChart, addDataTable, patchLook, setGroupOnGraph, setGroupOrder } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
+import { buildGroupedModel } from '../grouped/groupedModel';
+import { buildSurvivalModel } from '../survival/survivalModel';
+import { buildXyModel } from '../xy/xyModel';
 
 function projectWith(kind: TableKind, type: ChartType): Project {
   return addChart('c', 't', undefined, type)(addDataTable('t', kind, { sample: true })(createExampleProject()));

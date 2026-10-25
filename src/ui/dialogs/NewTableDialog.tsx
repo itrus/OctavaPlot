@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { MAX_REPLICATES, MIN_REPLICATES, SUMMARY_FORMATS, subLabels } from '../model/tableLayout';
-import type { ReplicateLayout, SummaryFormat, TableKind } from '../model/types';
-import type { NewTableOptions } from '../state/commands';
+import { MAX_REPLICATES, MIN_REPLICATES, SUMMARY_FORMATS, subLabels } from '../../model/table/tableLayout';
+import type { ReplicateLayout, SummaryFormat, TableKind } from '../../model/types';
+import type { NewTableOptions } from '../../state/commands';
 import { Modal } from './NewItemDialogs';
 
 type FormatId = 'xy' | 'column' | 'grouped' | 'contingency' | 'survival';

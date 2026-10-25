@@ -1,14 +1,12 @@
-import { dashOf } from '../model/look';
-import type { AxisConfig, BreakMark, Chart, GridStyle } from '../model/types';
-import { n2 } from '../model/units';
-import { labelOffset, tickPath, tickPaths } from './axisTicks';
-import { fitLines } from './fitCurve';
-import { keyWidthOf, LEGEND_KEY, X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP, type Layout, type LegendItemLayout, type Rect } from './layout';
+import { type SceneElement, el } from './sceneElement';
+import { n2 } from '../../../model/units';
+import type { AxisConfig, BreakMark, Chart, GridStyle } from '../../../model/types';
+import { dashOf } from '../../../model/graph/look';
+import { type YAxisScale, majorStepOf } from '../axes/scales';
 import type { PlacedReferenceLine } from './referenceLines';
-import { el, type SceneElement } from './sceneElement';
-import { majorStepOf, type YAxisScale } from './scales';
 import { svgId } from './svgIds';
-import type { XySeries } from './xyModel';
+import { labelOffset, tickPath, tickPaths } from '../axes/axisTicks';
+import { LEGEND_KEY, type Layout, type LegendItemLayout, type Rect, X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP, keyWidthOf } from '../parts/layout';
 
 /**
  * The chrome of a chart as scene elements: the clip of the plotting region, the backgrounds, the gridlines, the axes with
@@ -214,7 +212,7 @@ export interface CategoryAxisProps {
   chart: Chart;
   cfg: AxisConfig;
   plot: Rect;
-  /** The categories along the axis: where each is in the vertical drawing (see Orientation in model.ts) and what it is called. */
+  /** The categories along the axis: where each is in the vertical drawing (see Orientation in shared/parts/orientation.ts) and what it is called. */
   items: ReadonlyArray<{ key: string | number; centerX: number; label: string }>;
   /** Horizontal columns: the categories are down the left. */
   horizontal: boolean;
@@ -295,47 +293,3 @@ export function legendElements(chart: Chart, layout: Layout, keysOf: (item: Lege
   ];
 }
 
-export interface AtRiskGeometry {
-  xs: number[];
-  y0: number;
-  rowHeight: number;
-  fontSizePt: number;
-  rows: Array<{ label: string; color: string; counts: number[] }>;
-}
-
-/** The number of subjects still under observation at each time tick, under a survival plot. */
-export function atRiskElements(chart: Chart, table: AtRiskGeometry, plotX: number, labelX: number): SceneElement[] {
-  return [
-    el('g', [['font-size', table.fontSizePt], ['fill', chart.textColor]], {
-      id: 'at-risk-table',
-      children: [
-        el('text', [['x', n2(plotX)], ['y', n2(table.y0 + table.rowHeight * 0.8)], ['font-weight', 'bold'], ['text-anchor', 'start']], { text: 'Number at risk' }),
-        ...table.rows.map((r, ri) => {
-          const y = table.y0 + table.rowHeight * (ri + 1.8);
-          return el('g', [], {
-            children: [
-              el('text', [['x', n2(labelX)], ['y', n2(y)], ['text-anchor', 'end'], ['fill', r.color], ['font-weight', 'bold']], { text: r.label }),
-              ...r.counts.map((n, ci) => el('text', [['x', n2(table.xs[ci])], ['y', n2(y)], ['text-anchor', 'middle'], ['fill', r.color]], { text: String(n) })),
-            ],
-          });
-        }),
-      ],
-    }),
-  ];
-}
-
-/** The fitted parameters of each series, one block of lines per curve in the colour of the curve. */
-export function fitParameterElements(series: XySeries[], x: number, y: number, fontSizePt: number, level: number): SceneElement[] {
-  const size = fontSizePt * 0.7;
-  const line = size * 1.3;
-  let row = 0;
-  const blocks = series.flatMap((s) => (s.fit?.summary ? [{ s, lines: [s.label, ...fitLines(s.fit.summary, level)] }] : []));
-  return [
-    el('g', [['font-size', size], ['pointer-events', 'none']], {
-      id: 'fit-parameters',
-      children: blocks.flatMap(({ s, lines }) =>
-        lines.map((text, i) => el('text', [['x', x], ['y', y + (row++ + 1) * line], ['fill', s.fitCurveLook?.color ?? s.style.lineColor], ['font-weight', i === 0 ? 'bold' : undefined]], { text })),
-      ),
-    }),
-  ];
-}

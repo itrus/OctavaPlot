@@ -1,5 +1,5 @@
 import { CHART_TYPES, chartFamily, isSeriesColourType, supportsHorizontal } from './chartTypes';
-import type { ChartType } from './types';
+import type { ChartType } from '../types';
 
 /**
  * What each chart type can do, in one place. The controls of the inspector, the validation of a project and the capability
@@ -25,16 +25,16 @@ export interface Capabilities {
   numericAxes: boolean;
 }
 
-/** Types whose data sets can be bound to the right axis (see bindingUi in chart/axes.ts). */
+/** Types whose data sets can be bound to the right axis (see bindingUi in chart/shared/axes/axes.ts). */
 const SECONDARY_AXIS: ReadonlySet<ChartType> = new Set<ChartType>(['bar', 'scatter', 'mean']);
 
 function referenceLinesOf(type: ChartType): Capabilities['referenceLines'] {
   switch (chartFamily(type)) {
     case 'xy':
     case 'survival':
-    case 'hist':
+    case 'histogram':
       return 'xy';
-    case 'category':
+    case 'column':
     case 'grouped':
       return 'y';
     default:
@@ -52,7 +52,7 @@ export function capabilitiesOf(type: ChartType): Capabilities {
     secondaryAxis: SECONDARY_AXIS.has(type),
     seriesColour: isSeriesColourType(type),
     survivalOptions: family === 'survival',
-    numericAxes: family !== 'whole' && family !== 'heat',
+    numericAxes: family !== 'pie' && family !== 'heatmap',
   };
 }
 

@@ -1,5 +1,5 @@
 import { DialogShell, trapTab } from './DialogShell';
-import { PALETTE_GROUPS, PALETTE_GROUP_INFO, GGSCI_CITATION, palettesInGroup } from '../model/palettes';
+import { PALETTE_GROUPS, PALETTE_GROUP_INFO, GGSCI_CITATION, palettesInGroup } from '../../model/graph/palettes';
 
 const link = (href: string) => (
   <a href={href} target="_blank" rel="noreferrer">{href}</a>

@@ -77,12 +77,14 @@ A chart draws one table, named by `dataTableId`; the table must exist. `type` is
 | `widthPx`, `heightPx` | Size in CSS pixels (96 px = 1 inch). |
 | `xAxis`, `yAxis`, `y2Axis` | Settings of the axes: titles, limits, scale (linear, log), ticks, breaks, grid. `y2Axis` is drawn only while a data set is bound to it. |
 | `legend`, `grid`, `frame`, colours, `fontFamily` | The look of the whole chart. |
-| `defaults`, `layers` | Styles of the data sets: see below. `layers` has at least one layer. |
+| `defaults`, `layers` | Styles of the data sets: see below. `layers` holds one layer, the one the graph is drawn from. A file with more is read with a note and only the first is kept; a file with none is refused. |
 | `bars`, `barLabels`, `distribution`, `heatmap`, `histogram`, `pie`, `survival`, `pairs`, `fit`, `jitter` | Settings that belong to one family of charts. They are always present. |
 | `hiddenGroupIds`, `groupOrder`, `extraGroups`, `displayNames` | Which data sets are on the graph, in what order, from which other tables, and under what names. An older file may hold `groupGaps` (a space before each data set): it is folded into `bars.gapPct` on opening and not written again. |
 | `annotations`, `referenceLines` | Text and lines placed on the chart. |
-| `layerStyles` | Look of single layers by layer ID: `color`, `widthPt`, `lineStyle`, `opacity`, any of them. Used by the fit curve and the fit band. A setting that cannot be read is dropped, with a note. |
-| `hiddenLayerIds` | IDs of the parts of an XY chart that are not drawn (for example `<series id>:fitBand`). Hiding changes no calculation. |
+| `layerStyles` | Look of single parts of a graph (layers) by layer ID, any of `color`, `widthPt`, `lineStyle`, `opacity`, `shape`. XY and survival charts: the line, error bars, points, individual values, fit curve and bands, area. Each kind of part takes only the settings that suit it. A setting that cannot be read is dropped, with a note. |
+| `hiddenLayerIds` | IDs of the parts of a graph that are not drawn (for example `<series id>:fitBand`, `<series id>:errorBars`, `<reference line id>:referenceLine`). Hiding changes no calculation and no axis. |
+| `rangeExcludedLayerIds` | IDs of parts of an XY chart whose values the axis range is not fitted to (points, individual values, error bars, fit curve). The part is still drawn. |
+| `layerOrder` | IDs of the data parts of a graph from the lowest to the highest, once one was moved. Empty: the order of the chart type. IDs that are not parts of the graph are ignored; a part that is not listed goes above the part below it in the order of the chart type. |
 
 ### Styles
 

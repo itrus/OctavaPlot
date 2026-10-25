@@ -1,4 +1,4 @@
-import type { Id } from '../model/types';
+import type { Id } from '../../../model/types';
 
 /**
  * Hit testing. Marks rendered in editor mode carry `data-hit*` attributes;

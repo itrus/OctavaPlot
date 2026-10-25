@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from 'react';
-import { formatNum, sliderStep, snapToStep } from '../numberFormat';
-import { WheelRange } from '../WheelRange';
+import { formatNum, sliderStep, snapToStep } from '../../data/numberFormat';
+import { WheelRange } from '../../components/WheelRange';
 
 export function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
   const [openState, setOpen] = useState(defaultOpen);

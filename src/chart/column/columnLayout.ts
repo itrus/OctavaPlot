@@ -1,6 +1,6 @@
 import { scaleBand } from 'd3';
-import { bandPadding } from '../model/columnOptions';
-import type { BarLayout, Id } from '../model/types';
+import { bandPadding } from '../../model/options/columnOptions';
+import type { BarLayout, Id } from '../../model/types';
 
 /** Where the columns of a column chart sit across the plotting region. */
 interface ColumnLayout {

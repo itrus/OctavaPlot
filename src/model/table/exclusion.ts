@@ -1,4 +1,4 @@
-import type { DataTable, Observation } from './types';
+import type { DataTable, Observation } from '../types';
 
 /**
  * Excluded observations (a value that is kept in the table, with a reason, but not used): hidden from every chart and

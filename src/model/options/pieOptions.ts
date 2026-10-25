@@ -1,5 +1,5 @@
-import { bool, clamp, oneOf, record, text, valuesOf } from './sanitize';
-import type { PieLabelMode, PieOptions } from './types';
+import { bool, clamp, oneOf, record, text, valuesOf } from '../sanitize';
+import type { PieLabelMode, PieOptions } from '../types';
 
 /** Settings of pies and doughnuts (spec 14). */
 

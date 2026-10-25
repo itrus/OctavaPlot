@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_SUMMARY } from '../model/defaults';
-import { buildXyModel } from '../chart/xyModel';
+import { buildXyModel } from '../chart/xy/xyModel';
 import { createChart, createXyTable } from '../model/defaults';
-import { NO_FIT_SETTINGS } from '../model/fitOptions';
+import { NO_FIT_SETTINGS } from '../model/options/fitOptions';
 import { cachedCalc, calcKey, calcStats, clearCalcCache, type CalcIdentity } from './calcCache';
 import { summaryOf } from './summary';
 

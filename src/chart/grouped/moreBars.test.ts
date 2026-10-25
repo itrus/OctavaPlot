@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import type { ChartType, Project, TableKind } from '../model/types';
-import { addChart, addDataTable, patchLook, patchSurvival } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
+import { createExampleProject } from '../../model/defaults';
+import type { ChartType, Project, TableKind } from '../../model/types';
+import { addChart, addDataTable, patchLook, patchSurvival } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
 import { buildGroupedModel } from './groupedModel';
-import { buildSurvivalModel } from './survivalModel';
+import { buildSurvivalModel } from '../survival/survivalModel';
 
 function projectWith(kind: TableKind, type: ChartType, options?: Parameters<typeof addDataTable>[2]): Project {
   const p = addDataTable('t', kind, { sample: true, ...options })(createExampleProject());

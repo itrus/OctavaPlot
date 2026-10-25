@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { createEmptyProject, createExampleProject } from '../model/defaults';
-import { viewAfterRemoval } from '../model/viewOrder';
+import { viewAfterRemoval } from '../model/project/viewOrder';
 import type { Project, Selection, ViewRef } from '../model/types';
-import type { InspectorTarget } from '../ui/inspector/nav';
 import type { Command } from './commands';
 import { historyReducer, initialHistory, scopeCoalesceKey } from './history';
 import { backupAutosave, loadAutosave, saveAutosave } from './serialize';
 import { loadSettings, saveSettings, sanitizeSettings, type Settings } from './settings';
+import type { InspectorTarget } from './inspectorNav';
 
 interface AppApi {
   project: Project;
@@ -129,7 +129,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // in the navigator (see viewAfterRemoval), not back to the first table.
   const projectBefore = useRef(project);
   useEffect(() => {
-    const exists = view.kind === 'table' ? project.dataTables.some((t) => t.id === view.id) : view.kind === 'chart' ? project.charts.some((c) => c.id === view.id) : view.kind === 'layout' ? (project.layouts ?? []).some((l) => l.id === view.id) : (project.analyses ?? []).some((a) => a.id === view.id);
+    const exists = view.kind === 'folder' ? true : view.kind === 'table' ? project.dataTables.some((t) => t.id === view.id) : view.kind === 'chart' ? project.charts.some((c) => c.id === view.id) : view.kind === 'layout' ? (project.layouts ?? []).some((l) => l.id === view.id) : (project.analyses ?? []).some((a) => a.id === view.id);
     if (!exists) setView(viewAfterRemoval(projectBefore.current, project, view));
     projectBefore.current = project;
   }, [project, view]);

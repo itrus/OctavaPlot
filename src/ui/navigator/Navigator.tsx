@@ -1,27 +1,18 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { newId } from '../model/ids';
-import type { AnalysisKind, ChartType, Id, TableKind, ViewRef } from '../model/types';
-import type { ChartVariant } from '../model/chartVariant';
-import { useApp } from '../state/AppContext';
-import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, removeAnalysis, type NewTableOptions } from '../state/commands';
-import { DeleteIcon } from './icons';
-import { NewAnalysisDialog } from './NewAnalysisDialog';
-import { NewLayoutDialog, type NewLayoutOptions } from './NewLayoutDialog';
-import { NewGraphDialog } from './NewGraphDialog';
-import { analysesOf } from '../model/analysis';
-import { NewTableDialog } from './NewTableDialog';
-
-type Folder = 'tables' | 'results' | 'graphs' | 'layouts';
-
-/** A short tag beside every table, so its kind is visible in the list. */
-const TABLE_BADGE: Record<TableKind, { text: string; title: string }> = {
-  column: { text: 'COL', title: 'Column table' },
-  xy: { text: 'XY', title: 'XY table' },
-  grouped: { text: 'GRP', title: 'Grouped table' },
-  contingency: { text: 'CNT', title: 'Contingency table' },
-  survival: { text: 'SRV', title: 'Survival table' },
-};
+import { newId } from '../../model/ids';
+import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
+import { FOLDER_TITLE } from '../../model/project/folderItems';
+import type { AnalysisKind, ChartType, FolderKey, Id, TableKind, ViewRef } from '../../model/types';
+import type { ChartVariant } from '../../model/graph/chartVariant';
+import { useApp } from '../../state/AppContext';
+import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, removeAnalysis, type NewTableOptions } from '../../state/commands';
+import { DeleteIcon } from '../components/icons';
+import { NewAnalysisDialog } from '../dialogs/NewAnalysisDialog';
+import { NewLayoutDialog, type NewLayoutOptions } from '../dialogs/NewLayoutDialog';
+import { NewGraphDialog } from '../dialogs/NewGraphDialog';
+import { analysesOf } from '../../model/project/analysis';
+import { NewTableDialog } from '../dialogs/NewTableDialog';
 
 const sameView = (a: ViewRef, b: ViewRef) => a.kind === b.kind && a.id === b.id;
 
@@ -31,7 +22,7 @@ const LOCKED_SECTIONS: readonly string[] = [];
 export function Navigator() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const { project, view, setView, run, settings, setStatus } = useApp();
-  const [open, setOpen] = useState<Record<Folder, boolean>>({ tables: true, results: true, graphs: true, layouts: true });
+  const [open, setOpen] = useState<Record<FolderKey, boolean>>({ tables: true, results: true, graphs: true, layouts: true });
 
   const currentTableId =
     view.kind === 'table' ? view.id : project.charts.find((c) => c.id === view.id)?.dataTableId;
@@ -112,16 +103,22 @@ export function Navigator() {
     }
   };
 
-  const folder = (key: Folder, title: string) => (
-    <button className="nav-folder" onClick={() => setOpen({ ...open, [key]: !open[key] })} aria-expanded={open[key]}>
-      <span className="chev">{open[key] ? '▾' : '▸'}</span> {title}
-    </button>
+  // The triangle folds or unfolds the list; the name opens the overview of the folder: all its pages as thumbnails.
+  const folder = (key: FolderKey) => (
+    <div className={`nav-folder-row${view.kind === 'folder' && view.id === key ? ' active' : ''}`}>
+      <button className="nav-chev" onClick={() => setOpen({ ...open, [key]: !open[key] })} aria-expanded={open[key]} aria-label={`${open[key] ? 'Fold' : 'Unfold'} ${FOLDER_TITLE[key]}`} title={open[key] ? 'Fold the list' : 'Unfold the list'}>
+        <span className="chev">{open[key] ? '▾' : '▸'}</span>
+      </button>
+      <button className="nav-folder" onClick={() => setView({ kind: 'folder', id: key })} title={`See all ${FOLDER_TITLE[key].toLowerCase()} as pictures: select, rename, reorder or delete several`} aria-current={view.kind === 'folder' && view.id === key ? 'page' : undefined}>
+        {FOLDER_TITLE[key]}
+      </button>
+    </div>
   );
-  const finishRename = (ref: ViewRef, name: string) => {
+  const finishRename = (ref: Exclude<ViewRef, { kind: 'folder' }>, name: string) => {
     setRenaming(null);
     run('Rename', renameItem(ref.kind, ref.id, name));
   };
-  const item = (ref: ViewRef, icon: string, name: string, badge?: { text: string; title: string }) =>
+  const item = (ref: Exclude<ViewRef, { kind: 'folder' }>, icon: string, name: string, badges: Badge[] = []) =>
     renaming === ref.id ? (
       <div key={ref.id} className="nav-item active">
         <span className="nav-icon">{icon}</span>
@@ -141,7 +138,9 @@ export function Navigator() {
     ) : (
       <button key={ref.id} className={`nav-item${sameView(view, ref) ? ' active' : ''}`} onClick={() => setView(ref)} onDoubleClick={() => setRenaming(ref.id)} onKeyDown={(e) => e.key === 'F2' && setRenaming(ref.id)} title="Double-click or press F2 to rename">
         <span className="nav-icon">{icon}</span> {name}
-        {badge && <span className="nav-badge" title={badge.title}>{badge.text}</span>}
+        {badges.map((badge) => (
+          <span key={badge.text} className="nav-badge" title={badge.title}>{badge.text}</span>
+        ))}
       </button>
     );
   const newItem = (label: string, onClick: () => void) => (
@@ -154,28 +153,28 @@ export function Navigator() {
     <nav className="navigator" aria-label="Project navigator">
       <div className="nav-panel">
         <div className="nav-tree">
-          {folder('tables', 'Data Tables')}
+          {folder('tables')}
           {open.tables && (
             <>
-              {project.dataTables.map((t) => item({ kind: 'table', id: t.id }, '▦', t.name, TABLE_BADGE[t.kind]))}
+              {project.dataTables.map((t) => item({ kind: 'table', id: t.id }, '▦', t.name, [TABLE_BADGE[t.kind]]))}
               {newItem('New Data Table…', () => setDialog('table'))}
             </>
           )}
-          {folder('results', 'Results')}
+          {folder('results')}
           {open.results && (
             <>
               {analysesOf(project).map((a) => item({ kind: 'analysis', id: a.id }, 'Σ', a.name))}
               {newItem('New Analysis…', () => setDialog('analysis'))}
             </>
           )}
-          {folder('graphs', 'Graphs')}
+          {folder('graphs')}
           {open.graphs && (
             <>
-              {project.charts.map((c) => item({ kind: 'chart', id: c.id }, '▥', c.name, c.linkedTo ? { text: '🔗', title: `Linked to ${project.charts.find((x) => x.id === c.linkedTo)?.name ?? 'another graph'}: it follows that graph's format` } : undefined))}
+              {project.charts.map((c) => item({ kind: 'chart', id: c.id }, '▥', c.name, [chartBadge(c.type), ...(c.linkedTo ? [{ text: '🔗', title: `Linked to ${project.charts.find((x) => x.id === c.linkedTo)?.name ?? 'another graph'}: it follows that graph's format` }] : [])]))}
               {newItem('New Graph…', () => setDialog('graph'))}
             </>
           )}
-          {folder('layouts', 'Layouts')}
+          {folder('layouts')}
           {open.layouts && (
             <>
               {(project.layouts ?? []).map((l) => item({ kind: 'layout', id: l.id }, '▤', l.name))}

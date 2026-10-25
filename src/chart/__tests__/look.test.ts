@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createXyTable } from '../model/defaults';
-import { bandPadding } from '../model/columnOptions';
-import { sanitizeLook } from '../model/look';
-import { patchAxis, patchBars, patchLegend, patchLook } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
-import { buildChartModel } from './model';
-import { buildXyModel } from './xyModel';
-import type { Project } from '../model/types';
+import { createChart, createColumnTable, createXyTable } from '../../model/defaults';
+import { bandPadding } from '../../model/options/columnOptions';
+import { sanitizeLook } from '../../model/graph/look';
+import { patchAxis, patchBars, patchLegend, patchLook } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
+import { buildColumnModel } from '../column/columnModel';
+import { buildXyModel } from '../xy/xyModel';
+import type { Project } from '../../model/types';
 
 const setup = () => {
   const table = createXyTable('XY 1', true);
@@ -137,7 +137,7 @@ describe('column spacing, baseline and legend key', () => {
     const { p, table } = column();
     const id = p.charts[0].id;
     const next = patchBars(id, { gapPct: 50, beforePct: 50, afterPct: 50 })(p);
-    const m = buildChartModel(next.charts[0], table);
+    const m = buildColumnModel(next.charts[0], table);
     const bars = m.groups.map((g) => g.bar!).filter(Boolean);
     const w = bars[0].width;
     expect(bars[1].x - (bars[0].x + w)).toBeCloseTo(w * 0.5, 6);
@@ -145,7 +145,7 @@ describe('column spacing, baseline and legend key', () => {
     const last = bars[bars.length - 1];
     expect(m.layout.plot.x + m.layout.plot.width - (last.x + last.width)).toBeCloseTo(w * 0.5, 6);
     const lopsided = patchBars(id, { gapPct: 0, beforePct: 100, afterPct: 0 })(p);
-    const m2 = buildChartModel(lopsided.charts[0], table);
+    const m2 = buildColumnModel(lopsided.charts[0], table);
     const b2 = m2.groups.map((g) => g.bar!);
     expect(b2[1].x).toBeCloseTo(b2[0].x + b2[0].width, 6);
     expect(b2[0].x - m2.layout.plot.x).toBeCloseTo(b2[0].width, 6);
@@ -153,10 +153,10 @@ describe('column spacing, baseline and legend key', () => {
   it('starts the bars at the baseline asked for, or at the nearest edge of the axis', () => {
     const { p, table } = column();
     const id = p.charts[0].id;
-    const m0 = buildChartModel(p.charts[0], table);
+    const m0 = buildColumnModel(p.charts[0], table);
     expect(m0.groups[0].bar!.y + m0.groups[0].bar!.height).toBeCloseTo(m0.yScale(0), 6);
     const next = patchBars(id, { baseline: 1 })(p);
-    const m1 = buildChartModel(next.charts[0], table);
+    const m1 = buildColumnModel(next.charts[0], table);
     const bar = m1.groups[0].bar!;
     // Group A is about 1.24: its bar runs from the baseline at 1 up to the mean.
     expect(Math.max(bar.y, bar.y + bar.height)).toBeCloseTo(m1.yScale(1), 6);

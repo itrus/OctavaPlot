@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STYLE, DEFAULT_SUMMARY, createChart } from '../model/defaults';
-import { resolveSummary } from '../model/summary';
-import { resolveStyle } from '../model/style';
-import { computeGroupStats, statsFor } from '../stats/summary';
-import { dualAxisFixture } from '../testing/dualAxisFixture';
+import { DEFAULT_STYLE, DEFAULT_SUMMARY, createChart } from '../../../model/defaults';
+import { resolveSummary } from '../../../model/graph/summary';
+import { resolveStyle } from '../../../model/graph/style';
+import { computeGroupStats, statsFor } from '../../../stats/summary';
+import { dualAxisFixture } from '../../../testing/dualAxisFixture';
 import {
   AXIS_BINDINGS,
   AXIS_NAME,

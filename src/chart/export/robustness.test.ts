@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { CHART_TYPES, supportsHorizontal } from '../model/chartTypes';
-import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createXyTable } from '../model/defaults';
-import { NO_FIT_SETTINGS } from '../model/fitOptions';
-import { FIT_MODELS } from '../stats/fit';
-import type { Chart, DataTable, FitSettings, TableKind } from '../model/types';
-import { buildAnyModel } from './anyModel';
+import { CHART_TYPES, supportsHorizontal } from '../../model/graph/chartTypes';
+import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createXyTable } from '../../model/defaults';
+import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
+import { FIT_MODELS } from '../../stats/fit';
+import type { Chart, DataTable, FitSettings, TableKind } from '../../model/types';
+import { buildAnyModel } from '../anyModel';
 import { chartToSvgString } from './export';
 
 /**

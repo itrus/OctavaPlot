@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildXyModel } from '../chart/xyModel';
-import { addAnnotation, addChart, addDataTable, addReferenceLine, patchLayerStyle, setLayerHidden } from '../state/commands';
-import { parseProject, parseProjectWithNotes, stringifyProject } from '../state/serialize';
-import { NO_FIT_SETTINGS } from './fitOptions';
-import { createExampleProject } from './defaults';
-import { BAND_OPACITY } from '../chart/survivalModel';
-import { DEFAULT_BAND_OPACITY, layerLook, layerRows, layersAvailable, layersOf, sanitizeLayerStyles } from './layers';
-import type { Chart, Project } from './types';
+import { buildXyModel } from '../../chart/xy/xyModel';
+import { addAnnotation, addChart, addDataTable, addReferenceLine, patchLayerStyle, setLayerHidden } from '../../state/commands';
+import { parseProject, parseProjectWithNotes, stringifyProject } from '../../state/serialize';
+import { NO_FIT_SETTINGS } from '../options/fitOptions';
+import { CHART_TYPES } from './chartTypes';
+import { createExampleProject } from '../defaults';
+import { BAND_OPACITY } from '../../chart/survival/survivalModel';
+import { DEFAULT_BAND_OPACITY, layerLook, layerRows, layersOf, sanitizeLayerStyles } from './layers';
+import type { Chart, Project } from '../types';
 
 const projectWith = (patch: (c: Chart) => Chart = (c) => c): Project => {
   const p = addChart('c', 't', undefined, 'xyLine')(addDataTable('t', 'xy', { sample: true })(createExampleProject()));
@@ -16,16 +17,16 @@ const tableOf = (p: Project) => p.dataTables.find((t) => t.id === 't')!;
 const chartOf = (p: Project) => p.charts.find((c) => c.id === 'c')!;
 const layers = (p: Project) => layersOf(chartOf(p), tableOf(p));
 const withStyle = (patch: Record<string, unknown>) => (c: Chart): Chart => ({ ...c, layers: c.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, ...patch } } : l)) });
-/** A bar chart on a column table, which is not drawn from layers. */
-const barProject = (): Project => {
-  const p = addDataTable('x', 'column', { sample: true })(createExampleProject());
-  return addChart('b', 'x', undefined, 'bar')(p);
-};
-
 describe('layers of an XY chart', () => {
-  it('are available for the XY family only', () => {
-    expect(layersAvailable(chartOf(projectWith()))).toBe(true);
-    expect(layersAvailable(barProject().charts.find((c) => c.id === 'b')!)).toBe(false);
+  it('are there for every kind of chart, with unique ids and a drawing order that counts up', () => {
+    for (const info of CHART_TYPES) {
+      const p = addChart('k', 'k-table', undefined, info.type)(addDataTable('k-table', info.tableKind, { sample: true })(createExampleProject()));
+      const chart = p.charts.find((c) => c.id === 'k')!;
+      const ls = layersOf(chart, p.dataTables.find((t) => t.id === 'k-table')!);
+      expect(ls.length, info.type).toBeGreaterThan(0);
+      expect(new Set(ls.map((l) => l.id)).size, info.type).toBe(ls.length);
+      expect(ls.map((l) => l.z), info.type).toEqual(ls.map((_, i) => i));
+    }
   });
   it('have unique ids and a strictly increasing drawing order', () => {
     const ls = layers(projectWith());
@@ -87,10 +88,6 @@ describe('layers of an XY chart', () => {
     expect(z(normal, 'points')).toBeGreaterThan(z(normal, 'line'));
     const top = layers(projectWith((c) => ({ ...c, lineOrder: 'onTop' })));
     expect(z(top, 'points')).toBeLessThan(z(top, 'line'));
-  });
-  it('refuses a family that is not drawn from layers', () => {
-    const bar = barProject();
-    expect(() => layersOf(bar.charts.find((x) => x.id === 'b')!, bar.dataTables.find((t) => t.id === 'x')!)).toThrow();
   });
 });
 
@@ -157,7 +154,7 @@ describe('the look of a single layer', () => {
     const r = sanitizeLayerStyles({
       'a:fitCurve': { color: '#AA0000', widthPt: 3, lineStyle: 'dotted', opacity: 0.5, bogus: 1 },
       'b:fitBand': { color: '#00ff00', opacity: 2, widthPt: 3 },
-      'c:line': { color: '#000000' },
+      'c:annotation': { color: '#000000' },
       'd:fitCurve': { color: 'red', widthPt: 0, lineStyle: 'zigzag' },
       'e:fitCurve': 'x',
     });
@@ -175,9 +172,9 @@ describe('the look of a single layer', () => {
     expect(chartOf(patchLayerStyle('c', curve, { color: null })(b)).layerStyles).toEqual({});
   });
   it('ignores a setting the layer does not take, and a layer that takes none', () => {
-    const { p, band, line } = fitProject();
+    const { p, band } = fitProject();
     expect(chartOf(patchLayerStyle('c', band, { widthPt: 4 })(p)).layerStyles).toEqual({});
-    expect(chartOf(patchLayerStyle('c', line, { color: '#112233' })(p)).layerStyles).toEqual({});
+    expect(chartOf(patchLayerStyle('c', 'n1:annotation', { color: '#112233' })(p)).layerStyles).toEqual({});
   });
   it('falls back to the series line look, and to its own settings where given', () => {
     const { p, curve, band } = fitProject();

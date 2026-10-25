@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createExampleProject, createGroup } from './defaults';
-import { newId } from './ids';
+import { createChart, createExampleProject, createGroup } from '../defaults';
+import { newId } from '../ids';
 import { createRows } from './rows';
-import { buildChartModel } from '../chart/model';
+import { buildColumnModel } from '../../chart/column/columnModel';
 import { effectiveTable, graphSources } from './chartTable';
-import { setGroupOnGraph } from '../state/commands';
-import type { Project } from './types';
+import { setGroupOnGraph } from '../../state/commands';
+import type { Project } from '../types';
 
 function twoTables(): Project {
   const p = createExampleProject();
@@ -32,7 +32,7 @@ describe('data sets on a graph', () => {
     const g = p.dataTables[0].groups[1];
     p = setGroupOnGraph(chartId, p.dataTables[0].id, g.id, false)(p);
     expect(effectiveTable(p, p.charts[0])!.groups.map((x) => x.name)).toEqual(['Group A', 'Group C', 'Group D']);
-    expect(buildChartModel(p.charts[0], effectiveTable(p, p.charts[0])!).groups).toHaveLength(3);
+    expect(buildColumnModel(p.charts[0], effectiveTable(p, p.charts[0])!).groups).toHaveLength(3);
     p = setGroupOnGraph(chartId, p.dataTables[0].id, g.id, true)(p);
     expect(effectiveTable(p, p.charts[0])).toBe(p.dataTables[0]);
   });
@@ -48,7 +48,7 @@ describe('data sets on a graph', () => {
     expect(t.groups[4].observations).toHaveLength(t.rowCount);
     expect(t.groups[4].observations.slice(0, 3).map((o) => o.value)).toEqual([5, 6, 7]);
     expect(t.groups[4].observations[3].value).toBeNull();
-    expect(buildChartModel(p.charts[0], t).groups).toHaveLength(5);
+    expect(buildColumnModel(p.charts[0], t).groups).toHaveLength(5);
     expect(graphSources(p, p.charts[0]).filter((s) => !s.own).map((s) => [s.group.name, s.onGraph])).toEqual([['X', true], ['Y', false]]);
     p = setGroupOnGraph(chartId, p.dataTables[1].id, x.id, false)(p);
     expect(p.charts[0].extraGroups).toEqual([]);

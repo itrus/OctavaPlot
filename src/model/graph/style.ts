@@ -1,7 +1,15 @@
-import { BAR_PALETTE } from './defaults';
+import { BAR_PALETTE } from '../defaults';
 import { isSeriesColourType } from './chartTypes';
 import { paletteById, paletteColor } from './palettes';
-import type { Chart, ChartLayer, ChartStyle, Group, Id } from './types';
+import type { Chart, ChartLayer, ChartStyle, Group, Id } from '../types';
+
+/**
+ * The layer a chart is drawn from: its style, summary and per data set overrides. A chart has exactly one data layer: a file with
+ * more is read with a note and only the first is kept (state/serialize.ts). Every model, inspector and command reaches it through
+ * here, so what "the layer" is gets decided in one place. What a chart is made of beyond it are its layers in the sense of
+ * model/graph/layers.ts (hideable, orderable parts), which are derived from the chart and its data, not stored here.
+ */
+export const dataLayer = (chart: Pick<Chart, 'layers'>): ChartLayer => chart.layers[0];
 
 /**
  * Style hierarchy (highest priority first):

@@ -749,6 +749,8 @@
         "annotations": [],
         "referenceLines": [],
         "hiddenLayerIds": [],
+        "rangeExcludedLayerIds": [],
+        "layerOrder": [],
         "layerStyles": {}
       }
     ]

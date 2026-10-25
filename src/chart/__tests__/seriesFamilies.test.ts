@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { CHART_TYPES, chartFamily, chartTypesFor } from '../model/chartTypes';
-import { createChart, createExampleProject } from '../model/defaults';
-import { xySeries } from '../model/tableLayout';
-import type { ChartType, Project, TableKind } from '../model/types';
-import { addChart, addDataTable, addGroup, pasteMatrix, removeSeries, renameSeries, replaceTableData, setCells } from '../state/commands';
-import { parseProject, parseProjectWithNotes, stringifyProject } from '../state/serialize';
-import { buildAnyModel } from './anyModel';
-import { chartToSvgString } from './export';
-import { buildGroupedModel } from './groupedModel';
-import { buildSurvivalModel, kaplanMeier } from './survivalModel';
+import { CHART_TYPES, chartFamily, chartTypesFor } from '../../model/graph/chartTypes';
+import { createChart, createExampleProject } from '../../model/defaults';
+import { xySeries } from '../../model/table/tableLayout';
+import type { ChartType, Project, TableKind } from '../../model/types';
+import { addChart, addDataTable, addGroup, pasteMatrix, removeSeries, renameSeries, replaceTableData, setCells } from '../../state/commands';
+import { parseProject, parseProjectWithNotes, stringifyProject } from '../../state/serialize';
+import { buildAnyModel } from '../anyModel';
+import { chartToSvgString } from '../export/export';
+import { buildGroupedModel } from '../grouped/groupedModel';
+import { buildSurvivalModel, kaplanMeier } from '../survival/survivalModel';
 
 /** A project with one table of the kind (with sample data) and one chart of the type. */
 function projectWith(kind: TableKind, type: ChartType, layout?: Parameters<typeof addDataTable>[2]): Project {
@@ -25,7 +25,7 @@ describe('catalogue', () => {
     expect(chartFamily('groupedBar')).toBe('grouped');
     expect(chartFamily('contingencyPercent')).toBe('grouped');
     expect(chartFamily('survival')).toBe('survival');
-    expect(chartFamily('bar')).toBe('category');
+    expect(chartFamily('bar')).toBe('column');
   });
 });
 

@@ -1,6 +1,7 @@
-import type { DataTable } from '../model/types';
-import { sanitizeRowTitle } from '../model/rows';
-import { parseCell, type DecimalSeparator } from './cellText';
+import type { DataTable } from '../../model/types';
+import { sanitizeRowTitle } from '../../model/table/rows';
+import { parseCell } from './cellText';
+import type { DecimalSeparator } from '../../model/types';
 
 /** First header cell that marks the row title column in an exported file. */
 const ROW_TITLE_HEADER = 'Row title';

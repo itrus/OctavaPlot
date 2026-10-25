@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { curveFitSheet, fitObservations } from '../model/curveFit';
-import { createChart, createExampleProject, createXyTable } from '../model/defaults';
-import { NO_FIT_SETTINGS, resolveFit, sanitizeFit } from '../model/fitOptions';
-import type { Chart, DataTable, FitSettings, Project } from '../model/types';
-import { addAnalysis, addChart, addDataTable, composeCommands, patchAnalysis, patchLook, removeAnalysis } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
+import { curveFitSheet, fitObservations } from '../../model/project/curveFit';
+import { createChart, createExampleProject, createXyTable } from '../../model/defaults';
+import { NO_FIT_SETTINGS, resolveFit, sanitizeFit } from '../../model/options/fitOptions';
+import type { Chart, DataTable, FitSettings, Project } from '../../model/types';
+import { addAnalysis, addChart, addDataTable, composeCommands, patchAnalysis, patchLook, removeAnalysis } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
 import { fitLines } from './fitCurve';
 import { buildXyModel } from './xyModel';
 
@@ -198,7 +198,7 @@ describe('writing a fit', () => {
 describe('fit caching', () => {
   it('does not fit again for a style edit, and fits only the series whose data changed', async () => {
     const { fitStats } = await import('./fitCurve');
-    const { buildAnyModelCached } = await import('./anyModel');
+    const { buildAnyModelCached } = await import('../anyModel');
     const table = createXyTable('XY', true);
     const chart = createChart(table.id, undefined, 'xyScatter');
     const fit = { ...NO_FIT_SETTINGS, model: 'linear' as const, level: 0.93 };

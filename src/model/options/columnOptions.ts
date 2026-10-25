@@ -1,5 +1,5 @@
-import { bool, clamp, clampOrNull, numberOrNull, oneOf, optionalHex, record, text, valuesOf } from './sanitize';
-import type { BarLabelMode, BarLabels, BarLayout, Id } from './types';
+import { bool, clamp, clampOrNull, numberOrNull, oneOf, optionalHex, record, text, valuesOf } from '../sanitize';
+import type { BarLabelMode, BarLabels, BarLayout, Id } from '../types';
 
 /** Settings of the columns of a column chart: the space between them, their baseline and the labels above them. */
 

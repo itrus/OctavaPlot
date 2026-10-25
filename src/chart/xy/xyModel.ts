@@ -1,19 +1,21 @@
-import { isXyChartType } from '../model/chartTypes';
-import { layerLook, layersAvailable, layersOf, type LayerSpec } from '../model/layers';
-import { resolveStyle } from '../model/style';
-import { resolveSummary } from '../model/summary';
-import { layoutOf, summaryFormatInfo, xySeries } from '../model/tableLayout';
-import { NO_FIT_SETTINGS } from '../model/fitOptions';
-import type { Chart, ChartStyle, DataTable, FitSettings, Id, LayerStyle, SpreadKind, SummaryFormat } from '../model/types';
-import { chartPx2Pt, n2 } from '../model/units';
-import { summaryOf, type GroupStats } from '../stats/summary';
-import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
-import { computeLayout, type Layout } from './layout';
+import { isXyChartType } from '../../model/graph/chartTypes';
+import { layerLook, layersOf, type LayerKind, type LayerSpec } from '../../model/graph/layers';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
+import { resolveSummary } from '../../model/graph/summary';
+import { layoutOf, xySeries } from '../../model/table/tableLayout';
+import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
+import type { Chart, ChartStyle, DataTable, FitSettings, Id, LayerStyle } from '../../model/types';
+import { chartPx2Pt, n2 } from '../../model/units';
+import { summaryOf, type GroupStats } from '../../stats/summary';
+import { buildErrorBar, clippedEndpointCount, errorEndValues } from '../shared/parts/errorGeometry';
+import { computeLayout, type Layout } from '../shared/parts/layout';
 import { curveYValues, drawFit, runFit, type FittedCurve } from './fitCurve';
-import { displayName } from './model';
-import { attachLazyScene, type Scene } from './scene';
-import { axisMapper, inBreak, onAxis, polylinesThroughBreaks, resolveAxis } from './axisScale';
-import type { YAxisScale } from './scales';
+import { type Scene } from '../shared/scene/scene';
+import { axisMapper, inBreak, onAxis, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
+import type { YAxisScale } from '../shared/axes/scales';
+import { displayName } from '../shared/parts/names';
+import { suppliedStats } from '../../model/table/suppliedStats';
+import { attachLazyScene } from './xyScene';
 
 /** One plotted point of an XY series: a single Y value, or the centre of replicate / supplied-summary values. */
 export interface XyPoint {
@@ -60,8 +62,10 @@ export interface XySeries {
   points: XyPoint[];
   /** Every replicate on its own, when the individual-values layer is on (a table of replicates only). */
   rawPoints?: XyRawPoint[];
-  /** SVG path data of the connecting line: one subpath per run of consecutive valid rows (a missing value breaks it). */
+  /** SVG path data of the connecting line: one subpath per run of consecutive valid rows (a missing value breaks it). A spikes chart has its stems here instead. */
   linePath: string;
+  /** Area charts: the closed polygons between the baseline and the line, one for each run; absent for the other types. */
+  areaPath?: string;
   /** Path data of all the error bars of the series (stems and caps); empty when there are none. */
   errorPath: string;
   /** What the error bars show, e.g. "SD"; null when there are none. */
@@ -130,64 +134,6 @@ const nearZero = (values: number[]): boolean => {
   return lo >= 0 && lo <= 0.25 * hi;
 };
 
-const SUPPLIED_MEANING: Record<string, string> = {
-  sd: 'SD (as entered)',
-  sem: 'SEM (as entered)',
-  cv: 'SD from the %CV entered',
-  plusMinus: '+/- error as entered',
-  limits: 'upper/lower limits as entered',
-};
-
-/**
- * Stats of one row of a "values already calculated" series: the mean (or median) entered, and an interval built from
- * the error entered. An error that is missing or negative leaves the point without an error bar.
- */
-export function suppliedStats(format: SummaryFormat, values: ReadonlyArray<number | null>): { stats: GroupStats; meaning: string } | null {
-  const info = summaryFormatInfo(format);
-  const get = (name: string): number | null => {
-    const i = info.columns.indexOf(name);
-    const v = i >= 0 ? values[i] : null;
-    return v === null || v === undefined || !Number.isFinite(v) ? null : v;
-  };
-  const mean = get('Mean');
-  if (mean === null) return null;
-  let lower: number | null = null;
-  let upper: number | null = null;
-  let spread: SpreadKind = 'none';
-  if (info.error === 'limits') {
-    upper = get('Upper');
-    lower = get('Lower');
-    if (lower !== null && upper !== null && lower <= upper) spread = 'range';
-    else lower = upper = null;
-  } else {
-    const raw = info.error === 'sd' ? get('SD') : info.error === 'sem' ? get('SEM') : info.error === 'cv' ? get('%CV') : get('+/- error');
-    // A %CV is relative to the mean: with a mean of 0 it fixes no SD, so there is no error to draw.
-    const err = raw === null ? null : info.error === 'cv' ? (mean === 0 ? null : (Math.abs(mean) * raw) / 100) : raw;
-    if (err !== null && err >= 0) {
-      lower = mean - err;
-      upper = mean + err;
-      spread = info.error === 'sem' ? 'sem' : info.error === 'plusMinus' ? 'range' : 'sd';
-    }
-  }
-  // N is a count of subjects: a positive whole number, else it is unknown (0) and not made up.
-  const rawN = get('N');
-  const n = rawN !== null && Number.isInteger(rawN) && rawN > 0 ? rawN : null;
-  const stats: GroupStats = {
-    n: n ?? 0,
-    missing: 0,
-    invalid: 0,
-    centreKind: 'mean',
-    spread,
-    effectiveSpread: spread,
-    confidenceLevel: 0.95,
-    centre: mean,
-    interval: { status: spread === 'none' ? 'none' : 'ok', lower, upper, coverage: null, code: null },
-    rejected: false,
-    notices: [],
-  };
-  return { stats, meaning: SUPPLIED_MEANING[info.error] };
-}
-
 /**
  * Model of an XY chart. The table's first column is X; the other columns form the Y series (one column each, or blocks
  * of replicate / supplied-summary sub-columns). Rows with a missing X or Y are not drawn (missing is never zero); a
@@ -196,9 +142,10 @@ export function suppliedStats(format: SummaryFormat, values: ReadonlyArray<numbe
 export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = NO_FIT_SETTINGS): XyModel {
   if (!isXyChartType(chart.type) || table.groups.length === 0) throw new Error('buildXyModel needs an XY chart on an XY table');
   const [W, H] = [chartPx2Pt(chart.widthPx), chartPx2Pt(chart.heightPx)];
-  const layer = chart.layers[0];
+  const layer = dataLayer(chart);
   const layout = layoutOf(table);
   const warnings: string[] = [];
+  const fromBaseline = chart.type === 'xySpikes' || chart.type === 'xyArea';
   const xs = table.groups[0].observations.map((o) => o.value);
 
   // 1. Per series and row: the centre and, where there is a spread, its stats.
@@ -253,9 +200,17 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   });
 
   // 2. Scales from every drawn value, error bar ends included, so manual limits clip but never exclude.
-  const allX = raw.flatMap((r) => [...r.pts.map((p) => p.x), ...r.rawObs.map((o) => o.x)]);
+  // Each layer says whether its values are part of the range (see rangeContribution in model/graph/layers.ts); a part with no layer counts.
+  const layerList = layersOf(chart, table);
+  const counts = (kind: LayerKind, seriesId: Id): boolean => layerList.find((l) => l.id === `${seriesId}:${kind}`)?.rangeContribution ?? true;
+  const allX = raw.flatMap((r) => [...(counts('points', r.s.id) ? r.pts.map((p) => p.x) : []), ...(counts('rawPoints', r.s.id) ? r.rawObs.map((o) => o.x) : [])]);
   // A fitted curve is part of the data the axis holds (its band is not: a wide band is cut off by the plot).
-  const allY = raw.flatMap((r) => [...r.pts.flatMap((p) => (p.stats ? rangeValuesFor(p.stats, r.style.showErrorBars, r.style.errorDirection) : [p.y])), ...curveYValues(r.fitRun), ...r.rawObs.map((o) => o.y)]);
+  const allY = raw.flatMap((r) => [
+    ...(counts('points', r.s.id) ? r.pts.map((p) => p.y) : []),
+    ...(counts('errorBars', r.s.id) ? r.pts.flatMap((p) => (p.stats ? errorEndValues(p.stats, r.style.showErrorBars, r.style.errorDirection) : [])) : []),
+    ...(counts('fitCurve', r.s.id) ? curveYValues(r.fitRun) : []),
+    ...(counts('rawPoints', r.s.id) ? r.rawObs.map((o) => o.y) : []),
+  ]);
   const xAxis = resolveAxis({
     values: allX,
     includeZero: chart.xAxis.scale === 'linear' && nearZero(allX),
@@ -266,7 +221,8 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   }, chart.xAxis);
   const yAxis = resolveAxis({
     values: allY,
-    includeZero: chart.yAxis.scale === 'linear' && nearZero(allY),
+    // Spikes and areas stand on a baseline of 0: it is always in range, as for bars.
+    includeZero: chart.yAxis.scale === 'linear' && (fromBaseline || nearZero(allY)),
     min: chart.yAxis.min,
     max: chart.yAxis.max,
     majorInterval: chart.yAxis.majorInterval,
@@ -317,9 +273,15 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
       seq.push({ x: p.x, y: p.y });
       prevRow = p.row;
     }
-    const d = polylinesThroughBreaks(seq, xAxis, yAxis)
-      .map((part) => part.map((q, i) => `${i === 0 ? 'M' : 'L'}${n2(xScale(q.x))},${n2(yScale(q.y))}`).join(''))
-      .join('');
+    const runs = polylinesThroughBreaks(seq, xAxis, yAxis);
+    const outline = runs.map((part) => part.map((q, i) => `${i === 0 ? 'M' : 'L'}${n2(xScale(q.x))},${n2(yScale(q.y))}`).join('')).join('');
+    // The baseline: 0, or the nearest edge of the axis when 0 is out of range (a log axis has no 0).
+    const baseY = yScale(Math.min(Math.max(0, yAxis.domain[0]), yAxis.domain[1]));
+    // A spike is a stem from the baseline to its point; an area is closed down to the baseline at both ends of each run.
+    const d = chart.type === 'xySpikes' ? points.map((p) => `M${n2(p.px)},${n2(baseY)}L${n2(p.px)},${n2(p.py)}`).join('') : outline;
+    const areaPath = chart.type === 'xyArea'
+      ? runs.filter((part) => part.length > 0).map((part) => `${part.map((q, i) => `${i === 0 ? `M${n2(xScale(q.x))},${n2(baseY)}L` : 'L'}${n2(xScale(q.x))},${n2(yScale(q.y))}`).join('')}L${n2(xScale(part[part.length - 1].x))},${n2(baseY)}Z`).join('')
+      : undefined;
     // Error bars: one stem with caps per point that has an interval, built by the same code as the category charts.
     let errorPath = '';
     let errorMeaning: string | null = null;
@@ -334,7 +296,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     const fitted = fit.model === 'none' ? undefined : drawFit(r.fitRun, fit, { xAxis, yAxis, xScale, yScale });
     if (fitted?.failure) warnings.push(`${r.label}: no curve was fitted. ${fitted.failure}`);
     else if (fitted?.summary?.message) warnings.push(`${r.label}: ${fitted.summary.message}`);
-    return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: d, errorPath, errorMeaning, skipped: r.skipped, ...(r.style.showRawPoints ? { rawPoints } : {}), fit: fitted, fitCurveLook: layerLook(chart, `${r.s.id}:fitCurve`, r.style), fitBandLook: layerLook(chart, `${r.s.id}:fitBand`, r.style) };
+    return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: d, ...(areaPath !== undefined ? { areaPath } : {}), errorPath, errorMeaning, skipped: r.skipped, ...(r.style.showRawPoints ? { rawPoints } : {}), fit: fitted, fitCurveLook: layerLook(chart, `${r.s.id}:fitCurve`, r.style), fitBandLook: layerLook(chart, `${r.s.id}:fitBand`, r.style) };
   });
   if (offAxis > 0) warnings.push(`${offAxis} point${offAxis === 1 ? ' has' : 's have'} a value of 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
@@ -342,7 +304,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   if (skippedTotal > 0) warnings.push(`${skippedTotal} row${skippedTotal === 1 ? ' has' : 's have'} an X or Y value missing and ${skippedTotal === 1 ? 'is' : 'are'} not drawn.`);
   if (allX.length === 0) warnings.push('Enter numbers in the X column and in at least one Y column to see the chart.');
 
-  const model: XyModel = { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit, layers: layersAvailable(chart) ? layersOf(chart, table) : undefined };
+  const model: XyModel = { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit, layers: layerList };
   attachLazyScene(chart, model);
   return model;
 }

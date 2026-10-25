@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STYLE, DEFAULT_SUMMARY } from '../model/defaults';
-import type { SummarySpec } from '../model/types';
-import { computeGroupStats, type GroupStats } from '../stats/summary';
+import { DEFAULT_STYLE, DEFAULT_SUMMARY } from '../../../model/defaults';
+import type { SummarySpec } from '../../../model/types';
+import { computeGroupStats, type GroupStats } from '../../../stats/summary';
 import { buildErrorBar, rangeValuesFor, type ErrorBarInput, type ErrorBarStyle } from './errorGeometry';
 
 const statsOf = (values: (number | null)[], patch: Partial<SummarySpec> = {}): GroupStats =>

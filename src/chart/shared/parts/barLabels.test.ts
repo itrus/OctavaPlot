@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createGroupedTable, DEFAULT_BAR_LABELS } from '../model/defaults';
-import type { BarLabels, Project } from '../model/types';
-import { patchBarLabels } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
+import { createChart, createColumnTable, createGroupedTable, DEFAULT_BAR_LABELS } from '../../../model/defaults';
+import type { BarLabels, Project } from '../../../model/types';
+import { patchBarLabels } from '../../../state/commands';
+import { parseProject, stringifyProject } from '../../../state/serialize';
 import { barLabelText, placeBarLabel } from './barLabels';
-import { chartToSvgString } from './export';
-import { buildAnyModel } from './anyModel';
-import { buildChartModel } from './model';
+import { chartToSvgString } from '../../export/export';
+import { buildAnyModel } from '../../anyModel';
+import { buildColumnModel } from '../../column/columnModel';
 
 const cfg = (patch: Partial<BarLabels> = {}): BarLabels => ({ ...DEFAULT_BAR_LABELS, show: 'value', ...patch });
 
@@ -44,14 +44,14 @@ describe('labels on charts', () => {
   it('are drawn only when asked for, above the error bars', () => {
     const { p, table } = column();
     const id = p.charts[0].id;
-    expect(buildChartModel(p.charts[0], table).groups.every((g) => g.barLabel === null)).toBe(true);
+    expect(buildColumnModel(p.charts[0], table).groups.every((g) => g.barLabel === null)).toBe(true);
     expect(chartToSvgString(p.charts[0], table)).not.toContain('text-anchor="middle" font-size="11.2"');
     const on = patchBarLabels(id, { show: 'n' })(p).charts[0];
-    const m = buildChartModel(on, table);
+    const m = buildColumnModel(on, table);
     expect(m.groups.map((g) => g.barLabel!.text)).toEqual(['5', '5', '5', '5']);
     for (const g of m.groups) expect(g.barLabel!.y).toBeLessThan(g.bar!.y);
     const values = patchBarLabels(id, { show: 'value', decimals: 2, prefix: '~' })(p).charts[0];
-    expect(buildChartModel(values, table).groups[0].barLabel!.text).toBe('~1.24');
+    expect(buildColumnModel(values, table).groups[0].barLabel!.text).toBe('~1.24');
     expect(chartToSvgString(values, table)).toContain('>~1.24</text>');
   });
   it('sit beyond the end of a bar that grows down, also when the axis is reversed', () => {
@@ -59,7 +59,7 @@ describe('labels on charts', () => {
     const id = p.charts[0].id;
     const flipped = { ...patchBarLabels(id, { show: 'value' })(p).charts[0] };
     flipped.yAxis = { ...flipped.yAxis, reverse: true };
-    const m = buildChartModel(flipped, table);
+    const m = buildColumnModel(flipped, table);
     for (const g of m.groups) expect(g.barLabel!.y).toBeGreaterThan(g.bar!.y + g.bar!.height);
   });
   it('are drawn on grouped bars, one per bar', () => {

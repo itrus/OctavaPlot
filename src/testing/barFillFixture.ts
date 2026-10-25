@@ -1,7 +1,7 @@
 import { createChart, createGroup } from '../model/defaults';
-import { FILL_PATTERNS } from '../model/fill';
+import { FILL_PATTERNS } from '../model/graph/fill';
 import { newId } from '../model/ids';
-import { createRows } from '../model/rows';
+import { createRows } from '../model/table/rows';
 import type { ChartStyle, Project } from '../model/types';
 import { composeCommands, patchAxis, patchStyle } from '../state/commands';
 

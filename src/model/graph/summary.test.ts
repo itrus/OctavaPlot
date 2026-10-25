@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createExampleProject, DEFAULT_SUMMARY } from './defaults';
+import { createChart, createExampleProject, DEFAULT_SUMMARY } from '../defaults';
 import {
   clearGroupSummary,
   isSummaryOverridden,
@@ -12,9 +12,9 @@ import {
   SUMMARY_KEYS,
   validateSummaryPatch,
 } from './summary';
-import { clearSummaryOverrides, patchSummary, removeGroup, resetStyle } from '../state/commands';
-import { historyReducer, initialHistory } from '../state/history';
-import type { ChartLayer } from './types';
+import { clearSummaryOverrides, patchSummary, removeGroup, resetStyle } from '../../state/commands';
+import { historyReducer, initialHistory } from '../../state/history';
+import type { ChartLayer } from '../types';
 
 const layer = (): ChartLayer => createChart('t').layers[0];
 

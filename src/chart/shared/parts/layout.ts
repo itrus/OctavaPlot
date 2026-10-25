@@ -1,7 +1,7 @@
-import { legendKeyWidthPt } from '../model/look';
-import { numberStartPt } from '../model/axis';
-import { FONT_FAMILY } from '../model/defaults';
-import type { AxisConfig, LegendConfig } from '../model/types';
+import { legendKeyWidthPt } from '../../../model/graph/look';
+import { numberStartPt } from '../../../model/graph/axis';
+import { FONT_FAMILY } from '../../../model/defaults';
+import type { AxisConfig, LegendConfig } from '../../../model/types';
 import { measureText } from './text';
 
 /** Layout constants in pt (spec section 20 starting tokens). */

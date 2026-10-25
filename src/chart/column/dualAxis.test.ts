@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import { resolveSummary } from '../model/summary';
-import type { Project } from '../model/types';
-import { patchAxis, patchLegend, patchStyle, setChartType } from '../state/commands';
-import { statsFor } from '../stats/summary';
-import { bindLeft, bindRight, dualAxisFixture } from '../testing/dualAxisFixture';
-import { buildChartModel } from './model';
+import { createExampleProject } from '../../model/defaults';
+import { resolveSummary } from '../../model/graph/summary';
+import type { Project } from '../../model/types';
+import { patchAxis, patchLegend, patchStyle, setChartType } from '../../state/commands';
+import { statsFor } from '../../stats/summary';
+import { bindLeft, bindRight, dualAxisFixture } from '../../testing/dualAxisFixture';
+import { buildColumnModel } from './columnModel';
 
-const modelOf = (p: Project) => buildChartModel(p.charts[0], p.dataTables[0]);
+const modelOf = (p: Project) => buildColumnModel(p.charts[0], p.dataTables[0]);
 const idsOf = (p: Project) => p.dataTables[0].groups.map((g) => g.id);
 const meanChart = (p: Project): Project => {
   const withType = setChartType(p.charts[0].id, 'mean')(p);

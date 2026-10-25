@@ -1,6 +1,6 @@
-import { WHISKER_RULES, SMOOTHING_FACTOR } from '../stats/distribution';
-import { bool, clamp, oneOf, record } from './sanitize';
-import type { DistributionOptions, DistributionPoints } from './types';
+import { WHISKER_RULES, SMOOTHING_FACTOR } from '../../stats/distribution';
+import { bool, clamp, oneOf, record } from '../sanitize';
+import type { DistributionOptions, DistributionPoints } from '../types';
 
 /** Settings of box plots and violins that are shared by all data sets (spec 10). */
 

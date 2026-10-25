@@ -1,12 +1,15 @@
-import { leadingColumns } from '../model/chartTypes';
-import { rowTitleAt } from '../model/rows';
-import { resolveStyle } from '../model/style';
-import type { Chart, ChartStyle, DataTable, Id, PieLabelMode } from '../model/types';
-import { chartPx2Pt, n2 } from '../model/units';
-import { displayName } from './model';
-import { measureText } from './text';
-import { computeLayout, type Layout, type Rect } from './layout';
-import { formatLabelValue } from './labels';
+import { leadingColumns } from '../../model/graph/chartTypes';
+import { layersOf, type LayerSpec } from '../../model/graph/layers';
+import { rowTitleAt } from '../../model/table/rows';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
+import type { Chart, ChartStyle, DataTable, Id, PieLabelMode } from '../../model/types';
+import { chartPx2Pt, n2 } from '../../model/units';
+import { compilePieMarks } from './pieMarks';
+import type { SceneElement } from '../shared/scene/sceneElement';
+import { measureText } from '../shared/parts/text';
+import { computeLayout, type Layout, type Rect } from '../shared/parts/layout';
+import { formatLabelValue } from '../shared/parts/labels';
+import { displayName } from '../shared/parts/names';
 
 /** The share of a row, in percent, written with `digits` decimals. */
 export const percentText = (fraction: number, digits: number): string => `${(fraction * 100).toFixed(digits)}%`;
@@ -33,6 +36,8 @@ export function sliceLabelText(mode: PieLabelMode, name: string, value: number, 
 
 interface PieSlice {
   id: string;
+  /** The cell of the table that holds the count: what names the slice in the drawing, whatever happens to the order of the rows. */
+  obsId?: Id;
   groupId: Id;
   label: string;
   value: number;
@@ -47,6 +52,8 @@ interface PieSlice {
 
 interface PieGeom {
   row: number;
+  /** The ID of the row of the table the pie is of. */
+  rowId?: Id;
   title: string;
   cx: number;
   cy: number;
@@ -71,6 +78,10 @@ export interface PieModel {
   parts: Array<{ groupId: Id; label: string; style: ChartStyle }>;
   legendParts: number[];
   warnings: string[];
+  /** The layers the chart is drawn from, lowest first (see model/graph/layers.ts). */
+  layers: LayerSpec[];
+  /** The marks of the layers as scene elements, compiled when a drawing, an export or a hit test first asks for them; not enumerable. */
+  marks?: SceneElement[];
 }
 
 const TWO_PI = Math.PI * 2;
@@ -123,7 +134,7 @@ export function pieGrid(count: number, width: number, height: number, roomX = 0,
  */
 export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   const [W, H] = [chartPx2Pt(chart.widthPx), chartPx2Pt(chart.heightPx)];
-  const layer = chart.layers[0];
+  const layer = dataLayer(chart);
   const opts = chart.pie;
   const warnings: string[] = [];
   const first = leadingColumns(table.kind);
@@ -200,17 +211,19 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
       const a1 = angle + dir * fraction * TWO_PI;
       angle = a1;
       const id = `${p.g.id}:slice:${row}`;
-      if (!(w > 0)) return { id, groupId: p.g.id, label: p.label, value: w, fraction, path: '', style: p.style, text: null };
+      const obsId = p.g.observations[row]?.id;
+      if (!(w > 0)) return { id, obsId, groupId: p.g.id, label: p.label, value: w, fraction, path: '', style: p.style, text: null };
       const mid = (a0 + a1) / 2;
       const content = sliceLabelText(opts.labels, p.label, w, fraction, opts.percentDigits);
       // The text sits outside the circle, on the side of its slice.
       const pt = at(cx, cy, r + 16, mid);
       const text = content === null ? null : { x: pt.x, y: pt.y, anchor: Math.abs(pt.x - cx) < r * 0.2 ? ('middle' as const) : pt.x > cx ? ('start' as const) : ('end' as const), content };
-      return { id, groupId: p.g.id, label: p.label, value: w, fraction, path: slicePath(cx, cy, r, rInner, a0, a1), style: p.style, text };
+      return { id, obsId, groupId: p.g.id, label: p.label, value: w, fraction, path: slicePath(cx, cy, r, rInner, a0, a1), style: p.style, text };
     });
     const totalText = opts.showTotal ? `${opts.totalPrefix}${formatLabelValue(total, null)}` : null;
     pies.push({
       row,
+      rowId: table.rows[row]?.id,
       title,
       cx,
       cy,
@@ -226,7 +239,7 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   if (bad.length > 0) warnings.push(`Not drawn: ${bad.join('; ')}. A pie needs counts of 0 or more that add up to more than 0.`);
   if (rows.length === 0) warnings.push('Enter counts in the table to see the chart.');
 
-  return {
+  const model: PieModel = {
     widthPt: W,
     heightPt: H,
     layout,
@@ -234,5 +247,9 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
     parts: parts.map((p) => ({ groupId: p.g.id, label: p.label, style: p.style })),
     legendParts: legendKeyParts,
     warnings: [...new Set(warnings)],
+    layers: layersOf(chart, table),
   };
+  let marks: SceneElement[] | undefined;
+  Object.defineProperty(model, 'marks', { enumerable: false, configurable: true, get: () => (marks ??= compilePieMarks(chart, model)) });
+  return model;
 }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject, DEFAULT_STYLE } from '../model/defaults';
-import { LABEL_STYLE_KEYS, patchAllGroups, resolveStyle } from '../model/style';
-import type { ChartStyle } from '../model/types';
-import { parseProject, stringifyProject } from '../state/serialize';
+import { createExampleProject, DEFAULT_STYLE } from '../../../model/defaults';
+import { LABEL_STYLE_KEYS, patchAllGroups, resolveStyle } from '../../../model/graph/style';
+import type { ChartStyle } from '../../../model/types';
+import { parseProject, stringifyProject } from '../../../state/serialize';
 import {
   anyLabelsRequested,
   BoxGrid,

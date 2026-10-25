@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeBreaks } from '../model/axis';
-import { createChart, createColumnTable, createXyTable } from '../model/defaults';
-import type { DataTable, Project } from '../model/types';
-import { patchAxis } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
+import { sanitizeBreaks } from '../../../model/graph/axis';
+import { createChart, createColumnTable, createXyTable } from '../../../model/defaults';
+import type { DataTable, Project } from '../../../model/types';
+import { patchAxis } from '../../../state/commands';
+import { parseProject, stringifyProject } from '../../../state/serialize';
 import { axisGaps, axisMapper, axisPieces, BREAK_GAP_PT, resolveAxis, segmentsOf } from './axisScale';
-import { chartToSvgString } from './export';
-import { buildChartModel } from './model';
-import { buildXyModel } from './xyModel';
+import { chartToSvgString } from '../../export/export';
+import { buildColumnModel } from '../../column/columnModel';
+import { buildXyModel } from '../../xy/xyModel';
 
 const input = (values: number[], patch = {}) => ({ values, includeZero: true, min: 0, max: 100, majorInterval: 10, tickCountHint: 6, ...patch });
 const cfg = (breaks: Array<{ from: number; to: number }>, extra = {}) => ({ scale: 'linear' as const, reverse: false, minorTicks: 0, numberFormat: 'auto' as const, decimals: null, thousands: false, prefix: '', suffix: '', breaks, ...extra });
@@ -103,7 +103,7 @@ describe('a column chart with a broken value axis', () => {
   it('has the tall bar cross the gap, the clip cutting the gap out, and the axis line in two pieces', () => {
     const { p, table } = setup();
     const c = broken(p);
-    const m = buildChartModel(c, table);
+    const m = buildColumnModel(c, table);
     expect(m.y.segments).toHaveLength(2);
     const svg = chartToSvgString(c, table);
     // The clip of the data is two rectangles, one above the gap and one below.
@@ -120,7 +120,7 @@ describe('a column chart with a broken value axis', () => {
   });
   it('draws like any other chart when nothing is broken', () => {
     const { p, table } = setup();
-    expect(buildChartModel(p.charts[0], table).y.segments).toBeUndefined();
+    expect(buildColumnModel(p.charts[0], table).y.segments).toBeUndefined();
     const svg = chartToSvgString(p.charts[0], table);
     expect(/<clipPath id="plot-clip">(.*?)<\/clipPath>/.exec(svg)![1].match(/<rect/g)).toHaveLength(1);
   });

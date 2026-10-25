@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createXyTable } from '../model/defaults';
-import type { DataTable, Project } from '../model/types';
-import { patchAxis, patchLook } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
+import { createChart, createColumnTable, createXyTable } from '../../../model/defaults';
+import type { DataTable, Project } from '../../../model/types';
+import { patchAxis, patchLook } from '../../../state/commands';
+import { parseProject, stringifyProject } from '../../../state/serialize';
 import { crossingPosition } from './axisTicks';
-import { chartToSvgString } from './export';
-import { buildChartModel } from './model';
-import { buildXyModel } from './xyModel';
+import { chartToSvgString } from '../../export/export';
+import { buildColumnModel } from '../../column/columnModel';
+import { buildXyModel } from '../../xy/xyModel';
 
 const r2 = (v: number) => String(Math.round(v * 100) / 100);
 
@@ -85,7 +85,7 @@ describe('origin of a column chart', () => {
   it('puts the category axis through zero, where bars with negative values hang from it', () => {
     const { p, table } = setup();
     const c = patchLook(p.charts[0].id, { origin: { x: null, y: 0 } })(p).charts[0];
-    const m = buildChartModel(c, table);
+    const m = buildColumnModel(c, table);
     const svg = chartToSvgString(c, table);
     expect(svg).toContain(`M${r2(m.layout.plot.x)},${r2(m.yScale(0))}H`);
     // The category names stay under the plot, not on the line.
@@ -96,7 +96,7 @@ describe('origin of a column chart', () => {
   it('puts the category axis of a horizontal chart through zero too, as a vertical line', () => {
     const { p, table } = setup();
     const flipped = patchLook(p.charts[0].id, { orientation: 'horizontal', origin: { x: null, y: 0 } })(p).charts[0];
-    const m = buildChartModel(flipped, table);
+    const m = buildColumnModel(flipped, table);
     const zeroX = m.orient.toScreen(0, m.yScale(0)).x;
     expect(chartToSvgString(flipped, table)).toContain(`M${r2(zeroX)},${r2(m.layout.plot.y)}V`);
   });

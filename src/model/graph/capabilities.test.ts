@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { bindingSelectState } from '../chart/axes';
+import { bindingSelectState } from '../../chart/shared/axes/axes';
 import { CAPABILITIES, capabilitiesOf, capabilityTable } from './capabilities';
 import { CHART_TYPES, chartFamily, supportsHorizontal } from './chartTypes';
 
@@ -34,14 +34,14 @@ describe('capability registry', () => {
       expect(by(type)).toMatchObject({ referenceLines: 'none', numericAxes: false, curveFit: false, secondaryAxis: false });
     }
     // X lines need a numeric X axis; a column chart has categories there.
-    for (const c of CAPABILITIES) if (c.referenceLines === 'xy') expect(['xy', 'survival', 'hist']).toContain(chartFamily(c.type));
+    for (const c of CAPABILITIES) if (c.referenceLines === 'xy') expect(['xy', 'survival', 'histogram']).toContain(chartFamily(c.type));
     // Only the three Cartesian column charts can be bound to the right axis.
     expect(CAPABILITIES.filter((c) => c.secondaryAxis).map((c) => c.type)).toEqual(['bar', 'scatter', 'mean']);
     expect(capabilitiesOf('violin').curveFit).toBe(false);
   });
 
   it('is the source of the table in the README (UPDATE_README=1 rewrites it)', () => {
-    const file = resolve(__dirname, '../../README.md');
+    const file = resolve(__dirname, '../../../README.md');
     const readme = readFileSync(file, 'utf8');
     const start = '<!-- capabilities:start -->';
     const end = '<!-- capabilities:end -->';

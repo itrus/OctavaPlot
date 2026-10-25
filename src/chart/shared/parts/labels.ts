@@ -1,4 +1,4 @@
-import type { Chart, ChartStyle, ChartType, PointLabelCollision, PointLabelPlacement, PointLabelSource } from '../model/types';
+import type { Chart, ChartStyle, ChartType, PointLabelCollision, PointLabelPlacement, PointLabelSource } from '../../../model/types';
 import { measureText } from './text';
 
 /** Point-label constants (P: spec 23 L1539 leaves label behaviour unspecified). */

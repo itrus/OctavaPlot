@@ -1,16 +1,16 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { effectiveTable } from './model/chartTable';
+import { effectiveTable } from './model/table/chartTable';
 import { AppProvider, useApp } from './state/AppContext';
 import { PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile } from './state/projectFile';
-import { Navigator } from './ui/Navigator';
-import { Splitter } from './ui/Splitter';
-import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIcon } from './ui/icons';
+import { Navigator } from './ui/navigator/Navigator';
+import { Splitter } from './ui/components/Splitter';
+import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIcon } from './ui/components/icons';
 import { setProjectName } from './state/commands';
-import { InfoDialog } from './ui/InfoDialog';
-import { SettingsDialog } from './ui/SettingsDialog';
-import { UndoRedo } from './ui/UndoRedo';
-import { WheelRange } from './ui/WheelRange';
-import { isTextEntryTarget } from './ui/shortcutGuard';
+import { InfoDialog } from './ui/dialogs/InfoDialog';
+import { SettingsDialog } from './ui/dialogs/SettingsDialog';
+import { UndoRedo } from './ui/components/UndoRedo';
+import { WheelRange } from './ui/components/WheelRange';
+import { isTextEntryTarget } from './ui/components/shortcutGuard';
 import { downloadBlob, exportFileName } from './util/download';
 
 /** The browser's save-file dialog (File System Access API; not in every browser). */
@@ -20,10 +20,11 @@ type SaveFilePicker = (options: {
 }) => Promise<{ name: string; createWritable: () => Promise<{ write: (data: string) => Promise<void>; close: () => Promise<void> }> }>;
 
 // Each workspace view is its own chunk, loaded when first opened.
-const DataTableView = lazy(() => import('./ui/DataTableView').then((m) => ({ default: m.DataTableView })));
-const AnalysisView = lazy(() => import('./ui/AnalysisView').then((m) => ({ default: m.AnalysisView })));
-const LayoutView = lazy(() => import('./ui/LayoutView').then((m) => ({ default: m.LayoutView })));
-const GraphView = lazy(() => import('./ui/GraphView').then((m) => ({ default: m.GraphView })));
+const DataTableView = lazy(() => import('./ui/views/DataTableView').then((m) => ({ default: m.DataTableView })));
+const AnalysisView = lazy(() => import('./ui/views/AnalysisView').then((m) => ({ default: m.AnalysisView })));
+const LayoutView = lazy(() => import('./ui/views/LayoutView').then((m) => ({ default: m.LayoutView })));
+const FolderView = lazy(() => import('./ui/views/FolderView').then((m) => ({ default: m.FolderView })));
+const GraphView = lazy(() => import('./ui/views/GraphView').then((m) => ({ default: m.GraphView })));
 const Inspector = lazy(() => import('./ui/inspector/Inspector').then((m) => ({ default: m.Inspector })));
 
 /** A window outline with the left or right strip filled: the usual "side panel" glyph. */
@@ -210,7 +211,8 @@ function Shell() {
           {chart && chartTable && <GraphView chart={chart} table={chartTable} />}
           {view.kind === 'analysis' && <AnalysisView analysisId={view.id} />}
           {view.kind === 'layout' && <LayoutView layoutId={view.id} />}
-          {!table && !chart && view.kind !== 'analysis' && view.kind !== 'layout' && <div className="empty">Select an item in the navigator.</div>}
+          {view.kind === 'folder' && <FolderView folder={view.id} />}
+          {!table && !chart && view.kind !== 'analysis' && view.kind !== 'layout' && view.kind !== 'folder' && <div className="empty">Select an item in the navigator.</div>}
         </Suspense>
       </main>
       {chart && chartTable && (

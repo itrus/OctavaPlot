@@ -1,5 +1,5 @@
-import { newId } from './ids';
-import type { DataRow, DataTable } from './types';
+import { newId } from '../ids';
+import type { DataRow, DataTable } from '../types';
 
 /** Longest stored row title, in code points (P). */
 export const MAX_ROW_TITLE_CHARS = 200;

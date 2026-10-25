@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createXyTable } from '../model/defaults';
-import { CHART_TYPES, chartTypesFor } from '../model/chartTypes';
-import { effectiveTable, graphSources } from '../model/chartTable';
-import type { Chart, ChartType, DataTable, Project } from '../model/types';
-import { addChart, addDataTable, addGroup, applyPalette, setCells, setChartType, setGroupOnGraph } from '../state/commands';
-import { createExampleProject } from '../model/defaults';
-import { paletteById } from '../model/palettes';
-import { parseProject, parseProjectWithNotes, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
+import { createChart, createXyTable } from '../../model/defaults';
+import { CHART_TYPES, chartTypesFor } from '../../model/graph/chartTypes';
+import { effectiveTable, graphSources } from '../../model/table/chartTable';
+import type { Chart, ChartType, DataTable, Project } from '../../model/types';
+import { addChart, addDataTable, addGroup, applyPalette, setCells, setChartType, setGroupOnGraph } from '../../state/commands';
+import { createExampleProject } from '../../model/defaults';
+import { paletteById } from '../../model/graph/palettes';
+import { parseProject, parseProjectWithNotes, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
 import { buildXyModel } from './xyModel';
 
 const project = (type: ChartType): { p: Project; table: DataTable; chart: Chart } => {
@@ -19,8 +19,8 @@ const project = (type: ChartType): { p: Project; table: DataTable; chart: Chart 
 describe('chart types and table types', () => {
   it('offers the chart types of each table type', () => {
     expect(chartTypesFor('column').map((c) => c.type)).toEqual(['bar', 'scatter', 'mean', 'box', 'floating', 'paired', 'histogram', 'ecdf', 'violin']);
-    expect(chartTypesFor('xy').map((c) => c.type)).toEqual(['xyScatter', 'xyLine', 'xyLineSymbols']);
-    expect(CHART_TYPES).toHaveLength(24);
+    expect(chartTypesFor('xy').map((c) => c.type)).toEqual(['xyScatter', 'xyLine', 'xyLineSymbols', 'xySpikes', 'xyArea']);
+    expect(CHART_TYPES).toHaveLength(28);
   });
   it('the presets decide symbols and lines', () => {
     const s = (t: ChartType) => createChart('t', undefined, t).layers[0].style;

@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { chartToSvgString } from '../chart/export';
-import { GALLERY } from '../model/chartGallery';
+import { chartToSvgString } from '../chart/export/export';
+import { GALLERY } from '../model/graph/chartGallery';
 import { createEmptyProject, createExampleProject } from '../model/defaults';
 import type { TableKind } from '../model/types';
 import type { Project } from '../model/types';

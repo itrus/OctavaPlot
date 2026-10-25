@@ -1,17 +1,18 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import { layersOf } from '../model/layers';
-import type { Chart, ChartType, Project, TableKind } from '../model/types';
-import { addAnnotation, addChart, addDataTable, addReferenceLine, setLayerHidden } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { buildAnyModel, ChartCanvas } from './anyModel';
-import { chartToSvgString } from './export';
-import { compileXyScene, type Scene, sceneTargets } from './scene';
+import { createExampleProject } from '../../../model/defaults';
+import { layersOf } from '../../../model/graph/layers';
+import type { Chart, ChartType, Project, TableKind } from '../../../model/types';
+import { addAnnotation, addChart, addDataTable, addReferenceLine, setLayerHidden } from '../../../state/commands';
+import { parseProject, stringifyProject } from '../../../state/serialize';
+import { buildAnyModel, ChartCanvas } from '../../anyModel';
+import { chartToSvgString } from '../../export/export';
+import { type Scene, sceneTargets } from './scene';
 import type { SceneElement } from './sceneElement';
 import { svgId } from './svgIds';
-import { buildXyModel } from './xyModel';
+import { buildXyModel } from '../../xy/xyModel';
+import { compileXyScene } from '../../xy/xyScene';
 
 /** `at` is a value inside the range of the axis, so that the reference line is drawn. */
 const project = (kind: TableKind, type: ChartType, at = 5, layout?: Parameters<typeof addDataTable>[2]): Project => {
@@ -139,7 +140,7 @@ describe('the scene', () => {
   it('is compiled for a histogram too, which is not drawn from layers', () => {
     const p = project('column', 'histogram');
     const any = buildAnyModel(chartOf(p), tableOf(p));
-    expect(any.family).toBe('hist');
+    expect(any.family).toBe('histogram');
     const scene = compileXyScene(chartOf(p), any.model as ReturnType<typeof buildXyModel>);
     expect(scene.widthPt).toBeGreaterThan(0);
     expect(svgOf(p)).not.toContain('NaN');

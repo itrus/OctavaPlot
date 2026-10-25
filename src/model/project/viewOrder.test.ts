@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { addAnalysis, addChart, addLayout, addDataTable, removeChart, removeLayout, removeAnalysis, removeTable } from '../state/commands';
-import { createExampleProject } from './defaults';
+import { addAnalysis, addChart, addLayout, addDataTable, removeChart, removeLayout, removeAnalysis, removeTable } from '../../state/commands';
+import { createExampleProject } from '../defaults';
 import { viewAfterRemoval, viewOrder } from './viewOrder';
 
 /** Two tables, one result, two graphs and two layouts. */

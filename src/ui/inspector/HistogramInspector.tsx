@@ -1,19 +1,21 @@
 import { useMemo, useState } from 'react';
-import { buildHistModel } from '../../chart/histModel';
-import { chartTypesFor } from '../../model/chartTypes';
-import { defaultYTitle, FREQUENCIES, HISTOGRAM_LIMITS } from '../../model/histogramOptions';
-import { resolveStyle } from '../../model/style';
+import { buildHistogramModel } from '../../chart/histogram/histogramModel';
+import { chartTypesFor } from '../../model/graph/chartTypes';
+import { defaultYTitle, FREQUENCIES, HISTOGRAM_LIMITS } from '../../model/options/histogramOptions';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { Chart, ChartType, DataTable, HistogramOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { composeCommands, patchAxis, patchChart, patchLook, patchStyle, setChartType } from '../../state/commands';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './controls';
-import { FrameSection } from './LookControls';
-import { SECTIONS, TABS, type AppearanceSection, type InspectorTab } from './nav';
-import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, PaletteField, TextSections } from './SharedSections';
+import { LayersSection } from './sections/LayersSection';
+import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './common/controls';
+import { FrameSection } from './sections/LookControls';
+import { SECTIONS, TABS } from './common/nav';
+import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, PaletteField, TextSections } from './sections/SharedSections';
 import { AxisLimits } from './XyInspector';
+import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
 
 /** The formatting panel of histograms and cumulative distributions of a column table. */
-export function HistInspector({ chart, table }: { chart: Chart; table: DataTable }) {
+export function HistogramInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run, inspectorNav } = useApp();
   const [tab, setTab] = useState<InspectorTab>('appearance');
   const [section, setSection] = useState<AppearanceSection>('style');
@@ -26,8 +28,8 @@ export function HistInspector({ chart, table }: { chart: Chart; table: DataTable
       if (t.section) setSection(t.section);
     }
   }
-  const model = useMemo(() => buildHistModel(chart, table), [chart, table]);
-  const layer = chart.layers[0];
+  const model = useMemo(() => buildHistogramModel(chart, table), [chart, table]);
+  const layer = dataLayer(chart);
   const o = chart.histogram;
   const histogram = chart.type === 'histogram';
   // The Y axis title follows what the heights are, as long as it is still the title the chart made for itself.
@@ -58,6 +60,7 @@ export function HistInspector({ chart, table }: { chart: Chart; table: DataTable
                 </Field>
                 <PaletteField chart={chart} hint="Gives the data sets coordinated colours in order. The colours below still apply on top." />
               </GroupBox>
+              <LayersSection chart={chart} table={table} />
 
               {histogram ? (
                 <GroupBox title="Histogram">

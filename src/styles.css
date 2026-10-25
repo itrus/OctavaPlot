@@ -146,6 +146,7 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
 .choice-card.selected { border-color: var(--accent); background: var(--accent-soft); }
 .choice-label { display: flex; align-items: center; gap: 8px; }
 .choice-label select { flex: 1; }
+.nav-item .nav-badge + .nav-badge { margin-left: 4px; }
 .nav-badge { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; }
 .col-head { position: relative; }
 .col-head.two-row { padding: 0; gap: 0; justify-content: flex-end; }
@@ -500,3 +501,47 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
 /* A setting's name takes one line: the dialog is wide enough, and the control takes the rest of the row. */
 .settings-body .field-label { flex: 0 0 auto; white-space: nowrap; }
 .format-tab-gap { margin-left: 10px; }
+
+/* ------------------------------------------------------------ navigator folders: the triangle folds, the name opens the overview */
+.nav-folder-row { display: flex; align-items: center; margin-top: 2px; border-radius: 3px; }
+.nav-folder-row.active { background: var(--accent-soft); }
+.nav-folder-row .nav-folder { flex: 1; margin-top: 0; min-width: 0; }
+.nav-folder-row .nav-folder:hover { background: rgba(0, 0, 0, 0.05); }
+.nav-chev { border: 0; background: transparent; padding: 4px 4px 4px 6px; border-radius: 3px; line-height: 1; cursor: pointer; }
+.nav-chev:hover { background: rgba(0, 0, 0, 0.08); }
+
+/* ------------------------------------------------------------ folder overview: all the pages of a folder as thumbnails */
+.folder-view { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 14px 20px 20px; background: #fff; display: flex; flex-direction: column; }
+.folder-head { display: flex; align-items: baseline; gap: 12px; }
+.folder-head h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.folder-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 16px; }
+.folder-toolbar button { display: inline-flex; align-items: center; gap: 5px; }
+.folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; outline: none; align-content: start; }
+.folder-card { border: 1px solid transparent; border-radius: 6px; padding: 8px; user-select: none; }
+.folder-card:hover { background: #f3f7fd; border-color: var(--border-soft); }
+.folder-card.selected { background: var(--accent-soft); border-color: var(--accent); }
+.folder-card.dragging { opacity: 0.45; }
+.folder-card.drop-before { box-shadow: -5px 0 0 var(--accent); }
+.folder-card.drop-after { box-shadow: 5px 0 0 var(--accent); }
+.folder-grid:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.folder-thumb { height: 170px; border: 1px solid var(--border); background: #fff; border-radius: 3px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.folder-label { display: flex; align-items: center; gap: 8px; margin-top: 8px; min-width: 0; }
+.folder-label input[type='checkbox'] { width: 16px; height: 16px; flex: none; margin: 0; }
+.folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.folder-name .nav-badge { margin-left: 0; flex: none; }
+.folder-number { margin-left: auto; font-weight: 700; flex: none; }
+.folder-hint { margin-top: 18px; }
+.thumb-chart { width: 100%; height: 100%; padding: 4px; }
+.thumb-chart svg { width: 100%; height: 100%; display: block; }
+.thumb-sheet { width: 100%; align-self: flex-start; font-size: 10px; line-height: 1.3; }
+.thumb-row { display: flex; border-bottom: 1px solid #d8dde3; }
+.thumb-head { background: #eef2f6; font-weight: 600; }
+.thumb-rownum { width: 22px; flex: none; text-align: center; background: #e8edf2; color: var(--muted); padding: 2px 0; }
+.thumb-cell { flex: 1; min-width: 0; padding: 2px 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-left: 1px solid #d8dde3; }
+.thumb-num { text-align: right; }
+.thumb-result { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; text-align: center; }
+.thumb-sigma { font-size: 44px; line-height: 1; color: var(--accent); }
+.thumb-page { position: relative; height: 150px; max-width: 100%; border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); }
+.thumb-panel { position: absolute; border: 1px solid var(--accent); background: var(--accent-soft); font-size: 10px; padding: 1px 3px; overflow: hidden; }
+.thumb-panel.empty { border-style: dashed; background: transparent; }
+.thumb-missing { color: var(--muted); font-size: 12px; }

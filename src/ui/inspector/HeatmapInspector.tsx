@@ -1,18 +1,20 @@
 import { useState } from 'react';
-import { chartTypesFor } from '../../model/chartTypes';
-import { HEAT_LIMITS, HEAT_PALETTES } from '../../model/heatmapOptions';
+import { chartTypesFor } from '../../model/graph/chartTypes';
+import { HEAT_LIMITS, HEAT_PALETTES } from '../../model/options/heatmapOptions';
 import type { Chart, ChartType, DataTable, HeatmapOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { patchAxis, patchLook, setChartType } from '../../state/commands';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SectionBar, SelectInput, TabBar } from './controls';
-import { SECTIONS as ALL_SECTIONS, TABS, type AppearanceSection, type InspectorTab } from './nav';
-import { AnnotationsTab, DimensionsSection, TextSections } from './SharedSections';
+import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SectionBar, SelectInput, TabBar } from './common/controls';
+import { SECTIONS as ALL_SECTIONS, TABS } from './common/nav';
+import { LayersSection } from './sections/LayersSection';
+import { AnnotationsTab, DimensionsSection, TextSections } from './sections/SharedSections';
+import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
 
 /** A heat map has no axes of numbers, no frame and no legend: its panel has the style, text and layout sections. */
 const SECTIONS = ALL_SECTIONS.filter((s) => s.id === 'style' || s.id === 'text' || s.id === 'layout');
 
 /** The formatting panel of heat maps of a grouped table. */
-export function HeatInspector({ chart, table }: { chart: Chart; table: DataTable }) {
+export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run, inspectorNav } = useApp();
   const [tab, setTab] = useState<InspectorTab>('appearance');
   const [section, setSection] = useState<AppearanceSection>('style');
@@ -43,6 +45,7 @@ export function HeatInspector({ chart, table }: { chart: Chart; table: DataTable
                   <SelectInput<ChartType> value={chart.type} options={chartTypesFor('grouped').map((c) => ({ value: c.type, label: c.label }))} onChange={(t) => run('Change graph type', setChartType(chart.id, t))} />
                 </Field>
               </GroupBox>
+              <LayersSection chart={chart} table={table} />
 
               <GroupBox title="Colours">
                 <Field label="Scale">

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { GRID_MAX, pageMm, slotRects, standardArrangements } from '../model/layout';
-import type { Chart, Id, LayoutArrangement, PageOrientation } from '../model/types';
+import { GRID_MAX, pageMm, slotRects, standardArrangements } from '../../model/project/layout';
+import type { Chart, Id, LayoutArrangement, PageOrientation } from '../../model/types';
 import { Modal } from './NewItemDialogs';
 
 export interface NewLayoutOptions {

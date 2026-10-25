@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { buildAnyModel, ChartCanvas } from '../chart/anyModel';
+import { buildAnyModel, ChartCanvas } from '../../chart/anyModel';
 
-import { applyVariant, previewFit, type ChartVariant } from '../model/chartVariant';
-import { GALLERY, availableItems, type GalleryItem } from '../model/chartGallery';
-import { inheritChart } from '../model/chartFormat';
-import { chartTypeInfo, tableTypeInfo } from '../model/chartTypes';
-import { createChart } from '../model/defaults';
-import type { Chart, ChartType, DataTable, Id, TableKind } from '../model/types';
+import { applyVariant, previewFit, type ChartVariant } from '../../model/graph/chartVariant';
+import { GALLERY, availableItems, type GalleryItem } from '../../model/graph/chartGallery';
+import { inheritChart } from '../../model/graph/chartFormat';
+import { chartTypeInfo, tableTypeInfo } from '../../model/graph/chartTypes';
+import { createChart } from '../../model/defaults';
+import type { Chart, ChartType, DataTable, Id, TableKind } from '../../model/types';
 import { GallerySketch } from './GallerySketches';
 import { Modal } from './NewItemDialogs';
 

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildChartModel } from '../chart/model';
-import { columnLayout } from '../chart/columns';
-import { createChart, createColumnTable } from './defaults';
+import { buildColumnModel } from '../../chart/column/columnModel';
+import { columnLayout } from '../../chart/column/columnLayout';
+import { createChart, createColumnTable } from '../defaults';
 import { effectiveTable } from './chartTable';
 import { applyOrder, moveGroup, sanitizeOrder } from './groupOrder';
-import { AUTO_BAR_GAP_PCT, foldGroupGaps } from './columnOptions';
-import { removeGroup, setGroupOrder } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import type { Project } from './types';
+import { AUTO_BAR_GAP_PCT, foldGroupGaps } from '../options/columnOptions';
+import { removeGroup, setGroupOrder } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import type { Project } from '../types';
 
 const setup = () => {
   const table = createColumnTable('Data', true);
@@ -49,7 +49,7 @@ describe('the order and the gaps on a chart', () => {
     const eff = effectiveTable(reversed, reversed.charts[0])!;
     expect(eff.groups.map((g) => g.name)).toEqual(table.groups.map((g) => g.name).reverse());
     expect(eff.groups.find((g) => g.name === 'Group A')!.paletteIndex).toBe(colourOf('Group A'));
-    const m = buildChartModel(reversed.charts[0], eff);
+    const m = buildColumnModel(reversed.charts[0], eff);
     expect(m.groups.map((g) => g.name)).toEqual(['Group D', 'Group C', 'Group B', 'Group A']);
     expect(m.groups[0].centerX).toBeLessThan(m.groups[3].centerX);
   });

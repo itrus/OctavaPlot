@@ -4,7 +4,7 @@ import type {
   PointLabelCollision,
   PointLabelPlacement,
   PointLabelSource,
-} from '../../model/types';
+} from '../../../model/types';
 import {
   LABEL_AUTO_COLOR,
   LABEL_DECIMALS_LIMITS,
@@ -14,7 +14,7 @@ import {
   sanitizeLabelStyle,
   type PointLabelReport,
   type SuppressedLabel,
-} from '../../chart/labels';
+} from '../../../chart/shared/parts/labels';
 
 const PLACEMENT_OPTIONS: Array<{ value: PointLabelPlacement; label: string }> = [
   { value: 'above-right', label: 'Above right' },

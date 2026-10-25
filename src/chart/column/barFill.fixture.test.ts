@@ -1,26 +1,26 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { FILL_PATTERNS, legendKeyFill, resolveBarFill } from '../model/fill';
-import type { Project } from '../model/types';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { patchStyle } from '../state/commands';
+import { FILL_PATTERNS, legendKeyFill, resolveBarFill } from '../../model/graph/fill';
+import type { Project } from '../../model/types';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { patchStyle } from '../../state/commands';
 import {
   BAR_FILL_KEY_FRAMES,
   BAR_FILL_NEGATIVE_INDEX,
   BAR_FILL_PATTERN_COUNT,
   barFillFixture,
-} from '../testing/barFillFixture';
-import { ChartSvg } from './ChartSvg';
-import { chartToSvgString } from './export';
-import { buildChartModel } from './model';
+} from '../../testing/barFillFixture';
+import { ColumnChartSvg } from './ColumnChartSvg';
+import { chartToSvgString } from '../export/export';
+import { buildColumnModel } from './columnModel';
 
 const svgOf = (p: Project): string => chartToSvgString(p.charts[0], p.dataTables[0]);
-const modelOf = (p: Project) => buildChartModel(p.charts[0], p.dataTables[0]);
+const modelOf = (p: Project) => buildColumnModel(p.charts[0], p.dataTables[0]);
 const count = (s: string, re: RegExp): number => (s.match(re) ?? []).length;
 const editorHtml = (p: Project): string =>
   renderToStaticMarkup(
-    createElement(ChartSvg, {
+    createElement(ColumnChartSvg, {
       chart: p.charts[0],
       model: modelOf(p),
       editor: { selection: { kind: 'chart' } as never },

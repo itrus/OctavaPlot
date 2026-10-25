@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { PIE_LABEL_MODES, PIE_LIMITS } from '../../model/pieOptions';
-import { chartTypesFor } from '../../model/chartTypes';
+import { PIE_LABEL_MODES, PIE_LIMITS } from '../../model/options/pieOptions';
+import { chartTypesFor } from '../../model/graph/chartTypes';
 import { composeCommands, patchChart, patchLook, patchStyle, setChartType } from '../../state/commands';
-import { displayName } from '../../chart/model';
-import { resolveStyle } from '../../model/style';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { Chart, ChartType, DataTable, PieLabelMode, PieOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { ColorInput, Field, GroupBox, NumField, SectionBar, SelectInput, TabBar, TextInput, Check } from './controls';
-import { AnnotationsTab, DimensionsSection, LegendSection, PaletteField, TextSections } from './SharedSections';
-import { TABS, type AppearanceSection, type InspectorTab } from './nav';
+import { ColorInput, Field, GroupBox, NumField, SectionBar, SelectInput, TabBar, TextInput, Check } from './common/controls';
+import { AnnotationsTab, DimensionsSection, LegendSection, PaletteField, TextSections } from './sections/SharedSections';
+import { LayersSection } from './sections/LayersSection';
+import { TABS } from './common/nav';
+import { displayName } from '../../chart/shared/parts/names';
+import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
 
 /** Pies and doughnuts have no axes or frame, so their formatting panel has fewer sections. */
 const SECTIONS: Array<{ id: AppearanceSection; label: string }> = [
@@ -33,7 +35,7 @@ export function PieInspector({ chart, table }: { chart: Chart; table: DataTable 
       if (t.section && SECTIONS.some((s) => s.id === t.section)) setSection(t.section);
     }
   }
-  const layer = chart.layers[0];
+  const layer = dataLayer(chart);
   const d = chart.pie;
   const set = (label: string, patch: Partial<PieOptions>, key?: string) => run(label, patchLook(chart.id, { pie: { ...d, ...patch } }), key);
   const doughnut = chart.type === 'doughnut';
@@ -59,6 +61,7 @@ export function PieInspector({ chart, table }: { chart: Chart; table: DataTable 
                 </Field>
                 <PaletteField chart={chart} hint="Gives the parts coordinated colours in order. The colours below still apply on top." />
               </GroupBox>
+              <LayersSection chart={chart} table={table} />
 
               <GroupBox title={doughnut ? 'Doughnut' : 'Pie'}>
                 <NumField label="First part starts at" unit="°" hint="Degrees from the top, clockwise" value={d.startAngle} min={PIE_LIMITS.startAngle.min} max={PIE_LIMITS.startAngle.max} onCommit={(v) => set('Pie start angle', { startAngle: v }, 'pie:start')} />

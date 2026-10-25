@@ -1,7 +1,7 @@
 import { format, precisionFixed } from 'd3';
-import { logBaseOf } from '../model/axis';
-import { extent } from '../model/units';
-import type { AxisBreak, AxisConfig } from '../model/types';
+import { logBaseOf } from '../../../model/graph/axis';
+import { extent } from '../../../model/units';
+import type { AxisBreak, AxisConfig } from '../../../model/types';
 import { clean, MAX_TICKS_PER_AXIS, resolveYAxis, type YAxisInput, type YAxisScale } from './scales';
 
 /**

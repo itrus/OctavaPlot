@@ -4,8 +4,8 @@
  * Limits are P (spec 1.2 L57) and are labelled "P limit" in messages.
  */
 
-import { FILL_LIMITS, FILL_PATTERN_OPTIONS, describeBarFillUi, resolveBarFill } from '../../model/fill';
-import type { ChartStyle, FillPattern } from '../../model/types';
+import { FILL_LIMITS, FILL_PATTERN_OPTIONS, describeBarFillUi, resolveBarFill } from '../../../model/graph/fill';
+import type { ChartStyle, FillPattern } from '../../../model/types';
 
 type PatternStyle = Pick<ChartStyle, 'barPattern' | 'barBorderColor' | 'barPatternColor' | 'barPatternBackground'>;
 

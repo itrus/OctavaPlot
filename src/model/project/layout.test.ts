@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { drawLayout } from '../chart/layoutExport';
-import { addChart, addDataTable, addFreePanel, addLayout, duplicateLayout, freeLayout, patchLayout, removeChart, removeFreePanel, removeLayout, removeTable, renameItem, setFrame, setLayoutPanel } from '../state/commands';
-import { buildPdf, rgbaToFlateRgb } from '../chart/pdf';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { createExampleProject } from './defaults';
+import { drawLayout } from '../../chart/export/layoutExport';
+import { addChart, addDataTable, addFreePanel, addLayout, duplicateLayout, freeLayout, patchLayout, removeChart, removeFreePanel, removeLayout, removeTable, renameItem, setFrame, setLayoutPanel } from '../../state/commands';
+import { buildPdf, rgbaToFlateRgb } from '../../chart/export/pdf';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { createExampleProject } from '../defaults';
 import { arrangeLayout, defaultLayout, mmToPt, pageFrame, panelLabel, sanitizeLayout, slotCount, slotRects, standardArrangements, turnFrames } from './layout';
-import type { FrameMm, Layout, Project } from './types';
+import type { FrameMm, Layout, Project } from '../types';
 
 const twoCharts = (): Project => {
   const p = createExampleProject();

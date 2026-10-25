@@ -1,19 +1,24 @@
 import { ticks as d3Ticks } from 'd3';
-import { HEAT_PALETTES } from '../model/heatmapOptions';
-import { rowTitleAt } from '../model/rows';
-import { layoutOf, xySeries } from '../model/tableLayout';
-import { DEFAULT_SUMMARY } from '../model/defaults';
-import type { Chart, DataTable, Id } from '../model/types';
-import { chartPx2Pt } from '../model/units';
-import { matrixRange, normaliseMatrix, type Matrix } from '../stats/matrix';
-import { computeGroupStats } from '../stats/summary';
+import { HEAT_PALETTES } from '../../model/options/heatmapOptions';
+import { layersOf, type LayerSpec } from '../../model/graph/layers';
+import { rowTitleAt } from '../../model/table/rows';
+import { layoutOf, xySeries } from '../../model/table/tableLayout';
+import { DEFAULT_SUMMARY } from '../../model/defaults';
+import type { Chart, DataTable, Id } from '../../model/types';
+import { chartPx2Pt } from '../../model/units';
+import { matrixRange, normaliseMatrix, type Matrix } from '../../stats/matrix';
+import { computeGroupStats } from '../../stats/summary';
 import { contrastColour, paletteColour, scalePosition, type HeatScale } from './heatColours';
-import { computeLayout, type Layout, type Rect } from './layout';
-import { displayName } from './model';
-import { suppliedStats } from './xyModel';
+import { computeLayout, type Layout, type Rect } from '../shared/parts/layout';
+import { compileHeatMarks } from './heatMarks';
+import type { SceneElement } from '../shared/scene/sceneElement';
+import { displayName } from '../shared/parts/names';
+import { suppliedStats } from '../../model/table/suppliedStats';
 
 interface HeatCell {
   id: Id;
+  /** The observation of the series' first column in the row of the cell: what names the cell in the drawing, whatever happens to the order of the rows, and wherever a transposed map puts it. */
+  obsId?: Id;
   /** The series (column of the table) behind the cell: what a click selects. */
   seriesId: Id;
   rowLabel: string;
@@ -53,6 +58,10 @@ export interface HeatModel {
   colLabelY: number;
   bar: HeatBar | null;
   warnings: string[];
+  /** The layers the chart is drawn from, lowest first (see model/graph/layers.ts). */
+  layers: LayerSpec[];
+  /** The marks of the layers as scene elements, compiled when a drawing, an export or a hit test first asks for them; not enumerable. */
+  marks?: SceneElement[];
 }
 
 /** Room taken at the right by the colour bar and its numbers, pt. */
@@ -148,9 +157,11 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
       const v = values[ri]?.[ci] ?? null;
       const fill = v === null ? o.missingColour : colourOf(v);
       const series = o.transpose ? defs[ri] : defs[ci];
+      const tableRow = categoryRows[o.transpose ? ci : ri];
       const text = v === null || !o.showValues ? null : o.decimals === null ? nice(v) : v.toFixed(o.decimals);
       cells.push({
         id: `cell:${ri}:${ci}`,
+        obsId: series?.columns[0].observations[tableRow]?.id,
         seriesId: series?.id ?? '',
         rowLabel: rowLabels[ri],
         colLabel: colLabels[ci],
@@ -180,7 +191,7 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
     bar = { rect, lo, hi, diverging: palette.diverging, strips, ticks: tickValues.map((value) => ({ value, y: rect.y + rect.height * (1 - (value - lo) / (hi - lo || 1)) })) };
   }
 
-  return {
+  const model: HeatModel = {
     widthPt: W,
     heightPt: H,
     layout,
@@ -191,5 +202,9 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
     colLabelY: plot.y + plot.height,
     bar,
     warnings: [...new Set(warnings)],
+    layers: layersOf(chart, table),
   };
+  let marks: SceneElement[] | undefined;
+  Object.defineProperty(model, 'marks', { enumerable: false, configurable: true, get: () => (marks ??= compileHeatMarks(chart, model)) });
+  return model;
 }

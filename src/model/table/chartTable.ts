@@ -1,8 +1,8 @@
-import { leadingColumns, usesSeriesBlocks } from './chartTypes';
+import { leadingColumns, usesSeriesBlocks } from '../graph/chartTypes';
 import { withoutExcluded } from './exclusion';
 import { applyOrder } from './groupOrder';
 import { tableSeriesWidth, xySeries } from './tableLayout';
-import type { Chart, DataTable, Group, Id, Project } from './types';
+import type { Chart, DataTable, Group, Id, Project } from '../types';
 
 /** One data set a graph can plot, from its own table or from another one. */
 export interface GraphSource {

@@ -1,5 +1,5 @@
-import { CHART_PX_MAX, CHART_PX_MIN } from './defaults';
-import type { ChartAspect } from './types';
+import { CHART_PX_MAX, CHART_PX_MIN } from '../defaults';
+import type { ChartAspect } from '../types';
 
 /** Width divided by height of a locked shape; null while free. */
 const aspectRatio = (aspect: ChartAspect): number | null =>

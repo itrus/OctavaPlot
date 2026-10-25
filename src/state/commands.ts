@@ -1,26 +1,28 @@
-import { sanitizeAxis } from '../model/axis';
-import { sanitizeBarLabels, sanitizeBars } from '../model/columnOptions';
-import { sanitizeDistribution } from '../model/distributionOptions';
-import { sanitizeLayerStyles } from '../model/layers';
-import { sanitizeLook } from '../model/look';
-import { sanitizeOrder } from '../model/groupOrder';
+import { sanitizeAxis } from '../model/graph/axis';
+import { sanitizeBarLabels, sanitizeBars } from '../model/options/columnOptions';
+import { sanitizeDistribution } from '../model/options/distributionOptions';
+import { sanitizeLayerStyles } from '../model/graph/layers';
+import { sanitizeLook } from '../model/graph/look';
+import { sanitizeOrder } from '../model/table/groupOrder';
 import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createGroup, createXyTable, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
-import { analysisKindApplies, analysisTypeInfo } from '../model/analysis';
-import { sanitizeDegree } from '../model/fitOptions';
-import { inheritChart } from '../model/chartFormat';
-import { clampFrame, defaultLayout, FREE_MAX, framesOf, newFrame, resizePanels, sanitizeLayout, turnFrames } from '../model/layout';
+import { analysisKindApplies, analysisTypeInfo } from '../model/project/analysis';
+import { sanitizeDegree } from '../model/options/fitOptions';
+import { inheritChart } from '../model/graph/chartFormat';
+import { clampFrame, defaultLayout, FREE_MAX, framesOf, newFrame, resizePanels, sanitizeLayout, turnFrames } from '../model/project/layout';
 import type { FitModelId } from '../stats/fit';
-import { effectiveTable } from '../model/chartTable';
-import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, xySeries } from '../model/tableLayout';
+import { effectiveTable } from '../model/table/chartTable';
+import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, xySeries } from '../model/table/tableLayout';
 
 /** Chart types whose series colour is the colour of symbols, lines and error bars (not of filled bars). */
-import { applyVariant, type ChartVariant, variantFits } from '../model/chartVariant';
-import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns, usesSeriesBlocks } from '../model/chartTypes';
+import { applyVariant, type ChartVariant, variantFits } from '../model/graph/chartVariant';
+import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns, usesSeriesBlocks } from '../model/graph/chartTypes';
 import { newId } from '../model/ids';
-import { paletteColor, type Palette } from '../model/palettes';
-import { createRows, sanitizeRowTitle } from '../model/rows';
-import { clearGroupSummary, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/summary';
-import { LABEL_STYLE_KEYS, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle } from '../model/style';
+import { paletteColor, type Palette } from '../model/graph/palettes';
+import { createRows, sanitizeRowTitle } from '../model/table/rows';
+import { clearGroupSummary, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/graph/summary';
+import { folderItems, nudge, reorder, sortedByName } from '../model/project/folderItems';
+import { clearPartStyles, layersOf, layerStylesAvailable, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
+import { LABEL_STYLE_KEYS, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
 import type {
   LayerStyle,
   Analysis,
@@ -43,6 +45,7 @@ import type {
   JitterConfig,
   Layout,
   LegendConfig,
+  FolderKey,
   Project,
   ReferenceLine,
   ReplicateLayout,
@@ -73,7 +76,8 @@ const mapChart = (p: Project, chartId: Id, fn: (c: Chart) => Chart): Project => 
 
 /** Apply fn to the first layer only; the same project when nothing changed. */
 const mapLayer0 = (p: Project, chartId: Id, fn: (l: ChartLayer) => ChartLayer): Project => {
-  const layer = p.charts.find((c) => c.id === chartId)?.layers[0];
+  const found = p.charts.find((c) => c.id === chartId);
+  const layer = found ? dataLayer(found) : undefined;
   if (!layer) return p;
   const next = fn(layer);
   if (next === layer) return p;
@@ -325,6 +329,8 @@ export const applyPalette = (chartId: Id, palette: Palette): Command => (p) => {
   return mapChart(p, chartId, (c) => ({
     ...c,
     paletteId: palette.id,
+    // The palette sets the colour of every series, so a colour that a part was given of its own is replaced like a manual one.
+    layerStyles: clearPartStyles(c.layerStyles, 'all', ['barFill', 'symbolColor', 'symbolBorderColor', 'lineColor', 'errorColor']),
     layers: c.layers.map((l, i) =>
       i !== 0
         ? l
@@ -370,7 +376,7 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
     return {
       ...c,
       type,
-      distribution: type === 'violin' && c.distribution.points === 'none' ? { ...c.distribution, points: 'all' } : c.distribution,
+      distribution: (type === 'violin' || type === 'groupedViolin') && c.distribution.points === 'none' ? { ...c.distribution, points: 'all' } : c.distribution,
       layers: c.layers.map((l) => ({
         ...l,
         style: { ...l.style, ...TYPE_PRESETS[type] },
@@ -384,6 +390,8 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
 export const patchStyle = (chartId: Id, scope: 'all' | Id, patch: Partial<ChartStyle>): Command => (p) =>
   mapChart(p, chartId, (c) => ({
     ...c,
+    // The latest edit wins: a part (line, error bars, points ...) that was given its own setting takes the series' again.
+    layerStyles: clearPartStyles(c.layerStyles, scope, Object.keys(patch) as Array<keyof ChartStyle>),
     layers: c.layers.map((l, i) =>
       i !== 0 ? l : scope === 'all' ? patchAllGroups(l, patch) : patchGroup(l, scope, patch),
     ),
@@ -424,13 +432,15 @@ export const resetAllDataSets = (chartId: Id): Command => (p) =>
       xAxis: axis('xAxis'),
       yAxis: axis('yAxis'),
       y2Axis: axis('y2Axis'),
-      layers: c.layers.map((l, i) => (i !== 0 ? l : { ...fresh.layers[0], id: l.id, name: l.name })),
+      layers: c.layers.map((l, i) => (i !== 0 ? l : { ...dataLayer(fresh), id: l.id, name: l.name })),
     };
   });
 
 export const resetStyle = (chartId: Id, scope: 'all' | Id, table: DataTable): Command => (p) =>
   mapChart(p, chartId, (c) => ({
     ...c,
+    // Back to the look of the series: what its parts were given of their own goes too.
+    layerStyles: clearPartStyles(c.layerStyles, scope, 'every'),
     layers: c.layers.map((l, i) => {
       if (i !== 0) return l;
       const groups = scope === 'all' ? table.groups : table.groups.filter((g) => g.id === scope);
@@ -581,7 +591,7 @@ export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; hei
   return { ...withFit, charts: [...withFit.charts, { ...made, fit: { ...made.fit, analysisId } }] };
 };
 
-/** New graph of a data table that takes its format from an existing graph (see model/chartFormat.ts). */
+/** New graph of a data table that takes its format from an existing graph (see model/graph/chartFormat.ts). */
 export const addChartLike = (chartId: Id, tableId: Id, sourceChartId: Id, linked = true): Command => (p) => {
   const table = p.dataTables.find((t) => t.id === tableId);
   const source = p.charts.find((c) => c.id === sourceChartId);
@@ -594,7 +604,7 @@ export const addChartLike = (chartId: Id, tableId: Id, sourceChartId: Id, linked
 /** Stop a graph following the graph it is linked to; it keeps all its settings as they are. */
 export const unlinkChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId && c.linkedTo !== undefined) ? mapChart(p, chartId, ({ linkedTo: _gone, ...c }) => c) : p);
 
-/** Colours, frame and gridline style of the chart (see model/axis.ts: sanitizeLook). */
+/** Colours, frame and gridline style of the chart (see model/graph/axis.ts: sanitizeLook). */
 export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
     const { grid, ...rest } = patch;
@@ -616,6 +626,50 @@ export const patchBarLabels = (chartId: Id, patch: Partial<BarLabels>): Command 
 /** Settings of box plots and violins. */
 export const patchDistribution = (chartId: Id, patch: Partial<DistributionOptions>): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, distribution: sanitizeDistribution({ ...c.distribution, ...patch }, c.distribution) }));
+
+/** The project with the items of a folder replaced by `change` of them (the lists of results and layouts are absent when empty). */
+function withFolder(p: Project, folder: FolderKey, change: <T extends { id: Id; name: string }>(list: T[]) => T[]): Project {
+  switch (folder) {
+    case 'tables':
+      return { ...p, dataTables: change(p.dataTables) };
+    case 'graphs':
+      return { ...p, charts: change(p.charts) };
+    case 'results': {
+      const list = change(p.analyses ?? []);
+      return { ...p, analyses: list.length > 0 ? list : undefined };
+    }
+    case 'layouts': {
+      const list = change(p.layouts ?? []);
+      return { ...p, layouts: list.length > 0 ? list : undefined };
+    }
+  }
+}
+
+/** Put the items of a folder that are in `ids` together before the item `before` (the end when null): the order of the navigator. */
+export const moveItems = (folder: FolderKey, ids: ReadonlyArray<Id>, before: Id | null): Command => (p) => {
+  const next = withFolder(p, folder, (list) => reorder(list, ids, before));
+  return folderItems(next, folder).every((x, i) => x.id === folderItems(p, folder)[i]?.id) ? p : next;
+};
+
+/** Move the items of a folder that are in `ids` one place earlier or later. */
+export const nudgeItems = (folder: FolderKey, ids: ReadonlyArray<Id>, step: 1 | -1): Command => (p) => {
+  const next = withFolder(p, folder, (list) => nudge(list, ids, step));
+  return folderItems(next, folder).every((x, i) => x.id === folderItems(p, folder)[i]?.id) ? p : next;
+};
+
+/** Put the items of a folder in the order of their names, A to Z. */
+export const sortItemsByName = (folder: FolderKey): Command => (p) => {
+  const next = withFolder(p, folder, (list) => sortedByName(list));
+  return folderItems(next, folder).every((x, i) => x.id === folderItems(p, folder)[i]?.id) ? p : next;
+};
+
+/** Delete several items of a folder in one step (one undo). A table takes its graphs and results with it; the last table stays. */
+export const removeItems = (folder: FolderKey, ids: ReadonlyArray<Id>): Command =>
+  composeCommands(...ids.map((id) => (folder === 'tables' ? removeTable(id) : folder === 'graphs' ? removeChart(id) : folder === 'results' ? removeAnalysis(id) : removeLayout(id))));
+
+/** Copy several items of a folder in one step; `copies` pairs each item with the ID its copy gets. */
+export const duplicateItems = (folder: FolderKey, copies: ReadonlyArray<readonly [Id, Id]>): Command =>
+  composeCommands(...copies.map(([id, copyId]) => (folder === 'tables' ? duplicateTable(id, copyId) : folder === 'graphs' ? duplicateChart(id, copyId) : folder === 'results' ? duplicateAnalysis(id, copyId) : duplicateLayout(id, copyId))));
 
 /** Rename a data table, a graph or an analysis from the navigator; a blank name is ignored. */
 export const renameItem = (kind: 'table' | 'chart' | 'analysis' | 'layout', id: Id, name: string): Command => (p) => {
@@ -815,6 +869,8 @@ export const setExcluded = (tableId: Id, cells: CellRef[], excluded: boolean, re
 /** Give a layer its own look, or take a setting back to the series' (null). A setting the layer's kind does not take is ignored. */
 export const patchLayerStyle = (chartId: Id, layerId: Id, patch: { [K in keyof LayerStyle]?: LayerStyle[K] | null }): Command => (p) =>
   mapChart(p, chartId, (c) => {
+    // Only the families that draw their parts in a look of their own take one.
+    if (!layerStylesAvailable(c)) return c;
     const merged: Record<string, unknown> = { ...(c.layerStyles[layerId] ?? {}) };
     for (const [k, v] of Object.entries(patch)) {
       if (v === null) delete merged[k];
@@ -825,6 +881,33 @@ export const patchLayerStyle = (chartId: Id, layerId: Id, patch: { [K in keyof L
     if (styles[layerId]) next[layerId] = styles[layerId];
     else delete next[layerId];
     return { ...c, layerStyles: next };
+  });
+
+/**
+ * Put a data layer one place higher (+1: it is drawn over the layer above it) or lower (-1) among the data layers of the chart.
+ * Nothing that is calculated changes. The same project when the layer cannot go that way.
+ */
+export const moveLayer = (chartId: Id, layerId: Id, step: 1 | -1): Command => (p) => {
+  const chart = p.charts.find((c) => c.id === chartId);
+  const table = chart && effectiveTable(p, chart);
+  if (!chart || !table) return p;
+  const ids = layersOf(chart, table).filter((l) => ORDERABLE_LAYER_KINDS.includes(l.kind)).map((l) => l.id);
+  const at = ids.indexOf(layerId);
+  const to = at + step;
+  if (at < 0 || to < 0 || to >= ids.length) return p;
+  [ids[at], ids[to]] = [ids[to], ids[at]];
+  return mapChart(p, chartId, (c) => ({ ...c, layerOrder: ids }));
+};
+
+/** Go back to the order of the data layers that the chart type gives. */
+export const resetLayerOrder = (chartId: Id): Command => (p) => mapChart(p, chartId, (c) => (c.layerOrder.length === 0 ? c : { ...c, layerOrder: [] }));
+
+/** Take a layer's values out of what the axis range is fitted to (it is still drawn, and nothing that is calculated changes) or put them back. */
+export const setLayerRange = (chartId: Id, layerId: Id, included: boolean): Command => (p) =>
+  mapChart(p, chartId, (c) => {
+    const out = c.rangeExcludedLayerIds.includes(layerId);
+    if (included !== out) return c;
+    return { ...c, rangeExcludedLayerIds: included ? c.rangeExcludedLayerIds.filter((id) => id !== layerId) : [...c.rangeExcludedLayerIds, layerId] };
   });
 
 /** Hide a layer of the chart (take it out of the drawing; nothing that is calculated changes) or show it again. */

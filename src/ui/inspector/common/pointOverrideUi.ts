@@ -1,6 +1,6 @@
-import type { ChartStyle, ChartType, DataTable, Id, PointLabelPlacement, Selection } from '../../model/types';
-import { LABEL_OFFSET_LIMITS, type Box, type PlacementCode, type PointLabelModel } from '../../chart/labels';
-import { LABEL_STYLE_KEYS } from '../../model/style';
+import type { ChartStyle, ChartType, DataTable, Id, PointLabelPlacement, Selection } from '../../../model/types';
+import { LABEL_OFFSET_LIMITS, type Box, type PlacementCode, type PointLabelModel } from '../../../chart/shared/parts/labels';
+import { LABEL_STYLE_KEYS } from '../../../model/graph/style';
 import { describePointLabelUi, placementPatch, type PointLabelUi } from './pointLabelUi';
 
 /** What the Inspector edits for the current selection, and the selection to fall back to when it is stale. */

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { drawLayout, layoutPngSize, layoutToPdfBlob, layoutToPngBlob, layoutToSvgString } from '../chart/layoutExport';
-import { clampFrame, FREE_MAX, GAP_MM_MAX, GRID_MAX, LABEL_PT_MAX, LABEL_PT_MIN, MARGIN_MM_MAX, pageMm, PERCENT_MAX, PERCENT_MIN, standardArrangements, sameArrangement } from '../model/layout';
-import type { FrameMm, Layout, LayoutArrangement, LayoutScaling, PanelLabelStyle } from '../model/types';
-import { useApp } from '../state/AppContext';
-import { addFreePanel, freeLayout, patchLayout, removeFreePanel, removeLayout, setFrame, setLayoutPanel } from '../state/commands';
-import { downloadBlob, exportFileName } from '../util/download';
-import { DeleteIcon, ExportIcon } from './icons';
-import { Check, ColorInput, Field, NumField, Section, SelectInput, TextInput } from './inspector/controls';
+import { drawLayout, layoutPngSize, layoutToPdfBlob, layoutToPngBlob, layoutToSvgString } from '../../chart/export/layoutExport';
+import { clampFrame, FREE_MAX, GAP_MM_MAX, GRID_MAX, LABEL_PT_MAX, LABEL_PT_MIN, MARGIN_MM_MAX, pageMm, PERCENT_MAX, PERCENT_MIN, standardArrangements, sameArrangement } from '../../model/project/layout';
+import type { FrameMm, Layout, LayoutArrangement, LayoutScaling, PanelLabelStyle } from '../../model/types';
+import { useApp } from '../../state/AppContext';
+import { addFreePanel, freeLayout, patchLayout, removeFreePanel, removeLayout, setFrame, setLayoutPanel } from '../../state/commands';
+import { downloadBlob, exportFileName } from '../../util/download';
+import { DeleteIcon, ExportIcon } from '../components/icons';
+import { Check, ColorInput, Field, NumField, Section, SelectInput, TextInput } from '../inspector/common/controls';
 
 const CANVAS_PAD = 24;
 const SCROLLBAR_ROOM = 17;

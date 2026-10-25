@@ -1,10 +1,7 @@
-import { dataGaps } from './axisScale';
-import type { Chart, ReferenceLine } from '../model/types';
-import { extent, n2 } from '../model/units';
-import type { GroupedModel } from './groupedModel';
-import type { ChartModel } from './model';
-import type { YAxisScale } from './scales';
-import type { XyModel } from './xyModel';
+import type { Chart, ReferenceLine } from '../../../model/types';
+import type { YAxisScale } from '../axes/scales';
+import { extent, n2 } from '../../../model/units';
+import { dataGaps } from '../axes/axisScale';
 
 /** A reference line ready to draw: a path across the plotting region, and where its label goes. */
 export interface PlacedReferenceLine {
@@ -92,12 +89,28 @@ export function referenceLineNotices(r: { skipped: readonly ReferenceLine[]; uns
   return out;
 }
 
+/** What the placing of lines needs of an XY-shaped model (XY, survival, histogram) ... */
+interface XyShaped {
+  xScale: (v: number) => number;
+  yScale: (v: number) => number;
+  x: AxisFacts;
+  y: AxisFacts;
+  layout: { plot: { x: number; y: number; width: number; height: number } };
+}
+
+/** ... and of a model over categories (columns, grouped bars): a value axis that may run across. */
+interface CategoryShaped {
+  orient: { horizontal: boolean; toScreen: (x: number, y: number) => { x: number; y: number } };
+  yScale: (v: number) => number;
+  y: AxisFacts;
+  layout: { plot: { x: number; y: number; width: number; height: number } };
+}
+
 /** The model of a chart of a family that can have reference lines (the others carry no axes to put them on). */
 export type ModelOfFamily =
-  | { family: 'category'; model: ChartModel }
-  | { family: 'xy' | 'survival' | 'hist'; model: XyModel }
-  | { family: 'grouped'; model: GroupedModel }
-  | { family: 'whole' | 'heat'; model: unknown };
+  | { family: 'column' | 'grouped'; model: CategoryShaped }
+  | { family: 'xy' | 'survival' | 'histogram'; model: XyShaped }
+  | { family: 'pie' | 'heatmap'; model: unknown };
 
 /** Where the reference lines of the chart are drawn on its model, and the notices for the ones that cannot be. */
 export function referenceLinesOf(chart: Chart, any: ModelOfFamily) {
@@ -107,9 +120,9 @@ export function referenceLinesOf(chart: Chart, any: ModelOfFamily) {
   switch (any.family) {
     case 'xy':
     case 'survival':
-    case 'hist':
+    case 'histogram':
       return placeReferenceLines(lines, { xMap: any.model.xScale, yMap: any.model.yScale, xAxis: any.model.x, yAxis: any.model.y, plot: any.model.layout.plot });
-    case 'category':
+    case 'column':
     case 'grouped': {
       const m = any.model;
       const horizontal = m.orient.horizontal;

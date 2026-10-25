@@ -1,9 +1,8 @@
 import { newId } from './ids';
-import { untitledProjectName } from '../util/download';
-import { DEFAULT_PALETTE_ID } from './palettes';
-import { chartFamily } from './chartTypes';
-import { defaultSeriesName, subLabels, summaryFormatInfo } from './tableLayout';
-import { createRows } from './rows';
+import { DEFAULT_PALETTE_ID } from './graph/palettes';
+import { chartFamily } from './graph/chartTypes';
+import { defaultSeriesName, subLabels, summaryFormatInfo } from './table/tableLayout';
+import { createRows } from './table/rows';
 import type {
   AxisConfig,
   BarLabels,
@@ -25,6 +24,7 @@ import type {
   SummarySpec,
   SurvivalOptions,
 } from './types';
+import { untitledProjectName } from '../util/stamp';
 
 export const FONT_FAMILY = 'Arial, Helvetica, sans-serif';
 export const INITIAL_ROWS = 1000;
@@ -49,6 +49,8 @@ function axisTitlesFor(type: ChartType): { x: string; y: string } {
     case 'xyScatter':
     case 'xyLine':
     case 'xyLineSymbols':
+    case 'xySpikes':
+    case 'xyArea':
       return { x: 'X', y: 'Y' };
     case 'contingencyBars':
     case 'contingencyStacked':
@@ -190,9 +192,14 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
   xyScatter: { showBars: false, showSymbols: true, showLines: false, showMeanLine: false },
   xyLine: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   xyLineSymbols: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
+  // Spikes: the line layer draws the stems; an area has its fill under the line, which is its outline.
+  xySpikes: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
+  xyArea: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   groupedBar: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedStacked: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedFloating: { showBars: true, showSymbols: false, showLines: false, showMeanLine: true },
+  groupedBox: { showBars: true, showSymbols: true, showLines: false, showMeanLine: false },
+  groupedViolin: { showBars: true, showSymbols: true, showLines: false, showMeanLine: false },
   heatmap: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedLine: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
   pie: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
@@ -279,7 +286,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     bars: { ...DEFAULT_BARS },
     barLabels: { ...DEFAULT_BAR_LABELS },
     // A violin shows its values from the start: the Points box then switches them off.
-    distribution: { ...DEFAULT_DISTRIBUTION, ...(type === 'violin' ? { points: 'all' as const } : {}) },
+    distribution: { ...DEFAULT_DISTRIBUTION, ...(type === 'violin' || type === 'groupedViolin' ? { points: 'all' as const } : {}) },
     pairs: { bridge: false },
     heatmap: { ...DEFAULT_HEATMAP },
     histogram: { ...DEFAULT_HISTOGRAM },
@@ -297,6 +304,8 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     annotations: [],
     referenceLines: [],
     hiddenLayerIds: [],
+    rangeExcludedLayerIds: [],
+    layerOrder: [],
     layerStyles: {},
   };
 }

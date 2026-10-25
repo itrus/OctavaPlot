@@ -1,20 +1,27 @@
-import { rowTitleAt } from '../model/rows';
-import { isGroupedChartType, supportsHorizontal } from '../model/chartTypes';
-import { resolveStyle } from '../model/style';
-import { resolveSummary } from '../model/summary';
-import { layoutOf, xySeries } from '../model/tableLayout';
-import type { Chart, ChartStyle, DataTable, Id } from '../model/types';
-import { chartPx2Pt, extent, n2 } from '../model/units';
-import { summaryOf, type GroupStats } from '../stats/summary';
-import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from './errorGeometry';
-import { computeLayout, type Layout } from './layout';
-import { displayName, hash01, type Orientation } from './model';
-import { barLabelText, placeBarLabel, type BarLabelGeom } from './barLabels';
-import { axisMapper, onAxis, resolveAxis } from './axisScale';
-import type { YAxisScale } from './scales';
-import { suppliedStats } from './xyModel';
-import { compileGroupedScene } from './categoryChrome';
-import type { ChromeScene } from './scene';
+import { rowTitleAt } from '../../model/table/rows';
+import { isGroupedChartType, supportsHorizontal } from '../../model/graph/chartTypes';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
+import { resolveSummary } from '../../model/graph/summary';
+import { layoutOf, xySeries } from '../../model/table/tableLayout';
+import type { Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
+import { chartPx2Pt, extent, n2 } from '../../model/units';
+import { summaryOf, type GroupStats } from '../../stats/summary';
+import { boxSummary, densityProfile, normaliseProfiles, quantile6, sortedFinite, type BoxSummary, type DensityProfile } from '../../stats/distribution';
+import { buildBox, buildViolin, type DistGeom } from '../shared/parts/distributionGeom';
+import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from '../shared/parts/errorGeometry';
+import { computeLayout, type Layout } from '../shared/parts/layout';
+import { barLabelText, placeBarLabel, type BarLabelGeom } from '../shared/parts/barLabels';
+import { axisMapper, onAxis, resolveAxis } from '../shared/axes/axisScale';
+import type { YAxisScale } from '../shared/axes/scales';
+import { layersOf, type LayerSpec } from '../../model/graph/layers';
+import { compileGroupedMarks } from './groupedMarks';
+import type { ChromeScene } from '../shared/scene/scene';
+import type { SceneElement } from '../shared/scene/sceneElement';
+import type { Orientation } from '../shared/parts/orientation';
+import { displayName } from '../shared/parts/names';
+import { hash01 } from '../shared/parts/jitter';
+import { suppliedStats } from '../../model/table/suppliedStats';
+import { compileGroupedScene } from './groupedChrome';
 
 /** How the bars of a cluster are arranged: side by side, stacked as counts, or stacked as shares of the row total. */
 type Arrangement = 'side' | 'stacked' | 'percent';
@@ -28,8 +35,10 @@ interface GroupedCategory {
 }
 
 interface GroupedBar {
-  /** Stable identity: the series and the table row. */
+  /** Identity of the mark: the series and the table row. */
   id: Id;
+  /** The observation of the first column of the series in the row: what names the mark in the drawing, whatever happens to the order of the rows. */
+  obsId?: Id;
   row: number;
   categoryIndex: number;
   /** Value drawn: the centre, the count, or the percentage. */
@@ -48,15 +57,21 @@ interface GroupedBar {
   /** Floating bars: the lower and upper value of the bar, and the line across it at the centre. */
   range?: [number, number];
   centerLine?: { x1: number; x2: number; y: number };
+  /** Box and violin charts: the body and lines of the cell, in place of the rectangle (which is then the box, or empty). */
+  dist?: DistGeom | null;
 }
 
 interface GroupedPoint {
   id: Id;
+  /** As for a bar: the observation of the first column of the series in the row. */
+  obsId?: Id;
   row: number;
   px: number;
   py: number;
   value: number;
   stats: GroupStats | null;
+  /** A mark of its own (the mean of a box plot); absent: the series' symbol. */
+  shape?: SymbolShape;
 }
 
 interface GroupedSeries {
@@ -77,7 +92,7 @@ export interface GroupedModel {
   widthPt: number;
   heightPt: number;
   layout: Layout;
-  /** Horizontal bars are built as vertical ones in a virtual region and turned into place (see Orientation in model.ts). */
+  /** Horizontal bars are built as vertical ones in a virtual region and turned into place (see Orientation in shared/parts/orientation.ts). */
   orient: Orientation;
   arrangement: Arrangement;
   asLines: boolean;
@@ -88,6 +103,8 @@ export interface GroupedModel {
   /** Index into `series` of each legend entry. */
   legendSeries: number[];
   warnings: string[];
+  /** The layers the chart is drawn from, lowest first (see model/graph/layers.ts). */
+  layers: LayerSpec[];
   /** The chrome of the chart (clip, backgrounds, grids, axes, titles, legend) as scene elements. */
   scene?: ChromeScene;
 }
@@ -105,11 +122,13 @@ const arrangementOf = (type: Chart['type']): Arrangement => (type === 'contingen
 export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel {
   if (!isGroupedChartType(chart.type)) throw new Error('buildGroupedModel needs a grouped or contingency chart');
   const [W, H] = [chartPx2Pt(chart.widthPx), chartPx2Pt(chart.heightPx)];
-  const layer = chart.layers[0];
+  const layer = dataLayer(chart);
   const layout = layoutOf(table);
   const arrangement = arrangementOf(chart.type);
   const asLines = chart.type === 'groupedLine';
   const floating = chart.type === 'groupedFloating';
+  const isDist = chart.type === 'groupedBox' || chart.type === 'groupedViolin';
+  const opts = chart.distribution;
   const contingency = table.kind === 'contingency';
   const warnings: string[] = [];
   const seriesDefs = xySeries(table);
@@ -161,7 +180,14 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         if (reps.length > 0) span = extent(reps.map((x) => x.value));
         else if (stats?.interval.status === 'ok' && stats.interval.lower !== null && stats.interval.upper !== null) span = [stats.interval.lower, stats.interval.upper];
       }
-      return { row: r, ci, value, stats, count: contingency ? (values[0] ?? undefined) : undefined, reps, span };
+      // Box plots and violins work on the replicate values: on a log axis only the ones above 0 count.
+      let dist: { values: number[]; summary: BoxSummary | null; profile: DensityProfile | null; sorted: number[] } | null = null;
+      if (isDist && reps.length > 0) {
+        const values = reps.map((x) => x.value).filter((v) => chart.yAxis.scale === 'linear' || v > 0);
+        dist = { values, summary: chart.type === 'groupedBox' ? boxSummary(values, opts.whisker, opts.tukeyK) : null, profile: chart.type === 'groupedViolin' ? densityProfile(values, { smoothing: opts.smoothing, bandwidth: opts.bandwidth, trim: opts.trim }) : null, sorted: sortedFinite(values) };
+        value = dist.sorted.length > 0 ? quantile6(dist.sorted, 0.5) : null;
+      }
+      return { row: r, ci, value, stats, count: contingency ? (values[0] ?? undefined) : undefined, reps, span, dist };
     });
     return { s, style, cells, meaning, label: displayName(chart, s.id, s.name) };
   });
@@ -172,9 +198,25 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   // Positive parts pile up above the baseline and negative ones below it (spec 8.4); the axis shows both piles.
   const stackedTotals = categoryRows.flatMap((_, ci) => [raw.reduce((sum, r) => sum + Math.max(0, r.cells[ci].value ?? 0), 0), raw.reduce((sum, r) => sum + Math.min(0, r.cells[ci].value ?? 0), 0)]);
   // Individual values are shown over bars of replicates, not over lines or counts.
+  if (isDist && layout.kind !== 'replicates') warnings.push('Box plots and violins need the replicate values: enter the data as replicates.');
   const showDots = (style: ChartStyle) => (chart.type === 'groupedBar' || floating) && layout.kind === 'replicates' && style.showSymbols;
+  /** What a cell of a box plot or violin occupies on the value axis. */
+  const distShow = (c: (typeof raw)[number]['cells'][number], style: ChartStyle): number[] => {
+    const d = c.dist;
+    if (!d) return [];
+    const out: number[] = [];
+    if (d.summary) out.push(d.summary.whiskerLow, d.summary.whiskerHigh, d.summary.q1, d.summary.q3, ...(style.showSymbols ? (opts.points === 'all' ? [d.summary.min, d.summary.max] : opts.points === 'outside' ? d.summary.outliers : []) : []));
+    if (chart.type === 'groupedViolin') {
+      if (d.profile) out.push(d.profile.v[0], d.profile.v[d.profile.v.length - 1]);
+      else out.push(...d.sorted);
+      if (opts.points === 'all' && style.showSymbols && d.sorted.length) out.push(d.sorted[0], d.sorted[d.sorted.length - 1]);
+    }
+    return out;
+  };
   const allY =
-    arrangement === 'side'
+    isDist
+      ? raw.flatMap((r) => r.cells.flatMap((c) => distShow(c, r.style)))
+      : arrangement === 'side'
       ? raw.flatMap((r) => r.cells.flatMap((c) => (c.value === null ? [] : floating ? (c.span ? [...c.span, c.value] : []) : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars, r.style.errorDirection) : [c.value]), ...(showDots(r.style) ? c.reps.map((x) => x.value) : [])])))
       : stackedTotals;
   const horizontal = chart.orientation === 'horizontal' && supportsHorizontal(chart.type);
@@ -183,7 +225,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const axisCfg = arrangement === 'side' ? chart.yAxis : { ...chart.yAxis, scale: 'linear' as const, reverse: false };
   const yAxis = resolveAxis({
     values: arrangement === 'percent' ? [0, 100] : allY,
-    includeZero: axisCfg.scale === 'linear' && (!asLines || allY.every((v) => v >= 0)),
+    includeZero: axisCfg.scale === 'linear' && !isDist && (!asLines || allY.every((v) => v >= 0)),
     min: chart.yAxis.min ?? (arrangement === 'percent' ? 0 : null),
     max: chart.yAxis.max ?? (arrangement === 'percent' ? 100 : null),
     majorInterval: chart.yAxis.majorInterval,
@@ -225,6 +267,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const nSeries = Math.max(1, raw.length);
   const cluster = slot * CLUSTER_FRACTION;
   const baseline = Math.min(Math.max(yAxis.log ? 0 : (chart.bars.baseline ?? 0), y0), y1);
+  const violinWidths = chart.type === 'groupedViolin' ? normaliseProfiles(raw.flatMap((r) => r.cells.map((c) => c.dist?.profile ?? null)), opts.normalisation) : [];
+  let cellIndex = -1;
   const stackUp = new Array<number>(categoryRows.length).fill(0);
   const stackDown = new Array<number>(categoryRows.length).fill(0);
   let clipped = 0;
@@ -239,6 +283,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     let errorMeaning: string | null = null;
     let prevCi = -2;
     for (const cell of r.cells) {
+      cellIndex++;
       if (cell.value === null) continue;
       // A value with no position on a log axis (0 or less) is left out and counted.
       if (!onAxis(yAxis, cell.value)) {
@@ -250,7 +295,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       if (asLines) {
         const px = cat.centerX;
         const py = yScale(cell.value);
-        points.push({ id, row: cell.row, px, py, value: cell.value, stats: cell.stats });
+        points.push({ id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, px, py, value: cell.value, stats: cell.stats });
         linePath += `${cell.ci === prevCi + 1 ? 'L' : 'M'}${n2(px)},${n2(py)}`;
         prevCi = cell.ci;
         if (cell.stats) {
@@ -266,6 +311,31 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       const stacked = arrangement !== 'side';
       const bw = stacked ? cluster * 0.75 : cluster / nSeries;
       const x = stacked ? cat.centerX - bw / 2 : cat.centerX - cluster / 2 + si * bw;
+      // Box plots and violins of a cell with no replicate values have nothing to draw.
+      if (isDist && !cell.dist) continue;
+      if (isDist && cell.dist) {
+        const centerX = x + bw / 2;
+        const common = { groupId: id, centerX, toY: yScale, opts, lineColor: r.style.lineColor, lineWidthPt: r.style.lineWidthPt, lineOpacity: r.style.lineOpacity };
+        const dist = chart.type === 'groupedBox' ? buildBox({ ...common, width: bw * opts.boxWidth, summary: cell.dist.summary }) : buildViolin({ ...common, halfWidth: (bw * opts.violinWidth) / 2, profile: cell.dist.profile, widths: violinWidths[cellIndex] ?? null, values: cell.dist.values });
+        const rect = dist?.rect ?? { x: centerX, y: yScale(cell.value), width: 0, height: 0 };
+        bars.push({ id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, categoryIndex: cell.ci, value: cell.value, ...rect, stats: null, dist });
+        const summary = cell.dist.summary;
+        const wantDot = (v: number): boolean => {
+          if (!r.style.showSymbols) return false;
+          if (opts.points === 'all') return true;
+          return opts.points === 'outside' && chart.type === 'groupedBox' && !!summary && (v < summary.whiskerLow || v > summary.whiskerHigh);
+        };
+        // With no density the values themselves are the picture of a violin.
+        const showAll = chart.type === 'groupedViolin' && dist?.shape === 'points';
+        const dotWidth = dist?.kind === 'box' ? bw * opts.boxWidth : bw * opts.violinWidth;
+        for (const rep of cell.reps) {
+          if (!onAxis(yAxis, rep.value) || (!showAll && !wantDot(rep.value))) continue;
+          dots.push({ id: rep.id, row: cell.row, px: centerX + (chart.jitter.enabled ? (hash01(rep.id) - 0.5) * chart.jitter.widthFraction * dotWidth : 0), py: yScale(rep.value), value: rep.value, stats: null });
+        }
+        if (opts.showMean && summary && Number.isFinite(yScale(summary.mean))) dots.push({ id: `${id}:mean`, row: cell.row, px: centerX, py: yScale(summary.mean), value: summary.mean, stats: null, shape: 'plus' });
+        if (dist?.note) warnings.push(`${r.label}, ${categories[cell.ci].label}: ${dist.note}.`);
+        continue;
+      }
       let from = baseline;
       let to = cell.value;
       if (floating) {
@@ -291,9 +361,11 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       const pb = yScale(to);
       const yTop = Math.min(pa, pb);
       const yBottom = Math.max(pa, pb);
-      const gbar: GroupedBar = { id, row: cell.row, categoryIndex: cell.ci, value: cell.value, x, y: yTop, width: bw, height: Math.max(0, yBottom - yTop), stats: cell.stats, count: cell.count };
+      const gbar: GroupedBar = { id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, categoryIndex: cell.ci, value: cell.value, x, y: yTop, width: bw, height: Math.max(0, yBottom - yTop), stats: cell.stats, count: cell.count };
       if (floating) {
         gbar.range = [from, to];
+        gbar.centerLine = { x1: x, x2: x + bw, y: yScale(cell.value) };
+      } else if (chart.type === 'groupedBar' && r.style.showMeanLine) {
         gbar.centerLine = { x1: x, x2: x + bw, y: yScale(cell.value) };
       }
       bars.push(gbar);
@@ -329,7 +401,10 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   if (noSpan > 0) warnings.push(`${noSpan} value${noSpan === 1 ? ' has' : 's have'} no range to draw a floating bar from: enter replicates, or limits as the values already calculated.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
 
-  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, legendSeries, warnings: [...new Set(warnings)] };
+  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileGroupedScene(chart, model);
+  // The marks are compiled when a drawing, an export or a hit test first asks for them.
+  let marks: SceneElement[] | undefined;
+  Object.defineProperty(model.scene, 'marks', { enumerable: false, configurable: true, get: () => (marks ??= compileGroupedMarks(chart, model)) });
   return model;
 }

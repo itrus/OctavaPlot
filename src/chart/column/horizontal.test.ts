@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable } from '../model/defaults';
-import type { DataTable, Project } from '../model/types';
-import { addChart, patchAxis, patchBarLabels, patchDistribution, patchLook } from '../state/commands';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { chartToSvgString } from './export';
-import { buildChartModel } from './model';
+import { createChart, createColumnTable } from '../../model/defaults';
+import type { DataTable, Project } from '../../model/types';
+import { addChart, patchAxis, patchBarLabels, patchDistribution, patchLook } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { chartToSvgString } from '../export/export';
+import { buildColumnModel } from './columnModel';
 
 const setup = (type: 'bar' | 'scatter' | 'mean' | 'box' | 'violin' = 'bar') => {
   const table: DataTable = createColumnTable('Data', true);
@@ -17,8 +17,8 @@ const flip = (p: Project) => patchLook(p.charts[0].id, { orientation: 'horizonta
 describe('horizontal column charts', () => {
   it('turn the drawing a quarter: values along the bottom, categories down the left', () => {
     const { p, table } = setup();
-    const v = buildChartModel(p.charts[0], table);
-    const h = buildChartModel(flip(p), table);
+    const v = buildColumnModel(p.charts[0], table);
+    const h = buildColumnModel(flip(p), table);
     expect(h.orient.horizontal).toBe(true);
     // The virtual region is the real one on its side.
     expect(h.orient.virtual.width).toBeCloseTo(h.orient.real.height, 6);
@@ -39,7 +39,7 @@ describe('horizontal column charts', () => {
   });
   it('turns every shape by one matrix that keeps lengths', () => {
     const { p, table } = setup();
-    const h = buildChartModel(flip(p), table);
+    const h = buildColumnModel(flip(p), table);
     const m = /matrix\(([-\d. ]+)\)/.exec(h.orient.matrix!)![1].split(' ').map(Number);
     expect(m.slice(0, 4)).toEqual([0, 1, -1, 0]);
     // A point of the virtual drawing and the same point turned by the matrix agree.
@@ -58,8 +58,8 @@ describe('horizontal column charts', () => {
   it('make room on the left for the longest name', () => {
     const { p, table } = setup();
     table.groups[0].name = 'A very long data set name indeed';
-    const v = buildChartModel(p.charts[0], table).layout.plot;
-    const h = buildChartModel(flip(p), table).layout.plot;
+    const v = buildColumnModel(p.charts[0], table).layout.plot;
+    const h = buildColumnModel(flip(p), table).layout.plot;
     expect(h.x).toBeGreaterThan(v.x + 40);
   });
   it('use the value axis settings for the numbers: scale, range, format, reverse', () => {
@@ -67,26 +67,26 @@ describe('horizontal column charts', () => {
     const flipped: Project = { ...p, charts: [flip(p)] };
     const id = flipped.charts[0].id;
     const logged = patchAxis(id, 'yAxis', { scale: 'log10', prefix: '$' })(flipped).charts[0];
-    expect(buildChartModel(logged, table).y.log).toBe(10);
+    expect(buildColumnModel(logged, table).y.log).toBe(10);
     expect(chartToSvgString(logged, table)).toContain('>$10<');
     const reversed = patchAxis(id, 'yAxis', { reverse: true })(flipped).charts[0];
-    const r = buildChartModel(reversed, table);
+    const r = buildColumnModel(reversed, table);
     expect(r.orient.toScreen(0, r.yScale(r.y.domain[0])).x).toBeCloseTo(r.orient.real.x + r.orient.real.width, 6);
   });
   it('have no right axis, and say that point labels are not available yet', () => {
     const { p, table } = setup();
     let c = flip(p);
     c = { ...c, layers: [{ ...c.layers[0], groupOverrides: { [table.groups[0].id]: { axisBinding: 'secondary' } } }] };
-    expect(buildChartModel(c, table).y2).toBeNull();
+    expect(buildColumnModel(c, table).y2).toBeNull();
     const labelled = { ...c, layers: [{ ...c.layers[0], style: { ...c.layers[0].style, showPointLabels: true } }] };
-    expect(buildChartModel(labelled, table).warnings.join(' ')).toMatch(/Point labels are not available on horizontal charts/);
+    expect(buildColumnModel(labelled, table).warnings.join(' ')).toMatch(/Point labels are not available on horizontal charts/);
   });
   it('put the label of a bar beside its end', () => {
     const { p, table } = setup();
     const c = patchBarLabels(p.charts[0].id, { show: 'value', decimals: 1 })({ ...p, charts: [flip(p)] }).charts[0];
     const svg = chartToSvgString(c, table);
     expect(svg).toMatch(/text-anchor="start"[^>]*>1\.2</);
-    const m = buildChartModel(c, table);
+    const m = buildColumnModel(c, table);
     const g = m.groups[0];
     const end = m.orient.toScreen(g.centerX, m.yScale(g.centreValue!)).x;
     const dots = Math.max(...g.points.map((q) => m.orient.toScreen(q.cx, q.cy).x));
@@ -99,7 +99,7 @@ describe('horizontal column charts', () => {
     for (const type of ['box', 'violin'] as const) {
       const { p, table } = setup(type);
       const c = patchDistribution(p.charts[0].id, { points: 'all' })({ ...p, charts: [flip(p)] }).charts[0];
-      const m = buildChartModel(c, table);
+      const m = buildColumnModel(c, table);
       expect(m.groups[0].dist).not.toBeNull();
       expect(chartToSvgString(c, table)).not.toContain('NaN');
     }

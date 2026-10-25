@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ANALYSIS_TYPES, analysisKindApplies, analysisTypeInfo } from '../model/analysis';
-import { tableTypeInfo } from '../model/chartTypes';
-import type { AnalysisKind, DataTable, Id } from '../model/types';
+import { ANALYSIS_TYPES, analysisKindApplies, analysisTypeInfo } from '../../model/project/analysis';
+import { tableTypeInfo } from '../../model/graph/chartTypes';
+import type { AnalysisKind, DataTable, Id } from '../../model/types';
 import { Modal } from './NewItemDialogs';
 
 /** A new analysis: which analysis, and of which table. Only tables of a kind the analysis applies to are offered. */

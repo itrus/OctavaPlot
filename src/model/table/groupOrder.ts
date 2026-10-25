@@ -1,4 +1,4 @@
-import type { Id } from './types';
+import type { Id } from '../types';
 
 /** The ways the order of the data sets on a graph can be changed (the buttons of the Data Sets on Graph tab). */
 export type MoveOp = 'top' | 'up' | 'down' | 'bottom' | 'reverse';

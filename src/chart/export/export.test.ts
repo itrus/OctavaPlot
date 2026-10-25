@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createExampleProject } from '../model/defaults';
-import { parseProject, stringifyProject } from '../state/serialize';
-import { patchPointStyle, patchStyle, patchSummary, setChartType, setRowTitles } from '../state/commands';
-import type { Project } from '../model/types';
-import { n2 } from '../model/units';
-import { ChartSvg } from './ChartSvg';
+import { createExampleProject } from '../../model/defaults';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { patchPointStyle, patchStyle, patchSummary, setChartType, setRowTitles } from '../../state/commands';
+import type { Project } from '../../model/types';
+import { n2 } from '../../model/units';
+import { ColumnChartSvg } from '../column/ColumnChartSvg';
 import { chartToSvgString } from './export';
-import { hitAttrs } from './hitTest';
-import { buildChartModel } from './model';
+import { hitAttrs } from '../shared/scene/hitTest';
+import { buildColumnModel } from '../column/columnModel';
 
 describe('SVG export', () => {
   it('is a vector SVG without editor-only or hit-test content', () => {
@@ -61,15 +61,15 @@ describe('point label rendering', () => {
   const svgOf = (p: Project): string => chartToSvgString(p.charts[0], p.dataTables[0]);
   const editorHtml = (p: Project): string =>
     renderToStaticMarkup(
-      createElement(ChartSvg, {
+      createElement(ColumnChartSvg, {
         chart: p.charts[0],
-        model: buildChartModel(p.charts[0], p.dataTables[0]),
+        model: buildColumnModel(p.charts[0], p.dataTables[0]),
         editor: { selection: { kind: 'chart' } as never },
         cssWidth: '1px',
         cssHeight: '1px',
       }),
     );
-  const modelOf = (p: Project) => buildChartModel(p.charts[0], p.dataTables[0]);
+  const modelOf = (p: Project) => buildColumnModel(p.charts[0], p.dataTables[0]);
   // Without legend or annotations the labels are the last block of the export.
   const labelBlock = (s: string) => s.slice(s.indexOf('<g><g><text'));
   const farOff = { pointLabelPlacement: 'custom', pointLabelOffsetXPt: 40, pointLabelOffsetYPt: -40 };

@@ -1,5 +1,5 @@
-import type { SymbolShape } from '../model/types';
-import { n2 } from '../model/units';
+import type { SymbolShape } from '../../../model/types';
+import { n2 } from '../../../model/units';
 
 /**
  * SVG path for a symbol centred on (cx, cy). `size` is the physical extent in

@@ -1,57 +1,41 @@
 import { scaleLinear, scaleLog } from 'd3';
-import { BAR_PALETTE } from '../model/defaults';
-import { paletteById } from '../model/palettes';
-import { isPatternInvisible, resolveBarFill, type FillSpec } from '../model/fill';
-import { rowTitleAt } from '../model/rows';
-import { resolveSummary } from '../model/summary';
-import { resolveStyle } from '../model/style';
-import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SymbolShape } from '../model/types';
-import { chartPx2Pt, n2 } from '../model/units';
-import { statsFor, summarize, type GroupStats, type GroupSummary, type Notice } from '../stats/summary';
-import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, populateAxes, type RangeRow } from './axes';
-import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, type ErrorBarGeom } from './errorGeometry';
-import { countMarks, patternMarks, type PatternMarks, type Point, type Rect } from './hatch';
-import { computeLayout, type Layout } from './layout';
-import { anyLabelsRequested, buildPointLabels, emptyPointLabelModel, labelWarnings, type PointLabelModel } from './labels';
-import { memoFor } from '../stats/memo';
-import { boxSummary, densityProfile, normaliseProfiles, sortedFinite, type BoxSummary, type DensityProfile } from '../stats/distribution';
-import { supportsHorizontal } from '../model/chartTypes';
-import { barLabelText, placeBarLabel, type BarLabelGeom } from './barLabels';
-import { buildBox, buildFloating, buildViolin, type DistGeom } from './distributionGeom';
-import { columnLayout } from './columns';
-import { axisMapper, onAxis, resolveAxis } from './axisScale';
-import type { YAxisScale } from './scales';
-import { compileCategoryScene } from './categoryChrome';
-import type { ChromeScene } from './scene';
+import { BAR_PALETTE } from '../../model/defaults';
+import { paletteById } from '../../model/graph/palettes';
+import { isPatternInvisible, resolveBarFill } from '../../model/graph/fill';
+import { rowTitleAt } from '../../model/table/rows';
+import { resolveSummary } from '../../model/graph/summary';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
+import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
+import { chartPx2Pt, n2 } from '../../model/units';
+import { statsFor, summarize, type GroupStats, type GroupSummary, type Notice } from '../../stats/summary';
+import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, populateAxes, type RangeRow } from '../shared/axes/axes';
+import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, type ErrorBarGeom } from '../shared/parts/errorGeometry';
+import { countMarks, patternMarks, type Point, type Rect } from '../shared/parts/hatch';
+import { computeLayout, type Layout } from '../shared/parts/layout';
+import { anyLabelsRequested, buildPointLabels, emptyPointLabelModel, labelWarnings, type PointLabelModel } from '../shared/parts/labels';
+import { memoFor } from '../../stats/memo';
+import { boxSummary, densityProfile, normaliseProfiles, sortedFinite, type BoxSummary, type DensityProfile } from '../../stats/distribution';
+import { supportsHorizontal } from '../../model/graph/chartTypes';
+import { barLabelText, placeBarLabel, type BarLabelGeom } from '../shared/parts/barLabels';
+import { buildBox, buildFloating, buildViolin, type DistGeom } from '../shared/parts/distributionGeom';
+import { columnLayout } from './columnLayout';
+import { axisMapper, onAxis, resolveAxis } from '../shared/axes/axisScale';
+import type { YAxisScale } from '../shared/axes/scales';
+import { layersOf, type LayerSpec } from '../../model/graph/layers';
+import { compileColumnMarks } from './columnMarks';
+import type { ChromeScene } from '../shared/scene/scene';
+import type { SceneElement } from '../shared/scene/sceneElement';
+import { Orientation } from '../shared/parts/orientation';
+import { displayName } from '../shared/parts/names';
+import { hash01 } from '../shared/parts/jitter';
+import { BarGeom } from '../shared/parts/barGeom';
+import { compileColumnScene } from './columnChrome';
 
 /**
  * Chart model: the pure, React-free pipeline
  *   summaries -> Y scale -> layout -> geometry
- * `buildChartModel` returns everything the SVG drawing layer needs.
+ * `buildColumnModel` returns everything the SVG drawing layer needs.
  */
-
-export interface BarGeom {
-  id: Id;
-  groupId: Id;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  fill: string;
-  opacity: number;
-  stroke: string;
-  strokeWidth: number;
-  /** Opacity of the border, 0 to 1. */
-  strokeOpacity: number;
-  /** Resolved fill (mode, pattern and its physical sizes); the legacy fields above stay as they were. */
-  fillSpec: FillSpec;
-  /** Pattern lattice anchor: bar centre x, baseline pixel of the group's own axis. */
-  anchor: Point;
-  /** Bar rectangle intersected with the plot area; null when empty. */
-  bounds: Rect | null;
-  /** Pattern marks, only in pattern mode with bounds. */
-  marks: PatternMarks | null;
-}
 
 interface PointGeom {
   id: Id;
@@ -110,24 +94,11 @@ export interface GroupGeom {
   dist: DistGeom | null;
 }
 
-/**
- * A horizontal column chart is built as a vertical one (categories along x, values along y) in a "virtual" plotting region
- * `virtual` whose width is the height of the real one and whose height is its width; `toScreen` turns a point of that
- * drawing into a point of the real region `real` (a quarter turn with a flip: lengths and angles between lines stay).
- */
-export interface Orientation {
-  horizontal: boolean;
-  real: Rect;
-  virtual: Rect;
-  /** Position on the page of a point of the virtual drawing. */
-  toScreen: (x: number, y: number) => { x: number; y: number };
-  /** The SVG matrix that does the same to a whole group of shapes. */
-  matrix: string | null;
-}
-
 /** The line joining the values of one row (a subject) in the data sets that have one. */
 interface PairLine {
   id: Id;
+  /** The first value of the subject: what names the line in the drawing, whatever happens to the order of the rows. */
+  obsId?: Id;
   row: number;
   d: string;
   color: string;
@@ -135,7 +106,7 @@ interface PairLine {
   opacity: number;
 }
 
-export interface ChartModel {
+export interface ColumnModel {
   widthPt: number;
   heightPt: number;
   layout: Layout;
@@ -155,6 +126,8 @@ export interface ChartModel {
   /** Point labels; always present, empty while none is requested. They never affect ranges, summaries or layout. */
   labels: PointLabelModel;
   warnings: string[];
+  /** The layers the chart is drawn from, lowest first (see model/graph/layers.ts). */
+  layers: LayerSpec[];
   /** The chrome of the chart (clip, backgrounds, grids, axes, titles, legend) as scene elements. */
   scene?: ChromeScene;
 }
@@ -168,33 +141,15 @@ export function intersectRects(a: Rect, b: Rect): Rect | null {
   return x1 > x0 && y1 > y0 ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : null;
 }
 
-export const displayName = (chart: Chart, groupId: Id, fallback: string): string => {
-  const custom = chart.displayNames[groupId];
-  return custom !== undefined && custom.trim() !== '' ? custom : fallback;
-};
-
-/** Deterministic pseudo-random in [0,1) from a string (FNV-1a hash -> mulberry32). */
-export function hash01(key: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < key.length; i++) {
-    h ^= key.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  let t = (h + 0x6d2b79f5) | 0;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}
-
 /** Notices about the interval; shown only while the error bars are shown (unless the summary was rejected). */
 const SPREAD_NOTICE_CODES: ReadonlySet<Notice['code']> = new Set(['n-too-small', 'coverage', 'too-large', 'level-range', 'interval-invalid']);
 const isSpreadNotice = (n: Notice, stats: GroupStats): boolean =>
   SPREAD_NOTICE_CODES.has(n.code) || (n.code === 'nonfinite' && stats.centre !== null);
 
-export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
+export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   const widthPt = chartPx2Pt(chart.widthPx);
   const heightPt = chartPx2Pt(chart.heightPx);
-  const layer = chart.layers[0];
+  const layer = dataLayer(chart);
   const warnings: string[] = [];
   // Horizontal columns: the right-hand axis does not exist there, and the data sets all sit on the one value axis.
   const horizontal = chart.orientation === 'horizontal' && supportsHorizontal(chart.type);
@@ -544,17 +499,19 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
       let d = '';
       let segments = 0;
       let joined = false;
+      let anchor: Id | undefined;
       for (const g of groups) {
         const p = g.points.find((q) => q.row === row && q.observationId !== null);
         if (!p || !Number.isFinite(p.cy)) {
           if (!chart.pairs.bridge) joined = false;
           continue;
         }
+        anchor ??= p.observationId ?? undefined;
         d += `${joined ? 'L' : 'M'}${n2(p.cx)},${n2(p.cy)}`;
         if (joined) segments++;
         joined = true;
       }
-      if (segments > 0 && first) pairLines.push({ id: `pair:${row}`, row, d, color: first.lineColor, strokeWidth: first.lineWidthPt, opacity: first.lineOpacity });
+      if (segments > 0 && first) pairLines.push({ id: `pair:${row}`, obsId: anchor, row, d, color: first.lineColor, strokeWidth: first.lineWidthPt, opacity: first.lineOpacity });
     }
   }
 
@@ -639,7 +596,7 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
 
   // Clipped marks and truncated baselines, per axis. Counts are strict (a value on the limit is inside)
   // and nothing is excluded from the drawing. Visual warnings (spec 21.5 L1462).
-  const clipped: ChartModel['clipped'] = { primary: { bars: 0, points: 0 }, secondary: { bars: 0, points: 0 } };
+  const clipped: ColumnModel['clipped'] = { primary: { bars: 0, points: 0 }, secondary: { bars: 0, points: 0 } };
   const barsOnAxis: Record<AxisBinding, boolean> = { primary: false, secondary: false };
   for (const g of groups) {
     const [lo, hi] = [...axisOf(g.axis).scale.domain].sort((a, b) => a - b);
@@ -681,7 +638,10 @@ export function buildChartModel(chart: Chart, table: DataTable): ChartModel {
     );
   }
 
-  const model: ChartModel = { widthPt, heightPt, layout, orient, y, yScale, y2, y2Scale, clipped, groups, pairLines, legendGroups, labels, warnings: [...new Set(warnings)] };
-  model.scene = compileCategoryScene(chart, model);
+  const model: ColumnModel = { widthPt, heightPt, layout, orient, y, yScale, y2, y2Scale, clipped, groups, pairLines, legendGroups, labels, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
+  model.scene = compileColumnScene(chart, model);
+  // The marks are compiled when a drawing, an export or a hit test first asks for them, so a model that is only measured does not pay for them.
+  let marks: SceneElement[] | undefined;
+  Object.defineProperty(model.scene, 'marks', { enumerable: false, configurable: true, get: () => (marks ??= compileColumnMarks(chart, model)) });
   return model;
 }
