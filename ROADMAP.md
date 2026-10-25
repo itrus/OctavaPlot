@@ -39,7 +39,7 @@ Checked against the exit criteria of each phase. "Not reviewed" means this pass 
 
 Also in place: a calculation cache keyed by identity (`src/stats/calcCache.ts`), PDF and layout export, linked graphs, a folder overview with thumbnails and multi-select (Navigator), and tags for tables and graphs.
 
-Dead code is checked with `npx knip`.
+The plan for the gaps is below. Dead code is checked with `npx knip`.
 
 ## Phases
 
@@ -90,22 +90,70 @@ Above about 100k points, clip to the viewport and simplify the preview only. Nev
 - Saved style presets for common single- and double-column widths, stated in pt.
 - Rich text with Greek letters, sub- and superscripts. Missing glyphs are reported.
 
-## Work items
-
-Done:
+## Done so far
 
 - First-class layers and bindings: hide, order, range, own looks (XY and survival), one data layer.
 - A shared calculation cache keyed by calculation identity.
 - A scene shared by preview, export and hit testing for the marks of every family; stable ids on them.
 - PNG at a chosen resolution.
 - A capability registry (`src/model/graph/capabilities.ts`) that the inspector and the README table read.
+- A folder overview of the pages, and the layout of the source with its architecture test.
 
-Next:
+## Plan
 
-1. Bar labels, point labels and annotations into the scene; then the chrome of pie and heat map.
-2. Font diagnostics and the export inspection panel.
-3. Observation roles (subject), then the locked graphs that wait for them.
-4. Confirm P0 and P3 against their exit criteria, which this pass did not do. The first work items of the earlier roadmap were: confidence intervals and failed-fit uncertainty; pt/px sizing and export scaling; broken-axis and histogram geometry; hardened project and CSV import and saving.
+Sizes are estimates (S: half a day, M: one to two days, L: several days). P0 and P3 have not been audited, so their rows describe how the gaps are found, not what they are.
+
+| # | Work | Why here |
+|---|---|---|
+| 1 | Labels, annotations and the editor's overlays into the scene | Closes the open P2 criterion. Gives the export panel a complete list of what is drawn. |
+| 2 | Export panel and font diagnostics | Needs step 1: every text must be a scene element to check its font. |
+| 3 | P0 and P3 audits, read-only, in parallel | Correctness defects should be known early. |
+| 4 | P5 groundwork: Playwright workflows and visual fixtures | Protects the refactors of P3 and P4. Needs the font decision of step 2. |
+| 5 | Fixes from the audits, then the P3 build items | |
+| 6 | P4 families, starting with observation roles | |
+| 7 | The rest of P5: migrations, benchmarks, gallery, docs | |
+
+### 1. Labels, annotations and overlays into the scene (about L, five steps)
+
+Each step compares the SVG of many setups before and after, as the earlier moves of families did.
+
+| Step | Content | Size |
+|---|---|---|
+| 1a | Annotations as scene elements. The live position during a drag is a parameter, because the scene must not depend on editor state. `whenSelected` is widened from a data set to an annotation or a point. | S |
+| 1b | Bar and value labels (column and grouped), as a layer for each data set so that they can be hidden. | M |
+| 1c | Point labels (leader lines, text, hit targets) and the selection ring and frame, as editor-only scene elements. | M |
+| 1d | Pie and heat map chrome (background, titles, legend, axis labels) with the chrome builders that already exist. | M |
+| 1e | With all of that in the scene, the seven `*ChartSvg` components become one renderer. | S |
+
+Also in step 1: a zoom-independence test for every family, not only XY. Done when no SVG component draws a mark itself, and labels and annotations have ids and hit targets from the scene.
+
+### 2. Export panel and font diagnostics (about M, plus L for glyph checks)
+
+- **The panel** shows, for one graph: the size in px, pt and mm at the chosen resolution; the format and resolution, with the canvas limit check that now sits in the graph view; the fonts requested, used and missing; objects clipped outside the axes and rows that cannot be drawn (from the counts the models already keep); the known limits (PDF is a raster, fonts are not embedded in an SVG). It holds the choice of format and resolution and the Export button.
+- **Fonts:** a pure module takes the availability check as a parameter, so tests can pass a fake. Availability uses `document.fonts.check` together with a width probe against the generic fonts, because `check` alone answers yes for any name.
+- **Glyphs** (second part): once step 1 is done every text is a scene element, so Greek letters and sub- and superscripts can be checked and missing glyphs reported.
+- **Thin strokes and small text:** these warnings need a target print width (open decision 1).
+- **Tests:** a fake font checker, the report for fixture graphs, PNG pixels and resolution.
+
+### 3. Audits (S to M each, no code changes)
+
+- **P0:** for each item, which tests exist, which are missing, and which fixtures of section 22.1 of the calculation contracts are implemented. The result is a table: defect, missing test, or fine.
+- **P3:** property search, mixed-state multi-selection and small screens have no clear implementation yet; numeric annotation placement, grid input, the reset commands and the keyboard handling partly exist. The audit finds the gaps against the exit criterion (reproduce a figure from numeric inputs).
+
+### Later phases
+
+| Phase | Gaps | Size |
+|---|---|---|
+| **P3** | Property search (needs a registry of field labels), mixed state, the three reset levels made explicit, keyboard navigation, small screens (there are no media queries) | M each, L for search |
+| **P4** | Observation roles first (a subject column; exclusion exists). Then the locked graphs: `cat.nested`, `grp.paired`, `three.bars`, `three.dots` and `xy.trajectory` need roles; `xy.bars`, `xy.bubble` and `xy.vector` need more columns for an XY series; `curve.smooth` needs reference fixtures; `grp.scatterS` is a layout; `xy.offset` needs offset traces with a scale bar. Forest, ROC, Q-Q, Bland-Altman and residual plots each need a calculation contract with fixtures first. | roles L, each graph M, each new family L |
+| **P5** | Playwright workflows (none yet), visual fixtures with a pinned font, an explicit migration chain tested against old files, benchmarks against the performance table (not measured), fits in a worker, an example gallery, docs | M each, the worker L |
+
+### Open decisions
+
+1. **Target print width**, for the thin-stroke and small-text warnings: a setting on each graph (90 mm, 140 mm, 180 mm or custom) or one for the project. Proposed: on the graph, since figures differ.
+2. **Fonts in exports:** only diagnose, or also embed the font or turn text into paths in the SVG. Embedding makes exports reproducible (a P5 goal) but makes files larger and raises licensing questions. Proposed: diagnostics now, embedding decided later.
+3. **Where the export panel lives:** a dialog behind the Export button, or a tab of the inspector. Proposed: a dialog, since it is a one-time action.
+4. **Observation roles** (P4): how a subject is declared in a table. To be designed before step 6.
 
 ## Size
 
