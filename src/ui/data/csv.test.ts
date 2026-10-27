@@ -183,3 +183,33 @@ describe('CSV export of excluded values', () => {
     expect(r.ok && r.data.names).toEqual(['B', 'A excluded']);
   });
 });
+
+describe('the header and the size of a file', () => {
+  it('ignores a byte-order mark, as Excel writes one, in the first group name', () => {
+    expect(parseCsv('﻿a,b\n1,2')).toEqual([['a', 'b'], ['1', '2']]);
+    const r = importCsv('﻿Control,Treated\n1,2\n3,4');
+    expect(r.ok && r.data.names).toEqual(['Control', 'Treated']);
+  });
+  it('keeps two groups with the same name as two groups', () => {
+    const r = importCsv('A,A\n1,2\n3,4');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.names).toEqual(['A', 'A']);
+      expect(r.data.values).toEqual([[1, 2], [3, 4]]);
+    }
+  });
+  it('names a group with an empty header by its place', () => {
+    const r = importCsv('A,,C\n1,2,3');
+    expect(r.ok && r.data.names).toEqual(['A', 'Group 2', 'C']);
+  });
+  it('refuses a file with more data lines than a table holds, with the count', () => {
+    const lines = Array.from({ length: 100001 }, (_, i) => String(i));
+    const r = importCsv('A\n' + lines.join('\n'));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.message).toMatch(/at most 100,000 rows.*100,001 data lines/);
+    expect(importCsv('A\n' + lines.slice(0, 100000).join('\n')).ok).toBe(true);
+  });
+  it('refuses NaN and Infinity as text, since a cell is a number or empty', () => {
+    for (const bad of ['NaN', 'Infinity', '-Infinity', 'inf']) expect(importCsv('A\n' + bad).ok).toBe(false);
+  });
+});

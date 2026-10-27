@@ -23,6 +23,8 @@ export interface SceneElement {
   editorOnly?: boolean;
   /** Present only in the editor, while the series (data set) with this ID is selected (its glow, its frame). */
   whenSelected?: string;
+  /** Present only in the editor, while the annotation with this ID is selected (its frame). */
+  whenAnnotationSelected?: string;
 }
 
 type Attrs = NonNullable<SceneElement['attrs']>;

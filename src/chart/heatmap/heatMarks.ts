@@ -5,6 +5,8 @@ import type { HeatModel } from './heatmapModel';
 import { el, type SceneElement } from '../shared/scene/sceneElement';
 import { svgId } from '../shared/scene/svgIds';
 import { measureText } from '../shared/parts/text';
+import { numberStartPt } from '../../model/graph/axis';
+import { X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP } from '../shared/parts/layout';
 
 const SMALLEST_LABEL_PT = 8;
 
@@ -72,4 +74,34 @@ export function compileHeatMarks(chart: Chart, model: HeatModel): SceneElement[]
   };
 
   return model.layers.flatMap((layer) => (hidden.has(layer.id) ? [] : elementsOf(layer)));
+}
+
+/**
+ * The labels of the rows (on the left) and of the columns (along the bottom, turned when they are crowded) of a heat map as scene
+ * elements, with the axis they belong to as their hit target. Each axis is drawn only when it is visible.
+ */
+export function heatAxisLabelElements(chart: Chart, model: HeatModel): SceneElement[] {
+  const { plot } = model.layout;
+  const xa = chart.xAxis;
+  const ya = chart.yAxis;
+  const cw = plot.width / Math.max(1, model.cols.length);
+  const ch = plot.height / Math.max(1, model.rows.length);
+  const bottom = plot.y + plot.height;
+  const rows = ya.visible
+    ? model.rows.map((label, i) =>
+        el('text', [['x', n2(plot.x - numberStartPt(ya) - Y_TICK_LABEL_GAP)], ['y', n2(plot.y + ch * (i + 0.5))], ['dy', '0.35em'], ['text-anchor', 'end'], ['font-size', ya.tickFontSizePt], ['font-weight', ya.tickBold ? 'bold' : undefined], ['fill', chart.textColor]], { text: label, hit: { kind: 'axis', objectId: 'y' }, id: svgId('row-label', i) }),
+      )
+    : [];
+  const cols = xa.visible
+    ? model.cols.map((label, i) => {
+        const x = plot.x + cw * (i + 0.5);
+        const y = bottom + numberStartPt(xa) + X_TICK_LABEL_GAP + xa.tickFontSizePt * 0.8;
+        const common = [['font-size', xa.tickFontSizePt], ['font-weight', xa.tickBold ? 'bold' : undefined], ['fill', chart.textColor]] as const;
+        const opts = { text: label, hit: { kind: 'axis' as const, objectId: 'x' }, id: svgId('col-label', i) };
+        if (!model.layout.xTickRotated) return el('text', [['x', n2(x)], ['y', n2(y)], ['text-anchor', 'middle'], ...common], opts);
+        const ry = n2(y - xa.tickFontSizePt * 0.4);
+        return el('text', [['x', n2(x)], ['y', ry], ['text-anchor', 'end'], ['transform', `rotate(-45 ${n2(x)} ${ry})`], ...common], opts);
+      })
+    : [];
+  return [...rows, ...cols];
 }

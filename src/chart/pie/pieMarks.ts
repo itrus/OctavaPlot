@@ -1,8 +1,9 @@
 import type { LayerSpec } from '../../model/graph/layers';
 import type { Chart } from '../../model/types';
 import { n2 } from '../../model/units';
-import { SELECT_COLOR } from '../shared/scene/ChartParts';
+import { SELECT_COLOR } from '../shared/scene/annotations';
 import type { PieModel } from './pieModel';
+import { legendElements } from '../shared/scene/chrome';
 import { el, type SceneElement } from '../shared/scene/sceneElement';
 import { svgId } from '../shared/scene/svgIds';
 
@@ -54,4 +55,13 @@ export function compilePieMarks(chart: Chart, model: PieModel): SceneElement[] {
   };
 
   return model.layers.flatMap((layer) => (hidden.has(layer.id) ? [] : elementsOf(layer)));
+}
+
+/** The legend of a pie or doughnut chart as scene elements: a key in the colours of each part, and its name. Nothing without a legend. */
+export function pieLegendElements(chart: Chart, model: PieModel): SceneElement[] {
+  return legendElements(chart, model.layout, (it, w) => {
+    const part = model.parts[model.legendParts[it.index]];
+    const st = part.style;
+    return { groupId: part.groupId, keys: [el('rect', [['x', n2(it.x)], ['y', n2(it.y - 10)], ['width', w], ['height', 20], ['fill', st.barFill], ['fill-opacity', st.barOpacity], ['stroke', st.barBorderColor], ['stroke-width', st.barBorderWidthPt], ['stroke-opacity', st.barBorderOpacity < 1 ? st.barBorderOpacity : undefined]], { id: svgId('legend', part.groupId) })] };
+  });
 }

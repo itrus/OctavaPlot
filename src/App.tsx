@@ -65,6 +65,13 @@ function Shell() {
       veryNarrow.removeEventListener('change', apply);
     };
   }, []);
+  // Where the panels float over the workspace (max-width 900px in styles.css), choosing an item in the navigator takes it out of the way.
+  const lastView = useRef(view);
+  useEffect(() => {
+    const changed = lastView.current !== view && !(lastView.current.kind === view.kind && 'id' in lastView.current && 'id' in view && lastView.current.id === view.id);
+    lastView.current = view;
+    if (changed && window.matchMedia('(max-width: 900px)').matches) setNavOpen(false);
+  }, [view]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   // What was reset when the last file was opened: all of it, with the paths, is behind the Details button.

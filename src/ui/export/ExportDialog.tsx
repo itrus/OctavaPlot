@@ -4,11 +4,11 @@ import { useApp } from '../../state/AppContext';
 import { EXPORT_DPI_CHOICES, PNG_DPI_CHOICES, type ExportDpi, type ExportFormat, type PngDpi } from '../../state/settings';
 import { Field, SelectInput, SubHeading } from '../inspector/common/controls';
 import { Modal } from '../dialogs/NewItemDialogs';
-import { browserFontAvailable } from './browserFonts';
+import { browserFontAvailable, browserHasGlyph } from './browserFonts';
 import { exportStatusText, type ExportOutcome, type ExportState } from './exportJob';
 
 /** What the dialog says about: the drawing, the fonts it asks for and what its model warned about. The format and resolution are the dialog's own. */
-type ExportSubject = Omit<ExportReportInput, 'format' | 'dpi' | 'isFontAvailable'>;
+type ExportSubject = Omit<ExportReportInput, 'format' | 'dpi' | 'isFontAvailable' | 'hasGlyph'>;
 
 interface Props {
   /** A graph is PNG at its own resolution and PDF at the layout one; a layout page is both at the layout one. */
@@ -28,6 +28,22 @@ const FORMATS: ReadonlyArray<readonly [ExportFormat, string]> = [
 ];
 
 const mmText = (n: number) => String(Math.round(n * 10) / 10);
+
+/** What the font lacks of the characters in the texts, in plain language. */
+function GlyphsBody({ glyphs }: { glyphs: ExportReport['glyphs'] }) {
+  if (glyphs === null) return <div className="muted small">The characters of the texts were not checked for this export.</div>;
+  if (glyphs.skipped !== null) return <div className="muted small">{glyphs.skipped}</div>;
+  if (glyphs.missing.length === 0) return <div className="muted small">{glyphs.checked === 0 ? 'The texts hold only basic Latin characters.' : `All ${glyphs.checked} special characters (Greek letters, accents, symbols) are in ${glyphs.font}.`}</div>;
+  return (
+    <ul className="warnings">
+      {glyphs.missing.map((m) => (
+        <li key={m.codePoint}>
+          ⚠ {m.char} ({m.codePoint}, {m.count}×) is not in {glyphs.font}: it is drawn with another font, or as an empty box.
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** The report in plain language. Separate from the dialog's controls so that it reads as the document it is. */
 function ReportBody({ report }: { report: ExportReport }) {
@@ -61,6 +77,8 @@ function ReportBody({ report }: { report: ExportReport }) {
           {f.missing.length > 0 && f.replacedBy === null && <div className="muted small">Not installed: {f.missing.join(', ')}.</div>}
         </div>
       ))}
+      <SubHeading>Characters</SubHeading>
+      <GlyphsBody glyphs={report.glyphs} />
       {report.printWidthMm !== null && (
         <>
           <SubHeading>Print width {report.printWidthMm} mm</SubHeading>
@@ -90,7 +108,7 @@ export function ExportDialog({ kind, subject, state, onExport, onClose }: Props)
   // A graph's PNG has its own resolution (96 dpi is its size on screen); every PDF and a layout page use the other one.
   const ownPng = kind === 'graph' && format === 'png';
   const dpi = ownPng ? settings.pngDpi : settings.exportDpi;
-  const report = buildExportReport({ ...subject, format, dpi, isFontAvailable: browserFontAvailable });
+  const report = buildExportReport({ ...subject, format, dpi, isFontAvailable: browserFontAvailable, hasGlyph: browserHasGlyph });
   const tooBig = report.raster?.exceedsCanvasLimit === true;
   const busy = state.phase === 'preparing' || state.phase === 'rasterizing' || state.phase === 'encoding';
   const reason = tooBig ? `${report.raster?.width} × ${report.raster?.height} px is more than the browser can make. Lower the resolution, make the graph smaller, or choose SVG.` : null;

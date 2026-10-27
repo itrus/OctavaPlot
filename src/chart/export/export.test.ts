@@ -6,7 +6,7 @@ import { parseProject, stringifyProject } from '../../state/serialize';
 import { patchPointStyle, patchStyle, patchSummary, setChartType, setRowTitles } from '../../state/commands';
 import type { Project } from '../../model/types';
 import { n2 } from '../../model/units';
-import { ColumnChartSvg } from '../column/ColumnChartSvg';
+import { ChartCanvas } from '../anyModel';
 import { chartToSvgString } from './export';
 import { hitAttrs } from '../shared/scene/hitTest';
 import { buildColumnModel } from '../column/columnModel';
@@ -58,12 +58,13 @@ describe('point label rendering', () => {
   const labelledFrom = (p: Project, patch: Record<string, unknown> = {}) =>
     patchStyle(p.charts[0].id, 'all', { showSymbols: true, showPointLabels: true, pointLabelSource: 'value', ...patch })(p);
   const labelled = (patch: Record<string, unknown> = {}) => labelledFrom(createExampleProject(), patch);
-  const svgOf = (p: Project): string => chartToSvgString(p.charts[0], p.dataTables[0]);
+  // The ids of the labels and leaders (svgIds.ts) came after the format pinned here: they are left out of the comparison.
+  const svgOf = (p: Project): string => chartToSvgString(p.charts[0], p.dataTables[0]).replace(/ id="(?:point-label|leader)-[^"]*"/g, '');
   const editorHtml = (p: Project): string =>
     renderToStaticMarkup(
-      createElement(ColumnChartSvg, {
+      createElement(ChartCanvas, {
         chart: p.charts[0],
-        model: buildColumnModel(p.charts[0], p.dataTables[0]),
+        any: { family: 'column' as const, model: buildColumnModel(p.charts[0], p.dataTables[0]) },
         editor: { selection: { kind: 'chart' } as never },
         cssWidth: '1px',
         cssHeight: '1px',

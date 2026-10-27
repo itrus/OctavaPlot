@@ -15,6 +15,7 @@ import { RowsMenu } from './RowsMenu';
 import { leadingColumns, usesSeriesBlocks } from '../../model/graph/chartTypes';
 import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../../model/table/tableLayout';
 import { blockToText, formatCell, parseCell, planPaste, selectionStrings } from '../data/cellText';
+import { planFill } from '../data/fill';
 
 // Sizes at 100% zoom, in px; the table multiplies them by its zoom.
 const BASE_ROW_H = 24;
@@ -443,6 +444,18 @@ export function DataTableView({ table }: { table: DataTable }) {
     requestAnimationFrame(() => ensureVisible(before, selRef.current.fc));
   };
 
+  // Ctrl+D and Ctrl+R: fill the selection from its first row or column (the row above or column to the left for one row or column); one history entry.
+  const fillSelection = (direction: 'down' | 'right') => {
+    const plan = planFill(table, bounds(sel), direction);
+    if (!plan.ok) {
+      setMessage({ kind: 'error', text: plan.message });
+      return;
+    }
+    const values = setCells(table.id, plan.edits);
+    run(plan.label, plan.titles.length > 0 ? composeCommands(setRowTitles(table.id, plan.titles), values) : values);
+    setMessage({ kind: 'info', text: plan.message });
+  };
+
   // ---- clipboard
   const fromInput = (e: { target: EventTarget }) => e.target instanceof HTMLInputElement;
   const onCopy = (e: ClipboardEvent) => {
@@ -506,6 +519,12 @@ export function DataTableView({ table }: { table: DataTable }) {
           if (cut) clearSelection();
         }
       });
+      return;
+    }
+    // Fill down and right, as in a spreadsheet. Ctrl+D and Ctrl+R belong to the browser (bookmark, reload) only when the grid is not focused.
+    if (mod && !e.altKey && !e.shiftKey && (e.code === 'KeyD' || e.code === 'KeyR')) {
+      e.preventDefault();
+      fillSelection(e.code === 'KeyD' ? 'down' : 'right');
       return;
     }
     // Row operations. Alt combinations are free: browser zoom uses Ctrl, and typing a character ignores Alt.

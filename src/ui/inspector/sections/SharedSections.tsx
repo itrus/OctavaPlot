@@ -27,6 +27,7 @@ import {
   setDisplayName,
   setGroupOnGraph,
   setLegendColumns,
+  setLegendOffset,
   setLegendItemVisible,
 } from '../../../state/commands';
 import { LINE_STYLES } from '../../../model/graph/look';
@@ -35,7 +36,7 @@ import { DialogShell, trapTab } from '../../dialogs/DialogShell';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, SubHeading, TextInput } from '../common/controls';
 import { BarLabelSection, hasBarLabels } from './LookControls';
 import { LegendOrder } from './LegendOrder';
-import { LEGEND_MAX_COLUMNS, legendColumns } from '../../../model/graph/legendEntries';
+import { LEGEND_MAX_COLUMNS, LEGEND_MAX_OFFSET_PT, legendColumns, legendOffset } from '../../../model/graph/legendEntries';
 import { displayName } from '../../../chart/shared/parts/names';
 
 /**
@@ -228,6 +229,8 @@ export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[]
           />
         </Field>
         <NumField label="Columns" value={legendColumns(chart.legend)} min={1} max={LEGEND_MAX_COLUMNS} step={1} disabled={!chart.legend.visible} onCommit={(v) => run('Legend columns', setLegendColumns(chart.id, v))} hint="Entries in a row; 1 is one under the other" />
+        <NumField label="Move right" value={legendOffset(chart.legend).x} min={-LEGEND_MAX_OFFSET_PT} max={LEGEND_MAX_OFFSET_PT} step={1} unit="pt" disabled={!chart.legend.visible} onCommit={(v) => run('Move legend', setLegendOffset(chart.id, v, legendOffset(chart.legend).y))} hint="Shifts the legend from its place; negative moves it left" />
+        <NumField label="Move down" value={legendOffset(chart.legend).y} min={-LEGEND_MAX_OFFSET_PT} max={LEGEND_MAX_OFFSET_PT} step={1} unit="pt" disabled={!chart.legend.visible} onCommit={(v) => run('Move legend', setLegendOffset(chart.id, legendOffset(chart.legend).x, v))} hint="Negative moves it up" />
         <LegendOrder chart={chart} groups={groups} />
         <SubHeading>Data sets in legend</SubHeading>
         {groups.map((g) => (

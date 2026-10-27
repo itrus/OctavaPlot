@@ -1,5 +1,5 @@
 import type { DataTable } from '../../model/types';
-import { sanitizeRowTitle } from '../../model/table/rows';
+import { MAX_TABLE_ROWS, sanitizeRowTitle } from '../../model/table/rows';
 import { formatCell, parseCell } from './cellText';
 import type { DecimalSeparator } from '../../model/types';
 
@@ -200,6 +200,8 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
     return { error: err instanceof Error ? err.message : String(err) };
   }
   if (records.length < 2) return { error: 'The file needs a header line with the group names and at least one data line.' };
+  // The same limit as a paste or a table that grows: a file is refused before any table is made from it.
+  if (records.length - 1 > MAX_TABLE_ROWS) return { error: `A table holds at most ${MAX_TABLE_ROWS.toLocaleString('en-US')} rows; the file has ${(records.length - 1).toLocaleString('en-US')} data lines.` };
   const header = records[0];
   // A header that does not split is a differently delimited file; say so instead of failing on its first value.
   if (header.length === 1) {

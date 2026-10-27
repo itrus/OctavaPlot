@@ -138,6 +138,23 @@ describe('nonlinear models', () => {
     expect(r.rss).toBeLessThan(1e-6);
     expect(r.params.map((p) => p.name)).toHaveLength(5);
   });
+  it('names the fast phase k1 and the slow one k2 whichever phase the data lists first', () => {
+    const xs = Array.from({ length: 30 }, (_, i) => (i * 12) / 29);
+    for (const [k1, a1, k2, a2] of [[2.5, 6, 0.15, 4], [0.15, 4, 2.5, 6], [0.05, 1, 3, 9], [20, 5, 0.1, 2]] as const) {
+      const r = ok(fitCurve(pts(xs, (x) => 1 + a1 * Math.exp(-k1 * x) + a2 * Math.exp(-k2 * x)), { model: 'exp_two_phase' }));
+      expect(r.converged).toBe(true);
+      expect(value(r, 2)).toBeGreaterThan(value(r, 4));
+      expect(value(r, 2)).toBeCloseTo(Math.max(k1, k2), 3);
+      expect(value(r, 4)).toBeCloseTo(Math.min(k1, k2), 3);
+    }
+  });
+  it('never shows uncertainty for two phases that collapsed into one', () => {
+    // The start values do not find the two rates of this curve: the fit ends with equal rates, and says so.
+    const xs = Array.from({ length: 30 }, (_, i) => (i * 6) / 29);
+    const r = ok(fitCurve(pts(xs, (x) => 1 + 2 * Math.exp(-5 * x) + 8 * Math.exp(-0.5 * x)), { model: 'exp_two_phase' }));
+    if (!r.converged) expect(r.params.every((q) => q.se === null)).toBe(true);
+    else expect(Math.abs(value(r, 2) - value(r, 4))).toBeGreaterThan(0.1);
+  });
   it('keeps a rate from going negative', () => {
     const r = ok(fitCurve(pts([0, 1, 2, 3, 4, 5], (x) => 3 + 2 * x), { model: 'exp_decay' }));
     expect(value(r, 2)).toBeGreaterThanOrEqual(0);

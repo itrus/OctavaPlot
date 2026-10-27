@@ -3,7 +3,7 @@ import { sanitizeBarLabels, sanitizeBars } from '../model/options/columnOptions'
 import { sanitizeDistribution } from '../model/options/distributionOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLook } from '../model/graph/look';
-import { sanitizeLegendLayout, withoutLegendColumns, withoutLegendOrder } from '../model/graph/legendEntries';
+import { sanitizeLegendLayout, withoutLegendColumns, withoutLegendOffset, withoutLegendOrder } from '../model/graph/legendEntries';
 import { sanitizeOrder } from '../model/table/groupOrder';
 import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createGroup, createXyTable, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
 import { analysisKindApplies, analysisTypeInfo } from '../model/project/analysis';
@@ -370,6 +370,10 @@ export const setLegendOrder = (chartId: Id, order: readonly Id[]): Command => (p
 /** The number of columns of the legend (1 to 6; 1 is the usual layout). */
 export const setLegendColumns = (chartId: Id, columns: number): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, legend: { ...withoutLegendColumns(c.legend), ...sanitizeLegendLayout({ columns }) } }));
+
+/** Move the legend from its place by this many pt (right and down are positive); 0 and 0 puts it back. */
+export const setLegendOffset = (chartId: Id, x: number, y: number): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, legend: { ...withoutLegendOffset(c.legend), ...sanitizeLegendLayout({ offsetXPt: x, offsetYPt: y }) } }));
 
 /** Show or hide one data set in the legend, leaving the others as they are. */
 export const setLegendItemVisible = (chartId: Id, groupId: Id, visible: boolean): Command => (p) =>

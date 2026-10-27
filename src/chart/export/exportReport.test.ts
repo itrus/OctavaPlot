@@ -63,7 +63,7 @@ describe('buildExportReport', () => {
   });
   it('keeps its keys in a fixed order and survives a JSON round trip', () => {
     const r = buildExportReport(input({ warnings: ['w'], printWidthMm: 140 }));
-    expect(Object.keys(r)).toEqual(['name', 'format', 'dpi', 'size', 'raster', 'fonts', 'warnings', 'printWidthMm', 'printWarnings', 'limits']);
+    expect(Object.keys(r)).toEqual(['name', 'format', 'dpi', 'size', 'raster', 'fonts', 'glyphs', 'warnings', 'printWidthMm', 'printWarnings', 'limits']);
     expect(Object.keys(r.size)).toEqual(['px', 'pt', 'mm']);
     expect(Object.keys(r.raster!)).toEqual(['width', 'height', 'megapixels', 'exceedsCanvasLimit']);
     expect(Object.keys(r.fonts[0])).toEqual(['requested', 'families', 'used', 'missing', 'replacedBy']);

@@ -7,7 +7,7 @@ import { canvasToPngBlob } from './pngDpi';
 import { prefixIds as prefixIdsWith } from './prefixIds';
 
 /**
- * Export renders the same declarative <ColumnChartSvg> without editor state, so
+ * Export renders the same declarative <ChartCanvas> without editor state, so
  * selection outlines, hover helpers and hit-test attributes cannot leak in.
  * Output stays vector: paths, text and symbols.
  */

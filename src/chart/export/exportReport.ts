@@ -1,5 +1,6 @@
 import { chartPx2Pt } from '../../model/units';
 import { checkFonts, type FontCheck } from './fontCheck';
+import { checkGlyphs, type GlyphCheck } from './glyphCheck';
 import { exportPixels, fitsCanvas } from './pngDpi';
 
 type ReportFormat = 'svg' | 'png' | 'pdf';
@@ -22,6 +23,10 @@ export interface ExportReportInput {
   /** The font-family lists the drawing asks for (CSS syntax); each is checked once. */
   fontFamilies: readonly string[];
   isFontAvailable: (family: string) => boolean;
+  /** Every text of the drawing (see drawingTexts), to look the characters up in the font; absent or null when they are not known (a page layout). */
+  texts?: readonly string[] | null;
+  /** Whether a font has a character; asked only for characters outside basic Latin. */
+  hasGlyph?: (family: string, char: string) => boolean;
   /** What the model says it could not draw or clipped, as it words it. */
   warnings: readonly string[];
   /** The print width the graph is checked against, mm; null = none. */
@@ -44,6 +49,8 @@ export interface ExportReport {
   /** The pixels of the PNG or of the picture in a PDF; null for SVG. */
   raster: { width: number; height: number; megapixels: number; exceedsCanvasLimit: boolean } | null;
   fonts: FontCheck[];
+  /** Characters of the texts that the font in use does not have; null when the texts are not known. */
+  glyphs: GlyphCheck | null;
   warnings: string[];
   printWidthMm: number | null;
   printWarnings: string[];
@@ -55,6 +62,7 @@ const round = (v: number, digits: number): number => Math.round(v * 10 ** digits
 export function buildExportReport(input: ExportReportInput): ExportReport {
   const { widthPx, heightPx } = input;
   const mm = (px: number) => round((px * 25.4) / 96, 2);
+  const fonts = [...new Set(input.fontFamilies)].map((list) => checkFonts(list, input.isFontAvailable));
   const pixels = input.format === 'svg' ? null : exportPixels({ widthPx, heightPx }, input.dpi);
   return {
     name: input.name,
@@ -66,7 +74,9 @@ export function buildExportReport(input: ExportReportInput): ExportReport {
       mm: { width: mm(widthPx), height: mm(heightPx) },
     },
     raster: pixels && { width: pixels.width, height: pixels.height, megapixels: round((pixels.width * pixels.height) / 1e6, 2), exceedsCanvasLimit: !fitsCanvas(pixels.width, pixels.height) },
-    fonts: [...new Set(input.fontFamilies)].map((list) => checkFonts(list, input.isFontAvailable)),
+    fonts,
+    // The characters are looked up in the font the drawing is made in: the first list is the chart's own.
+    glyphs: input.texts && input.hasGlyph ? checkGlyphs(input.texts, fonts[0]?.used ?? null, input.hasGlyph) : null,
     warnings: [...input.warnings],
     printWidthMm: input.printWidthMm,
     printWarnings: [...input.printWarnings],

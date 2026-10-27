@@ -2,10 +2,11 @@ import type { LayerKind, LayerSpec } from '../../model/graph/layers';
 import { linePattern } from '../../model/graph/look';
 import type { Chart, ChartStyle } from '../../model/types';
 import { n2 } from '../../model/units';
-import { SELECT_COLOR } from '../shared/scene/ChartParts';
+import { SELECT_COLOR } from '../shared/scene/annotations';
 import type { GroupedModel } from './groupedModel';
 import { el, type SceneElement } from '../shared/scene/sceneElement';
 import { svgId } from '../shared/scene/svgIds';
+import { barLabelElement, insideBarLabelElement } from '../shared/parts/barLabelElements';
 import { symbolPath } from '../shared/parts/symbols';
 
 /**
@@ -110,4 +111,18 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
     ),
   );
   return [el('g', [['clip-path', 'url(#plot-clip)']], { children: [...out, ...selection] })];
+}
+
+/** The labels of the bars of a grouped chart as scene elements, as `compileColumnLabels` does for columns: per series, outside labels first, then inside ones. */
+export function compileGroupedLabels(chart: Chart, model: GroupedModel): SceneElement[] {
+  const hidden = new Set(chart.hiddenLayerIds);
+  const seriesOf = new Map(model.series.map((s) => [s.groupId, s]));
+  const shown = model.layers.flatMap((l) => {
+    const s = l.kind === 'labels' && l.binding && !hidden.has(l.id) ? seriesOf.get(l.binding.seriesId) : undefined;
+    return s ? [{ layer: l, s }] : [];
+  });
+  return [
+    ...(chart.barLabels.show === 'none' ? [] : shown.flatMap(({ layer, s }) => s.bars.flatMap((b) => (b.label ? [barLabelElement(b.label, chart.barLabels, chart.textColor, model.orient, svgId(layer.id, b.obsId ?? b.id, 'out'))] : [])))),
+    ...shown.flatMap(({ layer, s }) => s.bars.flatMap((b) => (b.insideLabel ? [insideBarLabelElement(b.insideLabel, chart.barLabels.sizePt, model.orient, svgId(layer.id, b.obsId ?? b.id, 'in'))] : []))),
+  ];
 }

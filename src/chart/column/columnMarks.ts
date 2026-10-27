@@ -1,5 +1,8 @@
 import type { LayerKind, LayerSpec } from '../../model/graph/layers';
 import type { Chart } from '../../model/types';
+import { n2 } from '../../model/units';
+import { SELECT_COLOR } from '../shared/scene/annotations';
+import { barLabelElement, insideBarLabelElement } from '../shared/parts/barLabelElements';
 import { barMarkElement } from '../shared/parts/fillElements';
 import type { ColumnModel, GroupGeom } from './columnModel';
 import { el, type SceneElement } from '../shared/scene/sceneElement';
@@ -98,4 +101,67 @@ export function compileColumnMarks(chart: Chart, model: ColumnModel): SceneEleme
   }
   flush();
   return [el('g', [['clip-path', 'url(#plot-clip)']], { children: out })];
+}
+
+/**
+ * The labels of the bars of a column chart as scene elements: for every data set whose labels layer is not hidden, the label
+ * beyond the end of its bar, then (after all of those) the one inside it. They are drawn above the clipped marks, outside the plot clip.
+ */
+export function compileColumnLabels(chart: Chart, model: ColumnModel): SceneElement[] {
+  const hidden = new Set(chart.hiddenLayerIds);
+  const groupOf = new Map(model.groups.map((g) => [g.groupId, g]));
+  const shown = model.layers.flatMap((l) => {
+    const g = l.kind === 'labels' && l.binding && !hidden.has(l.id) ? groupOf.get(l.binding.seriesId) : undefined;
+    return g ? [{ layer: l, g }] : [];
+  });
+  return [
+    ...(chart.barLabels.show === 'none' ? [] : shown.flatMap(({ layer, g }) => (g.barLabel ? [barLabelElement(g.barLabel, chart.barLabels, chart.textColor, model.orient, svgId(layer.id, 'out'))] : []))),
+    ...shown.flatMap(({ layer, g }) => (g.insideLabel ? [insideBarLabelElement(g.insideLabel, chart.barLabels.sizePt, model.orient, svgId(layer.id, 'in'))] : [])),
+  ];
+}
+
+/**
+ * The labels of single points of a column chart (text, leader line and the hit target of the editor) as scene elements, outside
+ * the plot clip: the leaders first, then the labels. Colour, weight and slant are those the model worked out for each label.
+ */
+export function compileColumnPointLabels(chart: Chart, model: ColumnModel): SceneElement[] {
+  const items = model.labels.items;
+  if (items.length === 0) return [];
+  // The data set that owns each labelled point.
+  const owner = new Map<string, GroupGeom>();
+  for (const g of model.groups) for (const p of g.points) owner.set(p.id, g);
+  return [
+    el('g', [], {
+      children: [
+        ...items.flatMap((it) => (it.leader ? [el('path', [['d', `M${n2(it.leader.x1)},${n2(it.leader.y1)}L${n2(it.leader.x2)},${n2(it.leader.y2)}`], ['fill', 'none'], ['stroke', it.color ?? chart.textColor], ['stroke-width', 1]], { id: svgId('leader', it.id) })] : [])),
+        ...items.map((it) =>
+          el('g', [], {
+            hit: { kind: 'label', groupId: owner.get(it.id)?.groupId, objectId: it.id },
+            id: svgId('point-label', it.id),
+            children: [
+              el('rect', [['x', n2(it.box.x0)], ['y', n2(it.box.y0)], ['width', n2(it.box.x1 - it.box.x0)], ['height', n2(it.box.y1 - it.box.y0)], ['fill', 'transparent']], { editorOnly: true }),
+              el('text', [['x', n2(it.x)], ['y', n2(it.y)], ['font-size', it.fontSizePt], ['fill', it.color ?? chart.textColor], ['font-weight', it.bold ? 'bold' : undefined], ['font-style', it.italic ? 'italic' : undefined]], { text: it.shown }),
+            ],
+          }),
+        ),
+      ],
+    }),
+  ];
+}
+
+/** The editor's own marks of a column chart: the ring round the selected point, the frame of its label and the band of the selected data set. Never in an export. */
+export function compileColumnSelection(model: ColumnModel, selectedGroup: string | null, selectedPoint: string | null): SceneElement[] {
+  const { plot } = model.layout;
+  const dashed = [['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '6 4'], ['pointer-events', 'none']] as const;
+  return [
+    ...(selectedPoint === null
+      ? []
+      : [
+          ...model.groups.flatMap((g) => g.points.filter((p) => p.id === selectedPoint)).map((p) => el('circle', [['data-editor-only', 'true'], ['cx', n2(p.cx)], ['cy', n2(p.cy)], ['r', n2(p.size / 2 + 6)], ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2.4], ['pointer-events', 'none']], { editorOnly: true })),
+          ...model.labels.items.filter((it) => it.id === selectedPoint).map((it) => el('rect', [['data-editor-only', 'true'], ['x', n2(it.box.x0 - 4)], ['y', n2(it.box.y0 - 4)], ['width', n2(it.box.x1 - it.box.x0 + 8)], ['height', n2(it.box.y1 - it.box.y0 + 8)], ...dashed], { editorOnly: true })),
+        ]),
+    ...(selectedGroup === null
+      ? []
+      : model.groups.filter((g) => g.groupId === selectedGroup).map((g) => el('rect', [['data-editor-only', 'true'], ['x', n2(g.slotX)], ['y', n2(plot.y)], ['width', n2(g.slotWidth)], ['height', n2(plot.height)], ['fill', SELECT_COLOR], ['fill-opacity', 0.07], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '8 6'], ['pointer-events', 'none']], { editorOnly: true }))),
+  ];
 }

@@ -11,7 +11,7 @@ import {
   BAR_FILL_PATTERN_COUNT,
   barFillFixture,
 } from '../../testing/barFillFixture';
-import { ColumnChartSvg } from './ColumnChartSvg';
+import { ChartCanvas } from '../anyModel';
 import { chartToSvgString } from '../export/export';
 import { buildColumnModel } from './columnModel';
 
@@ -20,9 +20,9 @@ const modelOf = (p: Project) => buildColumnModel(p.charts[0], p.dataTables[0]);
 const count = (s: string, re: RegExp): number => (s.match(re) ?? []).length;
 const editorHtml = (p: Project): string =>
   renderToStaticMarkup(
-    createElement(ColumnChartSvg, {
+    createElement(ChartCanvas, {
       chart: p.charts[0],
-      model: modelOf(p),
+      any: { family: 'column' as const, model: modelOf(p) },
       editor: { selection: { kind: 'chart' } as never },
       cssWidth: '1px',
       cssHeight: '1px',

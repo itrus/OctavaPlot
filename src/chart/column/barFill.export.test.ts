@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import type { Project } from '../../model/types';
 import { patchAxis, patchStyle, setCells } from '../../state/commands';
-import { ColumnChartSvg } from './ColumnChartSvg';
+import { ChartCanvas } from '../anyModel';
 import { chartToSvgString } from '../export/export';
 import { fillClipId } from '../shared/parts/fillElements';
 import { buildColumnModel } from './columnModel';
@@ -19,9 +19,9 @@ const pattern = (p: Project, extra: Record<string, unknown> = {}) =>
   patchStyle(chartId, 'all', { barFillMode: 'pattern', barPattern: 'horizontal', barPatternSpacingPt: 6, ...extra })(p);
 const editorHtml = (p: Project): string =>
   renderToStaticMarkup(
-    createElement(ColumnChartSvg, {
+    createElement(ChartCanvas, {
       chart: p.charts[0],
-      model: buildColumnModel(p.charts[0], p.dataTables[0]),
+      any: { family: 'column' as const, model: buildColumnModel(p.charts[0], p.dataTables[0]) },
       editor: { selection: { kind: 'chart' } as never },
       cssWidth: '1px',
       cssHeight: '1px',

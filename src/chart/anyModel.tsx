@@ -1,17 +1,19 @@
 import { forwardRef } from 'react';
 import { chartFamily } from '../model/graph/chartTypes';
 import type { Chart, DataTable, FitSettings } from '../model/types';
-import { ColumnChartSvg, type EditorState } from './column/ColumnChartSvg';
-import { GroupedChartSvg } from './grouped/GroupedChartSvg';
+import { columnDrawing } from './column/columnDrawing';
+import { groupedDrawing } from './grouped/groupedDrawing';
+import { heatDrawing } from './heatmap/heatDrawing';
+import { pieDrawing } from './pie/pieDrawing';
+import { xyDrawing } from './xy/xyDrawing';
+import { drawingTexts } from './shared/scene/sceneText';
+import { type ChartDrawing, type EditorState, SceneChart } from './shared/scene/SceneChart';
 import { buildGroupedModel, type GroupedModel } from './grouped/groupedModel';
 import { buildColumnModel, type ColumnModel } from './column/columnModel';
 import { buildHeatModel, type HeatModel } from './heatmap/heatmapModel';
-import { HeatmapSvg } from './heatmap/HeatmapSvg';
 import { buildHistogramModel } from './histogram/histogramModel';
 import { buildPieModel, type PieModel } from './pie/pieModel';
-import { PieChartSvg } from './pie/PieChartSvg';
 import { buildSurvivalModel } from './survival/survivalModel';
-import { XyChartSvg } from './xy/XyChartSvg';
 import { referenceLineNotices, referenceLinesOf } from './shared/scene/referenceLines';
 import { buildXyModel, type XyModel } from './xy/xyModel';
 
@@ -75,12 +77,26 @@ interface CanvasProps {
   cssHeight: string;
 }
 
-/** Draws whichever kind of chart the model is for. */
+/** What a chart is drawn from, by the family of its model. */
+function drawingOf(chart: Chart, any: AnyModel): ChartDrawing {
+  switch (any.family) {
+    case 'column':
+      return columnDrawing(chart, any.model);
+    case 'grouped':
+      return groupedDrawing(chart, any.model);
+    case 'pie':
+      return pieDrawing(chart, any.model);
+    case 'heatmap':
+      return heatDrawing(chart, any.model);
+    default:
+      return xyDrawing(chart, any.model);
+  }
+}
+
+/** Every text the chart writes, for the export report's check of the characters. */
+export const chartTexts = (chart: Chart, any: AnyModel): string[] => drawingTexts(drawingOf(chart, any));
+
+/** Draws whichever kind of chart the model is for: one renderer, one drawing for each family. */
 export const ChartCanvas = forwardRef<SVGSVGElement, CanvasProps>(function ChartCanvas({ chart, any, editor, cssWidth, cssHeight }, ref) {
-  const common = { chart, editor, cssWidth, cssHeight };
-  if (any.family === 'column') return <ColumnChartSvg ref={ref} model={any.model} {...common} />;
-  if (any.family === 'grouped') return <GroupedChartSvg ref={ref} model={any.model} {...common} />;
-  if (any.family === 'pie') return <PieChartSvg ref={ref} model={any.model} {...common} />;
-  if (any.family === 'heatmap') return <HeatmapSvg ref={ref} model={any.model} {...common} />;
-  return <XyChartSvg ref={ref} model={any.model} {...common} />;
+  return <SceneChart ref={ref} chart={chart} drawing={drawingOf(chart, any)} editor={editor} cssWidth={cssWidth} cssHeight={cssHeight} />;
 });

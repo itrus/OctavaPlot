@@ -3,6 +3,7 @@ import type { Chart, Id } from '../../model/types';
 import type { XyModel, XySeries } from './xyModel';
 import { type SceneElement, el } from '../shared/scene/sceneElement';
 import { n2 } from '../../model/units';
+import { SELECT_COLOR } from '../shared/scene/annotations';
 import { svgId } from '../shared/scene/svgIds';
 import type { Scene, SceneLayer, ScenePath } from '../shared/scene/scene';
 import { linePattern } from '../../model/graph/look';
@@ -163,4 +164,12 @@ export function compileXyScene(chart: Chart, model: XyModel): Scene {
 export function attachLazyScene(chart: Chart, model: XyModel): void {
   let scene: Scene | undefined;
   Object.defineProperty(model, 'scene', { enumerable: true, configurable: true, get: () => (scene ??= compileXyScene(chart, model)) });
+}
+
+/** The editor's own mark of an XY chart: the ring round the selected point. Never in an export. */
+export function compileXySelection(model: XyModel, selectedPoint: string | null): SceneElement[] {
+  if (selectedPoint === null) return [];
+  return model.series.flatMap((s) =>
+    s.points.filter((p) => p.id === selectedPoint).map((p) => el('circle', [['data-editor-only', 'true'], ['cx', n2(p.px)], ['cy', n2(p.py)], ['r', n2(s.style.symbolSizePt / 2 + 6)], ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2.4], ['pointer-events', 'none']], { editorOnly: true })),
+  );
 }

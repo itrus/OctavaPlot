@@ -2,7 +2,7 @@ import { legendKeyWidthPt } from '../../../model/graph/look';
 import { numberStartPt } from '../../../model/graph/axis';
 import { FONT_FAMILY } from '../../../model/defaults';
 import type { AxisConfig, LegendConfig } from '../../../model/types';
-import { legendColumns } from '../../../model/graph/legendEntries';
+import { legendColumns, legendOffset } from '../../../model/graph/legendEntries';
 import { measureText } from './text';
 
 /** Layout constants in pt (spec section 20 starting tokens). */
@@ -263,6 +263,16 @@ export function computeLayout(input: LayoutInput): Layout {
           x += legendRows!.widths[i] + LEGEND_ITEM_GAP;
         }
       });
+    }
+    // A shift set by the user moves the legend only: the room it takes (and so the plot) stays as it was.
+    const { x: dx, y: dy } = legendOffset(legend);
+    if (dx !== 0 || dy !== 0) {
+      rect = { ...rect, x: rect.x + dx, y: rect.y + dy };
+      for (const it of items) {
+        it.x += dx;
+        it.y += dy;
+      }
+      if (rect.x < 0 || rect.y < 0 || rect.x + rect.width > W || rect.y + rect.height > H) warnings.push('The legend has been moved partly outside the chart.');
     }
     legendLayout = { rect, items, fontSizePt: legendFont };
   }

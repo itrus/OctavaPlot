@@ -491,6 +491,9 @@ export interface LegendConfig {
   order?: Id[];
   /** Entries per row, 1 to 6; absent = 1 (one under the other on the right, wrapped to the width on the top and bottom). */
   columns?: number;
+  /** Shift of the legend from where its position puts it, pt (right and down are positive); absent = 0. The room the legend takes does not change. */
+  offsetXPt?: number;
+  offsetYPt?: number;
 }
 
 /**

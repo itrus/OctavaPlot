@@ -9,7 +9,7 @@ import { chartToSvgString } from '../export/export';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { n2 } from '../../model/units';
-import { ColumnChartSvg } from './ColumnChartSvg';
+import { ChartCanvas } from '../anyModel';
 import { buildColumnModel } from './columnModel';
 import { bindLeft, bindRight, DUAL_AXIS_DATA, dualAxisFixture } from '../../testing/dualAxisFixture';
 
@@ -179,7 +179,7 @@ describe('right axis rendering', () => {
     const svg = svgOf(p);
     expect(svg).not.toContain('data-');
     const html = renderToStaticMarkup(
-      createElement(ColumnChartSvg, { chart: p.charts[0], model: modelOf(p), editor: { selection: { kind: 'chart' } as never }, cssWidth: '1px', cssHeight: '1px' }),
+      createElement(ChartCanvas, { chart: p.charts[0], any: { family: 'column' as const, model: modelOf(p) }, editor: { selection: { kind: 'chart' } as never }, cssWidth: '1px', cssHeight: '1px' }),
     );
     // Axes are clickable in the editor (they open the axis settings); only the editor render carries the attribute.
     expect(html).toContain('data-hit="axis"');

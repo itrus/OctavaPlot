@@ -20,15 +20,29 @@ export function legendEntries(legend: Pick<LegendConfig, 'hiddenGroupIds' | 'ord
   return applyOrder(shown, legend.order ?? []).map((e) => e.index);
 }
 
-/** The legend's own layout settings read from a file: the order as a list of ids and a column count of 2 to 6; anything else is left out. */
-export function sanitizeLegendLayout(raw: Record<string, unknown>): Pick<LegendConfig, 'order' | 'columns'> {
+/** The furthest the legend can be moved from its place, pt. */
+export const LEGEND_MAX_OFFSET_PT = 1000;
+
+/** The shift of the legend from its place, pt: 0 when none is set. */
+export const legendOffset = (legend: Pick<LegendConfig, 'offsetXPt' | 'offsetYPt'>): { x: number; y: number } => ({ x: legend.offsetXPt ?? 0, y: legend.offsetYPt ?? 0 });
+
+const cleanOffset = (v: unknown): number | undefined => {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
+  const n = Math.round(Math.max(-LEGEND_MAX_OFFSET_PT, Math.min(LEGEND_MAX_OFFSET_PT, v)) * 10) / 10;
+  return n === 0 ? undefined : n;
+};
+
+/** The legend's own layout settings read from a file: the order as a list of ids, a column count of 2 to 6 and the shift in pt (within 1000, none when 0); anything else is left out. */
+export function sanitizeLegendLayout(raw: Record<string, unknown>): Pick<LegendConfig, 'order' | 'columns' | 'offsetXPt' | 'offsetYPt'> {
   const order = Array.isArray(raw.order) ? [...new Set(raw.order.filter((id): id is string => typeof id === 'string'))] : [];
   const columns = typeof raw.columns === 'number' && Number.isFinite(raw.columns) ? Math.min(LEGEND_MAX_COLUMNS, Math.max(1, Math.round(raw.columns))) : 1;
-  return { ...(order.length > 0 ? { order } : {}), ...(columns > 1 ? { columns } : {}) };
+  const x = cleanOffset(raw.offsetXPt);
+  const y = cleanOffset(raw.offsetYPt);
+  return { ...(order.length > 0 ? { order } : {}), ...(columns > 1 ? { columns } : {}), ...(x !== undefined ? { offsetXPt: x } : {}), ...(y !== undefined ? { offsetYPt: y } : {}) };
 }
 
 /** A legend object from a file without its order and columns, which `sanitizeLegendLayout` reads again. */
-export const withoutLegendLayout = (raw: Record<string, unknown>): Record<string, unknown> => Object.fromEntries(Object.entries(raw).filter(([k]) => k !== 'order' && k !== 'columns'));
+export const withoutLegendLayout = (raw: Record<string, unknown>): Record<string, unknown> => Object.fromEntries(Object.entries(raw).filter(([k]) => k !== 'order' && k !== 'columns' && k !== 'offsetXPt' && k !== 'offsetYPt'));
 
 /** The legend without its order (the order names series of one table and does not go to another graph). */
 export function withoutLegendOrder(legend: LegendConfig): LegendConfig {
@@ -39,5 +53,11 @@ export function withoutLegendOrder(legend: LegendConfig): LegendConfig {
 /** The legend without its number of columns (back to one). */
 export function withoutLegendColumns(legend: LegendConfig): LegendConfig {
   const { columns: _columns, ...rest } = legend;
+  return rest;
+}
+
+/** The legend without its shift (back to its place). */
+export function withoutLegendOffset(legend: LegendConfig): LegendConfig {
+  const { offsetXPt: _x, offsetYPt: _y, ...rest } = legend;
   return rest;
 }

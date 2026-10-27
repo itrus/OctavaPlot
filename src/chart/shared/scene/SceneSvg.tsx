@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { SELECT_COLOR } from './ChartParts';
+import { SELECT_COLOR } from './annotations';
 import { hitAttrs } from './hitTest';
 import { prefixed, scopeRefs, useSvgIdPrefix } from './idPrefix';
 import { SceneElements } from './SceneElements';
