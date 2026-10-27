@@ -16,9 +16,11 @@ No defect below was reproduced by running code in this pass. The reviews say mos
 
 ## Progress, 27 October 2026
 
-Done and tested (full suite 3254 tests, type-check and `knip` clean; the interface was not looked at in a browser): **A** OP-007, 008, 009, 011, 012, 013, 014, 016, 017, DOC-001, DOC-003. **B** OP-002, OP-010, OP-033 (OP-012 in A). **C** OP-003, OP-004, OP-006, OP-015, and OP-005 for column and grouped charts (a bar that spans a gap is still one rectangle, trimmed by the plot clip). **D** OP-001, OP-023, OP-024, OP-025 (stale analyses and extra data sets open with a note; damaged structure is refused), OP-029, OP-030; a project restored from the recovery copy now counts as not saved to a file. **E** P8-006 (Connect points in: Ascending X), P8-007 (labels inside bars), P8-015 (legend order and columns; legend-only text is not done), P8-020 (seven heat map statistics). Also: SD is now the default spread of a new Bar chart and Mean with error bars (a change from the earlier "no spread by default" note).
+Done and tested (full suite 3421 tests on 27 October 2026, after roadmap steps 1a to 1e, type-check and `knip` clean; the interface was not looked at in a browser): **A** OP-007, 008, 009, 011, 012, 013, 014, 016, 017, DOC-001, DOC-003. **B** OP-002, OP-010, OP-033 (OP-012 in A). **C** OP-003, OP-004, OP-006, OP-015, and OP-005 for column and grouped charts (a bar that spans a gap is still one rectangle, trimmed by the plot clip). **D** OP-001, OP-023, OP-024, OP-025 (stale analyses and extra data sets open with a note; damaged structure is refused), OP-029, OP-030; a project restored from the recovery copy now counts as not saved to a file. **E** P8-006 (Connect points in: Ascending X), P8-007 (labels inside bars), P8-015 (legend order and columns; legend-only text is not done), P8-020 (seven heat map statistics). Also: SD is now the default spread of a new Bar chart and Mean with error bars (a change from the earlier "no spread by default" note).
 
 Also done: OP-018, 019 (already so in the working tree; tests added), 020, 021, 022, 026, 027 (focus movement not testable without a DOM), 028, 031, 035, 036 (uses Vite's parser: the installed TypeScript 7 has no JavaScript parser API), and OP-034 (export dialog with size, fonts, warnings, known limits and a JSON report; glyph checks and counts of clipped objects are not done). OP-032 is partly done: CSS for 900 px and 600 px, looked at in Chrome at 375 and 768 px (through an iframe, as the window could not be resized): no sideways page scroll, the side panels overlay, the Layouts settings stack under the page, and the top bar keeps the panel toggles, Save, Undo and Redo and Settings on screen (the rest scrolls). Still open: the inspector overlay is slightly clipped at the left edge at 375 px, the navigator overlay stays open after choosing an item, and the status text keeps old messages.
+
+Also on 27 October 2026 (after roadmap steps 1 to 3): the glyph checks of P2 (see ROADMAP step 2), regression tests for `exp_two_phase` ordering, and OP-032: in the narrow layout the navigator now closes when an item is chosen (not tried in a browser). The two audits are in [AUDIT-P0.md](AUDIT-P0.md) and [AUDIT-P3.md](AUDIT-P3.md).
 
 Not done from the lists: OP-032 (in full), and the P8 items not named above.
 
@@ -32,18 +34,18 @@ These also answer roadmap step 3 for P0 ("which defects exist"). Each needs a re
 
 | ID | Defect | Status and where | Size |
 |---|---|---|---|
-| OP-001 | Decimal comma: 1.234 is shown for editing as `1.234`, the parser takes the dot as thousands, an unchanged edit saves 1234 (and any other decimal, such as 1.5, is refused on an unchanged edit) | **Fixed 27 Oct 2026**: the separator of the setting is used to show, edit, copy and export; no thousands separator anywhere; CSV uses semicolons in comma mode; round-trip tests for edit, paste, copy and CSV. Not committed | done |
+| OP-001 | Decimal comma: 1.234 is shown for editing as `1.234`, the parser takes the dot as thousands, an unchanged edit saves 1234 (and any other decimal, such as 1.5, is refused on an unchanged edit) | **Fixed 27 Oct 2026**: the separator of the setting is used to show, edit, copy and export; no thousands separator anywhere; CSV uses semicolons in comma mode; round-trip tests for edit, paste, copy and CSV. Committed | done |
 | OP-002 | A graph in a layout ignores exclusions, hidden and added series | **Fixed 27 Oct 2026**: one entry point `prepareChartInput` (`src/model/table/preparedChart.ts`) used by the graph view, thumbnails and layouts; an architecture test guards it. | done |
-| OP-003 | On a log axis values of 0 or less are dropped before box, violin and floating-bar statistics, so the median changes (a warning counts them, the statistics still change) | Confirmed, `columnModel.ts:185`, `groupedModel.ts:186` | M |
-| OP-004 | Nonlinear fit: stopping tests are absolute and parameters are scaled only by their start value, so tiny Y can report `converged` with a wrong rate | Confirmed by reading, `src/stats/fit.ts:326`; the exact 1e-9 case was not run | L |
-| OP-005 | Broken axis, column charts: a mark inside the omitted range snaps to an edge, mean connector and paired lines are not split in data space | Partly: column only (`columnModel.ts:283`, `:505-535`). XY already splits in data space (`xyModel.ts:263`, `polylinesThroughBreaks`) and is the model to reuse | M |
-| OP-006 | Descending ECDF: the auto Y range comes from the steps, not from the start level (1, 100 or n), so the first step can be clipped | Confirmed in logic, `histogramModel.ts:48`; whether axis rounding hides it was not read | S |
+| OP-003 | On a log axis values of 0 or less are dropped before box, violin and floating-bar statistics, so the median changes (a warning counts them, the statistics still change) | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-004 | Nonlinear fit: stopping tests are absolute and parameters are scaled only by their start value, so tiny Y can report `converged` with a wrong rate | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-005 | Broken axis, column charts: a mark inside the omitted range snaps to an edge, mean connector and paired lines are not split in data space | **Partly fixed 27 Oct 2026**: column and grouped charts (a bar that spans a gap is still one rectangle, trimmed by the plot clip); other families not checked | M |
+| OP-006 | Descending ECDF: the auto Y range comes from the steps, not from the start level (1, 100 or n), so the first step can be clipped | **Fixed 27 Oct 2026** (see Progress) | done |
 | OP-007 | Hyperbola fit drops X = 0 although the model is defined there | **Fixed 27 Oct 2026**: hyperbola keeps X = 0 (`nonNegativeX`); curve sampling honours it. | done |
 | OP-008 | A supplied mean outside its supplied lower/upper limits is accepted as `ok` | **Fixed 27 Oct 2026**: a centre outside its limits makes the interval unavailable, with a notice. | done |
-| OP-010 | A data set added from another table gets the base table's row titles | Confirmed, `chartTable.ts:80` | M |
+| OP-010 | A data set added from another table gets the base table's row titles | **Fixed 27 Oct 2026** (see Progress) | done |
 | OP-011 | Added series change colour when an earlier added series is removed | **Fixed 27 Oct 2026**: added series keep a stored colour slot (`slot`, optional; old files open as before). | done |
 | OP-014 | Automatic histogram edges are rounded to 15 digits, so closely spaced values can fall outside every bin | **Fixed 27 Oct 2026**: counting uses exact edges when rounding would lose a value. | done |
-| OP-015 | Results SD squares raw deviations and underflows at about 1e-200; the chart SD scales first and does not | Confirmed, `descriptive.ts:62` vs `summary.ts:190` | S |
+| OP-015 | Results SD squares raw deviations and underflows at about 1e-200; the chart SD scales first and does not | **Fixed 27 Oct 2026** (see Progress) | done |
 | OP-016 | Annotation label clean-up uses `/s+/g`, so the letter s is replaced by a space | **Fixed 27 Oct 2026**: whitespace regex corrected. | done |
 
 ### 1.2 Identity, export and files
@@ -54,20 +56,20 @@ These also answer roadmap step 3 for P0 ("which defects exist"). Each needs a re
 | OP-012 | Layout PNG does not get the dpi chunk that a single graph gets | **Fixed 27 Oct 2026**: layout PNG uses the same encoder as a single graph, with the dpi chunk. | done |
 | OP-013 | Thumbnails inline many SVGs that all use `id="plot-clip"` | **Fixed 27 Oct 2026**: thumbnails get ids of their own; exports unchanged. | done |
 | OP-017 | `vite.config.ts` runs only `*.test.ts`, so `*.test.tsx` (for example `controls.test.tsx`) never runs under `npm test` | **Fixed 27 Oct 2026**: test config includes `*.test.tsx`. | done |
-| OP-025 | Import repair: a bad replicate layout silently becomes single values, duplicate analysis ids pass, only the first repair note is shown | Confirmed, `serialize.ts:58`, `:423`, `App.tsx:130` | M |
-| OP-033 | The layout report leaves out the warnings of its panels | Confirmed, `layoutExport.tsx:43` | S |
+| OP-025 | Import repair: a bad replicate layout silently becomes single values, duplicate analysis ids pass, only the first repair note is shown | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-033 | The layout report leaves out the warnings of its panels | **Fixed 27 Oct 2026** (see Progress) | done |
 
 ### 1.3 Performance and resource safety
 
 | ID | Defect | Status and where | Size |
 |---|---|---|---|
-| OP-018 | `prefixIds` runs three string passes per id over the whole SVG | Confirmed, `export.tsx:36`, `layoutExport.tsx:22` | M |
-| OP-019 | Paired matching is rows x groups x points | Confirmed, `columnModel.ts:504` | S |
-| OP-020 | Calc cache keys serialise the data; Results fits bypass the cache | Confirmed, `calcCache.ts:30`, `curveFit.ts:61` | M |
-| OP-021 | Nothing stops two PNG exports at once | Confirmed, `GraphView.tsx:121`, `LayoutView.tsx:153` | S |
-| OP-022 | Large paste uses `Math.max(0, ...rows)` and can overflow the stack | Partly: confirmed at `cellText.ts:221`. The huge-allocation case needs a project with zero groups and a large `rowCount`, so it is narrower than the review says | S |
-| OP-023 | No flush of autosave on page exit | Partly: there is no `pagehide` or `beforeunload` handler. The review is wrong that there is no unsaved state: `hasUnsavedChanges` and `markSaved` exist and a failed write is retried every 15 s | S |
-| OP-024 | Two tabs share one recovery key with no revision | Confirmed, `serialize.ts:490` | M |
+| OP-018 | `prefixIds` runs three string passes per id over the whole SVG | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-019 | Paired matching is rows x groups x points | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-020 | Calc cache keys serialise the data; Results fits bypass the cache | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-021 | Nothing stops two PNG exports at once | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-022 | Large paste uses `Math.max(0, ...rows)` and can overflow the stack | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-023 | No flush of autosave on page exit | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-024 | Two tabs share one recovery key with no revision | **Fixed 27 Oct 2026** (see Progress) | done |
 
 ### 1.4 Not adopted as written
 
@@ -88,11 +90,11 @@ The roadmap's step 1 (labels, annotations, overlays into the scene) and step 2 (
 | ID | Item | Status | Size | Fits |
 |---|---|---|---|---|
 | P8-003 | Warn when SD and SEM are mixed, or an error bar is hidden under its symbol; draft figure description from recorded meanings | Not checked | M | Step 2 panel, diagnostics |
-| OP-034 | Export preflight: final text and stroke size after panel scaling, fonts, clipped objects | Already the roadmap's step 2 | M | Step 2 |
+| OP-034 | Export preflight: final text and stroke size after panel scaling, fonts, clipped objects | **Mostly done 27 Oct 2026**: export dialog with size, fonts, warnings, known limits and a JSON report; glyph checks and counts of clipped objects not done | M | Step 2 |
 | P8-023 | Fix the inner plot size or the outer figure size; "reflow" versus "scale" as two operations | Not checked | M | Needs measured text (step 1) |
 | P8-024 | Align the plot axes of layout panels, not their frames | Not checked | L | After P8-023 |
 | P8-016 | A master legend object in a layout | Confirmed not built (`Layout` has no legend field, `types.ts:666`) | M | After OP-002 |
-| P8-015 | Legend order independent of drawing order, rows/columns, legend-only text | Confirmed not built (`LegendConfig`, `types.ts:456`) | M | |
+| P8-015 | Legend order independent of drawing order, rows/columns, legend-only text | **Partly done 27 Oct 2026**: legend order and columns; legend-only text not done | M | |
 | P8-031 | Batch export of selected graphs from one project revision | Not checked | M | After OP-021, OP-012 |
 | G2 | Optional reproducibility manifest beside an export | Proposal | M | Open decision 2 |
 | G5 | Vector PDF | Proposal, later | L | Roadmap says PDF is raster |
@@ -101,15 +103,15 @@ The roadmap's step 1 (labels, annotations, overlays into the scene) and step 2 (
 
 | ID | Item | Status | Size |
 |---|---|---|---|
-| OP-027 | Arrow keys, Home/End and roving tab stop in inspector tabs and radios | Confirmed for tabs (`controls.tsx:351`); radios not inspected | S |
-| OP-028 | Ctrl/Cmd+S saves the `.oplot` file | Confirmed not built (`App.tsx:73`) | S |
-| OP-029 | Insert, delete and duplicate rows | Confirmed not built; only "Add 1000 rows" and clearing cells | M |
-| OP-030 | CSV import preview with delimiter and decimal choice | Confirmed not built (`DataTableView.tsx:365`); related to OP-001 | M |
-| OP-031 | CSV export: all rows, included rows, or with exclusion columns | Not checked | S |
+| OP-027 | Arrow keys, Home/End and roving tab stop in inspector tabs and radios | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-028 | Ctrl/Cmd+S saves the `.oplot` file | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-029 | Insert, delete and duplicate rows | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-030 | CSV import preview with delimiter and decimal choice | **Fixed 27 Oct 2026** (see Progress) | done |
+| OP-031 | CSV export: all rows, included rows, or with exclusion columns | **Fixed 27 Oct 2026** (see Progress) | done |
 | P8-026 | Apply chosen formatting groups to several existing graphs, with a series mapping preview and one undo step | Not checked | M |
 | P8-017 | Labels and reference lines bound to a result (n, mean) that update when data change | Not checked | L |
 | P8-019 | Scientific rich text (sub- and superscripts) and labels anchored to a point with a stored offset | Not checked; roadmap already lists rich text and relative offsets | L |
-| OP-035 | Gallery shows creatable graphs by default, with a "Show planned" switch | Not checked | S |
+| OP-035 | Gallery shows creatable graphs by default, with a "Show planned" switch | **Fixed 27 Oct 2026** (see Progress) | done |
 
 ### P4 Chart families
 
@@ -118,12 +120,12 @@ Roadmap order is kept: observation roles first, then graphs, then new families w
 | ID | Item | Status | Size | Needs |
 |---|---|---|---|---|
 | P8-028 | Subject-aware nested and longitudinal plots (roles) | Roadmap open decision 4 | L | Decide how a subject is declared |
-| P8-006 | Choose line order (table order or ascending X) and gap behaviour | Confirmed mismatch: the gallery text says "in X order", `xyModel.ts:271` draws in row order | S to fix the text now, M for the option | |
+| P8-006 | Choose line order (table order or ascending X) and gap behaviour | **Fixed 27 Oct 2026** (see Progress) | done |
 | P8-001 | Density-shaped and collision-aware dot placement | Confirmed: only deterministic uniform jitter (`jitter.ts`) | L | Contracts section 16 |
 | P8-004 | Independent X error bars | Confirmed not built (`xyModel.ts:286` has one Y error path) | M | OP-008 |
 | P8-002 | Error envelope from measured or supplied intervals | Not checked | M | Interval record, OP-005 |
 | P8-005 | Boxes and violins at numeric X | Confirmed not built (`chartTypes.ts:62`) | M | OP-003 |
-| P8-007 | Bar labels inside the end or at the base; n and value together | Confirmed: one position and one content only (`barLabels.ts:23`, `:35`) | M | Roadmap step 1b |
+| P8-007 | Bar labels inside the end or at the base; n and value together | **Fixed 27 Oct 2026** (see Progress) | done | Roadmap step 1b |
 | P8-008 | Gap sizes and slots reserved for missing values | Not checked | M | |
 | P8-009 | Stacked, side-by-side and overlapping bars mixed; two-level category labels | Not checked | L | |
 | P8-010 | Date, time and duration columns and axes | Confirmed not built (`types.ts`; table folder not searched exhaustively) | L | OP-001, OP-030 |
@@ -132,7 +134,7 @@ Roadmap order is kept: observation roles first, then graphs, then new families w
 | P8-013 | Offset traces with a disclosed offset and explicit scale bar | Roadmap lists `xy.offset` | M | |
 | P8-014 | Secondary Y axis on numeric XY | Confirmed not built (`capabilities.ts:29`) | M | |
 | P8-018 | Comparison brackets bound to groups | Confirmed none (grep); roadmap lists it | L | Decide scope: supplied results only |
-| P8-020 | Heat map of SD, SEM, % CV, geometric mean | Confirmed: mean and median only (`heatmapOptions.ts:18`) | M | OP-015 |
+| P8-020 | Heat map of SD, SEM, % CV, geometric mean | **Fixed 27 Oct 2026** (see Progress) | done | OP-015 |
 | P8-021 | Heat map colour ranges and distinct styles for missing, excluded, out-of-range | Confirmed no interval ranges (`types.ts:297`) | M | |
 | P8-022 | Heat map cell size, group gaps, sparse labels, colour-bar controls | Not checked | M | |
 | P8-029 | Typed five-number box and effect-interval (forest) inputs | Not checked | M | OP-008 |
@@ -146,7 +148,7 @@ Heat map colours, done today: the five palettes were replaced by the 16 ggsci gr
 
 | ID | Item | Status |
 |---|---|---|
-| OP-036 | Architecture test reads imports with a regex that matches only single-quoted relative `from` and `import(` | Confirmed, `architecture.test.ts:26`. Use the TypeScript AST |
+| OP-036 | Architecture test reads imports with a regex that matches only single-quoted relative `from` and `import(` | **Fixed 27 Oct 2026** (see Progress) |
 | P8-032 | Example projects that double as visual fixtures; one per catalogue preset | Matches roadmap "example gallery" and "visual fixtures" |
 | | Playwright smoke: edit cell, exclude, compare graph and layout, duplicate, save and reopen, export PNG | Roadmap, not built |
 
@@ -154,13 +156,15 @@ Heat map colours, done today: the five palettes were replaced by the 16 ggsci gr
 
 | ID | Fix | Status |
 |---|---|---|
-| DOC-001 | README says 39 available, 24 chart types, 17 planned. Actual: 56 entries, 45 available, 11 locked, 28 chart types. Generate the numbers from the registry | Confirmed. The roadmap's 56 and 11 are right |
-| DOC-003 | ROADMAP lines 48, 59, 140 (and test names "spec 22.1") say section 22.1. The acceptance fixtures are `## 15. Acceptance fixtures` in `docs/calculation-contracts.md` | Confirmed. The roadmap needs this one-word edit; I have not made it |
+| DOC-001 | README says 39 available, 24 chart types, 17 planned. Actual: 56 entries, 45 available, 11 locked, 28 chart types. Generate the numbers from the registry | **Fixed 27 Oct 2026** (see Progress) |
+| DOC-003 | ROADMAP lines 48, 59, 140 (and test names "spec 22.1") say section 22.1. The acceptance fixtures are `## 15. Acceptance fixtures` in `docs/calculation-contracts.md` | **Fixed 27 Oct 2026** (see Progress) |
 | DOC-002, 004, 005, 006 | Median CI wording, PNG options, survival layer claims, split README | Not checked |
 
 ---
 
 ## 3. Where to start
+
+Status 27 October 2026: options A to D and the P8 items of E (P8-006, 007, 015 in part, 020) are done; see Progress. The table is kept as the record of the choice.
 
 All options keep the roadmap order: step 1 and step 2 stay the main line. The options differ in what runs beside it.
 
@@ -181,6 +185,27 @@ My suggestion: A first, then B and C in parallel with roadmap step 1. D can wait
 3. **OP-002 scope:** one prepared-data entry for graph, layout, thumbnail and export (proposed), or a one-line fix in `drawLayout` now and the larger change later.
 4. **P8-018 brackets:** supplied results only (proposed, matches "out of scope: multiple-comparison workflows"), or also calculated tests.
 5. **Roadmap open decisions 1 to 4** are unchanged and still needed before steps 2 and 6.
+
+## 4a. Found by the audits (27 October 2026)
+
+From [AUDIT-P0.md](AUDIT-P0.md) and [AUDIT-P3.md](AUDIT-P3.md); sizes are the audits' estimates.
+
+| Item | Source | Size |
+|---|---|---|
+| Reference values from outside the code for nonlinear fit intervals (SE, CI, bands); the line CI test takes its t quantile from the code under test | P0 | M |
+| Missing section 15 fixtures: bubble area, dot apportionment, nested weighting, ROC, exact binomial, Holm and BH (the features do not exist yet); Tukey fence, survival ties and no-event median only partly covered | P0 | L (with the features) |
+| Composition with a zero total: the contract says blocking error, the code warns and skips the row | P0 | S, decide first |
+| Undo and save tests: redo cleared by a new edit, undo across add or remove table, theme and data undo pair, page-exit flush hook | P0 | M |
+| Axis breaks outside column, grouped and XY (points and error bars in a gap), histogram, heat map, survival | P0 | M |
+| CSV import: BOM, `NaN` and `Infinity` text, file and column limit, duplicate or empty headers | P0 | **Done 27 Oct 2026**: tests for each; a file with more than 100,000 data lines is refused with the count (there is no limit on columns: the app has none to apply) |
+| Annotation anchor in data units (today: percent of the chart) | P3 | M |
+| Numeric legend offset (today: right, bottom or top only; no numeric route) | P3 | **Done 27 Oct 2026**: Move right and Move down (pt) under Legend; moves the legend only, the plot stays; a warning when it leaves the chart; saved as `offsetXPt` and `offsetYPt` (FILE_FORMAT) |
+| Reset ladder: field, data set or section, graph (`resetStyle` and `clearSummaryOverrides` have no UI) | P3 | M |
+| Mixed-state multi-selection (`Selection` is single) | P3 | L |
+| Property search (no registry of field labels) | P3 | M to L |
+| Keyboard: chart canvas, Navigator arrows, grid Home and End | P3 | M |
+| Grid fill down and right | P3 | **Done 27 Oct 2026**: Ctrl+D and Ctrl+R (planFill, `ui/data/fill.ts`; one undo step); not tried in a browser, and series fill (1, 2, 3 ...) is not built |
+| Small screens: status text keeps old messages (needs a decision on when to clear); inspector clip at 375 px is not confirmed from the CSS and needs a browser; "no width queries" in section 1.4 is out of date | P3 | S to M |
 
 ## 5. Not adopted from the reviews
 

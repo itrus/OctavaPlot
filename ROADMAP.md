@@ -30,10 +30,10 @@ Checked against the exit criteria of each phase. "Not reviewed" means this pass 
 
 | Phase | Status |
 |---|---|
-| **P0 Correctness** | Not reviewed. |
+| **P0 Correctness** | Audited on 27 October 2026 ([docs/AUDIT-P0.md](docs/AUDIT-P0.md)). The defects of [docs/BACKLOG.md](docs/BACKLOG.md) section 1 were worked through on 27 October 2026, each with a regression test; the one left open is broken-axis geometry outside column and grouped charts (OP-005). Of the 22 fixtures of section 15, about 10 pass with independent values, 3 are partly covered and 7 have no code (features not built). Gaps: reference values for nonlinear fit intervals, undo and save tests, axis breaks outside column and grouped charts. |
 | **P1 Layers** | Met, with two decisions: no `enabled` switch (see Decisions), and one data layer per graph (a file with more is read with a note). Every family is drawn from layers, which can be hidden and reordered one by one. XY and survival charts also give each part a look of its own and a switch for the axis range; the other families do not. |
-| **P2 Scene and export** | Mostly. The marks of every family are scene elements with stable ids, and the screen, the export and the editor's hit testing are made from them. PNG has an explicit resolution. Zoom-independence of sizes is tested for the XY drawing only. **Not yet:** bar and point labels, annotations and the editor's overlays are drawn outside the scene; so are the titles, legend and axis labels of pie and heat map; glyph checks (Greek letters, sub- and superscripts). Font diagnostics and the export dialog are built (step 2). |
-| **P3 Editing** | Not reviewed. |
+| **P2 Scene and export** | Mostly. The marks of every family are scene elements with stable ids, and the screen, the export and the editor's hit testing are made from them. PNG has an explicit resolution. Zoom-independence of sizes and the sameness of editor and export marks are tested for every family. Annotations and the bar labels of column and grouped charts (one hideable layer for each data set) are scene elements too (steps 1a, 1b), and so are the point labels of column charts and the editor's selection marks of column and XY charts (step 1c), and the legend of pie charts and the row and column labels of heat maps (step 1d). **Not yet:** glyph checks for page layouts, and rich text (sub- and superscripts as markup, P3). Font diagnostics and the export dialog are built (step 2). |
+| **P3 Editing** | Audited on 27 October 2026 ([docs/AUDIT-P3.md](docs/AUDIT-P3.md)); the exit criterion is not met. Mostly built: grid input. Partly: numeric placement, resets, keyboard, small screens. Not built: property search, mixed-state multi-selection. |
 | **P4 Chart families** | Started. In the gallery 11 graphs are still locked: `xy.bars`, `xy.vector`, `xy.bubble`, `xy.trajectory`, `xy.offset`, `curve.smooth`, `cat.nested`, `grp.scatterS`, `grp.paired`, `three.bars`, `three.dots`. Observation roles (subject) are not built, and five of those graphs wait for them. |
 | **P5 Release** | Not started: there are no Playwright workflows and no visual fixtures. |
 
@@ -92,6 +92,9 @@ Above about 100k points, clip to the viewport and simplify the preview only. Nev
 
 ## Done so far
 
+- Annotations, the bar labels of column and grouped charts (a layer for each data set), the point labels of column charts, the editor's selection marks, the pie legend and the heat map labels as scene elements with stable ids, drawn by one renderer for every family (steps 1a to 1e).
+- The export dialog, font diagnostics and the P0 defect fixes listed in [docs/BACKLOG.md](docs/BACKLOG.md).
+- Glyph checks in the export dialog; a numeric legend offset; fill down and right in the data grid; a row limit and tests for CSV import (27 October 2026).
 - First-class layers and bindings: hide, order, range, own looks (XY and survival), one data layer.
 - A shared calculation cache keyed by calculation identity.
 - A scene shared by preview, export and hit testing for the marks of every family; stable ids on them.
@@ -107,7 +110,7 @@ Sizes are estimates (S: half a day, M: one to two days, L: several days). P0 and
 |---|---|---|
 | 1 | Labels, annotations and the editor's overlays into the scene | Closes the open P2 criterion. Gives the export panel a complete list of what is drawn. |
 | 2 | Export panel and font diagnostics | Needs step 1: every text must be a scene element to check its font. |
-| 3 | P0 and P3 audits, read-only, in parallel | Correctness defects should be known early. |
+| 3 (done) | P0 and P3 audits, read-only, in parallel | Correctness defects should be known early. Results: [docs/AUDIT-P0.md](docs/AUDIT-P0.md), [docs/AUDIT-P3.md](docs/AUDIT-P3.md); the gaps are in [docs/BACKLOG.md](docs/BACKLOG.md) section 4a. |
 | 4 | P5 groundwork: Playwright workflows and visual fixtures | Protects the refactors of P3 and P4. Needs the font decision of step 2. |
 | 5 | Fixes from the audits, then the P3 build items | |
 | 6 | P4 families, starting with observation roles | |
@@ -119,19 +122,19 @@ Each step compares the SVG of many setups before and after, as the earlier moves
 
 | Step | Content | Size |
 |---|---|---|
-| 1a | Annotations as scene elements. The live position during a drag is a parameter, because the scene must not depend on editor state. `whenSelected` is widened from a data set to an annotation or a point. | S |
-| 1b | Bar and value labels (column and grouped), as a layer for each data set so that they can be hidden. | M |
-| 1c | Point labels (leader lines, text, hit targets) and the selection ring and frame, as editor-only scene elements. | M |
-| 1d | Pie and heat map chrome (background, titles, legend, axis labels) with the chrome builders that already exist. | M |
-| 1e | With all of that in the scene, the seven `*ChartSvg` components become one renderer. | S |
+| 1a (done) | Annotations as scene elements. The live position during a drag is a parameter, because the scene must not depend on editor state. `whenSelected` is widened from a data set to an annotation or a point. | S |
+| 1b (done) | Bar and value labels (column and grouped), as a layer for each data set so that they can be hidden. They are drawn above the clipped marks, whatever place the layer has in the order. | M |
+| 1c (done) | Point labels (leader lines, text, hit targets) and the selection ring and frame, as editor-only scene elements. | M |
+| 1d (done) | Pie and heat map chrome (background, titles, legend, axis labels) with the chrome builders that already exist. | M |
+| 1e (done) | With all of that in the scene, the `*ChartSvg` components (five, not seven) became one renderer, `SceneChart`; each family builds a drawing (its sections in order) from its model. | S |
 
-Also in step 1: a zoom-independence test for every family, not only XY. Done when no SVG component draws a mark itself, and labels and annotations have ids and hit targets from the scene.
+Step 1 is done (27 October 2026), with a zoom-independence test for every family. Its criterion was: done when no SVG component draws a mark itself, and labels and annotations have ids and hit targets from the scene.
 
-### 2. Export panel and font diagnostics (about M, plus L for glyph checks)
+### 2. Export panel and font diagnostics (about M, plus L for glyph checks; the panel, font diagnostics and glyph checks are built)
 
 - **The panel** shows, for one graph: the size in px, pt and mm at the chosen resolution; the format and resolution, with the canvas limit check that now sits in the graph view; the fonts requested, used and missing; objects clipped outside the axes and rows that cannot be drawn (from the counts the models already keep); the known limits (PDF is a raster, fonts are not embedded in an SVG). It holds the choice of format and resolution and the Export button.
 - **Fonts:** a pure module takes the availability check as a parameter, so tests can pass a fake. Availability uses `document.fonts.check` together with a width probe against the generic fonts, because `check` alone answers yes for any name.
-- **Glyphs** (second part): once step 1 is done every text is a scene element, so Greek letters and sub- and superscripts can be checked and missing glyphs reported.
+- **Glyphs** (second part): once step 1 is done every text is a scene element, so Greek letters and sub- and superscripts can be checked and missing glyphs reported. Built (27 October 2026): `drawingTexts` lists every text of a drawing, `checkGlyphs` (`src/chart/export/glyphCheck.ts`) looks each character outside basic Latin up in the font in use, and the export dialog lists what is missing. The lookup in the browser is a width heuristic (`browserHasGlyph`) that has not been tried in a browser; a generic family cannot be checked; page layouts are not checked yet (their texts are not collected).
 - **Thin strokes and small text:** these warnings need a target print width (open decision 1).
 - **Tests:** a fake font checker, the report for fixture graphs, PNG pixels and resolution.
 

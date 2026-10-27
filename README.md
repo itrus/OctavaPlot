@@ -69,20 +69,20 @@ The source is in `src/`, in layers. A layer imports from its own folder and from
 
 ### `src/chart/`
 
-Each family of chart has a folder with its model (the geometry), its SVG drawing, its marks (what goes in the scene) and its tests. What the families share is in `shared/`; nothing there knows a family. `survival/` and `histogram/` are drawn on the XY chart's model, so they use `xy/`.
+Each family of chart has a folder with its model (the geometry), its marks and chrome (what goes in the scene), its drawing (the sections the one renderer writes, `*Drawing.ts`) and its tests. What the families share is in `shared/`; nothing there knows a family. `survival/` and `histogram/` are drawn on the XY chart's model, so they use `xy/`.
 
 | Folder | What is in it |
 |---|---|
-| `xy/` | XY charts: `xyModel.ts`, `XyChartSvg.tsx`, curve fitting for drawing, the XY scene and chrome (`xyScene.ts`, `xyChrome.ts`) |
+| `xy/` | XY charts: `xyModel.ts`, `xyDrawing.ts`, curve fitting for drawing, the XY scene and chrome (`xyScene.ts`, `xyChrome.ts`) |
 | `survival/` | Kaplan–Meier and cumulative-event curves |
-| `column/` | Charts over the columns of a table: bars, dots, means, boxes, violins, floating bars, paired plots (`columnModel.ts`, `ColumnChartSvg.tsx`, `columnMarks.ts`, `columnChrome.ts`) |
-| `grouped/` | Grouped and contingency charts (`groupedModel.ts`, `GroupedChartSvg.tsx`, `groupedMarks.ts`) |
+| `column/` | Charts over the columns of a table: bars, dots, means, boxes, violins, floating bars, paired plots (`columnModel.ts`, `columnDrawing.ts`, `columnMarks.ts`, `columnChrome.ts`) |
+| `grouped/` | Grouped and contingency charts (`groupedModel.ts`, `groupedDrawing.ts`, `groupedMarks.ts`) |
 | `histogram/` | Histograms and cumulative distributions |
-| `pie/` | Pies and doughnuts |
-| `heatmap/` | Heat maps and their colour scales |
+| `pie/` | Pies and doughnuts (`pieModel.ts`, `pieMarks.ts`, `pieDrawing.ts`) |
+| `heatmap/` | Heat maps and their colour scales (`heatmapModel.ts`, `heatMarks.ts`, `heatDrawing.ts`) |
 | `export/` | SVG, PNG and PDF export of a graph, and of a page layout; the golden exports (`__snapshots__/`) |
 | `shared/axes/` | Value axes: domain and ticks (linear, log, reversed, minor, broken), axis binding |
-| `shared/scene/` | The scene of a chart (shapes in pt, in drawing order) that the screen, the export and the editor's hit testing are made from: `scene.ts`, `sceneElement.ts`, the chrome (backgrounds, grids, axes, titles, legend), ids, reference lines |
+| `shared/scene/` | The scene of a chart (shapes in pt, in drawing order) that the screen, the export and the editor's hit testing are made from: `scene.ts`, `sceneElement.ts`, `SceneChart.tsx` (the one renderer of every family), the chrome (backgrounds, grids, axes, titles, legend), ids, reference lines |
 | `shared/parts/` | Pieces that several families draw with: layout, text, symbols, fill patterns, error bars, bar labels, point labels, box and violin geometry, orientation |
 | `__tests__/` | Tests that cross families (draw order, the series of every family, the look settings) |
 | `anyModel.tsx`, `tooltip.ts` | The two things that put the families together: the model of any chart, and its tooltips |
