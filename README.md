@@ -44,6 +44,7 @@ npm install
 npm run dev      # development server
 npm run build    # type-check (strict) + production build
 npm test         # unit tests (vitest)
+npm run perf     # timings of the performance table, taken in the browser on the production build (test-results/perf.json)
 npm run e2e      # browser tests (Playwright, in the installed Google Chrome; starts its own dev server on port 5199)
 npm run typecheck # type-check only (no unused locals or parameters allowed)
 ```

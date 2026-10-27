@@ -150,7 +150,8 @@ Heat map colours, done today: the five palettes were replaced by the 16 ggsci gr
 |---|---|---|
 | OP-036 | Architecture test reads imports with a regex that matches only single-quoted relative `from` and `import(` | **Fixed 27 Oct 2026** (see Progress) |
 | P8-032 | Example projects that double as visual fixtures; one per catalogue preset | Matches roadmap "example gallery" and "visual fixtures" |
-| | Playwright smoke: edit cell, exclude, compare graph and layout, duplicate, save and reopen, export PNG | **Built 27 Oct 2026** (e2e/, 20 tests, `npm run e2e`): all of these except the comparison of a graph with a layout; also keyboard, dialog focus, several data sets, annotations, legend and the narrow window. Not run on GitHub yet |
+| | Performance measurements (`npm run perf`) | The performance table of the roadmap was never measured | **Measured 27 Oct 2026**: 6 measurements of the table in the browser, on the production build; results in the roadmap and section 4b |
+| Playwright smoke: edit cell, exclude, compare graph and layout, duplicate, save and reopen, export PNG | **Built 27 Oct 2026** (e2e/, 20 tests, `npm run e2e`): all of these except the comparison of a graph with a layout; also keyboard, dialog focus, several data sets, annotations, legend and the narrow window. Not run on GitHub yet |
 
 ### Documentation
 
@@ -207,6 +208,17 @@ From [AUDIT-P0.md](AUDIT-P0.md) and [AUDIT-P3.md](AUDIT-P3.md); sizes are the au
 | Grid fill down and right | P3 | **Done 27 Oct 2026**: Ctrl+D and Ctrl+R (planFill, `ui/data/fill.ts`; one undo step). Tried in Chrome: Ctrl+D fills and the browser does not take it; Ctrl+R could only be sent as a synthetic key event (the test tool reloads the page itself), where the grid handled it and called preventDefault. Series fill (1, 2, 3 ... or a step) is Rows → Fill series… (start, step, down the rows or across the columns; one Undo step), tried in Chrome. |
 | Status text keeps old messages | P3 | **Done 27 Oct 2026**: the status line clears on the next action (the first edit, undo or redo, new selection or change of page after the message appeared); a message set by the same action stays. This includes error messages and the message about the restored recovery copy (the recovery line beside it is separate and stays). Tried in Chrome |
 | Small screens: the inspector clip at 375 px was not reproduced in Chrome (it fits, 30 to 374 px, no sideways scroll); "no width queries" in section 1.4 is out of date | P3 | S |
+
+## 4b. Found by measuring (27 October 2026)
+
+From `npm run perf` (see the performance table in [ROADMAP.md](../ROADMAP.md)); sizes are my estimates.
+
+| Item | What was found | Size |
+|---|---|---|
+| A style edit rebuilds everything | Changing a title on a graph of 100 000 observations takes 2.3 to 2.5 s to the next frame, 0.5 to 0.8 s of it until the drawing changes. The model and the whole scene are made again, and React writes every dot again, although only a text changed (roadmap rule 4: a style or axis edit must not recompute what it does not change). Ideas: key the geometry on what it depends on (not on the title or fonts), keep the scene of the marks when only chrome changes, and give the marks a stable identity so that React skips them. | L |
+| Drawing 100 000 dots | The graph of 100 000 observations takes 5.7 to 7.8 s to draw (target 3 s). Ideas: clip and simplify the preview to the viewport above about 100 000 points (the roadmap rule; export stays exact), draw dots of one style as one path. | L |
+| Picking a point of 10 000 | 25 to 32 ms to the drawing, but 246 to 297 ms to the next frame: browser layout and paint of 10 000 elements. | M |
+| Pan and zoom, UI during export, a fit in a worker | Not measured; the worker does not exist (P5 "fits in a worker"). | M to L |
 
 ## 5. Not adopted from the reviews
 

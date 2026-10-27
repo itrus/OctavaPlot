@@ -35,7 +35,7 @@ Checked against the exit criteria of each phase. "Not reviewed" means this pass 
 | **P2 Scene and export** | Mostly. The marks of every family are scene elements with stable ids, and the screen, the export and the editor's hit testing are made from them. PNG has an explicit resolution. Zoom-independence of sizes and the sameness of editor and export marks are tested for every family. Annotations and the bar labels of column and grouped charts (one hideable layer for each data set) are scene elements too (steps 1a, 1b), and so are the point labels of column charts and the editor's selection marks of column and XY charts (step 1c), and the legend of pie charts and the row and column labels of heat maps (step 1d). **Not yet:** glyph checks for page layouts, and rich text (sub- and superscripts as markup, P3). Font diagnostics and the export dialog are built (step 2). |
 | **P3 Editing** | Audited on 27 October 2026 ([docs/AUDIT-P3.md](docs/AUDIT-P3.md)); the exit criterion is not met. Mostly built: grid input. Keyboard is done for the chart, the Navigator and the grid, and several data sets can be selected and edited together with "Mixed" where they differ. Property search (decided not needed) and the small screens are the rest. Resets have three levels now (a setting, a data set, the graph). Not built: property search, mixed-state multi-selection. |
 | **P4 Chart families** | Started. In the gallery 11 graphs are still locked: `xy.bars`, `xy.vector`, `xy.bubble`, `xy.trajectory`, `xy.offset`, `curve.smooth`, `cat.nested`, `grp.scatterS`, `grp.paired`, `three.bars`, `three.dots`. Observation roles (subject) are not built, and five of those graphs wait for them. |
-| **P5 Release** | Started: 20 Playwright tests (`e2e/`). Not started: visual fixtures, migrations, benchmarks, accessibility sweep, example gallery. |
+| **P5 Release** | Started: 20 Playwright tests (`e2e/`) and the performance table measured (several targets not met, see below). Not started: visual fixtures, migrations, accessibility sweep, example gallery, fits in a worker. |
 
 Also in place: a calculation cache keyed by identity (`src/stats/calcCache.ts`), PDF and layout export, linked graphs, a folder overview with thumbnails and multi-select (Navigator), and tags for tables and graphs.
 
@@ -68,16 +68,18 @@ Each phase ships on its own. A family moves to a new mechanism (layers, the scen
 
 ## Performance targets (provisional, on a defined reference laptop)
 
-Not measured yet.
+Measured on 27 October 2026 with `npm run perf` (`e2e/performance.spec.ts`, in the installed Google Chrome, on the production build): an 11th Gen Intel Core i7-1185G7 (8 threads), 16 GB, Windows 11. Two runs; where they differ, both are given. "Next frame" is the time until the browser has drawn the change; "observations" are values in the table (a graph of 100k observations draws 100k dots).
 
-| Workload | Target |
-|---|---|
-| Edit title, color or stroke | Visible within 50 ms |
-| Select one point in 10k | Within 100 ms |
-| Pan and zoom 100k points | 30+ fps |
-| Open a project with 100k observations | Under 3 s |
-| Export a normal figure | Under 2 s, UI not blocked |
-| Style edit during a fit | Main thread not blocked (worker) |
+| Workload | Target | Measured |
+|---|---|---|
+| Edit title, color or stroke | Visible within 50 ms | A normal graph: title 19 to 20 ms (met). 10 000 observations: 107 to 164 ms. 100 000 observations: title 2.3 to 2.5 s, stroke width 1.1 to 1.3 s (not met) |
+| Select one point in 10k | Within 100 ms | 25 to 32 ms until the drawing changes, but 246 to 297 ms until the next frame (not met: the browser takes the time) |
+| Pan and zoom 100k points | 30+ fps | Not measured (there is no clipping of the preview to the viewport yet) |
+| Open a project with 100k observations | Under 3 s | The table shows after 1.4 s (met); the graph is drawn after 5.7 to 7.8 s (not met) |
+| Export a normal figure | Under 2 s, UI not blocked | 124 ms to the PNG (met); whether the UI stays responsive was not measured |
+| Style edit during a fit | Main thread not blocked (worker) | Not measured; there is no worker, so the fit runs on the main thread |
+
+The development server is slower (React in development mode): the same runs gave 10 s for the graph of 100 000 observations and 3.9 s for its title edit.
 
 Above about 100k points, clip to the viewport and simplify the preview only. Never downsample the data or the export silently.
 
