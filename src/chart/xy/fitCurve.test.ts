@@ -265,3 +265,34 @@ describe('one fit for the graph and the Results sheet', () => {
     expect(fitStats.calculated - before).toBe(2 * sheetFits);
   });
 });
+
+describe('the band drawn on the graph follows the level of the fit', () => {
+  /** The area of a closed path of M and L commands (shoelace): the band is one polygon, so a wider band has a larger area. */
+  const area = (d: string): number => {
+    const pts = [...d.matchAll(/[ML](-?[\d.]+),(-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    let s = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const [x1, y1] = pts[i];
+      const [x2, y2] = pts[(i + 1) % pts.length];
+      s += x1 * y2 - x2 * y1;
+    }
+    return Math.abs(s) / 2;
+  };
+  const drawn = (level: number, band: 'confidence' | 'prediction' = 'confidence') => buildXyModel(createChart(table.id, undefined, 'xyScatter'), table, { ...NO_FIT_SETTINGS, model: 'linear', band, level }).series[0].fit!;
+
+  const table = createXyTable('Data', true);
+
+  it('is wider at a higher level and narrower at a lower one, with the curve unchanged', () => {
+    const [a90, a95, a99] = [0.9, 0.95, 0.99].map((l) => drawn(l));
+    expect(area(a99.bandPath)).toBeGreaterThan(area(a95.bandPath));
+    expect(area(a95.bandPath)).toBeGreaterThan(area(a90.bandPath));
+    expect(a90.path).toBe(a99.path);
+  });
+  it('the prediction band is wider than the band of the curve at the same level', () => {
+    expect(area(drawn(0.95, 'prediction').bandPath)).toBeGreaterThan(area(drawn(0.95, 'confidence').bandPath));
+  });
+  it('has no band when the level is not a level', () => {
+    expect(drawn(1.5).bandPath).toBe('');
+    expect(drawn(0).bandPath).toBe('');
+  });
+});

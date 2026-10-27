@@ -259,6 +259,9 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   // 4. Geometry.
   let clipped = 0;
   let offAxis = 0;
+  // Values inside an omitted range of a broken axis, and error bars with an end inside one: not drawn, and counted.
+  let inGap = 0;
+  let gapErrorBars = 0;
   const series: XySeries[] = raw.map((r) => {
     // A point with no position on a log axis (X or Y at or below 0) is left out and counted.
     const drawn = r.pts.filter((p) => onAxis(xAxis, p.x) && onAxis(yAxis, p.y));
@@ -266,9 +269,9 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     // A value inside a gap of a broken axis has no place on it: it is not drawn, and the line is cut at the gap's edge.
     const points: XyPoint[] = drawn.filter((p) => !inBreak(xAxis, p.x) && !inBreak(yAxis, p.y)).map((p) => ({ ...p, px: xScale(p.x), py: yScale(p.y) }));
     // Individual values are placed like the points: none where a log axis or a break gives them no position.
-    const rawPoints: XyRawPoint[] = r.rawObs
-      .filter((o) => onAxis(xAxis, o.x) && onAxis(yAxis, o.y) && !inBreak(xAxis, o.x) && !inBreak(yAxis, o.y))
-      .map((o) => ({ ...o, px: xScale(o.x), py: yScale(o.y) }));
+    const rawOnAxis = r.rawObs.filter((o) => onAxis(xAxis, o.x) && onAxis(yAxis, o.y));
+    const rawPoints: XyRawPoint[] = rawOnAxis.filter((o) => !inBreak(xAxis, o.x) && !inBreak(yAxis, o.y)).map((o) => ({ ...o, px: xScale(o.x), py: yScale(o.y) }));
+    inGap += drawn.length - points.length + (r.style.showRawPoints ? rawOnAxis.length - rawPoints.length : 0);
     // A run ends where a row between two drawn points is missing (Y or X), so a gap is a gap in the line.
     // Joined in ascending X instead, a row with an X but no drawable Y (empty, or off a log axis) cuts the line at its sorted place; a row with no X is not there at all.
     const seq: Array<{ x: number; y: number } | null> = [];
@@ -299,6 +302,11 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     let errorMeaning: string | null = null;
     for (const p of points) {
       if (!p.stats) continue;
+      // An end inside an omitted range would be drawn at the edge of the gap, as if that were its value: the bar is not drawn then.
+      if (errorEndValues(p.stats, r.style.showErrorBars, r.style.errorDirection).some((v) => inBreak(yAxis, v))) {
+        gapErrorBars++;
+        continue;
+      }
       const bar = buildErrorBar({ groupId: r.s.id, centerX: p.px, stats: p.stats, style: r.style, yScale, domain: yAxis.domain, log: !!yAxis.log });
       if (!bar) continue;
       errorPath += bar.d;
@@ -311,6 +319,8 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: d, ...(areaPath !== undefined ? { areaPath } : {}), errorPath, errorMeaning, skipped: r.skipped, ...(r.style.showRawPoints ? { rawPoints } : {}), fit: fitted, fitCurveLook: layerLook(chart, `${r.s.id}:fitCurve`, r.style), fitBandLook: layerLook(chart, `${r.s.id}:fitBand`, r.style) };
   });
   if (offAxis > 0) warnings.push(`${offAxis} point${offAxis === 1 ? ' has' : 's have'} a value of 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
+  if (inGap > 0) warnings.push(`${inGap} value${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);
+  if (gapErrorBars > 0) warnings.push(`${gapErrorBars} error bar${gapErrorBars === 1 ? ' has' : 's have'} an end inside an omitted range of the axis and ${gapErrorBars === 1 ? 'is' : 'are'} not drawn.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
   const skippedTotal = series.reduce((n, s) => n + s.skipped, 0);
   if (skippedTotal > 0) warnings.push(`${skippedTotal} row${skippedTotal === 1 ? ' has' : 's have'} an X or Y value missing and ${skippedTotal === 1 ? 'is' : 'are'} not drawn.`);

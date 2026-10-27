@@ -162,3 +162,19 @@ describe('degenerate data are not reported as a clean fit', () => {
     }
   });
 });
+
+describe('X far from zero', () => {
+  it('a peak fitted with X shifted by 1e8 comes back with its position shifted and its height, width and level unchanged', () => {
+    const shift = 1e8;
+    const c = CASES.find((k) => k.id === 'gaussian_peak')!;
+    const model = fitModelById('gaussian_peak');
+    const pts = c.xs.map((x) => ({ x: x + shift, y: model.fn(x, c.p) }));
+    const r = ok(fitCurve(pts, { model: 'gaussian_peak' }));
+    expect(r.converged).toBe(true);
+    const [level, height, centre, width] = r.params.map((q) => q.value);
+    expect(level).toBeCloseTo(c.p[0], 5);
+    expect(height).toBeCloseTo(c.p[1], 5);
+    expect(centre - shift).toBeCloseTo(c.p[2], 3);
+    expect(width).toBeCloseTo(c.p[3], 5);
+  });
+});

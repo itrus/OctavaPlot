@@ -83,6 +83,23 @@ test.describe('files', () => {
     await expect(page.locator('.nav-item').filter({ hasText: /BAR$/ })).toHaveCount(saved.charts.length);
   });
 
+  test('an edit made just before the page is left is in the recovery copy, and the project comes back with it', async ({ page }) => {
+    // The clock stops after the page has loaded, so the autosave delay of 400 ms never runs out: only the write on leaving the page can save the edit.
+    await page.clock.install({ time: new Date('2026-01-01T10:00:00') });
+    await openApp(page);
+    await page.clock.pauseAt(new Date('2026-01-01T10:00:30'));
+    await cell(page, 0, 0).click();
+    await page.keyboard.type('7.77');
+    await page.keyboard.press('Enter');
+    await expect(cell(page, 0, 0)).toHaveText('7.77');
+    await page.goto('about:blank');
+    await page.clock.resume();
+    await page.goto('./');
+    await expect(page.getByRole('grid', { name: 'Data table' })).toBeVisible();
+    await expect(status(page)).toContainText('Restored the project from the browser recovery copy');
+    await expect(cell(page, 0, 0)).toHaveText('7.77');
+  });
+
   test('a PNG export has the size and the resolution the dialog states', async ({ page }) => {
     await openApp(page);
     await openGraph(page);

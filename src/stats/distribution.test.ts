@@ -28,6 +28,16 @@ describe('box summaries', () => {
     expect(b.outliers).toEqual([30]);
     expect(b.max).toBe(30);
   });
+  it('puts the upper Tukey fence at Q3 + 1.5 IQR = 15: a value of 15 is inside it and the next value above is not', () => {
+    // 1 to 8 and one more value: Q1 is 2.5 and Q3 is 7.5 whatever the ninth value is, so the fence is 7.5 + 1.5 * 5 = 15.
+    const at = boxSummary([1, 2, 3, 4, 5, 6, 7, 8, 15], 'tukey')!;
+    expect([at.q1, at.q3]).toEqual([2.5, 7.5]);
+    expect(at.whiskerHigh).toBe(15);
+    expect(at.outliers).toEqual([]);
+    const over = boxSummary([1, 2, 3, 4, 5, 6, 7, 8, 15.000001], 'tukey')!;
+    expect(over.whiskerHigh).toBe(8);
+    expect(over.outliers).toEqual([15.000001]);
+  });
   it('draws the whole range with the minimum to maximum rule, and no outliers', () => {
     const b = boxSummary(data, 'minmax')!;
     expect([b.whiskerLow, b.whiskerHigh, b.outliers.length]).toEqual([1, 30, 0]);

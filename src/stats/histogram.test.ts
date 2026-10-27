@@ -127,3 +127,36 @@ describe('every observation falls in exactly one bin', () => {
     expect(sum).toBe(v.length);
   });
 });
+
+import { sanitizeHistogram } from '../model/options/histogramOptions';
+import { createChart } from '../model/defaults';
+
+describe('a bin width that would make too many bins, or that is not a width', () => {
+  it('a width far below the range stops at the cap of bins, and quickly', () => {
+    const t0 = performance.now();
+    const edges = binEdges([0, 1e9], 1e-6);
+    expect(edges.length).toBeLessThanOrEqual(2001);
+    expect(edges.length).toBeGreaterThan(100);
+    expect(performance.now() - t0).toBeLessThan(500);
+    // The cap can be asked for: the number of bins is at most `maxBins`, and every edge is still increasing.
+    const small = binEdges([0, 1000], 1, null, 50);
+    expect(small.length).toBeLessThanOrEqual(51);
+    for (let i = 1; i < small.length; i++) expect(small[i]).toBeGreaterThan(small[i - 1]);
+  });
+
+  it('a width of 0, a negative one, or one that is not a number is not taken from a file or a patch: the setting stays as it was', () => {
+    const base = { ...createChart('t').histogram, binning: 'width' as const, binWidth: 2.5 };
+    for (const bad of [0, -3, NaN, Infinity, '2', null, undefined]) {
+      const out = sanitizeHistogram({ binning: 'width', binWidth: bad }, base);
+      if (bad === null) expect(out.binWidth).toBeNull();
+      else if (bad === Infinity) expect(out.binWidth).toBeLessThanOrEqual(1e12);
+      else expect(out.binWidth).toBe(2.5);
+    }
+  });
+
+  it('a width is held within its limits', () => {
+    const base = { ...createChart('t').histogram, binWidth: 1 };
+    expect(sanitizeHistogram({ binWidth: 1e-30 }, base).binWidth).toBe(1e-12);
+    expect(sanitizeHistogram({ binWidth: 1e30 }, base).binWidth).toBe(1e12);
+  });
+});

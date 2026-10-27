@@ -21,6 +21,8 @@ export interface FitModel {
   fn: (x: number, p: readonly number[]) => number;
   /** Starting values from the data. */
   init: (xs: readonly number[], ys: readonly number[], degree: number) => number[];
+  /** Other starting values to try as well (the fit keeps the best result): for a model whose one start can end in a local minimum. */
+  starts?: (xs: readonly number[], ys: readonly number[]) => number[][];
   /** Bounds of each parameter (a rate cannot be negative), for the nonlinear models. */
   lower?: (n: number) => number[];
   upper?: (n: number) => number[];
@@ -36,6 +38,36 @@ const mean = (a: readonly number[]) => a.reduce((s, v) => s + v, 0) / a.length;
 const minOf = (a: readonly number[]) => a.reduce((m, v) => (v < m ? v : m), Infinity);
 const maxOf = (a: readonly number[]) => a.reduce((m, v) => (v > m ? v : m), -Infinity);
 const range = (a: readonly number[]): [number, number] => [minOf(a), maxOf(a)];
+
+/**
+ * Starting values for c + A1 exp(-k1 x) + A2 exp(-k2 x) by variable projection: for each pair of rates on a grid (k1 above k2, in
+ * units of 1 / the range of X), the offset and the two amplitudes that fit best are found by linear least squares, and the pairs with
+ * the smallest residual are the starts. A single start from the ends of the data can end with the two rates equal; these cannot.
+ */
+function twoPhaseStarts(xs: readonly number[], ys: readonly number[]): number[][] {
+  const [x0, x1] = [minOf(xs), maxOf(xs)];
+  const span = Math.max(x1 - x0, 1e-12);
+  const grid: number[] = [];
+  for (let k = 0.1; k <= 100; k *= 1.5) grid.push(k / span);
+  const found: Array<{ rss: number; start: number[] }> = [];
+  for (let i = 0; i < grid.length; i++) {
+    for (let j = 0; j < i; j++) {
+      const k1 = grid[i];
+      const k2 = grid[j];
+      const cols = [xs.map(() => 1), xs.map((x) => Math.exp(-k1 * (x - x0))), xs.map((x) => Math.exp(-k2 * (x - x0)))];
+      const a: Mat = cols.map((ci) => cols.map((cj) => ci.reduce((sum, v, r) => sum + v * cj[r], 0)));
+      const inv = invert(a);
+      if (!inv) continue;
+      const b = cols.map((ci) => ci.reduce((sum, v, r) => sum + v * ys[r], 0));
+      const [c, a1, a2] = inv.map((row) => row.reduce((sum, v, r) => sum + v * b[r], 0));
+      let rss = 0;
+      for (let r = 0; r < xs.length; r++) rss += (ys[r] - c - a1 * cols[1][r] - a2 * cols[2][r]) ** 2;
+      // The amplitudes are those at X = x0 here; the model has them at X = 0, so they are taken back.
+      if (Number.isFinite(rss)) found.push({ rss, start: [c, a1 * Math.exp(k1 * x0), k1, a2 * Math.exp(k2 * x0), k2] });
+    }
+  }
+  return found.sort((u, v) => u.rss - v.rss).slice(0, 3).map((f) => f.start);
+}
 const trendSign = (xs: readonly number[], ys: readonly number[]) => {
   const mx = mean(xs);
   const my = mean(ys);
@@ -116,6 +148,7 @@ export const FIT_MODELS: readonly FitModel[] = [
       const last = ys[xs.indexOf(x1)];
       return [last, (first - last) * 0.6, 10 / span, (first - last) * 0.4, 1 / span];
     },
+    starts: (xs, ys) => twoPhaseStarts(xs, ys),
     lower: () => [-INF, -INF, 0, -INF, 0],
     minPoints: () => 5,
   },
@@ -595,14 +628,27 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
     const nm = normalisation(model.id, xs, ys);
     const xn = xs.map((x) => (x - nm.xShift) / nm.xScale);
     const yn = ys.map((y) => (y - nm.yShift) / nm.yScale);
-    const start = model.init(xn, yn, degree);
-    const scales = start.map((v) => (Math.abs(v) > 1e-6 && Number.isFinite(v) ? Math.abs(v) : 1));
-    const scaledModel: FitModel = { ...model, fn: (x, t) => model.fn(x, t.map((v, i) => v * scales[i])) };
     const dims = PARAM_DIMS[model.id] ?? [];
-    const bound = (raw: number[] | undefined, fallback: number) => (raw ?? new Array<number>(p).fill(fallback)).map((v, i) => (v > 0 && Number.isFinite(v) && dims[i] === 'x' ? 1e-9 : v) / scales[i]);
-    const lo = bound(model.lower?.(p), -Infinity);
-    const hi = bound(model.upper?.(p), Infinity);
-    const r = levenbergMarquardt(scaledModel, xn, yn, start.map((v, i) => v / scales[i]), lo, hi, options.maxIterations ?? MAX_ITERATIONS, options.relativeTolerance ?? REL_TOL);
+    /** One search from one start: its own scales, bounds and result, and the residual it ends with. */
+    const attempt = (start: number[]) => {
+      const scales = start.map((v) => (Math.abs(v) > 1e-6 && Number.isFinite(v) ? Math.abs(v) : 1));
+      const scaledModel: FitModel = { ...model, fn: (x, t) => model.fn(x, t.map((v, i) => v * scales[i])) };
+      const bound = (raw: number[] | undefined, fallback: number) => (raw ?? new Array<number>(p).fill(fallback)).map((v, i) => (v > 0 && Number.isFinite(v) && dims[i] === 'x' ? 1e-9 : v) / scales[i]);
+      const lo = bound(model.lower?.(p), -Infinity);
+      const hi = bound(model.upper?.(p), Infinity);
+      const r = levenbergMarquardt(scaledModel, xn, yn, start.map((v, i) => v / scales[i]), lo, hi, options.maxIterations ?? MAX_ITERATIONS, options.relativeTolerance ?? REL_TOL);
+      let rssN = 0;
+      for (let i = 0; i < xn.length; i++) rssN += (yn[i] - scaledModel.fn(xn[i], r.p)) ** 2;
+      return { scales, scaledModel, r, rssN: Number.isFinite(rssN) ? rssN : Infinity };
+    };
+    // The usual start first; a model that has others tries them too, and the best result stands (the usual one on a tie).
+    let best = attempt(model.init(xn, yn, degree));
+    for (const other of model.starts?.(xn, yn) ?? []) {
+      const next = attempt(other);
+      const better = next.r.converged === best.r.converged ? next.rssN < best.rssN * (1 - 1e-9) : next.r.converged;
+      if (better) best = next;
+    }
+    const { scales, scaledModel, r } = best;
     working = r.p;
     const report = (t: readonly number[]) => reportedParams(model.id, t.map((v, i) => v * scales[i]), nm);
     params = report(working);

@@ -8,7 +8,7 @@ import { parseProject, parseProjectWithNotes, stringifyProject } from '../../sta
 import { buildAnyModel } from '../anyModel';
 import { chartToSvgString } from '../export/export';
 import { buildGroupedModel } from '../grouped/groupedModel';
-import { buildSurvivalModel, kaplanMeier } from '../survival/survivalModel';
+import { buildSurvivalModel, kaplanMeier, medianSurvival } from '../survival/survivalModel';
 
 /** A project with one table of the kind (with sample data) and one chart of the type. */
 function projectWith(kind: TableKind, type: ChartType, layout?: Parameters<typeof addDataTable>[2]): Project {
@@ -54,6 +54,27 @@ describe('Kaplan-Meier', () => {
     expect(km.steps[0]).toMatchObject({ time: 5, atRisk: 4, events: 2, survival: 0.5 });
     expect(km.marks).toEqual([{ time: 5, survival: 0.5, row: 1 }]);
     expect(km.steps[1]).toMatchObject({ time: 8, atRisk: 1, survival: 0 });
+  });
+
+  // The fixtures of section 15 of docs/calculation-contracts.md, with the values written there.
+  it('survival ties: (1, event), (2, event), (2, censor), (3, event) give 0.75, 0.5, 0, a censor mark at the post-event level, and a median of 2', () => {
+    const km = kaplanMeier(subj([[1, true], [2, true], [2, false], [3, true]]));
+    expect(km.steps.map((s) => [s.time, s.atRisk, s.events, s.survival])).toEqual([[1, 4, 1, 0.75], [2, 3, 1, 0.5], [3, 1, 1, 0]]);
+    expect(km.marks).toEqual([{ time: 2, survival: 0.5, row: 2 }]);
+    expect(medianSurvival(km)).toBe(2);
+  });
+
+  it('no-event survival: three censored subjects keep the estimate at 1, and the median is not reached', () => {
+    const km = kaplanMeier(subj([[1, false], [2, false], [3, false]]));
+    expect(km.steps).toEqual([]);
+    expect(km.marks.map((m) => m.survival)).toEqual([1, 1, 1]);
+    expect(medianSurvival(km)).toBeNull();
+  });
+
+  it('the median is the first time the estimate is 0.5 or below, and not reached while it stays above', () => {
+    expect(medianSurvival(kaplanMeier(subj([[1, true], [2, true], [3, true], [4, true]])))).toBe(2);
+    expect(medianSurvival(kaplanMeier(subj([[1, true], [2, false], [3, false], [4, false]])))).toBeNull();
+    expect(medianSurvival(kaplanMeier(subj([[5, true], [6, true], [7, true]])))).toBe(6);
   });
 
   it('has no steps when nobody has the event', () => {

@@ -88,6 +88,12 @@ export function kaplanMeier(subjects: ReadonlyArray<{ time: number; event: boole
   return { steps, marks, n: sorted.length, events, times: sorted.map((x) => x.time) };
 }
 
+/**
+ * The median survival time: the first event time at which the estimate is 0.5 or below, or null when the curve never gets there
+ * ("not reached": too few events, or most subjects censored). Pure; the contract's fixtures pin it.
+ */
+export const medianSurvival = (km: Pick<KaplanMeier, 'steps'>): number | null => km.steps.find((s) => s.survival <= 0.5)?.time ?? null;
+
 /** Number of subjects still under observation at time t: those whose time is at least t. */
 export const numberAtRisk = (km: KaplanMeier, t: number): number => km.times.filter((x) => x >= t).length;
 
