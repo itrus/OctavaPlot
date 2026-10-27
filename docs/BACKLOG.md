@@ -20,7 +20,7 @@ Done and tested (full suite 3421 tests on 27 October 2026, after roadmap steps 1
 
 Also done: OP-018, 019 (already so in the working tree; tests added), 020, 021, 022, 026, 027 (focus movement not testable without a DOM), 028, 031, 035, 036 (uses Vite's parser: the installed TypeScript 7 has no JavaScript parser API), and OP-034 (export dialog with size, fonts, warnings, known limits and a JSON report; glyph checks and counts of clipped objects are not done). OP-032 is partly done: CSS for 900 px and 600 px, looked at in Chrome at 375 and 768 px (through an iframe, as the window could not be resized): no sideways page scroll, the side panels overlay, the Layouts settings stack under the page, and the top bar keeps the panel toggles, Save, Undo and Redo and Settings on screen (the rest scrolls). Still open: the inspector overlay is slightly clipped at the left edge at 375 px, the navigator overlay stays open after choosing an item, and the status text keeps old messages.
 
-Also on 27 October 2026 (after roadmap steps 1 to 3): the glyph checks of P2 (see ROADMAP step 2), regression tests for `exp_two_phase` ordering, and OP-032: in the narrow layout the navigator now closes when an item is chosen (not tried in a browser). The two audits are in [AUDIT-P0.md](AUDIT-P0.md) and [AUDIT-P3.md](AUDIT-P3.md).
+Also on 27 October 2026 (after roadmap steps 1 to 3): the glyph checks of P2 (see ROADMAP step 2), regression tests for `exp_two_phase` ordering, and OP-032: in the narrow layout the navigator now closes when an item is chosen (tried in Chrome on 27 October 2026 in an 800 px iframe: choosing a different item closes the navigator, choosing the open one leaves it). The two audits are in [AUDIT-P0.md](AUDIT-P0.md) and [AUDIT-P3.md](AUDIT-P3.md).
 
 Not done from the lists: OP-032 (in full), and the P8 items not named above.
 
@@ -204,8 +204,8 @@ From [AUDIT-P0.md](AUDIT-P0.md) and [AUDIT-P3.md](AUDIT-P3.md); sizes are the au
 | Mixed-state multi-selection (`Selection` is single) | P3 | L |
 | Property search (no registry of field labels) | P3 | M to L |
 | Keyboard: chart canvas, Navigator arrows, grid Home and End | P3 | M |
-| Grid fill down and right | P3 | **Done 27 Oct 2026**: Ctrl+D and Ctrl+R (planFill, `ui/data/fill.ts`; one undo step); not tried in a browser, and series fill (1, 2, 3 ...) is not built |
-| Small screens: status text keeps old messages (needs a decision on when to clear); inspector clip at 375 px is not confirmed from the CSS and needs a browser; "no width queries" in section 1.4 is out of date | P3 | S to M |
+| Grid fill down and right | P3 | **Done 27 Oct 2026**: Ctrl+D and Ctrl+R (planFill, `ui/data/fill.ts`; one undo step). Tried in Chrome: Ctrl+D fills and the browser does not take it; Ctrl+R could only be sent as a synthetic key event (the test tool reloads the page itself), where the grid handled it and called preventDefault. Series fill (1, 2, 3 ...) is not built |
+| Small screens: status text keeps old messages (needs a decision on when to clear); the inspector clip at 375 px was not reproduced in Chrome (it fits, 30 to 374 px, no sideways scroll); "no width queries" in section 1.4 is out of date | P3 | S to M |
 
 ## 5. Not adopted from the reviews
 
