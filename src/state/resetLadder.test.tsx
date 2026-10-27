@@ -5,7 +5,7 @@ import { createExampleProject } from '../model/defaults';
 import { dataLayer, isGroupOverridden, resolveStyle } from '../model/graph/style';
 import { isSummaryOverridden, resolveSummary } from '../model/graph/summary';
 import type { Project } from '../model/types';
-import { Field, GroupBox, NumField } from '../ui/inspector/common/controls';
+import { ColorInput, Field, GroupBox, NumField, SelectInput } from '../ui/inspector/common/controls';
 import { clearGroupStyleSettings, clearGroupSummarySettings, clearSummaryOverrides, composeCommands, patchStyle, patchSummary, resetAllDataSets, resetStyle } from './commands';
 
 const setup = () => {
@@ -89,5 +89,31 @@ describe('the dot beside an overridden setting', () => {
   it('is the same on number fields and group boxes', () => {
     expect(html(<NumField label="Border" value={1} min={0} max={5} overridden={() => undefined} onCommit={() => undefined} />)).toContain('aria-label="Reset Border to the graph&#x27;s value"');
     expect(html(<GroupBox title="Bars" overridden={() => undefined}><span /></GroupBox>)).toContain('aria-label="Reset Bars to the graph&#x27;s value"');
+  });
+});
+
+describe('a setting the selected data sets do not agree on', () => {
+  const html = (node: ReactElement) => renderToStaticMarkup(node);
+  const mixed = { mixed: true, reset: () => undefined };
+
+  it('is tagged on the label, and the way back is still the dot', () => {
+    const out = html(<Field label="Opacity" overridden={mixed}><span /></Field>);
+    expect(out).toContain('mixed-tag');
+    expect(out).toContain('aria-label="Reset Opacity to the graph&#x27;s value"');
+    expect(html(<Field label="Opacity" overridden={{ mixed: true }}><span /></Field>)).not.toContain('<button');
+    expect(html(<Field label="Opacity" overridden={{ reset: () => undefined }}><span /></Field>)).not.toContain('mixed-tag');
+  });
+  it('shows an empty number box with "Mixed" in it, and a number box that agrees with its value', () => {
+    expect(html(<NumField label="Border" value={2} min={0} max={5} overridden={mixed} onCommit={() => undefined} />)).toMatch(/placeholder="Mixed"[^>]*value=""|value=""[^>]*placeholder="Mixed"/);
+    const agreed = html(<NumField label="Border" value={2} min={0} max={5} overridden={{ reset: () => undefined }} onCommit={() => undefined} />);
+    expect(agreed).toContain('value="2"');
+    expect(agreed).not.toContain('Mixed');
+  });
+  it('shows a selector with a "Mixed" entry selected, and a colour box marked as mixed', () => {
+    const options = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }];
+    const select = html(<Field label="Shape" overridden={mixed}><SelectInput value="a" options={options} onChange={() => undefined} /></Field>);
+    expect(select).toContain('Mixed');
+    expect(html(<Field label="Shape" overridden={false}><SelectInput value="a" options={options} onChange={() => undefined} /></Field>)).not.toContain('Mixed');
+    expect(html(<Field label="Fill" overridden={mixed}><ColorInput value="#ff0000" onChange={() => undefined} /></Field>)).toContain('class="mixed"');
   });
 });

@@ -44,7 +44,9 @@ import { AxisStyleControls, TickFields } from './sections/AxisStyleControls';
 import { DataSetOrder } from './sections/DataSetOrder';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
+import { DataSetPicker } from './sections/DataSetPicker';
 import { DataSetReset } from './sections/DataSetReset';
+import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
 import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './common/controls';
 import {
   backgroundDisplay,
@@ -80,6 +82,9 @@ function DatasetSwatchChip({ style }: { style: ChartStyle }) {
   );
 }
 
+/** The value of the data set selector when several data sets are selected together. */
+const SEVERAL = '__several__';
+
 export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { selection, setSelection, run, setStatus, inspectorNav } = useApp();
   const [tab, setTab] = useState<InspectorTab>('appearance');
@@ -97,14 +102,23 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
   // Selection scope: a selected data set or point edits that data set; anything else edits all groups.
   const sel = pointSelectionState(table, selection, chart.type);
   const selectedGroup = sel.groupId ? table.groups.find((g) => g.id === sel.groupId) : undefined;
-  const scope: 'all' | Id = selectedGroup ? selectedGroup.id : 'all';
+  const allIds = useMemo(() => table.groups.map((g) => g.id), [table.groups]);
+  // Several data sets selected together are edited together, and where they differ a field says so ("Mixed").
+  const several = selection.kind === 'groups' ? scopeGroupIds(selection.groupIds, allIds) : [];
+  const scope: StyleScope = several.length > 1 ? several : selectedGroup ? selectedGroup.id : 'all';
+  const scopeIds = scopeGroupIds(scope, allIds);
+  // A data set of the selection that is gone (deleted) leaves the selection.
+  useEffect(() => {
+    if (selection.kind === 'groups' && several.length !== selection.groupIds.length) setSelection(selectionOfGroups(several));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [several.length, selection.kind]);
   // A selected point that no longer exists (deleted data set or row, or a chart type without points) steps back.
   const fallbackKey = sel.fallback ? JSON.stringify(sel.fallback) : null;
   useEffect(() => {
     if (sel.fallback) setSelection(sel.fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fallbackKey]);
-  const sample = selectedGroup ?? table.groups[0];
+  const sample = selectedGroup ?? table.groups.find((g) => g.id === several[0]) ?? table.groups[0];
 
   const st: ChartStyle = useMemo(() => {
     if (!sample) return chart.defaults;
@@ -114,8 +128,19 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
   }, [chart, layer, sample, scope]);
 
   // Summary settings: the layer value for Global, the resolved value for a data set.
-  const spec: SummarySpec = !sample || scope === 'all' ? layer.summary : resolveSummary(layer, scope);
-  const ovSum = (key: keyof SummarySpec): Overridden => scope !== 'all' && isSummaryOverridden(layer, scope, key) && (() => run('Reset setting', clearGroupSummarySettings(chart.id, scope, [key])));
+  const spec: SummarySpec = !sample || scope === 'all' ? layer.summary : resolveSummary(layer, sample.id);
+  // The data sets the edits reach (hidden ones are not drawn, so they do not count as differing).
+  const inScope = table.groups.filter((g) => scopeIds.includes(g.id) && !chart.hiddenGroupIds.includes(g.id));
+  const inScopeKey = inScope.map((g) => g.id).join();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const mixedStyle = useMemo(() => mixedStyleKeys(chart, layer, inScope), [chart, layer, inScopeKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const mixedSummary = useMemo(() => mixedSummaryKeys(layer, inScope.map((g) => g.id)), [layer, inScopeKey]);
+  const ovSum = (key: keyof SummarySpec): Overridden => {
+    const own = scopeIds.filter((id) => isSummaryOverridden(layer, id, key));
+    const mixed = mixedSummary.has(key);
+    return own.length === 0 && !mixed ? false : { reset: own.length > 0 ? () => run('Reset setting', clearGroupSummarySettings(chart.id, own, [key])) : undefined, mixed };
+  };
   const setSummary = (patch: Partial<SummarySpec>, label = 'Change summary') => {
     if (!validateSummaryPatch(patch)) return;
     run(label, patchSummary(chart.id, scope, patch), `summary:${scope}:${Object.keys(patch).join(',')}`);
@@ -128,8 +153,8 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
   };
 
   const model = useMemo(() => buildColumnModel(chart, table), [chart, table]);
-  const scopeGroup = scope === 'all' ? null : model.groups.find((g) => g.groupId === scope) ?? null;
-  const clippedBars = (scopeGroup ? [scopeGroup] : model.groups).flatMap((g) => (g.errorBar ? [g.errorBar] : []));
+  const scopeGroup = typeof scope === 'string' && scope !== 'all' ? model.groups.find((g) => g.groupId === scope) ?? null : null;
+  const clippedBars = (scope === 'all' ? model.groups : model.groups.filter((g) => scopeIds.includes(g.groupId))).flatMap((g) => (g.errorBar ? [g.errorBar] : []));
   const clippedEnds = clippedEndpointCount(clippedBars);
 
   const setStyle = (patch: Partial<ChartStyle>) => {
@@ -149,7 +174,11 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
       coalesceKey,
     );
   // A setting this data set has its own value for: the dot beside it is the way back to the graph's value.
-  const ov = (key: keyof ChartStyle): Overridden => scope !== 'all' && isGroupOverridden(layer, scope, key) && (() => run('Reset setting', clearGroupStyleSettings(chart.id, scope, [key])));
+  const ov = (key: keyof ChartStyle): Overridden => {
+    const own = scopeIds.filter((id) => isGroupOverridden(layer, id, key));
+    const mixed = mixedStyle.has(key);
+    return own.length === 0 && !mixed ? false : { reset: own.length > 0 ? () => run('Reset setting', clearGroupStyleSettings(chart.id, own, [key])) : undefined, mixed };
+  };
 
   // "<" / ">" step through the data sets; stepping off either end returns to Global.
   const stepGroup = (dir: 1 | -1) => {
@@ -164,8 +193,8 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
   // Two value axes exist only while a data set is bound to the right one.
   const dual = model.y2 !== null;
   const bindingUi = bindingSelectState(chart.type, st);
-  const groupBindings = model.groups.map((g) => bindingOf(g.style));
-  const mixedBinding = scope === 'all' && groupBindings.some((b) => b !== groupBindings[0]);
+  const inScopeBindings = model.groups.filter((g) => scopeIds.includes(g.groupId)).map((g) => bindingOf(g.style));
+  const mixedBinding = inScopeBindings.some((b) => b !== inScopeBindings[0]);
   const setBinding = (axisBinding: AxisBinding) =>
     run(axisBinding === 'secondary' ? 'Plot data on right Y axis' : 'Plot data on left Y axis', patchStyle(chart.id, scope, { axisBinding }));
   const axisCtx = (axis: Chart['yAxis'], scale: { domain: [number, number]; log?: number | null }): AxisEditContext => ({
@@ -202,10 +231,11 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             <select
               className="dataset-select"
               aria-label="Data set"
-              value={scope}
-              onChange={(e) => setSelection(e.target.value === 'all' ? { kind: 'chart' } : { kind: 'group', groupId: e.target.value })}
+              value={Array.isArray(scope) ? SEVERAL : scope}
+              onChange={(e) => e.target.value !== SEVERAL && setSelection(e.target.value === 'all' ? { kind: 'chart' } : { kind: 'group', groupId: e.target.value })}
             >
               <option value="all">Global (all data sets)</option>
+              {Array.isArray(scope) && <option value={SEVERAL}>{scope.length} data sets together</option>}
               {table.groups.map((g) => (
                 <option key={g.id} value={g.id}>
                   {table.name}:{displayName(chart, g.id, g.name)}
@@ -221,6 +251,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             </button>
             <DataSetReset chart={chart} table={table} scope={scope} run={run} />
           </div>
+          <DataSetPicker sets={table.groups.map((g) => ({ id: g.id, label: displayName(chart, g.id, g.name) }))} selection={selection} setSelection={setSelection} />
 
           <GroupBox title="Style">
             <Field label="Appearance">

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { buildAnyModelCached, ChartCanvas, chartTexts } from '../../chart/anyModel';
-import { CHROME_STOPS, type ChromeStop, describeFocus, nextFocus, selectableMarks } from '../../chart/selectionOrder';
+import { CHROME_STOPS, type ChromeStop, describeFocus, extendGroups, nextFocus, selectableMarks } from '../../chart/selectionOrder';
+import { toggleGroupSelection } from '../../model/graph/selection/scope';
 import { hitFromTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
 import type { PreparedChart } from '../../model/table/preparedChart';
@@ -80,6 +81,9 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
       setDrag({ id: a.id, xFrac: from.xFrac, yFrac: from.yFrac, dx: pt.x - from.xFrac * model.widthPt, dy: pt.y - from.yFrac * model.heightPt, moved: false });
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       setTip(null);
+    } else if ((e.ctrlKey || e.metaKey || e.shiftKey) && hit.groupId && hit.kind !== 'background') {
+      // Ctrl, Cmd or Shift on a data set adds it to the selection, or takes it out: the data sets are then edited together.
+      setSelection(toggleGroupSelection(selection, hit.groupId, marks.map((m) => m.groupId)));
     } else if (hit.groupId && hit.objectId && (hit.kind === 'point' || hit.kind === 'label') && !hit.objectId.endsWith(':mean')) {
       // Mean markers have no row of their own; they select the data set.
       setSelection({ kind: 'point', groupId: hit.groupId, pointId: hit.objectId });
@@ -138,6 +142,13 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
         navigateInspector(target);
       }
       return;
+    }
+    // Shift with Left or Right grows the selection by the data set next to it.
+    if (e.shiftKey && !stop) {
+      const grown = extendGroups(marks, selection, e.key);
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault();
+      if (grown) setSelection(grown);
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return;
     }
     // The title, legend and axes are stops after the last data set; only those the chart draws are visited.
     const stops = CHROME_STOPS.filter((id) => svgRef.current?.querySelector(`[id="${id}"]`));

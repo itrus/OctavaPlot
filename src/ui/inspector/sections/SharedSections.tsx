@@ -7,7 +7,7 @@ import { CHART_PX_MAX, CHART_PX_MIN } from '../../../model/defaults';
 import { newId } from '../../../model/ids';
 import { type AnnotationPlacer, changeAnchor, drawnFractions, patchForMove } from '../../../chart/shared/scene/annotationPlace';
 import { capabilitiesOf } from '../../../model/graph/capabilities';
-import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../../model/graph/colorVision';
+import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../../model/graph/colour/colorVision';
 import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../../model/graph/palettes';
 import type { Chart, Group, Id } from '../../../model/types';
 import { useApp } from '../../../state/AppContext';

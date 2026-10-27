@@ -150,7 +150,7 @@ export function compileColumnPointLabels(chart: Chart, model: ColumnModel): Scen
 }
 
 /** The editor's own marks of a column chart: the ring round the selected point, the frame of its label and the band of the selected data set. Never in an export. */
-export function compileColumnSelection(model: ColumnModel, selectedGroup: string | null, selectedPoint: string | null): SceneElement[] {
+export function compileColumnSelection(model: ColumnModel, selectedGroups: readonly string[], selectedPoint: string | null): SceneElement[] {
   const { plot } = model.layout;
   const dashed = [['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '6 4'], ['pointer-events', 'none']] as const;
   return [
@@ -160,8 +160,8 @@ export function compileColumnSelection(model: ColumnModel, selectedGroup: string
           ...model.groups.flatMap((g) => g.points.filter((p) => p.id === selectedPoint)).map((p) => el('circle', [['data-editor-only', 'true'], ['cx', n2(p.cx)], ['cy', n2(p.cy)], ['r', n2(p.size / 2 + 6)], ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2.4], ['pointer-events', 'none']], { editorOnly: true })),
           ...model.labels.items.filter((it) => it.id === selectedPoint).map((it) => el('rect', [['data-editor-only', 'true'], ['x', n2(it.box.x0 - 4)], ['y', n2(it.box.y0 - 4)], ['width', n2(it.box.x1 - it.box.x0 + 8)], ['height', n2(it.box.y1 - it.box.y0 + 8)], ...dashed], { editorOnly: true })),
         ]),
-    ...(selectedGroup === null
+    ...(selectedGroups.length === 0
       ? []
-      : model.groups.filter((g) => g.groupId === selectedGroup).map((g) => el('rect', [['data-editor-only', 'true'], ['x', n2(g.slotX)], ['y', n2(plot.y)], ['width', n2(g.slotWidth)], ['height', n2(plot.height)], ['fill', SELECT_COLOR], ['fill-opacity', 0.07], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '8 6'], ['pointer-events', 'none']], { editorOnly: true }))),
+      : model.groups.filter((g) => selectedGroups.includes(g.groupId)).map((g) => el('rect', [['data-editor-only', 'true'], ['x', n2(g.slotX)], ['y', n2(plot.y)], ['width', n2(g.slotWidth)], ['height', n2(plot.height)], ['fill', SELECT_COLOR], ['fill-opacity', 0.07], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '8 6'], ['pointer-events', 'none']], { editorOnly: true }))),
   ];
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { formatNum, sliderStep, snapToStep } from '../../data/numberFormat';
 import { WheelRange } from '../../components/WheelRange';
 import { useRoving } from './roving';
@@ -22,6 +22,8 @@ interface FieldLink {
   labelId: string;
   describedBy: string | undefined;
   invalid: boolean;
+  /** The data sets being edited together do not agree on this setting: the control shows "Mixed" instead of a value. */
+  mixed: boolean;
 }
 const FieldContext = createContext<FieldLink | null>(null);
 
@@ -37,16 +39,35 @@ function useFieldAria(ariaLabel?: string): { 'aria-label'?: string; 'aria-labell
 
 /**
  * Whether a setting has a value of its own for the data set being edited. A function is the way back: the dot is then a button
- * that clears the data set's own value, so the graph's shows again.
+ * that clears the data set's own value, so the graph's shows again. With several data sets edited together the object form says
+ * whether the way back exists (`reset`: some of them have a value of their own) and whether they `mixed` (differ), which the
+ * control then shows as "Mixed".
  */
-export type Overridden = boolean | (() => void);
+export type Overridden = boolean | (() => void) | { reset?: () => void; mixed?: boolean };
+
+/** Whether the data sets being edited together differ in this setting. */
+const isMixed = (o: Overridden | undefined): boolean => typeof o === 'object' && o !== null && !!o.mixed;
+
+const resetOf = (o: Overridden | undefined): (() => void) | undefined => (typeof o === 'function' ? o : typeof o === 'object' && o !== null ? o.reset : undefined);
 
 /** The dot that marks an overridden setting; a button that resets it when there is a way. */
 function OverrideMark({ overridden, what, where }: { overridden: Overridden | undefined; what: string; where: string }) {
   if (!overridden) return null;
-  if (typeof overridden !== 'function') return <span className="override-dot" title={`Overridden for this ${where}`} />;
+  const reset = resetOf(overridden);
+  const mixed = isMixed(overridden);
+  const dot =
+    typeof overridden === 'object' || typeof overridden === 'function' ? (
+      reset ? (
+        <button type="button" className="override-dot override-reset" onClick={reset} aria-label={`Reset ${what} to the graph's value`} title={`Overridden for ${mixed ? 'some of these data sets' : `this ${where}`}. Click to use the graph's value again.`} />
+      ) : null
+    ) : (
+      <span className="override-dot" title={`Overridden for this ${where}`} />
+    );
   return (
-    <button type="button" className="override-dot override-reset" onClick={overridden} aria-label={`Reset ${what} to the graph's value`} title={`Overridden for this ${where}. Click to use the graph's value again.`} />
+    <>
+      {dot}
+      {mixed && <span className="mixed-tag" title="The selected data sets differ in this setting. A value set here applies to all of them.">mixed</span>}
+    </>
   );
 }
 
@@ -70,7 +91,7 @@ export function Field({
   const [labelId, errorId, noteId, hintId] = [`${id}-label`, `${id}-error`, `${id}-note`, `${id}-hint`];
   const describedBy = [error ? errorId : null, note ? noteId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined;
   return (
-    <FieldContext.Provider value={{ labelId, describedBy, invalid: !!error }}>
+    <FieldContext.Provider value={{ labelId, describedBy, invalid: !!error, mixed: isMixed(overridden) }}>
       <div className="field">
         <div className="field-row">
           <span className="field-label" id={labelId} title={hint}>
@@ -111,7 +132,13 @@ export function Check({
   title?: string;
 }) {
   const aria = useFieldAria(ariaLabel);
-  return <input type="checkbox" checked={checked} disabled={disabled} {...aria} title={title} onChange={(e) => onChange(e.target.checked)} />;
+  const mixed = useContext(FieldContext)?.mixed ?? false;
+  const ref = useRef<HTMLInputElement>(null);
+  // A box that the data sets do not agree on is neither ticked nor clear.
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = mixed;
+  }, [mixed, checked]);
+  return <input ref={ref} type="checkbox" checked={checked} disabled={disabled} {...aria} title={mixed ? 'Mixed: the selected data sets differ' : title} onChange={(e) => onChange(e.target.checked)} />;
 }
 
 export function ColorInput({
@@ -128,7 +155,8 @@ export function ColorInput({
   title?: string;
 }) {
   const aria = useFieldAria(ariaLabel);
-  return <input type="color" value={value} disabled={disabled} {...aria} title={title} onChange={(e) => onChange(e.target.value)} />;
+  const mixed = useContext(FieldContext)?.mixed ?? false;
+  return <input type="color" className={mixed ? 'mixed' : undefined} value={value} disabled={disabled} {...aria} title={mixed ? 'Mixed: the selected data sets differ. Choosing a colour sets it for all of them.' : title} onChange={(e) => onChange(e.target.value)} />;
 }
 
 export function SelectInput<T extends string>({
@@ -145,8 +173,14 @@ export function SelectInput<T extends string>({
   ariaLabel?: string;
 }) {
   const aria = useFieldAria(ariaLabel);
+  const mixed = useContext(FieldContext)?.mixed ?? false;
   return (
-    <select value={value} disabled={disabled} {...aria} onChange={(e) => onChange(e.target.value as T)}>
+    <select value={mixed ? '' : value} disabled={disabled} {...aria} onChange={(e) => onChange(e.target.value as T)}>
+      {mixed && (
+        <option value="" disabled>
+          Mixed
+        </option>
+      )}
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
@@ -200,8 +234,12 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
     else if (max !== undefined && v > max) err = `Must be at most ${max}.`;
     else if (validate) err = validate(v);
     setError(err);
-    if (!err && v !== value) onCommit(v);
+    // Data sets that differ take the typed value even when it is the one shown (that of the first of them).
+    if (!err && (v !== value || isMixed(overridden))) onCommit(v);
   };
+
+  // The value is not shown while the data sets differ and the box is not being typed in.
+  const mixedShown = isMixed(overridden) && !focused;
 
   // Fields with a very wide range (chart sizes in px) pass slider={false}: they are typed, or stepped with the arrow keys.
   const stepSize = step ?? (min !== undefined && max !== undefined ? sliderStep(min, max) : 1);
@@ -211,7 +249,7 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
   return (
     <Field label={label} hint={hint} overridden={overridden} error={error} note={note}>
       <span className="num-wrap slider-num">
-        {showSlider && (
+        {showSlider && !mixedShown && (
           <WheelRange
             min={min}
             max={max}
@@ -231,7 +269,8 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
           inputMode="decimal"
           ariaLabel={label}
           className={error ? 'invalid' : ''}
-          value={text}
+          value={mixedShown ? '' : text}
+          placeholder={mixedShown ? 'Mixed' : undefined}
           disabled={disabled}
           onChange={(e) => {
             setText(e.target.value);
@@ -351,12 +390,18 @@ export function GroupBox({
   overridden?: Overridden;
   children: ReactNode;
 }) {
+  const box = useRef<HTMLInputElement>(null);
+  const mixed = isMixed(overridden);
+  // A box that the data sets being edited together do not agree on is neither ticked nor clear.
+  useEffect(() => {
+    if (box.current) box.current.indeterminate = mixed;
+  }, [mixed, checked]);
   return (
     <fieldset className="group-box">
       <legend>
         {onCheckedChange && checked !== undefined ? (
           <label className="group-box-title">
-            <input type="checkbox" checked={checked} onChange={(e) => onCheckedChange(e.target.checked)} />
+            <input ref={box} type="checkbox" checked={checked} onChange={(e) => onCheckedChange(e.target.checked)} />
             {title}
           </label>
         ) : (

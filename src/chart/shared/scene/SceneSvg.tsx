@@ -9,7 +9,7 @@ import type { Scene } from './scene';
  * The shapes of a scene as SVG, in the scene's order. In the editor each shape that can be clicked carries its hit
  * attributes, a thin line has a transparent twin to be hit by, and the selected series is glowing; none of this is in an export.
  */
-export function SceneSvg({ scene, editor, selectedGroup }: { scene: Scene; editor: boolean; selectedGroup: string | null }) {
+export function SceneSvg({ scene, editor, selectedGroups }: { scene: Scene; editor: boolean; selectedGroups: ReadonlySet<string> }) {
   const prefix = useSvgIdPrefix();
   return (
     <>
@@ -34,7 +34,7 @@ export function SceneSvg({ scene, editor, selectedGroup }: { scene: Scene; edito
                   id={prefixed(prefix, p.id)}
                 />
                 {editor && p.hit && p.hitWidthPt !== undefined && <path d={p.d} fill="none" stroke="transparent" strokeWidth={p.hitWidthPt} {...hitAttrs(p.hit.kind, p.hit.groupId, p.hit.objectId)} />}
-                {editor && p.glow && p.hit && selectedGroup === p.hit.groupId && (
+                {editor && p.glow && p.hit && p.hit.groupId !== undefined && selectedGroups.has(p.hit.groupId) && (
                   <path data-editor-only d={p.d} fill="none" stroke={SELECT_COLOR} strokeOpacity={0.35} strokeWidth={p.strokeWidth + 10} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
                 )}
               </Fragment>

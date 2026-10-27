@@ -25,6 +25,6 @@ export function columnDrawing(chart: Chart, model: ColumnModel): ChartDrawing {
       { nodes: compileColumnPointLabels(chart, model) },
       { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), place: annotationPlacer({ family: 'column', model }, model.widthPt, model.heightPt).place },
     ],
-    selection: (s) => compileColumnSelection(model, s.groupId, s.pointId),
+    selection: (s) => compileColumnSelection(model, s.groupIds, s.pointId),
   };
 }

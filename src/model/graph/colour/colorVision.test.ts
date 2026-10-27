@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFICIENCIES, simulate, visionReport } from './colorVision';
-import { paletteById } from './palettes';
+import { paletteById } from '../palettes';
 
 describe('colour-vision simulation', () => {
   it('each matrix keeps greys grey and white white (rows sum to 1)', () => {

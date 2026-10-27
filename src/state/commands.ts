@@ -23,6 +23,7 @@ import { createRows, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/row
 import { clearGroupSummary, clearGroupSummaryKeys, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/graph/summary';
 import { folderItems, nudge, reorder, sortedByName } from '../model/project/folderItems';
 import { clearPartStyles, layersOf, layerStylesAvailable, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
+import type { StyleScope } from '../model/graph/selection/scope';
 import { LABEL_STYLE_KEYS, clearGroupKeys, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
 import type {
   LayerStyle,
@@ -471,13 +472,21 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
   });
 
 /** Style edit for all groups ('all') or one group. */
-export const patchStyle = (chartId: Id, scope: 'all' | Id, patch: Partial<ChartStyle>): Command => (p) =>
+/** The data sets of a scope that is not 'all': one, or several. */
+const idsOf = (scope: Exclude<StyleScope, 'all'>): readonly Id[] => (typeof scope === 'string' ? [scope] : scope);
+
+/** Part styles taken back for every data set of the scope (see clearPartStyles). */
+const clearParts = (styles: Record<Id, Partial<LayerStyle>>, scope: StyleScope, changed: ReadonlyArray<keyof ChartStyle> | 'every'): Record<Id, Partial<LayerStyle>> =>
+  scope === 'all' ? clearPartStyles(styles, 'all', changed) : idsOf(scope).reduce((acc, id) => clearPartStyles(acc, id, changed), styles);
+
+/** Style edit for all data sets ('all'), one, or several together (one history step either way). */
+export const patchStyle = (chartId: Id, scope: StyleScope, patch: Partial<ChartStyle>): Command => (p) =>
   mapChart(p, chartId, (c) => ({
     ...c,
     // The latest edit wins: a part (line, error bars, points ...) that was given its own setting takes the series' again.
-    layerStyles: clearPartStyles(c.layerStyles, scope, Object.keys(patch) as Array<keyof ChartStyle>),
+    layerStyles: clearParts(c.layerStyles, scope, Object.keys(patch) as Array<keyof ChartStyle>),
     layers: c.layers.map((l, i) =>
-      i !== 0 ? l : scope === 'all' ? patchAllGroups(l, patch) : patchGroup(l, scope, patch),
+      i !== 0 ? l : scope === 'all' ? patchAllGroups(l, patch) : idsOf(scope).reduce((layer, id) => patchGroup(layer, id, patch), l),
     ),
   }));
 
@@ -520,14 +529,14 @@ export const resetAllDataSets = (chartId: Id): Command => (p) =>
     };
   });
 
-export const resetStyle = (chartId: Id, scope: 'all' | Id, table: DataTable): Command => (p) =>
+export const resetStyle = (chartId: Id, scope: StyleScope, table: DataTable): Command => (p) =>
   mapChart(p, chartId, (c) => ({
     ...c,
     // Back to the look of the series: what its parts were given of their own goes too.
-    layerStyles: clearPartStyles(c.layerStyles, scope, 'every'),
+    layerStyles: clearParts(c.layerStyles, scope, 'every'),
     layers: c.layers.map((l, i) => {
       if (i !== 0) return l;
-      const groups = scope === 'all' ? table.groups : table.groups.filter((g) => g.id === scope);
+      const groups = scope === 'all' ? table.groups : table.groups.filter((g) => idsOf(scope).includes(g.id));
       return groups.reduce((layer, g) => resetGroupStyle(layer, g), l);
     }),
   }));
@@ -536,21 +545,23 @@ export const resetStyle = (chartId: Id, scope: 'all' | Id, table: DataTable): Co
  * Summary calculation edit for all data sets ('all') or one. An invalid patch
  * returns the same project. A centre change never rewrites the stored spread.
  */
-export const patchSummary = (chartId: Id, scope: 'all' | Id, patch: Partial<SummarySpec>): Command => (p) =>
+export const patchSummary = (chartId: Id, scope: StyleScope, patch: Partial<SummarySpec>): Command => (p) =>
   validateSummaryPatch(patch)
-    ? mapLayer0(p, chartId, (l) => (scope === 'all' ? patchAllSummary(l, patch) : patchGroupSummary(l, scope, patch)))
+    ? mapLayer0(p, chartId, (l) => (scope === 'all' ? patchAllSummary(l, patch) : idsOf(scope).reduce((layer, id) => patchGroupSummary(layer, id, patch), l)))
     : p;
 
 /** Reset single settings of one data set (the dot beside an overridden field): its own value goes and the graph's shows again. Nothing else of the data set changes. */
-export const clearGroupStyleSettings = (chartId: Id, groupId: Id, keys: ReadonlyArray<keyof ChartStyle>): Command => (p) => mapLayer0(p, chartId, (l) => clearGroupKeys(l, groupId, keys));
+export const clearGroupStyleSettings = (chartId: Id, groupIds: Id | readonly Id[], keys: ReadonlyArray<keyof ChartStyle>): Command => (p) =>
+  mapLayer0(p, chartId, (l) => idsOf(groupIds).reduce((layer, id) => clearGroupKeys(layer, id, keys), l));
 
 /** Reset single summary settings of one data set; the graph's value shows again. */
-export const clearGroupSummarySettings = (chartId: Id, groupId: Id, keys: ReadonlyArray<keyof SummarySpec>): Command => (p) => mapLayer0(p, chartId, (l) => clearGroupSummaryKeys(l, groupId, keys));
+export const clearGroupSummarySettings = (chartId: Id, groupIds: Id | readonly Id[], keys: ReadonlyArray<keyof SummarySpec>): Command => (p) =>
+  mapLayer0(p, chartId, (l) => idsOf(groupIds).reduce((layer, id) => clearGroupSummaryKeys(layer, id, keys), l));
 
 /** Drop the data set summary overrides ('all' or one data set); layer values stay. */
-export const clearSummaryOverrides = (chartId: Id, scope: 'all' | Id): Command => (p) =>
+export const clearSummaryOverrides = (chartId: Id, scope: StyleScope): Command => (p) =>
   mapLayer0(p, chartId, (l) => {
-    if (scope !== 'all') return clearGroupSummary(l, scope);
+    if (scope !== 'all') return idsOf(scope).reduce((layer, id) => clearGroupSummary(layer, id), l);
     return Object.keys(l.groupSummary).length === 0 ? l : { ...l, groupSummary: {} };
   });
 

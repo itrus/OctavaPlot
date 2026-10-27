@@ -28,11 +28,11 @@ describe('the point labels of a column chart as scene elements', () => {
 
 describe('the editor selection marks of a column chart', () => {
   it('are none for nothing selected, and all editor-only otherwise', () => {
-    expect(compileColumnSelection(model, null, null)).toEqual([]);
+    expect(compileColumnSelection(model, [], null)).toEqual([]);
     const pid = model.labels.items[0].id;
-    const sel = compileColumnSelection(model, model.groups[0].groupId, pid);
+    const sel = compileColumnSelection(model, [model.groups[0].groupId], pid);
     expect(sel.map((n) => n.tag)).toEqual(['circle', 'rect', 'rect']);
     expect(sel.every((n) => n.editorOnly)).toBe(true);
-    expect(compileColumnSelection(model, null, 'nobody')).toEqual([]);
+    expect(compileColumnSelection(model, [], 'nobody')).toEqual([]);
   });
 });

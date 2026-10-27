@@ -13,7 +13,7 @@ import { DataSetOrder } from './sections/DataSetOrder';
 import { AxisStyleControls } from './sections/AxisStyleControls';
 import { IntervalFields, LineAtField } from './sections/SummaryControls';
 import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
-import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, Id, LineConnect, LineStyle, SummarySpec } from '../../model/types';
+import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, LineConnect, LineStyle, SummarySpec } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { clearGroupStyleSettings, clearGroupSummarySettings, composeCommands, patchAxis, patchChart, patchLook, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
 import { LINE_STYLES } from '../../model/graph/look';
@@ -23,7 +23,9 @@ import { DistributionControls } from './sections/DistributionControls';
 import { FitSection } from './sections/FitControls';
 import { LayersSection } from './sections/LayersSection';
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
+import { DataSetPicker } from './sections/DataSetPicker';
 import { DataSetReset } from './sections/DataSetReset';
+import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
 import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './common/controls';
 import { SECTIONS, TABS } from './common/nav';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
@@ -67,6 +69,9 @@ export function AxisLimits({ chart, which, scale, name, canScale = true, canReve
  * X), grouped bars and lines over categories, and contingency bars. Each series has its own style; which boxes appear
  * follows the chart type and how the table's values are entered.
  */
+/** The value of the data set selector when several are selected together. */
+const SEVERAL = '__several__';
+
 export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { project, selection, setSelection, run, inspectorNav } = useApp();
   const [tab, setTab] = useState<InspectorTab>('appearance');
@@ -85,8 +90,18 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const series = useMemo(() => xySeries(table).map((s) => ({ ...s.columns[0], name: s.name })), [table]);
   const selectedId = selection.kind === 'group' || selection.kind === 'point' ? selection.groupId : null;
   const selected = series.find((g) => g.id === selectedId);
-  const scope: 'all' | Id = selected ? selected.id : 'all';
-  const sampleIndex = selected ? series.indexOf(selected) : 0;
+  // Several series selected together are edited together, and where they differ a field says so ("Mixed").
+  const seriesIds = useMemo(() => series.map((g) => g.id), [series]);
+  const several = selection.kind === 'groups' ? scopeGroupIds(selection.groupIds, seriesIds) : [];
+  const scope: StyleScope = several.length > 1 ? several : selected ? selected.id : 'all';
+  const scopeIds = scopeGroupIds(scope, seriesIds);
+  // A series of the selection that is gone (deleted) leaves the selection.
+  useEffect(() => {
+    if (selection.kind === 'groups' && several.length !== selection.groupIds.length) setSelection(selectionOfGroups(several));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [several.length, selection.kind]);
+  const first = selected ?? series.find((g) => g.id === several[0]);
+  const sampleIndex = first ? series.indexOf(first) : 0;
   const sample = series[sampleIndex];
   const curve = useMemo(() => resolveFit(chart.fit, analysesOf(project), table.id), [chart.fit, project.analyses, table.id]);
   const any = useMemo(() => buildAnyModelCached(chart, table, curve), [chart, table, curve]);
@@ -108,16 +123,31 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
     const l = scope === 'all' ? { ...layer, groupOverrides: {}, objectOverrides: {} } : layer;
     return resolveStyle(chart, l, { id: sample.id, paletteIndex: sample.seriesSlot ?? sampleIndex });
   }, [chart, layer, sample, sampleIndex, scope]);
-  // A setting this data set has its own value for: the dot beside it is the way back to the graph's value.
-  const ov = (key: keyof ChartStyle): Overridden => scope !== 'all' && isGroupOverridden(layer, scope, key) && (() => run('Reset setting', clearGroupStyleSettings(chart.id, scope, [key])));
+  // The series the edits reach (hidden ones are not drawn, so they do not count as differing).
+  const inScope = series.map((g, i) => ({ id: g.id, paletteIndex: g.seriesSlot ?? i })).filter((g) => scopeIds.includes(g.id) && !chart.hiddenGroupIds.includes(g.id));
+  const inScopeKey = inScope.map((g) => g.id).join();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const mixedStyle = useMemo(() => mixedStyleKeys(chart, layer, inScope), [chart, layer, inScopeKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const mixedSummary = useMemo(() => mixedSummaryKeys(layer, inScope.map((g) => g.id)), [layer, inScopeKey]);
+  // A setting these data sets have their own value for: the dot beside it is the way back to the graph's value; "mixed" when they differ.
+  const ov = (key: keyof ChartStyle): Overridden => {
+    const own = scopeIds.filter((id) => isGroupOverridden(layer, id, key));
+    const mixed = mixedStyle.has(key);
+    return own.length === 0 && !mixed ? false : { reset: own.length > 0 ? () => run('Reset setting', clearGroupStyleSettings(chart.id, own, [key])) : undefined, mixed };
+  };
   const setStyle = (patch: Partial<ChartStyle>) => {
     const recolours = 'symbolColor' in patch || 'lineColor' in patch || 'barFill' in patch;
     const command = recolours && chart.paletteId !== null ? composeCommands(patchStyle(chart.id, scope, patch), patchChart(chart.id, { paletteId: null })) : patchStyle(chart.id, scope, patch);
     run('Change style', command, `style:${scope}:${Object.keys(patch).join(',')}`);
   };
   // Summary of replicate values: the layer's for Global, the resolved one for a series.
-  const spec: SummarySpec = !sample || scope === 'all' ? layer.summary : resolveSummary(layer, scope);
-  const ovSum = (key: keyof SummarySpec): Overridden => scope !== 'all' && isSummaryOverridden(layer, scope, key) && (() => run('Reset setting', clearGroupSummarySettings(chart.id, scope, [key])));
+  const spec: SummarySpec = !sample || scope === 'all' ? layer.summary : resolveSummary(layer, sample.id);
+  const ovSum = (key: keyof SummarySpec): Overridden => {
+    const own = scopeIds.filter((id) => isSummaryOverridden(layer, id, key));
+    const mixed = mixedSummary.has(key);
+    return own.length === 0 && !mixed ? false : { reset: own.length > 0 ? () => run('Reset setting', clearGroupSummarySettings(chart.id, own, [key])) : undefined, mixed };
+  };
   const setSummary = (patch: Partial<SummarySpec>, label = 'Change summary') => {
     if (!validateSummaryPatch(patch)) return;
     run(label, patchSummary(chart.id, scope, patch), `summary:${scope}:${Object.keys(patch).join(',')}`);
@@ -142,8 +172,9 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
             <div className="tab-body">
               <div className="dataset-row">
                 <span className="dataset-label">{noun}:</span>
-                <select className="dataset-select" aria-label="Data set" value={scope} onChange={(e) => setSelection(e.target.value === 'all' ? { kind: 'chart' } : { kind: 'group', groupId: e.target.value })}>
+                <select className="dataset-select" aria-label="Data set" value={Array.isArray(scope) ? SEVERAL : scope} onChange={(e) => e.target.value !== SEVERAL && setSelection(e.target.value === 'all' ? { kind: 'chart' } : { kind: 'group', groupId: e.target.value })}>
                   <option value="all">Global (all {noun.toLowerCase() === 'series' ? 'series' : `${noun.toLowerCase()}s`})</option>
+                  {Array.isArray(scope) && <option value={SEVERAL}>{scope.length} {noun.toLowerCase() === 'series' ? 'series' : `${noun.toLowerCase()}s`} together</option>}
                   {series.map((g) => (
                     <option key={g.id} value={g.id}>
                       {displayName(chart, g.id, g.name)}
@@ -158,6 +189,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 </button>
                 <DataSetReset chart={chart} table={table} scope={scope} run={run} />
               </div>
+              <DataSetPicker sets={series.map((g) => ({ id: g.id, label: displayName(chart, g.id, g.name) }))} selection={selection} setSelection={setSelection} noun={noun.toLowerCase() === 'series' ? 'series' : `${noun.toLowerCase()}s`} />
 
               <GroupBox title="Style">
                 <Field label="Graph type">

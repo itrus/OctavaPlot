@@ -746,6 +746,8 @@ export interface Project {
 export type Selection =
   | { kind: 'chart' }
   | { kind: 'group'; groupId: Id }
+  /** Several data sets edited together (two or more; one is a 'group'). */
+  | { kind: 'groups'; groupIds: Id[] }
   /** One raw observation's symbol (and its label); mean markers are not selectable. */
   | { kind: 'point'; groupId: Id; pointId: Id }
   | { kind: 'annotation'; annotationId: Id };

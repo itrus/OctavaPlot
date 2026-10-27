@@ -138,3 +138,30 @@ describe('the title, legend and axes as stops of the keyboard', () => {
     expect(describeFocus(marks, at(g('a')))).toBe('A, data set 1 of 3, 2 points');
   });
 });
+
+import { extendGroups } from './selectionOrder';
+
+describe('several data sets selected with the keyboard', () => {
+  const groups = (...groupIds: string[]): Selection => ({ kind: 'groups', groupIds });
+  it('Shift+Right and Shift+Left add the data set next to the selection', () => {
+    expect(extendGroups(marks, g('a'), 'ArrowRight')).toEqual(groups('a', 'b'));
+    expect(extendGroups(marks, groups('a', 'b'), 'ArrowRight')).toEqual(groups('a', 'b', 'c'));
+    expect(extendGroups(marks, g('b'), 'ArrowLeft')).toEqual(groups('a', 'b'));
+    expect(extendGroups(marks, groups('b', 'c'), 'ArrowLeft')).toEqual(groups('a', 'b', 'c'));
+  });
+  it('stop at the ends, start from the end the key comes from on the whole chart, and ignore other keys', () => {
+    expect(extendGroups(marks, groups('b', 'c'), 'ArrowRight')).toBeNull();
+    expect(extendGroups(marks, g('a'), 'ArrowLeft')).toBeNull();
+    expect(extendGroups(marks, chart, 'ArrowRight')).toEqual(g('a'));
+    expect(extendGroups(marks, chart, 'ArrowLeft')).toEqual(g('c'));
+    expect(extendGroups(marks, g('a'), 'ArrowDown')).toBeNull();
+    expect(extendGroups(marks, annotationSel, 'ArrowRight')).toBeNull();
+    expect(extendGroups([], chart, 'ArrowRight')).toBeNull();
+  });
+  it('a plain arrow from several data sets goes on from the last of them, and they are read out together', () => {
+    expect(nextSelection(marks, groups('a', 'b'), 'ArrowRight')).toEqual(g('c'));
+    expect(nextSelection(marks, groups('a', 'b'), 'ArrowLeft')).toEqual(g('a'));
+    expect(nextSelection(marks, groups('a', 'b'), 'Escape')).toEqual(chart);
+    expect(describeSelection(marks, groups('a', 'b'))).toBe('A, B: 2 data sets edited together');
+  });
+});

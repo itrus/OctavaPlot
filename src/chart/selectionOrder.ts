@@ -34,6 +34,11 @@ export function selectableMarks(any: AnyModel): StepGroup[] {
 const PAGE = 10;
 
 const where = (marks: readonly StepGroup[], sel: Selection): { g: number; p: number } => {
+  // Several data sets selected together: the keys go on from the last of them.
+  if (sel.kind === 'groups') {
+    const g = Math.max(...sel.groupIds.map((id) => marks.findIndex((m) => m.groupId === id)));
+    return { g, p: -1 };
+  }
   if (sel.kind === 'group' || sel.kind === 'point') {
     const g = marks.findIndex((m) => m.groupId === sel.groupId);
     if (g >= 0) return { g, p: sel.kind === 'point' ? marks[g].points.findIndex((q) => q.id === sel.pointId) : -1 };
@@ -77,9 +82,27 @@ export function nextSelection(marks: readonly StepGroup[], sel: Selection, key: 
   }
 }
 
+/**
+ * Shift with Left or Right: the selection grows by the data set next to it (after the last selected one for Right, before the first for Left).
+ * A single data set, or the whole chart, becomes the start of the selection. Null at the end of the chart, or for another key.
+ */
+export function extendGroups(marks: readonly StepGroup[], sel: Selection, key: string): Selection | null {
+  if (key !== 'ArrowRight' && key !== 'ArrowLeft') return null;
+  if (marks.length === 0 || sel.kind === 'annotation') return null;
+  const chosen = (sel.kind === 'groups' ? sel.groupIds : sel.kind === 'group' || sel.kind === 'point' ? [sel.groupId] : []).map((id) => marks.findIndex((m) => m.groupId === id)).filter((i) => i >= 0);
+  const at = chosen.length === 0 ? (key === 'ArrowRight' ? 0 : marks.length - 1) : key === 'ArrowRight' ? Math.max(...chosen) + 1 : Math.min(...chosen) - 1;
+  if (at < 0 || at >= marks.length) return null;
+  const all = [...new Set([...chosen, at])].sort((a, b) => a - b).map((i) => marks[i].groupId);
+  return all.length === 1 ? { kind: 'group', groupId: all[0] } : { kind: 'groups', groupIds: all };
+}
+
 /** What a screen reader is told about the selection. */
 export function describeSelection(marks: readonly StepGroup[], sel: Selection, annotationText?: string): string {
   if (sel.kind === 'annotation') return `Text annotation${annotationText ? ` "${annotationText}"` : ''}`;
+  if (sel.kind === 'groups') {
+    const names = sel.groupIds.map((id) => marks.find((m) => m.groupId === id)?.label ?? id);
+    return `${names.join(', ')}: ${sel.groupIds.length} data sets edited together`;
+  }
   const { g, p } = where(marks, sel);
   if (g < 0) return 'Whole chart';
   const m = marks[g];
