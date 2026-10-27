@@ -1,4 +1,4 @@
-// Lines of code per commit, stored in docs/loc-history.csv:
+// Lines of code per commit, stored in docs/loc-history.csv (ignored by git: it is made from the history and can be made again):
 // date, commit, source, tests, kloc (the size after the commit), added, deleted (lines changed by the commit itself).
 // Incremental: a commit already in the file is never counted again; rows of commits that are no longer in the history
 // (after a rebase or amend) are dropped; a file with another header is counted again from the start.

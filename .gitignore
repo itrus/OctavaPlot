@@ -6,3 +6,6 @@ dist/
 *.log
 old-repo/
 .claude/settings.local.json
+
+# Made by npm run loc from the git history; not kept in the repository
+docs/loc-history.csv
