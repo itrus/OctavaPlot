@@ -8,6 +8,7 @@ import { patchAnnotation, removeChart, resetAllDataSets, unlinkChart } from '../
 import { exportPixels } from '../../chart/export/pngDpi';
 import { printSizeWarnings } from '../../chart/export/printSize';
 import { exportStatusText } from '../export/exportJob';
+import { annotationPlacer, drawnFractions, patchForMove } from '../../chart/shared/scene/annotationPlace';
 import { ExportDialog } from '../export/ExportDialog';
 import { useExportJob } from '../export/useExportJob';
 import { downloadBlob, exportFileName } from '../../util/download';
@@ -68,7 +69,9 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
       if (!a) return;
       const pt = pointerToChartPt(svgRef.current, e.clientX, e.clientY, model.widthPt, model.heightPt);
       setSelection({ kind: 'annotation', annotationId: a.id });
-      setDrag({ id: a.id, xFrac: a.xFrac, yFrac: a.yFrac, dx: pt.x - a.xFrac * model.widthPt, dy: pt.y - a.yFrac * model.heightPt, moved: false });
+      // A text anchored to data starts from where it is drawn, which the axes decide; the others from their fractions.
+      const from = drawnFractions(a, annotationPlacer(any, model.widthPt, model.heightPt)) ?? { xFrac: a.xFrac, yFrac: a.yFrac };
+      setDrag({ id: a.id, xFrac: from.xFrac, yFrac: from.yFrac, dx: pt.x - from.xFrac * model.widthPt, dy: pt.y - from.yFrac * model.heightPt, moved: false });
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       setTip(null);
     } else if (hit.groupId && hit.objectId && (hit.kind === 'point' || hit.kind === 'label') && !hit.objectId.endsWith(':mean')) {
@@ -105,7 +108,9 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
 
   const endDrag = () => {
     if (drag?.moved) {
-      run('Move annotation', patchAnnotation(chart.id, drag.id, { xFrac: drag.xFrac, yFrac: drag.yFrac }));
+      const moved = chart.annotations.find((x) => x.id === drag.id);
+      // A text anchored to data keeps the values at its new place, so it stays there when the axes change.
+      if (moved) run('Move annotation', patchAnnotation(chart.id, drag.id, patchForMove(moved, annotationPlacer(any, model.widthPt, model.heightPt), drag.xFrac, drag.yFrac)));
     }
     setDrag(null);
   };

@@ -540,6 +540,15 @@ export interface Annotation {
   color: string;
   /** 0 (invisible) to 1. */
   opacity: number;
+  /**
+   * Where the text is anchored: absent (the page) = at `xFrac` and `yFrac`; 'data' = at the values `x` and `y` on the axes, so the text
+   * follows the axis range, a log scale and breaks. A value that is absent (the X of a chart over categories) falls back to the fraction.
+   * `xFrac` and `yFrac` hold the place on the page the text had when it was last moved or anchored.
+   */
+  anchor?: 'data';
+  /** The X and Y value on the axes of a data-anchored text, in the units of the axes. */
+  x?: number;
+  y?: number;
 }
 
 /** How the pointwise interval of a survival estimate is built. Log-log keeps it inside 0 to 1; plain is S +/- z SE. */

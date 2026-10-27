@@ -22,6 +22,7 @@ import { resolveFit } from '../../model/options/fitOptions';
 import { DistributionControls } from './sections/DistributionControls';
 import { FitSection } from './sections/FitControls';
 import { LayersSection } from './sections/LayersSection';
+import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { DataSetReset } from './sections/DataSetReset';
 import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './common/controls';
 import { SECTIONS, TABS } from './common/nav';
@@ -381,7 +382,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
         </div>
       )}
 
-      {tab === 'annotations' && <AnnotationsTab chart={chart} />}
+      {tab === 'annotations' && <AnnotationsTab chart={chart} placer={annotationPlacer(any, any.model.widthPt, any.model.heightPt)} />}
     </aside>
   );
 }

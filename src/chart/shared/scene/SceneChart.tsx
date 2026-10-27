@@ -22,7 +22,7 @@ type ChartSection =
   /** The data layers of an XY scene, clipped to the plotting region. */
   | { xyData: Scene }
   /** The text annotations (the ones that are not hidden); the editor's drag and selection apply to them. */
-  | { annotations: ReadonlyArray<Annotation> };
+  | { annotations: ReadonlyArray<Annotation>; place?: (a: Annotation) => { x: number; y: number } | null };
 
 /** What a chart is drawn from, whatever its family: its size and its sections. The family builds it from its model. */
 export interface ChartDrawing {
@@ -64,7 +64,7 @@ export const SceneChart = forwardRef<SVGSVGElement, Props>(function SceneChart({
             <SceneSvg scene={s.xyData} editor={ed} selectedGroup={selectedGroup} />
           </g>
         ) : (
-          <SceneElements key={i} nodes={annotationElements(s.annotations, W, H, editor?.dragging)} editor={ed} selectedAnnotation={selectedAnnotation} />
+          <SceneElements key={i} nodes={annotationElements(s.annotations, W, H, editor?.dragging, s.place)} editor={ed} selectedAnnotation={selectedAnnotation} />
         ),
       )}
       {ed && drawing.selection && <SceneElements nodes={drawing.selection({ groupId: selectedGroup, pointId: selectedPoint })} editor />}

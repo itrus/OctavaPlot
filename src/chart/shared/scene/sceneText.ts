@@ -10,5 +10,5 @@ const textsOf = (nodes: ReadonlyArray<SceneElement>): string[] =>
  * or line: what an export puts in its SVG. The editor's own marks are not texts and are not here.
  */
 export function drawingTexts(drawing: ChartDrawing): string[] {
-  return drawing.sections.flatMap((s) => ('nodes' in s ? textsOf(s.nodes) : 'annotations' in s ? textsOf(annotationElements(s.annotations, drawing.widthPt, drawing.heightPt)) : []));
+  return drawing.sections.flatMap((s) => ('nodes' in s ? textsOf(s.nodes) : 'annotations' in s ? textsOf(annotationElements(s.annotations, drawing.widthPt, drawing.heightPt, null, s.place)) : []));
 }

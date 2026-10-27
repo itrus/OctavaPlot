@@ -312,6 +312,10 @@ function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['a
     const text = typeof a.text === 'string' ? a.text : typeof a.text === 'number' && Number.isFinite(a.text) ? String(a.text) : '';
     const color = typeof a.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(a.color) ? a.color : '#000000';
     const size = finiteOr(a.fontSizePt, 24);
+    // A data anchor needs at least one value on the axes; without one the text stays where the page puts it.
+    const hasX = typeof a.x === 'number' && Number.isFinite(a.x);
+    const hasY = typeof a.y === 'number' && Number.isFinite(a.y);
+    if (a.anchor === 'data' && !hasX && !hasY) notes.push(`${path}[${i}] was anchored to data without a value and was placed on the page.`);
     out.push({
       id: a.id,
       text,
@@ -320,6 +324,7 @@ function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['a
       fontSizePt: size > 0 ? size : 24,
       color,
       opacity: Math.min(1, Math.max(0, finiteOr(a.opacity, 1))),
+      ...(a.anchor === 'data' && (hasX || hasY) ? { anchor: 'data' as const, ...(hasX ? { x: a.x as number } : {}), ...(hasY ? { y: a.y as number } : {}) } : {}),
     });
   });
   return out;

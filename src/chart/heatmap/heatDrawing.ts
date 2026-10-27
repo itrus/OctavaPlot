@@ -1,5 +1,6 @@
 import type { Chart } from '../../model/types';
 import { visibleAnnotations } from '../shared/scene/annotations';
+import { annotationPlacer } from '../shared/scene/annotationPlace';
 import { backgroundElements, plotClipElement, titleElements } from '../shared/scene/chrome';
 import type { ChartDrawing } from '../shared/scene/SceneChart';
 import { compileHeatMarks, heatAxisLabelElements } from './heatMarks';
@@ -17,7 +18,7 @@ export function heatDrawing(chart: Chart, model: HeatModel): ChartDrawing {
       { nodes: model.marks ?? compileHeatMarks(chart, model) },
       { nodes: heatAxisLabelElements(chart, model) },
       { nodes: titleElements(chart, layout, chart.xAxis, chart.yAxis) },
-      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds) },
+      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), place: annotationPlacer({ family: 'heatmap', model }, W, H).place },
     ],
   };
 }

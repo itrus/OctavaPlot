@@ -28,7 +28,7 @@ interface Place {
   valueAxisHorizontal?: boolean;
 }
 
-const insideAxis = (axis: AxisFacts, v: number): boolean => {
+export const insideAxis = (axis: AxisFacts, v: number): boolean => {
   if (!Number.isFinite(v) || (axis.log && !(v > 0))) return false;
   const [lo, hi] = extent(axis.domain);
   if (v < lo || v > hi) return false;

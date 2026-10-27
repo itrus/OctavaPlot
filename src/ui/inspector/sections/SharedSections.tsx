@@ -5,6 +5,7 @@ import { AXIS_LIMITS } from '../../../model/graph/axis';
 import { FONT_FAMILIES, PRINT_WIDTH_MM } from '../../../model/graph/look';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../../model/defaults';
 import { newId } from '../../../model/ids';
+import { type AnnotationPlacer, changeAnchor, drawnFractions, patchForMove } from '../../../chart/shared/scene/annotationPlace';
 import { capabilitiesOf } from '../../../model/graph/capabilities';
 import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../../model/graph/colorVision';
 import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../../model/graph/palettes';
@@ -291,7 +292,11 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
   );
 }
 
-export function AnnotationsTab({ chart }: { chart: Chart }) {
+/**
+ * The annotations of a graph. `placer` (from the model of the graph) says where each one is drawn; with it a text can be anchored to
+ * values on the axes instead of a place on the page. Without it (a graph with no model here) every text is placed on the page.
+ */
+export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: AnnotationPlacer }) {
   const { run, selection, setSelection } = useApp();
   return (
     <div className="tab-body">
@@ -324,7 +329,10 @@ export function AnnotationsTab({ chart }: { chart: Chart }) {
               const dx = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0;
               const dy = e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0;
               const clamp = (v: number) => Math.min(1, Math.max(0, Math.round(v * 1000) / 1000));
-              run('Move annotation', patchAnnotation(chart.id, a.id, { xFrac: clamp(a.xFrac + dx), yFrac: clamp(a.yFrac + dy) }), `ann:${a.id}:nudge`);
+              // From where the text is drawn; a text anchored to data keeps its new values.
+              const from = (placer && drawnFractions(a, placer)) ?? { xFrac: a.xFrac, yFrac: a.yFrac };
+              const [xFrac, yFrac] = [clamp(from.xFrac + dx), clamp(from.yFrac + dy)];
+              run('Move annotation', patchAnnotation(chart.id, a.id, placer ? patchForMove(a, placer, xFrac, yFrac) : { xFrac, yFrac }), `ann:${a.id}:nudge`);
             }}
           >
             <button className="list-item" onClick={() => setSelection({ kind: 'annotation', annotationId: a.id })}>
@@ -335,8 +343,35 @@ export function AnnotationsTab({ chart }: { chart: Chart }) {
                 <Field label="Text">
                   <textarea rows={2} aria-label="Annotation text" value={a.text} onChange={(e) => run('Edit annotation text', patchAnnotation(chart.id, a.id, { text: e.target.value }), `ann:${a.id}:text`)} />
                 </Field>
-                <NumField label="Left" unit="% of chart width" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Position of the left edge of the text; arrow keys nudge a selected annotation (Shift 5%, Alt 0.1%)" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:x`)} />
-                <NumField label="Top" unit="% of chart height" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:y`)} />
+                {placer?.supportsData && (
+                  <Field label="Anchor" hint="Page: a place on the page. Data values: a place on the axes, so the text follows the axis range, a log scale and breaks.">
+                    <SelectInput<'page' | 'data'>
+                      value={a.anchor === 'data' ? 'data' : 'page'}
+                      options={[
+                        { value: 'page', label: 'Page' },
+                        { value: 'data', label: 'Data values' },
+                      ]}
+                      onChange={(v) => {
+                        const patch = changeAnchor(a, placer, v);
+                        if (patch && Object.keys(patch).length > 0) run('Annotation anchor', patchAnnotation(chart.id, a.id, patch));
+                      }}
+                    />
+                  </Field>
+                )}
+                {placer && a.anchor === 'data' ? (
+                  <>
+                    {placer.numericX && <NumField label="X value" value={a.x ?? 0} min={-1e15} max={1e15} slider={false} hint="In the units of the X axis; the left edge of the text" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { x: v }), `ann:${a.id}:x`)} />}
+                    <NumField label="Y value" value={a.y ?? 0} min={-1e15} max={1e15} slider={false} hint="In the units of the value axis; the top edge of the text" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { y: v }), `ann:${a.id}:y`)} />
+                    {placer.acrossPage === 'x' && <NumField label="Left" unit="% of chart width" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Across the categories the position stays a place on the page" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:xf`)} />}
+                    {placer.acrossPage === 'y' && <NumField label="Top" unit="% of chart height" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Across the categories the position stays a place on the page" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:yf`)} />}
+                    {placer.skipped([a]).length > 0 && <div className="field-note">These values are outside the axis range, so the text is not drawn.</div>}
+                  </>
+                ) : (
+                  <>
+                    <NumField label="Left" unit="% of chart width" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Position of the left edge of the text; arrow keys nudge a selected annotation (Shift 5%, Alt 0.1%)" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:x`)} />
+                    <NumField label="Top" unit="% of chart height" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:y`)} />
+                  </>
+                )}
                 <NumField label="Size" unit="pt" value={a.fontSizePt} min={8} max={192} onCommit={(v) => run('Annotation size', patchAnnotation(chart.id, a.id, { fontSizePt: v }), `ann:${a.id}:size`)} />
                 <Field label="Colour">
                   <ColorInput value={a.color} onChange={(v) => run('Annotation colour', patchAnnotation(chart.id, a.id, { color: v }), `ann:${a.id}:color`)} />

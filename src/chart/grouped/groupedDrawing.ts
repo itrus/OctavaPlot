@@ -1,5 +1,6 @@
 import type { Chart } from '../../model/types';
 import { visibleAnnotations } from '../shared/scene/annotations';
+import { annotationPlacer } from '../shared/scene/annotationPlace';
 import type { ChartDrawing } from '../shared/scene/SceneChart';
 import { compileGroupedScene } from './groupedChrome';
 import type { GroupedModel } from './groupedModel';
@@ -17,7 +18,7 @@ export function groupedDrawing(chart: Chart, model: GroupedModel): ChartDrawing 
       { nodes: scene.marks ?? compileGroupedMarks(chart, model) },
       { nodes: compileGroupedLabels(chart, model) },
       { nodes: scene.front },
-      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds) },
+      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), place: annotationPlacer({ family: 'grouped', model }, model.widthPt, model.heightPt).place },
     ],
   };
 }

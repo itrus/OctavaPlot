@@ -43,6 +43,7 @@ import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection }
 import { AxisStyleControls, TickFields } from './sections/AxisStyleControls';
 import { DataSetOrder } from './sections/DataSetOrder';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
+import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { DataSetReset } from './sections/DataSetReset';
 import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './common/controls';
 import {
@@ -640,7 +641,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
       )}
 
       {/* ------------------------------------------------ Annotations */}
-      {tab === 'annotations' && <AnnotationsTab chart={chart} />}
+      {tab === 'annotations' && <AnnotationsTab chart={chart} placer={annotationPlacer({ family: 'column', model }, model.widthPt, model.heightPt)} />}
     </aside>
   );
 }

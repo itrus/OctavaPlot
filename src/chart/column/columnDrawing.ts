@@ -1,5 +1,6 @@
 import type { Chart } from '../../model/types';
 import { visibleAnnotations } from '../shared/scene/annotations';
+import { annotationPlacer } from '../shared/scene/annotationPlace';
 import type { ChartDrawing } from '../shared/scene/SceneChart';
 import { compileColumnScene } from './columnChrome';
 import { compileColumnLabels, compileColumnMarks, compileColumnPointLabels, compileColumnSelection } from './columnMarks';
@@ -22,7 +23,7 @@ export function columnDrawing(chart: Chart, model: ColumnModel): ChartDrawing {
       { nodes: compileColumnLabels(chart, model) },
       { nodes: scene.front },
       { nodes: compileColumnPointLabels(chart, model) },
-      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds) },
+      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), place: annotationPlacer({ family: 'column', model }, model.widthPt, model.heightPt).place },
     ],
     selection: (s) => compileColumnSelection(model, s.groupId, s.pointId),
   };

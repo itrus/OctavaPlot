@@ -1,5 +1,6 @@
 import type { Chart } from '../../model/types';
 import { visibleAnnotations } from '../shared/scene/annotations';
+import { annotationPlacer } from '../shared/scene/annotationPlace';
 import type { ChartDrawing } from '../shared/scene/SceneChart';
 import type { XyModel } from './xyModel';
 import { compileXyScene, compileXySelection } from './xyScene';
@@ -16,7 +17,7 @@ export function xyDrawing(chart: Chart, model: XyModel): ChartDrawing {
       { xyData: scene },
       { nodes: scene.front },
       // Layers can be taken out of the drawing by ID only in a chart drawn from layers.
-      { annotations: visibleAnnotations(chart.annotations, model.layers ? chart.hiddenLayerIds : []) },
+      { annotations: visibleAnnotations(chart.annotations, model.layers ? chart.hiddenLayerIds : []), place: annotationPlacer({ family: 'xy', model }, model.widthPt, model.heightPt).place },
     ],
     selection: (s) => compileXySelection(model, s.pointId),
   };

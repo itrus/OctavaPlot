@@ -14,6 +14,8 @@ import { buildHeatModel, type HeatModel } from './heatmap/heatmapModel';
 import { buildHistogramModel } from './histogram/histogramModel';
 import { buildPieModel, type PieModel } from './pie/pieModel';
 import { buildSurvivalModel } from './survival/survivalModel';
+import { annotationNotices, annotationPlacer } from './shared/scene/annotationPlace';
+import { visibleAnnotations } from './shared/scene/annotations';
 import { referenceLineNotices, referenceLinesOf } from './shared/scene/referenceLines';
 import { buildXyModel, type XyModel } from './xy/xyModel';
 
@@ -28,6 +30,11 @@ export type AnyModel =
 export function buildAnyModel(chart: Chart, table: DataTable, fit?: FitSettings): AnyModel {
   const built = buildAnyModelUnchecked(chart, table, fit);
   if (chart.referenceLines.length > 0) built.model.warnings.push(...referenceLineNotices(referenceLinesOf(chart, built)));
+  // An annotation anchored to data values that are off the axes (or on a chart with none) is not drawn: say so, as for a reference line.
+  if (chart.annotations.some((a) => a.anchor === 'data')) {
+    const placer = annotationPlacer(built, built.model.widthPt, built.model.heightPt);
+    built.model.warnings.push(...annotationNotices(placer.skipped(visibleAnnotations(chart.annotations, chart.hiddenLayerIds)), placer.supportsData));
+  }
   return built;
 }
 

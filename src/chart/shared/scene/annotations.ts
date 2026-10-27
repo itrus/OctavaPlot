@@ -22,18 +22,20 @@ function annotationBox(a: Annotation, x: number, y: number) {
 }
 
 /**
- * The text annotations of a chart as scene elements, positioned as fractions of its size. The drag is a parameter, not editor
- * state: the scene itself knows nothing of the editor. The hit pad and the selection frame are editor-only; the frame shows
+ * The text annotations of a chart as scene elements. `place` says where each goes (see annotationPlace.ts: its page fractions, or
+ * its values on the axes) and leaves out one that has no place; without it every annotation is at its fractions of the size. The
+ * drag is a parameter, not editor state: the scene itself knows nothing of the editor. The hit pad and the selection frame are editor-only; the frame shows
  * while the annotation with its ID is selected (`whenAnnotationSelected`).
  */
-export function annotationElements(annotations: ReadonlyArray<Annotation>, width: number, height: number, drag?: AnnotationDrag | null): SceneElement[] {
-  return annotations.map((a) => {
+export function annotationElements(annotations: ReadonlyArray<Annotation>, width: number, height: number, drag?: AnnotationDrag | null, place?: (a: Annotation) => { x: number; y: number } | null): SceneElement[] {
+  return annotations.flatMap((a) => {
     const d = drag?.id === a.id ? drag : null;
-    const x = (d ? d.xFrac : a.xFrac) * width;
-    const y = (d ? d.yFrac : a.yFrac) * height;
+    const at = d ? { x: d.xFrac * width, y: d.yFrac * height } : place ? place(a) : { x: a.xFrac * width, y: a.yFrac * height };
+    if (!at) return [];
+    const { x, y } = at;
     const box = annotationBox(a, x, y);
     const frame = [['x', n2(box.x - 6)], ['y', n2(box.y - 6)], ['width', n2(box.w + 12)], ['height', n2(box.h + 12)]] as const;
-    return el('g', [], {
+    return [el('g', [], {
       hit: { kind: 'annotation', annotationId: a.id },
       id: svgId('annotation', a.id),
       children: [
@@ -43,7 +45,7 @@ export function annotationElements(annotations: ReadonlyArray<Annotation>, width
         }),
         el('rect', [['data-editor-only', 'true'], ...frame, ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '6 4'], ['pointer-events', 'none']], { whenAnnotationSelected: a.id }),
       ],
-    });
+    })];
   });
 }
 

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { buildHistogramModel } from '../../chart/histogram/histogramModel';
 import { chartTypesFor } from '../../model/graph/chartTypes';
 import { defaultYTitle, FREQUENCIES, HISTOGRAM_LIMITS } from '../../model/options/histogramOptions';
@@ -187,7 +188,7 @@ export function HistogramInspector({ chart, table }: { chart: Chart; table: Data
           <OnThisGraph chart={chart} />
         </div>
       )}
-      {tab === 'annotations' && <AnnotationsTab chart={chart} />}
+      {tab === 'annotations' && <AnnotationsTab chart={chart} placer={annotationPlacer({ family: 'histogram', model }, model.widthPt, model.heightPt)} />}
     </aside>
   );
 }
