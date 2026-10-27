@@ -295,6 +295,7 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
 .chart-scroller { flex: 1; overflow: auto; background: #dfe3e7; padding: 24px; min-height: 0; }
 .chart-wrap { position: relative; margin: 0 auto; }
 .chart-surface { background: #fff; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.25); line-height: 0; touch-action: none; }
+.chart-surface:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .chart-surface [data-hit] { cursor: pointer; }
 .chart-surface [data-hit='annotation'] { cursor: move; }
 .chart-surface [data-hit='label'] { cursor: pointer; }

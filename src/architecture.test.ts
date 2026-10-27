@@ -160,7 +160,7 @@ describe('the chart folder', () => {
 
   it('keeps at its root only what puts the families together', () => {
     const root = sources.filter((f) => f.startsWith('chart/') && f.split('/').length === 2).sort();
-    expect(root).toEqual(['chart/anyModel.tsx', 'chart/tooltip.ts']);
+    expect(root).toEqual(['chart/anyModel.tsx', 'chart/selectionOrder.ts', 'chart/tooltip.ts']);
   });
 
   it('puts every source file in the folder of its family or in shared', () => {

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { buildAnyModelCached, ChartCanvas, chartTexts } from '../../chart/anyModel';
+import { describeSelection, nextSelection, selectableMarks } from '../../chart/selectionOrder';
 import { hitFromTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
 import type { PreparedChart } from '../../model/table/preparedChart';
@@ -104,6 +105,40 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
       setTip({ x: x + 14 + tw > box.width ? Math.max(0, x - 14 - tw) : x + 14, y: y + 14 + th > box.height ? Math.max(0, y - 14 - th) : y + 14, lines });
     }
     else setTip(null);
+  };
+
+  // The keyboard selects what a click does: Left and Right between the data sets, Down and Up into and along the points, Escape back
+  // to the whole chart, Enter to its settings. On a selected annotation the arrows move it (1% of the chart, Shift 5%, Alt 0.1%).
+  const marks = useMemo(() => selectableMarks(any), [any]);
+  const selectedNote = selection.kind === 'annotation' ? chart.annotations.find((a) => a.id === selection.annotationId) : undefined;
+  const announcement = describeSelection(marks, selection, selectedNote?.text.split(String.fromCharCode(10))[0]);
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    // Shortcuts (Ctrl+Z, Ctrl+S ...) belong to the app; so does everything while a dialog or another field has the keys.
+    if (e.ctrlKey || e.metaKey || e.target !== e.currentTarget) return;
+    if (selectedNote && e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      const placer = annotationPlacer(any, model.widthPt, model.heightPt);
+      const step = e.shiftKey ? 0.05 : e.altKey ? 0.001 : 0.01;
+      const dx = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0;
+      const dy = e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0;
+      const from = drawnFractions(selectedNote, placer) ?? { xFrac: selectedNote.xFrac, yFrac: selectedNote.yFrac };
+      const clamp = (v: number) => Math.min(1, Math.max(0, Math.round(v * 1000) / 1000));
+      run('Move annotation', patchAnnotation(chart.id, selectedNote.id, patchForMove(selectedNote, placer, clamp(from.xFrac + dx), clamp(from.yFrac + dy))), `ann:${selectedNote.id}:nudge`);
+      return;
+    }
+    if (e.key === 'Enter') {
+      const target = inspectorTargetFor({ kind: selection.kind === 'annotation' ? 'annotation' : selection.kind === 'chart' ? 'background' : 'bar' });
+      if (target) {
+        e.preventDefault();
+        navigateInspector(target);
+      }
+      return;
+    }
+    const next = nextSelection(marks, selection, e.key);
+    if (next) {
+      e.preventDefault();
+      setSelection(next);
+    }
   };
 
   const endDrag = () => {
@@ -214,6 +249,10 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
         <div className="chart-wrap" ref={wrapRef} style={{ width: cssW }}>
           <div
             className="chart-surface"
+            tabIndex={0}
+            role="group"
+            aria-label="Chart. Arrow keys select data sets and points, Escape selects the whole chart, Enter opens its settings."
+            onKeyDown={onKeyDown}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
@@ -222,6 +261,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
           >
             <ChartCanvas ref={svgRef} chart={chart} any={any} editor={{ selection, dragging: drag }} cssWidth={`${cssW}px`} cssHeight={`${cssH}px`} />
           </div>
+          <div className="visually-hidden" role="status" aria-live="polite">{announcement}</div>
           {tip && (
             <div className="tooltip" style={{ left: tip.x, top: tip.y }}>
               {tip.lines.map((l, i) => (
