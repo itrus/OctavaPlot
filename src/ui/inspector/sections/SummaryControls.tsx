@@ -7,7 +7,7 @@ import {
   parseConfidencePercent,
   spreadSelectModel,
 } from '../../../stats/describe';
-import { Check, Field, SelectInput } from '../common/controls';
+import { Check, Field, FieldInput, SelectInput } from '../common/controls';
 
 const CENTRES: CentreKind[] = ['mean', 'geometricMean', 'median'];
 
@@ -85,7 +85,7 @@ export function IntervalFields({
   return (
     <>
       <Field label="Error bar shows" overridden={spreadOverridden}>
-        <select value={select.value} disabled={state.spreadReason !== null} onChange={(e) => onSpread(e.target.value as SpreadKind)}>
+        <select value={select.value} disabled={state.spreadReason !== null} aria-label="Error bar shows" onChange={(e) => onSpread(e.target.value as SpreadKind)}>
           {select.options.map((o) => (
             <option key={o.value} value={o.value} disabled={o.disabled}>
               {o.label}
@@ -96,9 +96,9 @@ export function IntervalFields({
       <Reason text={state.spreadReason} />
       <Field label="Confidence level" overridden={levelOverridden} error={error}>
         <span className="num-wrap">
-          <input
-            type="text"
+          <FieldInput
             inputMode="decimal"
+            ariaLabel="Confidence level"
             className={error ? 'invalid' : ''}
             value={text}
             disabled={!state.confidenceEnabled}

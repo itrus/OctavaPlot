@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matrixRange, normaliseMatrix, type Matrix } from './matrix';
+import { cellStatistic, matrixRange, normaliseMatrix, type Matrix } from './matrix';
 
 const m: Matrix = [
   [1, 2, 3],
@@ -42,5 +42,28 @@ describe('normalising a matrix', () => {
     expect(matrixRange(m)).toEqual([1, 30]);
     expect(matrixRange([[null, NaN]])).toBeNull();
     expect(matrixRange([])).toBeNull();
+  });
+});
+
+describe('the statistic of a cell', () => {
+  it('tells equal means apart by SD and %CV', () => {
+    const [a, b] = [[9, 10, 11], [0, 10, 20]];
+    expect([cellStatistic(a, 'sd').value, cellStatistic(b, 'sd').value]).toEqual([1, 10]);
+    expect([cellStatistic(a, 'cv').value, cellStatistic(b, 'cv').value]).toEqual([10, 100]);
+    expect(cellStatistic(a, 'sem').value).toBeCloseTo(1 / Math.sqrt(3), 12);
+  });
+  it('is unavailable, not zero, for one value', () => {
+    expect(cellStatistic([5], 'sd')).toEqual({ value: null, unavailable: 'few' });
+    expect(cellStatistic([5, null], 'sem').unavailable).toBe('few');
+    expect(cellStatistic([5], 'cv').unavailable).toBe('few');
+    expect(cellStatistic([null, null], 'sd')).toEqual({ value: null, unavailable: null });
+  });
+  it('needs every value above zero for the geometric mean, and a nonzero mean for the %CV', () => {
+    expect(cellStatistic([1, 10, 100], 'geomean').value).toBeCloseTo(10, 12);
+    expect(cellStatistic([-1, 2], 'geomean')).toEqual({ value: null, unavailable: 'nonpositive' });
+    expect(cellStatistic([-1, 1], 'cv')).toEqual({ value: null, unavailable: 'zeroMean' });
+  });
+  it('counts finite values only', () => {
+    expect(cellStatistic([1, null, NaN, 3, Infinity, undefined], 'n').value).toBe(2);
   });
 });

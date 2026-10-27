@@ -32,7 +32,7 @@ Checked against the exit criteria of each phase. "Not reviewed" means this pass 
 |---|---|
 | **P0 Correctness** | Not reviewed. |
 | **P1 Layers** | Met, with two decisions: no `enabled` switch (see Decisions), and one data layer per graph (a file with more is read with a note). Every family is drawn from layers, which can be hidden and reordered one by one. XY and survival charts also give each part a look of its own and a switch for the axis range; the other families do not. |
-| **P2 Scene and export** | Mostly. The marks of every family are scene elements with stable ids, and the screen, the export and the editor's hit testing are made from them. PNG has an explicit resolution. Zoom-independence of sizes is tested for the XY drawing only. **Not yet:** bar and point labels, annotations and the editor's overlays are drawn outside the scene; so are the titles, legend and axis labels of pie and heat map; font diagnostics; the export inspection panel. |
+| **P2 Scene and export** | Mostly. The marks of every family are scene elements with stable ids, and the screen, the export and the editor's hit testing are made from them. PNG has an explicit resolution. Zoom-independence of sizes is tested for the XY drawing only. **Not yet:** bar and point labels, annotations and the editor's overlays are drawn outside the scene; so are the titles, legend and axis labels of pie and heat map; glyph checks (Greek letters, sub- and superscripts). Font diagnostics and the export dialog are built (step 2). |
 | **P3 Editing** | Not reviewed. |
 | **P4 Chart families** | Started. In the gallery 11 graphs are still locked: `xy.bars`, `xy.vector`, `xy.bubble`, `xy.trajectory`, `xy.offset`, `curve.smooth`, `cat.nested`, `grp.scatterS`, `grp.paired`, `three.bars`, `three.dots`. Observation roles (subject) are not built, and five of those graphs wait for them. |
 | **P5 Release** | Not started: there are no Playwright workflows and no visual fixtures. |
@@ -45,7 +45,7 @@ The plan for the gaps is below. Dead code is checked with `npx knip`.
 
 | Phase | Focus | Exit criterion |
 |---|---|---|
-| **P0 Correctness** | Fit intervals and convergence, numerical conditioning, histogram bins, axis-break geometry, CSV and project import, save and undo, stable series colors, `exp_two_phase` identifiability, confidence-level changes recompute intervals | Every confirmed defect has a regression test. The fixtures of section 22.1 pass. |
+| **P0 Correctness** | Fit intervals and convergence, numerical conditioning, histogram bins, axis-break geometry, CSV and project import, save and undo, stable series colors, `exp_two_phase` identifiability, confidence-level changes recompute intervals | Every confirmed defect has a regression test. The fixtures of section 15 pass. |
 | **P1 Layers** | First-class layers with data bindings, calculation references, stable object IDs, z-order, `visible`/`rangeContribution`, capability registry. Existing chart types move over through adapters. Removes the "only the first layer is drawn" limit. | One chart combines raw points, mean, error bars, fit, band and annotations. Each part is styled and hidden independently. Hiding the band keeps the fit. |
 | **P2 Scene and export** | Scene compiler (validate, calculate, layout, transform, clip, compile) feeding preview and hit-testing. SVG with stable IDs. PNG at explicit pixel size or DPI. Font diagnostics. | Zoom never changes pt font or stroke size. Exported and displayed geometry come from the same scene. |
 | **P3 Editing** | Property search, mixed-state multi-selection, three reset operations, numeric annotation and label placement (offsets stored relative to the point), keyboard navigation, grid input, small screens | A figure can be reproduced from numeric inputs without dragging. |
@@ -56,7 +56,7 @@ Each phase ships on its own. A family moves to a new mechanism (layers, the scen
 
 ## Testing
 
-- **Reference fixtures:** independent values (SciPy, R, published examples), never a second call into the same implementation. Start with section 22.1 of the calculation contracts.
+- **Reference fixtures:** independent values (SciPy, R, published examples), never a second call into the same implementation. Start with section 15 (Acceptance fixtures) of the calculation contracts.
 - **Metamorphic:** translating X, rescaling units, reordering rows, changing style and hiding layers leave results unchanged. Stable ids are tested against restyling, resizing, saving and reordering the rows.
 - **Geometry:** clipping, breaks, log transforms, band intersections.
 - **Export fidelity:** SVG viewBox, text and stroke sizes, PNG pixel dimensions and resolution, golden exports of the legacy renderer (`src/chart/export/__snapshots__/`). A change of how a family is drawn is compared with its recorded old output before it is accepted.
@@ -85,7 +85,7 @@ Above about 100k points, clip to the viewport and simplify the preview only. Nev
 
 - Sizes in pt and px independent of zoom; strokes, dashes, caps and symbols are physical quantities.
 - SVG with metadata and stable identifiers; PNG with explicit dimensions and resolution (for example 1063 px wide is about 90 mm at 300 dpi; the app states the pixels and the dpi).
-- Export inspection panel: output size, fonts and fallbacks, raster resolution, clipped objects, known limits. Not built yet.
+- Export inspection panel: output size, fonts and fallbacks, raster resolution, clipped objects, known limits. Built as a dialog behind the Export button (size in px, pt and mm, fonts requested, used and missing, raster size and the canvas limit, the warnings of the chart model, print-size warnings, known limits, a copyable JSON report). Clipped objects appear only as the models word them. Glyph checks are not built.
 - Warnings for very thin strokes and unreadable text. Grayscale preview and color-vision check.
 - Saved style presets for common single- and double-column widths, stated in pt.
 - Rich text with Greek letters, sub- and superscripts. Missing glyphs are reported.
@@ -137,7 +137,7 @@ Also in step 1: a zoom-independence test for every family, not only XY. Done whe
 
 ### 3. Audits (S to M each, no code changes)
 
-- **P0:** for each item, which tests exist, which are missing, and which fixtures of section 22.1 of the calculation contracts are implemented. The result is a table: defect, missing test, or fine.
+- **P0:** for each item, which tests exist, which are missing, and which fixtures of section 15 (Acceptance fixtures) of the calculation contracts are implemented. The result is a table: defect, missing test, or fine.
 - **P3:** property search, mixed-state multi-selection and small screens have no clear implementation yet; numeric annotation placement, grid input, the reset commands and the keyboard handling partly exist. The audit finds the gaps against the exit criterion (reproduce a figure from numeric inputs).
 
 ### Later phases
@@ -150,9 +150,9 @@ Also in step 1: a zoom-independence test for every family, not only XY. Done whe
 
 ### Open decisions
 
-1. **Target print width**, for the thin-stroke and small-text warnings: a setting on each graph (90 mm, 140 mm, 180 mm or custom) or one for the project. Proposed: on the graph, since figures differ.
-2. **Fonts in exports:** only diagnose, or also embed the font or turn text into paths in the SVG. Embedding makes exports reproducible (a P5 goal) but makes files larger and raises licensing questions. Proposed: diagnostics now, embedding decided later.
-3. **Where the export panel lives:** a dialog behind the Export button, or a tab of the inspector. Proposed: a dialog, since it is a one-time action.
+1. **Target print width**, for the thin-stroke and small-text warnings: a setting on each graph (90 mm, 140 mm, 180 mm or custom) or one for the project. Decided: on the graph (`printWidthMm`, optional, 20 to 400 mm; warnings below 6 pt text and 0.25 pt lines, guideline values not checked against a journal).
+2. **Fonts in exports:** only diagnose, or also embed the font or turn text into paths in the SVG. Embedding makes exports reproducible (a P5 goal) but makes files larger and raises licensing questions. Decided: diagnostics now, embedding decided later.
+3. **Where the export panel lives:** a dialog behind the Export button, or a tab of the inspector. Decided: a dialog, since it is a one-time action.
 4. **Observation roles** (P4): how a subject is declared in a table. To be designed before step 6.
 
 ## Size

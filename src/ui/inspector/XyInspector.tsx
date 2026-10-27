@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { SYMBOL_SHAPE_OPTIONS } from '../../chart/shared/parts/symbols';
 import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext, type YAxisScale } from '../../chart/shared/axes/scales';
 import { buildAnyModelCached } from '../../chart/anyModel';
+import { capabilitiesOf } from '../../model/graph/capabilities';
 import { chartFamily, chartTypesFor, supportsHorizontal } from '../../model/graph/chartTypes';
 import { layoutOf, summaryFormatInfo, xySeries } from '../../model/table/tableLayout';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/graph/summary';
@@ -12,9 +13,9 @@ import { DataSetOrder } from './sections/DataSetOrder';
 import { AxisStyleControls } from './sections/AxisStyleControls';
 import { IntervalFields, LineAtField } from './sections/SummaryControls';
 import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
-import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, Id, LineStyle, SummarySpec } from '../../model/types';
+import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, Id, LineConnect, LineStyle, SummarySpec } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { composeCommands, patchAxis, patchChart, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
+import { composeCommands, patchAxis, patchChart, patchLook, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
 import { LINE_STYLES } from '../../model/graph/look';
 import { analysesOf } from '../../model/project/analysis';
 import { resolveFit } from '../../model/options/fitOptions';
@@ -138,8 +139,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
             <div className="tab-body">
               <div className="dataset-row">
                 <span className="dataset-label">{noun}:</span>
-                <select className="dataset-select" value={scope} onChange={(e) => setSelection(e.target.value === 'all' ? { kind: 'chart' } : { kind: 'group', groupId: e.target.value })}>
-                  <option value="all">Global (all {noun.toLowerCase()}s)</option>
+                <select className="dataset-select" aria-label="Data set" value={scope} onChange={(e) => setSelection(e.target.value === 'all' ? { kind: 'chart' } : { kind: 'group', groupId: e.target.value })}>
+                  <option value="all">Global (all {noun.toLowerCase() === 'series' ? 'series' : `${noun.toLowerCase()}s`})</option>
                   {series.map((g) => (
                     <option key={g.id} value={g.id}>
                       {displayName(chart, g.id, g.name)}
@@ -269,6 +270,11 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 <Field label="Pattern" overridden={ov('lineStyle')}>
                   <SelectInput<LineStyle> value={st.lineStyle} disabled={!st.showLines} options={LINE_STYLES.map((l) => ({ value: l.value, label: l.label }))} onChange={(v) => setStyle({ lineStyle: v })} />
                 </Field>
+                {family === 'xy' && capabilitiesOf(chart.type).lineConnect && (
+                  <Field label="Connect points in" hint="Table order joins the points as the rows run. Ascending X joins them from the lowest X to the highest; the table, the symbols and the fit do not change.">
+                    <SelectInput<LineConnect> value={chart.lineConnect} options={[{ value: 'table', label: 'Table order' }, { value: 'x', label: 'Ascending X' }]} onChange={(v) => run('Connect points in', patchLook(chart.id, { lineConnect: v }))} />
+                  </Field>
+                )}
                 <div className="muted small">{family === 'survival' ? 'The Kaplan-Meier estimate, a step at each event time.' : family === 'grouped' ? 'The means of each series are joined across the categories.' : 'Points are joined in the order of the table rows; a missing Y value breaks the line.'}</div>
               </GroupBox>
               )}

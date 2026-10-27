@@ -23,6 +23,8 @@ export interface Group {
   paletteIndex: number;
   /** Set only on the columns a graph is drawn from: where the series of this column sat in its table, so its colour stays with it when the series are reordered or hidden. */
   seriesSlot?: number;
+  /** Set only on a column added to a graph from another table: the row titles of that table, which are the ones its points are named by. */
+  sourceRowTitles?: string[];
   /** Always exactly `DataTable.rowCount` long. */
   observations: Observation[];
 }
@@ -288,7 +290,18 @@ interface PairOptions {
 }
 
 /** Colour scales of a heat map (spec 13.1). */
-export type HeatPalette = 'viridis' | 'magma' | 'blue' | 'greenred' | 'grayscale';
+export type HeatPalette =
+  | 'gsea'
+  | 'bs-blue' | 'bs-indigo' | 'bs-purple' | 'bs-pink' | 'bs-red' | 'bs-orange' | 'bs-yellow' | 'bs-green' | 'bs-teal' | 'bs-cyan' | 'bs-gray'
+  | 'md-red' | 'md-pink' | 'md-purple' | 'md-deep-purple'
+  | 'custom';
+
+/** The user's own scale: low to high, or low, middle, high when `mid` is set (the middle is then at the centre value); all #rrggbb. */
+export interface HeatCustomColours {
+  low: string;
+  mid: string | null;
+  high: string;
+}
 
 /** Settings of heat maps, one set for the whole chart: colours, normalising, labels (spec 13). */
 export interface HeatmapOptions {
@@ -301,8 +314,8 @@ export interface HeatmapOptions {
   centre: number | null;
   normalise: 'none' | 'row' | 'column';
   method: 'zscore' | 'minmax' | 'centre';
-  /** A cell of replicates shows their mean or their median. */
-  summary: 'mean' | 'median';
+  /** What a cell shows of its values: their mean, median, geometric mean, sample SD, SEM, %CV (100 SD / |mean|) or count. Normalising comes after. */
+  summary: 'mean' | 'median' | 'geomean' | 'sd' | 'sem' | 'cv' | 'n';
   showValues: boolean;
   /** Digits after the decimal point of the numbers in the cells; null = automatic. */
   decimals: number | null;
@@ -312,6 +325,8 @@ export interface HeatmapOptions {
   transpose: boolean;
   colourbar: boolean;
   missingColour: string;
+  /** The colours of the 'custom' scale; kept while another scale is chosen. */
+  customColours: HeatCustomColours;
 }
 
 /** How an XY chart shows a curve fit of the Results: which one, and how it is drawn. The model itself belongs to the analysis. */
@@ -373,10 +388,25 @@ export interface BarLabels {
   sizePt: number;
   /** null = the text colour of the chart. */
   color: string | null;
+  /** A second label inside the bar, using the number format and size above; absent = none. */
+  inside?: InsideBarLabel;
+}
+
+/** Where the label inside a bar sits: against the free end of the bar, or against its baseline. */
+export type InsideLabelPosition = 'end' | 'base';
+
+/** The label inside a bar: what it says and where; the number format and size are those of the label beyond the end. */
+export interface InsideBarLabel {
+  position: InsideLabelPosition;
+  show: BarLabelMode;
+  /** null = black or white, whichever reads better on the bar as drawn. */
+  color: string | null;
 }
 
 /** Pattern of a line: solid, dashed or dotted. */
 export type LineOrder = 'auto' | 'onTop' | 'underneath';
+/** The order an XY line joins its points in: the rows of the table, or ascending X. */
+export type LineConnect = 'table' | 'x';
 export type LineStyle = 'solid' | 'longDash' | 'dashed' | 'dotted' | 'dashDot' | 'dashDotDot';
 /** The frame round the plotting region: none, or a box (spec 6.2 frame.mode). */
 export type FrameStyle = 'none' | 'box';
@@ -457,6 +487,10 @@ export interface LegendConfig {
   fontSizePt: number;
   /** Data sets left out of the legend; the others stay listed. */
   hiddenGroupIds: Id[];
+  /** The order of the entries, as series ids (the ids `hiddenGroupIds` uses); the others follow in series order. Absent = series order. Never moves the marks. */
+  order?: Id[];
+  /** Entries per row, 1 to 6; absent = 1 (one under the other on the right, wrapped to the width on the top and bottom). */
+  columns?: number;
 }
 
 /**
@@ -532,12 +566,18 @@ export interface Chart {
   /** Chart size in CSS pixels (1 px = 0.75 pt). */
   widthPx: number;
   heightPx: number;
+  /** The width in mm the graph is meant to be printed at, 20 to 400; absent = none. Only the export report uses it (warnings for small text and thin lines). */
+  printWidthMm?: number;
   /** Data sets of the chart's own table that are switched off on this graph. */
   hiddenGroupIds: Id[];
   /** Order of the data sets on the graph (column charts): those listed come first, in this order. */
   groupOrder: Id[];
-  /** Data sets from other tables that are plotted on this graph too. */
-  extraGroups: Array<{ tableId: Id; groupId: Id }>;
+  /**
+   * Data sets from other tables that are plotted on this graph too. `slot` is the colour slot after the table's own
+   * colours, fixed when the data set is added so that removing another one does not change it (absent in older files:
+   * the position in this list is used).
+   */
+  extraGroups: Array<{ tableId: Id; groupId: Id; slot?: number }>;
   /** Survival and cumulative-event charts: confidence band and at-risk table. */
   survival: SurvivalOptions;
   /** Shape lock: with 4:3 or square, changing the width or the height moves the other one too. */
@@ -566,6 +606,8 @@ export interface Chart {
   orientation: ChartOrientation;
   /** Where lines and error bars are drawn relative to the symbols and bars: as the chart type usually does (auto), over them, or under them. */
   lineOrder: LineOrder;
+  /** XY lines and areas: join the points in table order (a missing value breaks the line) or in ascending X (a missing Y still breaks it). */
+  lineConnect: LineConnect;
   /** Where the axis lines cross, as values on the other axis (null = the low edge): the Y axis at this X, the X axis at this Y. */
   origin: { x: number | null; y: number | null };
   bars: BarLayout;

@@ -196,6 +196,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             <span className="dataset-label">Data set:</span>
             <select
               className="dataset-select"
+              aria-label="Data set"
               value={scope}
               onChange={(e) => setSelection(e.target.value === 'all' ? { kind: 'chart' } : { kind: 'group', groupId: e.target.value })}
             >

@@ -12,7 +12,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "loc": "node scripts/loc-history.mjs --chart"
   },
   "dependencies": {
     "d3": "^7.9.0",

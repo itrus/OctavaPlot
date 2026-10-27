@@ -112,10 +112,10 @@ describe('what a chart shows of a curve fit', () => {
     const old = JSON.parse(stringifyProject(p));
     delete old.project.charts[1].fit;
     expect(parseProject(JSON.stringify(old)).charts[1].fit.analysisId).toBeNull();
-    // A curve fit that names no model, or sits on a table that is not an XY table, is dropped.
+    // A curve fit that names no model, or sits on a table that is not an XY table, refuses the file.
     const bad = JSON.parse(stringifyProject(p));
     bad.project.analyses.find((a: { id: string }) => a.id === 'a').model = 'nonsense';
-    expect(parseProject(JSON.stringify(bad)).analyses?.some((a) => a.id === 'a') ?? false).toBe(false);
+    expect(() => parseProject(JSON.stringify(bad))).toThrow('project.analyses[0].model');
   });
   it('is lost with the analysis: deleting the curve fit leaves the chart with no curve', () => {
     let p = addDataTable('x', 'xy')(createExampleProject());
@@ -240,5 +240,28 @@ describe('the fitted parameters as text to paste on the graph', () => {
     const chart = createChart(table.id, undefined, 'xyScatter');
     expect(fitParametersText(buildXyModel(chart, table).series, 0.95)).toBe('');
     expect(fitCountLine({ n: 2, df: 0 } as never)).toBe('2 points');
+  });
+});
+
+describe('one fit for the graph and the Results sheet', () => {
+  it('calculates a fit once when both ask, and again only when an input changes', async () => {
+    const { fitStats, runFit } = await import('./fitCurve');
+    const { clearCalcCache } = await import('../../stats/calcCache');
+    clearCalcCache();
+    const table = createXyTable('XY', true);
+    const obs = fitObservations(table)[0].obs;
+    const analysis = { id: 'a', name: 'Curve fit', kind: 'curvefit' as const, dataTableId: table.id, level: 0.95, model: 'linear' as const };
+    const before = fitStats.calculated;
+    runFit(obs, { ...NO_FIT_SETTINGS, model: 'linear', level: 0.95 });
+    const one = fitStats.calculated - before;
+    expect(one).toBe(1);
+    const sheetFits = fitObservations(table).length;
+    curveFitSheet(table, analysis);
+    // The sheet fits each series; the one the graph already did is not repeated.
+    expect(fitStats.calculated - before).toBe(sheetFits);
+    curveFitSheet(table, analysis);
+    expect(fitStats.calculated - before).toBe(sheetFits);
+    curveFitSheet(table, { ...analysis, level: 0.9 });
+    expect(fitStats.calculated - before).toBe(2 * sheetFits);
   });
 });

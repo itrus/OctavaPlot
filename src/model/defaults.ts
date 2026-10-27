@@ -1,4 +1,5 @@
 import { newId } from './ids';
+import { DEFAULT_CUSTOM_COLOURS } from './options/heatmapOptions';
 import { DEFAULT_PALETTE_ID } from './graph/palettes';
 import { chartFamily } from './graph/chartTypes';
 import { defaultSeriesName, subLabels, summaryFormatInfo } from './table/tableLayout';
@@ -72,8 +73,9 @@ function axisTitlesFor(type: ChartType): { x: string; y: string } {
   }
 }
 
-/** The summary a new chart of this type starts with: XY charts of replicate values show the SD, as the usual convention. */
-const defaultSummaryFor = (type: ChartType): SummarySpec => (chartFamily(type) === 'xy' || type === 'groupedBar' || type === 'groupedLine' ? { ...DEFAULT_SUMMARY, spread: 'sd' } : { ...DEFAULT_SUMMARY });
+/** The summary a new chart of this type starts with: the charts that are made to show error bars (XY charts of replicate values, grouped bars and lines, a column bar chart, a mean with error bars) show the SD, as the usual convention. */
+const defaultSummaryFor = (type: ChartType): SummarySpec =>
+  chartFamily(type) === 'xy' || type === 'groupedBar' || type === 'groupedLine' || type === 'bar' || type === 'mean' ? { ...DEFAULT_SUMMARY, spread: 'sd' } : { ...DEFAULT_SUMMARY };
 
 export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, method: 'loglog', atRisk: false, eventSymbols: false, errorBars: false };
 
@@ -97,7 +99,7 @@ const DEFAULT_DISTRIBUTION: DistributionOptions = {
   showQuartiles: true,
 };
 /** Heat maps (spec 13.1): a single gradient, the range of the values, nothing normalised, no numbers in the cells. */
-const DEFAULT_HEATMAP: HeatmapOptions = { palette: 'viridis', reverse: false, min: null, max: null, centre: null, normalise: 'none', method: 'zscore', summary: 'mean', showValues: false, decimals: null, cellGapPt: 0, transpose: false, colourbar: true, missingColour: '#d9d9d9' };
+const DEFAULT_HEATMAP: HeatmapOptions = { palette: 'bs-blue', reverse: false, min: null, max: null, centre: null, normalise: 'none', method: 'zscore', summary: 'mean', showValues: false, decimals: null, cellGapPt: 0, transpose: false, colourbar: true, missingColour: '#d9d9d9', customColours: DEFAULT_CUSTOM_COLOURS };
 /** No fitted curve until a curve fit of the Results is chosen; a band, when asked for, uses that fit's confidence level. */
 const DEFAULT_FIT: ChartFit = { analysisId: null, band: 'none', extend: false, showParameters: false };
 
@@ -282,13 +284,14 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     grid: { ...DEFAULT_GRID },
     orientation: 'vertical',
     lineOrder: 'auto',
+    lineConnect: 'table',
     origin: { x: null, y: null },
     bars: { ...DEFAULT_BARS },
     barLabels: { ...DEFAULT_BAR_LABELS },
     // A violin shows its values from the start: the Points box then switches them off.
     distribution: { ...DEFAULT_DISTRIBUTION, ...(type === 'violin' || type === 'groupedViolin' ? { points: 'all' as const } : {}) },
     pairs: { bridge: false },
-    heatmap: { ...DEFAULT_HEATMAP },
+    heatmap: { ...DEFAULT_HEATMAP, customColours: { ...DEFAULT_CUSTOM_COLOURS } },
     histogram: { ...DEFAULT_HISTOGRAM },
     fit: { ...DEFAULT_FIT },
     pie: { ...DEFAULT_PIE },

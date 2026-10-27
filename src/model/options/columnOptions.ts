@@ -1,5 +1,5 @@
 import { bool, clamp, clampOrNull, numberOrNull, oneOf, optionalHex, record, text, valuesOf } from '../sanitize';
-import type { BarLabelMode, BarLabels, BarLayout, Id } from '../types';
+import type { BarLabelMode, BarLabels, BarLayout, Id, InsideBarLabel, InsideLabelPosition } from '../types';
 
 /** Settings of the columns of a column chart: the space between them, their baseline and the labels above them. */
 
@@ -44,11 +44,26 @@ export const BAR_LABEL_MODES: ReadonlyArray<{ value: BarLabelMode; label: string
   { value: 'n', label: 'Sample size' },
 ];
 
+export const INSIDE_LABEL_POSITIONS: ReadonlyArray<{ value: InsideLabelPosition; label: string }> = [
+  { value: 'end', label: 'At the end of the bar' },
+  { value: 'base', label: 'At the base of the bar' },
+];
+
 const LABEL_MODES = valuesOf(BAR_LABEL_MODES);
+const INSIDE_POSITIONS = valuesOf(INSIDE_LABEL_POSITIONS);
+
+/** The label inside a bar: absent from a file, or switched off with nothing else set, it is not kept at all. */
+function sanitizeInside(raw: unknown, base: InsideBarLabel | undefined): InsideBarLabel | undefined {
+  if (raw === undefined) return base;
+  const i = record(raw);
+  const out: InsideBarLabel = { position: oneOf(INSIDE_POSITIONS, i.position, base?.position ?? 'end'), show: oneOf(LABEL_MODES, i.show, base?.show ?? 'none'), color: optionalHex(i.color, base?.color ?? null) };
+  return out.show === 'none' && out.position === 'end' && out.color === null ? undefined : out;
+}
 
 /** Labels on bars from a file or a patch: a value that is not valid falls back to the one in `base`. */
 export function sanitizeBarLabels(raw: unknown, base: BarLabels): BarLabels {
   const b = record(raw);
+  const inside = sanitizeInside(b.inside, base.inside);
   return {
     show: oneOf(LABEL_MODES, b.show, base.show),
     decimals: b.decimals === null ? null : typeof b.decimals === 'number' && Number.isFinite(b.decimals) ? Math.round(clamp(b.decimals, 0, 10, 0)) : base.decimals,
@@ -57,6 +72,7 @@ export function sanitizeBarLabels(raw: unknown, base: BarLabels): BarLabels {
     suffix: text(b.suffix, 24, base.suffix),
     sizePt: clamp(b.sizePt, 4, 48, base.sizePt),
     color: optionalHex(b.color, base.color),
+    ...(inside ? { inside } : {}),
   };
 }
 

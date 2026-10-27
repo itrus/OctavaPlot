@@ -237,3 +237,26 @@ describe('reviewed regressions (confidence level, convergence, invariance)', () 
     }
   });
 });
+
+describe('the domain of X', () => {
+  it('a hyperbola keeps the point at X = 0, which its formula defines', () => {
+    const r = ok(fitCurve([{ x: 0, y: 1 }, { x: 1, y: 3 }, { x: 2, y: 4 }], { model: 'hyperbola' }));
+    expect(r.n).toBe(3);
+  });
+  it('a hyperbola still drops negative X, where its denominator can vanish', () => {
+    const r = fitCurve([{ x: -1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 3 }, { x: 2, y: 4 }], { model: 'hyperbola' });
+    expect(isFailure(r) ? -1 : r.n).toBe(3);
+  });
+  it('a model with x in a denominator or power still drops X <= 0 and says what it needs', () => {
+    const r = fitCurve([{ x: 0, y: 1 }, { x: 1, y: 2 }, { x: 2, y: 4 }, { x: 4, y: 6 }], { model: 'hill_4pl' });
+    expect(isFailure(r)).toBe(true);
+    if (isFailure(r)) expect(r.message).toContain('X above 0');
+    const h = fitCurve([{ x: 0, y: 1 }, { x: 1, y: 2 }, { x: 2, y: 4 }, { x: 4, y: 6 }, { x: 8, y: 7 }, { x: 16, y: 7.5 }], { model: 'hill_4pl' });
+    expect(isFailure(h) ? -1 : h.n).toBe(5);
+  });
+  it('the failure of a hyperbola says X must be 0 or above', () => {
+    const r = fitCurve([{ x: -1, y: 1 }, { x: -2, y: 3 }, { x: 0, y: 4 }], { model: 'hyperbola' });
+    expect(isFailure(r)).toBe(true);
+    if (isFailure(r)) expect(r.message).toContain('X of 0 or above');
+  });
+});

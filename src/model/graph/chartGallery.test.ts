@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHART_TYPES, chartTypesFor } from './chartTypes';
-import { GALLERY, availableItems, galleryItems } from './chartGallery';
+import { GALLERY, availableItems, galleryCounts, galleryItems, visibleItems, visibleTabs } from './chartGallery';
 import { applyVariant } from './chartVariant';
 import { createChart } from '../defaults';
 import type { TableKind } from '../types';
@@ -56,5 +56,33 @@ describe('graph gallery', () => {
   it('offers the horizontal versions of the grouped and contingency bars', () => {
     const horizontal = [...availableItems('grouped'), ...availableItems('contingency')].filter((i) => i.variant?.orientation === 'horizontal').map((i) => i.type);
     expect(horizontal.sort()).toEqual(['contingencyBars', 'contingencyPercent', 'contingencyStacked', 'groupedBar', 'groupedStacked']);
+  });
+});
+
+describe('gallery counts and visibility', () => {
+  it('counts come from the registry', () => {
+    const all = KINDS.flatMap((k) => galleryItems(k));
+    const c = galleryCounts();
+    expect(c.total).toBe(all.length);
+    expect(c.available).toBe(KINDS.flatMap((k) => availableItems(k)).length);
+    expect(c.planned).toBe(all.filter((i) => i.type === null).length);
+    expect(c.available + c.planned).toBe(c.total);
+  });
+
+  it('shows only the creatable graphs unless planned ones are asked for', () => {
+    for (const k of KINDS) {
+      expect(visibleItems(k, false)).toEqual(availableItems(k));
+      expect(visibleItems(k, true)).toEqual(galleryItems(k));
+      expect(visibleTabs(k, false).flatMap((t) => t.items)).toEqual(availableItems(k));
+      expect(visibleTabs(k, true).flatMap((t) => t.items)).toEqual(galleryItems(k));
+    }
+  });
+
+  it('keeps every tab, so one without a creatable graph can say so', () => {
+    for (const k of KINDS) expect(visibleTabs(k, false).map((t) => t.id)).toEqual(GALLERY[k].map((t) => t.id));
+  });
+
+  it('every locked entry has a preset id', () => {
+    for (const k of KINDS) for (const i of galleryItems(k).filter((x) => x.type === null)) expect(i.spec).toBeTruthy();
   });
 });

@@ -3,6 +3,10 @@
  * scale covers. Pure; a missing value is `null` and is never counted as zero.
  */
 
+import type { HeatmapOptions } from '../model/types';
+import { meanOf } from './moments';
+import { summarize } from './summary';
+
 export type Matrix = Array<Array<number | null>>;
 type NormaliseBy = 'none' | 'row' | 'column';
 type NormaliseMethod = 'zscore' | 'minmax' | 'centre';
@@ -63,4 +67,43 @@ export function matrixRange(m: Matrix): [number, number] | null {
     hi = Math.max(hi, v);
   }
   return lo <= hi ? [lo, hi] : null;
+}
+
+/** What a heat map cell can show of its values (HeatmapOptions.summary). */
+export type CellStatistic = HeatmapOptions['summary'];
+
+/** Why a statistic of a cell is not available: too few values, a value that is not above zero, a mean of zero, or a cell entered as already-calculated values that does not give it. */
+export type Unavailable = 'few' | 'nonpositive' | 'zeroMean' | 'supplied';
+
+/** A statistic of a cell: the number, or null with the reason (null with no reason = the cell holds no values). */
+export interface CellResult {
+  value: number | null;
+  unavailable: Unavailable | null;
+}
+
+const none: CellResult = { value: null, unavailable: null };
+const lacks = (unavailable: Unavailable): CellResult => ({ value: null, unavailable });
+
+/**
+ * A statistic of the values of one cell (replicates): sample SD (n - 1), SEM, %CV (100 SD / |mean|), the geometric mean
+ * (every value above zero) or the count of finite values. A statistic that cannot be calculated is unavailable, never zero.
+ * The mean and the median of a cell are the group summary of summary.ts.
+ */
+export function cellStatistic(values: ReadonlyArray<number | null | undefined>, kind: Exclude<CellStatistic, 'mean' | 'median'>): CellResult {
+  const s = summarize(values);
+  if (s.n === 0) return none;
+  switch (kind) {
+    case 'n':
+      return { value: s.n, unavailable: null };
+    case 'geomean': {
+      const xs = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      return xs.every((x) => x > 0) ? { value: Math.exp(meanOf(xs.map((x) => Math.log(x)))), unavailable: null } : lacks('nonpositive');
+    }
+    case 'sd':
+    case 'sem':
+      return s[kind] === null ? lacks('few') : { value: s[kind], unavailable: null };
+    case 'cv':
+      if (s.sd === null || s.mean === null) return lacks('few');
+      return s.mean === 0 ? lacks('zeroMean') : { value: (100 * s.sd) / Math.abs(s.mean), unavailable: null };
+  }
 }

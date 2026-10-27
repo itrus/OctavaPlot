@@ -2,6 +2,7 @@ import { leadingColumns } from '../../model/graph/chartTypes';
 import { layersOf, type LayerSpec } from '../../model/graph/layers';
 import { rowTitleAt } from '../../model/table/rows';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
+import { legendEntries } from '../../model/graph/legendEntries';
 import type { Chart, ChartStyle, DataTable, Id, PieLabelMode } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { compilePieMarks } from './pieMarks';
@@ -150,7 +151,7 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   }
 
   const hiddenAxis = { ...chart.xAxis, visible: false };
-  const legendKeyParts = parts.map((_, i) => i).filter((i) => !chart.legend.hiddenGroupIds.includes(parts[i].g.id));
+  const legendKeyParts = legendEntries(chart.legend, parts.map((p) => p.g.id));
   const layout = computeLayout({
     fontFamily: chart.fontFamily,
     titleOffsetPt: chart.titleOffsetPt,

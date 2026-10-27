@@ -20,6 +20,13 @@ export function fitCellLabel(text: string, widthPt: number, heightPt: number, ma
   return size >= SMALLEST_LABEL_PT ? size : null;
 }
 
+/** The title of the colour bar, above it and shrunk to the room at the right (left out when it cannot be read there). */
+function heatBarTitle(chart: Chart, model: HeatModel, bar: NonNullable<HeatModel['bar']>): SceneElement[] {
+  if (bar.title === null) return [];
+  const size = fitCellLabel(bar.title, model.widthPt - bar.rect.x - 4, Infinity, chart.legend.fontSizePt, chart.fontFamily);
+  return size === null ? [] : [el('text', [['x', n2(bar.rect.x)], ['y', n2(Math.max(size, bar.rect.y - 6))], ['font-size', n2(size)], ['fill', chart.textColor]], { text: bar.title })];
+}
+
 /**
  * The marks of a heat map as scene elements, in the order of the chart's layers (model.layers): the cells, the numbers in them
  * and the colour bar. A layer hidden by its ID draws nothing. Every mark has an id made from its layer and the cell it draws (the
@@ -46,6 +53,7 @@ export function compileHeatMarks(chart: Chart, model: HeatModel): SceneElement[]
                 children: [
                   ...bar.strips.map((s) => el('rect', [['x', n2(bar.rect.x)], ['y', n2(s.y)], ['width', n2(bar.rect.width)], ['height', n2(s.height)], ['fill', s.fill]])),
                   el('rect', [['x', n2(bar.rect.x)], ['y', n2(bar.rect.y)], ['width', n2(bar.rect.width)], ['height', n2(bar.rect.height)], ['fill', 'none'], ['stroke', chart.axisColor], ['stroke-width', 1.5]]),
+                  ...heatBarTitle(chart, model, bar),
                   ...bar.ticks.map((t) =>
                     el('g', [], {
                       children: [

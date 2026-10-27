@@ -99,14 +99,14 @@ export function histTooltipLines(model: XyModel, hit: HitTarget): string[] | nul
   return lines;
 }
 
-/** Tooltip lines for a hit on a heat map cell: its row, its column and its value (and the value before normalising). */
+/** Tooltip lines for a hit on a heat map cell: its row, its column and its value, named by the statistic (and the value before normalising). */
 export function heatTooltipLines(model: HeatModel, hit: HitTarget): string[] | null {
   const cell = model.cells.find((c) => c.id === hit.objectId);
   if (!cell) return null;
   const lines = [cell.colLabel, cell.rowLabel];
   if (cell.value === null) lines.push('No value');
   else {
-    lines.push(`Value: ${tooltipFmt(cell.value)}`);
+    lines.push(`${model.valueName}: ${tooltipFmt(cell.value)}`);
     if (cell.original !== null && cell.original !== cell.value) lines.push(`Before normalising: ${tooltipFmt(cell.original)}`);
   }
   return lines;

@@ -1,3 +1,4 @@
+import type { CellResult, CellStatistic } from '../../stats/matrix';
 import type { GroupStats } from '../../stats/summary';
 import type { SpreadKind, SummaryFormat } from '../types';
 import { summaryFormatInfo } from './tableLayout';
@@ -44,6 +45,13 @@ export function suppliedStats(format: SummaryFormat, values: ReadonlyArray<numbe
   // N is a count of subjects: a positive whole number, else it is unknown (0) and not made up.
   const rawN = get('N');
   const n = rawN !== null && Number.isInteger(rawN) && rawN > 0 ? rawN : null;
+  const notices: GroupStats['notices'] = [];
+  let interval: GroupStats['interval'] = { status: spread === 'none' ? 'none' : 'ok', lower, upper, coverage: null, code: null };
+  // A centre outside its own limits is an entry error: not drawn as an error bar, the endpoints are not corrected.
+  if (info.error === 'limits' && lower !== null && upper !== null && !(lower <= mean && mean <= upper)) {
+    notices.push({ code: 'interval-invalid', severity: 'blocking', message: `The limits [${lower}, ${upper}] do not contain the ${mean} entered; no error bar is drawn.` });
+    interval = { status: 'unavailable', lower: null, upper: null, coverage: null, code: 'nonfinite' };
+  }
   const stats: GroupStats = {
     n: n ?? 0,
     missing: 0,
@@ -53,9 +61,28 @@ export function suppliedStats(format: SummaryFormat, values: ReadonlyArray<numbe
     effectiveSpread: spread,
     confidenceLevel: 0.95,
     centre: mean,
-    interval: { status: spread === 'none' ? 'none' : 'ok', lower, upper, coverage: null, code: null },
+    interval,
     rejected: false,
-    notices: [],
+    notices,
   };
   return { stats, meaning: SUPPLIED_MEANING[info.error] };
+}
+
+/**
+ * A statistic of a row of a "values already calculated" series, for a heat map cell. One centre entered gives no spread of
+ * its own: the SD, SEM or N entered is shown as it is, the %CV is the SD entered over the mean (or the %CV entered), and what
+ * the table does not give is unavailable (null with the reason), never made up. The geometric mean is never available.
+ */
+export function suppliedStatistic(format: SummaryFormat, values: ReadonlyArray<number | null>, kind: Exclude<CellStatistic, 'mean' | 'median'>): CellResult {
+  const s = suppliedStats(format, values)?.stats;
+  if (!s || s.centre === null) return { value: null, unavailable: null };
+  const missing: CellResult = { value: null, unavailable: 'supplied' };
+  const half = s.interval.lower !== null && s.interval.upper !== null ? (s.interval.upper - s.interval.lower) / 2 : null;
+  if (kind === 'n') return s.n > 0 ? { value: s.n, unavailable: null } : missing;
+  if (kind === 'sd' || kind === 'cv') {
+    if (s.spread !== 'sd' || half === null) return missing;
+    if (kind === 'sd') return { value: half, unavailable: null };
+    return s.centre === 0 ? { value: null, unavailable: 'zeroMean' } : { value: (100 * half) / Math.abs(s.centre), unavailable: null };
+  }
+  return kind === 'sem' && s.spread === 'sem' && half !== null ? { value: half, unavailable: null } : missing;
 }

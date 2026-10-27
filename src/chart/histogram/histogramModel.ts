@@ -1,5 +1,6 @@
 import { layersOf } from '../../model/graph/layers';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
+import { legendEntries } from '../../model/graph/legendEntries';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
 import type { Chart, DataTable } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
@@ -42,10 +43,12 @@ export function buildHistogramModel(chart: Chart, table: DataTable): XyModel {
   });
   const ecdf = data.map((d) => (histogram ? null : ecdfSteps(d.values, opts.ecdfDirection)));
   const scaleOf = (n: number) => (opts.ecdfUnits === 'percent' ? 100 : opts.ecdfUnits === 'count' ? n : 1);
+  // The level before the first value: 0 for "at or below", the whole (1, 100 or n) for "above". It is part of the path.
+  const startLevel = (n: number) => (opts.ecdfDirection === 'atOrBelow' ? 0 : scaleOf(n));
 
   // 2. The axes: the value axis over the edges (or the values), the other from zero to the largest height.
   const allX = histogram ? edges : pooled;
-  const allY = histogram ? bins.flatMap((b) => b?.heights ?? []) : ecdf.flatMap((e) => (e ? e.steps.map((s) => s.f * scaleOf(e.n)) : []));
+  const allY = histogram ? bins.flatMap((b) => b?.heights ?? []) : ecdf.flatMap((e) => (e && e.steps.length ? [startLevel(e.n), ...e.steps.map((s) => s.f * scaleOf(e.n))] : []));
   const linear = { scale: 'linear' as const, reverse: false };
   const xAxis = resolveAxis(
     { values: allX, includeZero: false, min: chart.xAxis.min ?? (histogram && edges.length > 1 ? edges[0] : null), max: chart.xAxis.max ?? (histogram && edges.length > 1 ? edges[edges.length - 1] : null), majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) },
@@ -57,7 +60,7 @@ export function buildHistogramModel(chart: Chart, table: DataTable): XyModel {
   );
   warnings.push(...xAxis.warnings.map((w) => w.replace(/^Y /, 'X ').replace(/ Y limit/, ' X limit')), ...yAxis.warnings);
 
-  const legendSeries = data.map((_, i) => i).filter((i) => !chart.legend.hiddenGroupIds.includes(data[i].g.id));
+  const legendSeries = legendEntries(chart.legend, data.map((d) => d.g.id));
   const layout = computeLayout({
     fontFamily: chart.fontFamily,
     titleOffsetPt: chart.titleOffsetPt,
@@ -104,7 +107,7 @@ export function buildHistogramModel(chart: Chart, table: DataTable): XyModel {
     // Steps: level until the next value, then a jump. The level before the first value is 0 for "at or below", 1 for "above".
     let path = '';
     if (points.length > 0) {
-      const before = opts.ecdfDirection === 'atOrBelow' ? 0 : mult;
+      const before = startLevel(e.n);
       const after = points[points.length - 1].y;
       const left = opts.ecdfExtend ? xLo : points[0].x;
       const right = opts.ecdfExtend ? xHi : points[points.length - 1].x;

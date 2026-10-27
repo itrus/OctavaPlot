@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 import type { GalleryItem } from '../../model/graph/chartGallery';
+import { HEAT_GRADIENTS } from '../../model/options/heatGradients';
 import { ChartSketch } from './NewItemDialogs';
 
 const SVG = { width: 84, height: 54, viewBox: '0 0 84 54', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, 'aria-hidden': true } as const;
@@ -30,10 +31,11 @@ const Pie = ({ hole = false }: { hole?: boolean }) => (
   </g>
 );
 
-const VIRIDIS = [['#440154', '#3b528b', '#21918c', '#5ec962'], ['#472d7b', '#2c728e', '#27ad81', '#aadc32'], ['#3b528b', '#21918c', '#5ec962', '#fde725']];
-const MAGMA = [['#000004', '#3b0f70', '#8c2981', '#de4968'], ['#1d1147', '#51127c', '#b73779', '#fc8961'], ['#3b0f70', '#8c2981', '#f1605d', '#fcfdbf']];
-const BLUE = [['#f0f6ff', '#cfe0fb', '#9dbdf5', '#6c9bef'], ['#dbe8fc', '#b6cff8', '#7fa8f1', '#3f7be8'], ['#c4d9fa', '#8fb3f2', '#5a8eea', '#1f5fe0']];
-const GREENRED = [['#1b9e2a', '#0a5a14', '#050505', '#6a0d0d'], ['#37b94a', '#10701c', '#2a0a0a', '#b02020'], ['#52d05f', '#1b9e2a', '#7a1010', '#d94040']];
+/** A 3 by 4 patch of a gradient's own stops, rising from the top left to the bottom right. */
+const heatPatch = (id: string): string[][] => {
+  const stops = HEAT_GRADIENTS.find((p) => p.value === id)!.colors;
+  return [0, 1, 2].map((r) => [0, 1, 2, 3].map((k) => stops[Math.round(((r + k) / 5) * (stops.length - 1))]));
+};
 
 const SKETCHES: Record<string, () => ReactElement> = {
   'xy.bars': () => (<><Axes /><Bar x={16} y={36} /><Bar x={32} y={26} /><Bar x={48} y={14} /><Bar x={64} y={22} /></>),
@@ -62,10 +64,10 @@ const SKETCHES: Record<string, () => ReactElement> = {
   'grp.barsH': () => (<><Axes /><BarH y={8} x={52} h={5} tone={0.55} /><BarH y={14} x={38} h={5} tone={0.18} /><BarH y={26} x={64} h={5} tone={0.55} /><BarH y={32} x={46} h={5} tone={0.18} /></>),
   'grp.stackedH': () => (<><Axes /><BarH y={10} x={36} h={8} tone={0.55} /><rect x="36" y="10" width="22" height="8" fill="currentColor" fillOpacity={0.18} /><BarH y={28} x={46} h={8} tone={0.55} /><rect x="46" y="28" width="24" height="8" fill="currentColor" fillOpacity={0.18} /></>),
   'grp.floating': () => (<><Axes /><rect x="18" y="26" width="9" height="14" fill="currentColor" fillOpacity={0.55} /><rect x="29" y="18" width="9" height="16" fill="currentColor" fillOpacity={0.18} /><rect x="50" y="14" width="9" height="18" fill="currentColor" fillOpacity={0.55} /><rect x="61" y="22" width="9" height="14" fill="currentColor" fillOpacity={0.18} /></>),
-  'heat.viridis': () => <Heat colors={VIRIDIS} />,
-  'heat.magma': () => <Heat colors={MAGMA} />,
-  'heat.blue': () => <Heat colors={BLUE} />,
-  'heat.greenred': () => <Heat colors={GREENRED} />,
+  'heat.blue': () => <Heat colors={heatPatch('bs-blue')} />,
+  'heat.purple': () => <Heat colors={heatPatch('bs-purple')} />,
+  'heat.red': () => <Heat colors={heatPatch('md-red')} />,
+  'heat.gsea': () => <Heat colors={heatPatch('gsea')} />,
   'three.bars': () => (<><Axes /><Bar x={14} y={30} w={6} tone={0.55} /><Bar x={21} y={22} w={6} tone={0.18} /><Bar x={30} y={34} w={6} tone={0.55} /><Bar x={37} y={26} w={6} tone={0.18} /><Bar x={52} y={20} w={6} tone={0.55} /><Bar x={59} y={14} w={6} tone={0.18} /></>),
   'three.dots': () => (<><Axes /><Dot x={16} y={32} /><Dot x={21} y={28} open /><Dot x={32} y={36} /><Dot x={37} y={30} open /><Dot x={54} y={22} /><Dot x={59} y={16} open /></>),
   'grp.box': () => (<><Axes /><BoxV x={22} top={16} q1={24} q3={34} bottom={42} w={8} /><BoxV x={36} top={10} q1={18} q3={28} bottom={38} w={8} /><BoxV x={56} top={12} q1={20} q3={30} bottom={40} w={8} /><BoxV x={70} top={8} q1={16} q3={24} bottom={34} w={8} /></>),

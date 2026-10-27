@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
+import { useRoving } from '../inspector/common/roving';
 import { buildAnyModel, ChartCanvas } from '../../chart/anyModel';
 
 import { applyVariant, previewFit, type ChartVariant } from '../../model/graph/chartVariant';
-import { GALLERY, availableItems, type GalleryItem } from '../../model/graph/chartGallery';
+import { GALLERY, availableItems, galleryCounts, visibleTabs, type GalleryItem } from '../../model/graph/chartGallery';
 import { inheritChart } from '../../model/graph/chartFormat';
 import { chartTypeInfo, tableTypeInfo } from '../../model/graph/chartTypes';
 import { createChart } from '../../model/defaults';
@@ -58,17 +59,20 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
   const [tableId, setTableId] = useState<Id>(firstTable.id);
   const table = tables.find((t) => t.id === tableId) ?? firstTable;
   const family = table.kind;
-  const tabs = GALLERY[family];
+  const [showPlanned, setShowPlanned] = useState(false);
+  const counts = galleryCounts();
+  const tabs = visibleTabs(family, showPlanned);
   const [tabId, setTabId] = useState<string>(tabs[0].id);
   const tab = tabs.find((t) => t.id === tabId) ?? tabs[0];
   const [chosen, setChosen] = useState<string | null>(null);
   const first = availableItems(family)[0];
   // The chosen graph must belong to this family; otherwise the family's first available graph is selected.
-  const all = tabs.flatMap((t) => t.items);
+  const all = availableItems(family);
   const selected: GalleryItem = all.find((i) => i.id === chosen) ?? first;
   const selectedTab = tabs.find((t) => t.items.includes(selected));
   const tablesOfFamily = tables.filter((t) => t.kind === family);
   const canCreate = selected.type !== null;
+  const shape = tableTypeInfo(family).layout;
 
   const pickFamily = (kind: TableKind) => {
     const next = tables.find((t) => t.kind === kind);
@@ -77,6 +81,10 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
     setTabId(GALLERY[kind][0].id);
     setChosen(null);
   };
+  const modes = ['gallery', 'like'] as const;
+  const rovingMode = useRoving([true, charts.length > 0], modes.indexOf(mode), (i) => setMode(modes[i]));
+  const rovingTabs = useRoving(tabs.map(() => true), tabs.findIndex((t) => t.id === tab.id), (i) => setTabId(tabs[i].id));
+  const rovingItems = useRoving(tab.items.map((i) => i.type !== null), tab.items.findIndex((i) => i.id === selected.id), (i) => setChosen(tab.items[i].id), 'both');
   const pickTable = (id: Id) => {
     const next = tables.find((t) => t.id === id);
     if (!next) return;
@@ -96,11 +104,11 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
       confirmDisabled={mode === 'like' ? !source || !sourceTable : !canCreate}
       wide
     >
-      <span className="switch-group" role="radiogroup" aria-label="How to make the graph">
-        <button role="radio" aria-checked={mode === 'gallery'} className={`switch${mode === 'gallery' ? ' on' : ''}`} onClick={() => setMode('gallery')}>
+      <span className="switch-group" role="radiogroup" aria-label="How to make the graph" {...rovingMode.groupProps}>
+        <button role="radio" aria-checked={mode === 'gallery'} {...rovingMode.itemProps(0)} className={`switch${mode === 'gallery' ? ' on' : ''}`} onClick={() => setMode('gallery')}>
           From the gallery
         </button>
-        <button role="radio" aria-checked={mode === 'like'} className={`switch${mode === 'like' ? ' on' : ''}`} onClick={() => setMode('like')} disabled={charts.length === 0} title={charts.length === 0 ? 'There is no graph to take the format from yet' : undefined}>
+        <button role="radio" aria-checked={mode === 'like'} {...rovingMode.itemProps(1)} className={`switch${mode === 'like' ? ' on' : ''}`} onClick={() => setMode('like')} disabled={charts.length === 0} title={charts.length === 0 ? 'There is no graph to take the format from yet' : undefined}>
           Like an existing graph
         </button>
       </span>
@@ -173,9 +181,9 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
       {tablesOfFamily.length > 1 && <p className="muted small">{tablesOfFamily.length} {FAMILY_LABEL[family].toLowerCase()} tables: choose which one above.</p>}
 
       {tabs.length > 1 && (
-        <div className="format-tabs" role="tablist" aria-label="Graph kind">
-          {tabs.map((t) => (
-            <button key={t.id} role="tab" aria-selected={tab.id === t.id} className={`format-tab${tab.id === t.id ? ' active' : ''}`} onClick={() => setTabId(t.id)}>
+        <div className="format-tabs" role="tablist" aria-label="Graph kind" {...rovingTabs.groupProps}>
+          {tabs.map((t, i) => (
+            <button key={t.id} role="tab" aria-selected={tab.id === t.id} {...rovingTabs.itemProps(i)} className={`format-tab${tab.id === t.id ? ' active' : ''}`} onClick={() => setTabId(t.id)}>
               {t.label}
               {t.items.every((i) => i.type === null) && <span aria-hidden="true"> 🔒</span>}
             </button>
@@ -183,37 +191,48 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
         </div>
       )}
 
-      <div className="gallery" role="radiogroup" aria-label="Graph">
-        {tab.items.map((it) => (
-          <button
-            key={it.id}
-            className={`gallery-item${selected.id === it.id ? ' selected' : ''}${it.type === null ? ' locked' : ''}`}
-            role="radio"
-            aria-checked={selected.id === it.id}
-            title={it.type === null ? `${it.label}: planned, not available yet` : it.label}
-            onClick={() => setChosen(it.id)}
-            onDoubleClick={() => it.type && onCreate(table.id, it.type, it.variant)}
-          >
-            <GallerySketch item={it} />
-            {it.type === null && <span className="gallery-lock" aria-hidden="true">🔒</span>}
-            <span className="gallery-caption">{it.label}</span>
-          </button>
-        ))}
+      <label className="choice-label">
+        <input type="checkbox" checked={showPlanned} onChange={(e) => setShowPlanned(e.target.checked)} />
+        <span>Show planned graphs ({counts.available} available, {counts.planned} planned)</span>
+      </label>
+
+      <div className="gallery" role="radiogroup" aria-label="Graph" {...rovingItems.groupProps}>
+        {tab.items.length === 0 && <p className="muted">No graph of this kind can be created yet. Tick “Show planned graphs” to see what is planned.</p>}
+        {tab.items.map((it, n) => {
+          const locked = it.type === null;
+          return (
+            <button
+              key={it.id}
+              className={`gallery-item${selected.id === it.id ? ' selected' : ''}${locked ? ' locked' : ''}`}
+              role="radio"
+              aria-checked={selected.id === it.id}
+              {...rovingItems.itemProps(n)}
+              aria-disabled={locked}
+              title={`${it.label}${locked ? ` (planned, preset ${it.spec}, not available yet)` : ''}. ${FAMILY_LABEL[family]} graph. Needs: ${shape} ${it.description}`}
+              onClick={() => !locked && setChosen(it.id)}
+              onDoubleClick={() => it.type && onCreate(table.id, it.type, it.variant)}
+            >
+              <GallerySketch item={it} />
+              {locked && <span className="gallery-lock" aria-hidden="true">🔒</span>}
+              <span className="gallery-caption">{it.label}</span>
+              {locked && <span className="muted small">{it.spec}</span>}
+            </button>
+          );
+        })}
       </div>
 
       <div className="gallery-detail">
         <strong>{selected.label}</strong>
         {selectedTab && selectedTab.id !== tab.id && <span className="muted small"> · in “{selectedTab.label}”</span>}
+        <span className="muted small"> · {FAMILY_LABEL[family]} graph</span>
         <p className="muted">{selected.description}</p>
-        {selected.type === null && (
-          <p className="gallery-planned">🔒 Planned{selected.spec ? ` (preset ${selected.spec})` : ''}. It cannot be created yet; the graphs without a lock can.</p>
-        )}
+        <p className="muted small">Table needed: {shape}</p>
       </div>
 
       <div className="gallery-preview-box">
         <div className="gallery-preview-title">Preview</div>
         <div className="gallery-preview">
-          {selected.type ? <Preview table={table} type={selected.type} variant={selected.variant} /> : <div className="gallery-preview-empty muted">🔒 Planned: no preview yet.</div>}
+          {selected.type && <Preview table={table} type={selected.type} variant={selected.variant} />}
         </div>
       </div>
       </>

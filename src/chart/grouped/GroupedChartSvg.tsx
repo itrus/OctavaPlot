@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import type { Chart } from '../../model/types';
 import { n2 } from '../../model/units';
-import { BarLabelText } from '../shared/parts/BarLabelText';
+import { BarLabelText, InsideBarLabelText } from '../shared/parts/BarLabelText';
 import { AnnotationLayer, type EditorState } from '../shared/scene/ChartParts';
 import type { GroupedModel } from './groupedModel';
 import { compileGroupedMarks } from './groupedMarks';
@@ -39,6 +39,7 @@ export const GroupedChartSvg = forwardRef<SVGSVGElement, Props>(function Grouped
 
       {/* Labels above the bars. */}
       {chart.barLabels.show !== 'none' && series.map((s) => s.bars.map((bar) => bar.label && <BarLabelText key={bar.label.id} label={bar.label} cfg={chart.barLabels} textColor={chart.textColor} orient={orient} />))}
+      {series.map((s) => s.bars.map((bar) => bar.insideLabel && <InsideBarLabelText key={bar.insideLabel.id} label={bar.insideLabel} sizePt={chart.barLabels.sizePt} orient={orient} />))}
 
       <SceneElements nodes={scene.front} editor={ed} />
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { buildAnyModel } from '../../chart/anyModel';
 import { drawLayout } from '../../chart/export/layoutExport';
-import { addChart, addDataTable, addFreePanel, addLayout, duplicateLayout, freeLayout, patchLayout, removeChart, removeFreePanel, removeLayout, removeTable, renameItem, setFrame, setLayoutPanel } from '../../state/commands';
+import { addChart, addDataTable, addFreePanel, addLayout, patchChart, setCells, duplicateLayout, freeLayout, patchLayout, removeChart, removeFreePanel, removeLayout, removeTable, renameItem, setFrame, setLayoutPanel } from '../../state/commands';
 import { buildPdf, rgbaToFlateRgb } from '../../chart/export/pdf';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { createExampleProject } from '../defaults';
@@ -188,6 +189,21 @@ describe('page drawing', () => {
     const { p, l } = withLayout(twoCharts());
     const d = drawLayout({ ...l, scaling: { mode: 'percent', percent: 400 } }, p);
     expect(d.notices.length).toBeGreaterThan(0);
+  });
+  it('reports the warnings of each graph, prefixed by its panel and name, and nothing for a clean graph', () => {
+    const one = withLayout(createExampleProject());
+    expect(drawLayout(one.l, one.p).notices).toEqual([]);
+    const { p } = withLayout(twoCharts(), { arrangement: { kind: 'grid', cols: 2, rows: 1 } });
+    const chart = p.charts[0];
+    // A log axis cannot draw a value of 0 or less: the graph's own model says so.
+    const table = p.dataTables.find((t) => t.id === chart.dataTableId)!;
+    const zeroed = setCells(table.id, [{ row: 0, col: 1, value: 0 }])(p);
+    const logged = patchChart(chart.id, { yAxis: { ...chart.yAxis, scale: 'log10' }, xAxis: { ...chart.xAxis, scale: 'log10' } })(zeroed);
+    const alone = buildAnyModel(logged.charts[0], logged.dataTables.find((t) => t.id === chart.dataTableId)!).model.warnings;
+    expect(alone.length).toBeGreaterThan(0);
+    const d = drawLayout(logged.layouts![0], logged);
+    for (const w of alone) expect(d.notices).toContain(`A (${chart.name}): ${w}`);
+    expect(d.notices.every((n) => n.startsWith('A (') || n.startsWith('B ('))).toBe(true);
   });
 });
 

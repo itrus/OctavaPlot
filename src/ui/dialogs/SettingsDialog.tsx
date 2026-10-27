@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
 import { useApp } from '../../state/AppContext';
 import { EXPORT_DPI_CHOICES, PNG_DPI_CHOICES, type ExportDpi, type ExportFormat, type PngDpi } from '../../state/settings';
 import { DialogShell, trapTab } from './DialogShell';
 import { Check, Field, NumField, SelectInput } from '../inspector/common/controls';
+import { useRoving } from '../inspector/common/roving';
 import type { DecimalSeparator } from '../../model/types';
 
 const TABS = [
@@ -19,15 +20,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { settings, updateSettings, autosaveOk } = useApp();
   const ref = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<TabId>('general');
-  // Left and Right move between the tabs, as in any tab list.
-  const onTabKey = (e: ReactKeyboardEvent) => {
-    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-    if (step === 0) return;
-    e.preventDefault();
-    const next = TABS[(TABS.findIndex((t) => t.id === tab) + step + TABS.length) % TABS.length];
-    setTab(next.id);
-    requestAnimationFrame(() => document.getElementById(`settings-tab-${next.id}`)?.focus());
-  };
+  // Left and Right, Home and End move between the tabs, as in any tab list.
+  const roving = useRoving(TABS.map(() => true), TABS.findIndex((t) => t.id === tab), (i) => setTab(TABS[i].id));
 
   // Focus the dialog once, when it opens. (Doing it in the effect below would pull focus out of a field being edited
   // every time a setting changed, because onClose is a new function on each render.)
@@ -47,9 +41,9 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           <strong>Settings</strong>
           <button className="icon-btn" onClick={onClose} aria-label="Close settings">×</button>
         </div>
-        <div className="format-tabs settings-tabs" role="tablist" aria-label="Settings" onKeyDown={onTabKey}>
-          {TABS.map((t) => (
-            <button key={t.id} id={`settings-tab-${t.id}`} role="tab" aria-selected={tab === t.id} aria-controls="settings-panel" tabIndex={tab === t.id ? 0 : -1} className={`format-tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
+        <div className="format-tabs settings-tabs" role="tablist" aria-label="Settings" {...roving.groupProps}>
+          {TABS.map((t, i) => (
+            <button key={t.id} id={`settings-tab-${t.id}`} role="tab" aria-selected={tab === t.id} aria-controls="settings-panel" {...roving.itemProps(i)} className={`format-tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
               {t.label}
             </button>
           ))}
@@ -71,13 +65,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           )}
           {tab === 'tables' && (
             <>
-            <Field label="Decimal separator" hint="How typed, pasted and imported numbers are read. Automatic takes 1,5 as 1.5 but refuses 1,234, which could be 1.234 or 1234.">
+            <Field label="Decimal separator" hint="How numbers in tables are read, shown, copied and exported. Thousands separators are never read or written. Comma mode also makes CSV files semicolon-separated. Automatic reads 1,5 as 1.5, writes points, and refuses 1,234, which could be a thousand or 1.234.">
               <SelectInput<DecimalSeparator>
                 value={settings.decimalSeparator}
                 options={[
-                  { value: 'auto', label: 'Automatic (decimal point or comma)' },
-                  { value: 'point', label: 'Point: 1,234.5 (a comma is refused)' },
-                  { value: 'comma', label: 'Comma: 1.234,5 (a point is refused)' },
+                  { value: 'auto', label: 'Automatic (reads point or comma, writes point)' },
+                  { value: 'point', label: 'Point: 1234.5 (a comma is refused)' },
+                  { value: 'comma', label: 'Comma: 1234,5 (a point is refused)' },
                 ]}
                 onChange={(v) => updateSettings({ decimalSeparator: v })}
               />

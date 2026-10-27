@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { effectiveTable } from './model/table/chartTable';
+import { prepareChartInput } from './model/table/preparedChart';
 import { AppProvider, useApp } from './state/AppContext';
 import { PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile } from './state/projectFile';
 import { Navigator } from './ui/navigator/Navigator';
@@ -8,9 +8,13 @@ import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIco
 import { setProjectName } from './state/commands';
 import { InfoDialog } from './ui/dialogs/InfoDialog';
 import { SettingsDialog } from './ui/dialogs/SettingsDialog';
+import { RepairNotesDialog } from './ui/dialogs/RepairNotesDialog';
+import { LOAD_OTHER_TAB_WARNING, RecoveryConflictBanner } from './ui/components/RecoveryConflictBanner';
+import { openedStatus, refusedStatus } from './state/openStatus';
 import { UndoRedo } from './ui/components/UndoRedo';
 import { WheelRange } from './ui/components/WheelRange';
 import { isTextEntryTarget } from './ui/components/shortcutGuard';
+import { isSaveShortcut } from './ui/components/saveShortcut';
 import { downloadBlob, exportFileName } from './util/download';
 
 /** The browser's save-file dialog (File System Access API; not in every browser). */
@@ -38,7 +42,7 @@ function PanelIcon({ side }: { side: 'left' | 'right' }) {
 }
 
 function Shell() {
-  const { project, view, run, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, autosaveOk, zoom, setZoom, tableZoom, setTableZoom, settings, requestFit, inspectorNav } = useApp();
+  const { project, view, run, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, recoveryText, recoveryConflict, keepThisTab, loadOtherTab, zoom, setZoom, tableZoom, setTableZoom, settings, requestFit, inspectorNav } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   // Panels are only hidden (never unmounted), so their selections and edits survive a collapse.
   const [navOpen, setNavOpen] = useState(true);
@@ -63,15 +67,28 @@ function Shell() {
   }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  // What was reset when the last file was opened: all of it, with the paths, is behind the Details button.
+  const [repairs, setRepairs] = useState<{ file: string; notes: string[] } | null>(null);
+  const [repairsOpen, setRepairsOpen] = useState(false);
   // Clicking a chart element brings up its settings, even when the inspector was collapsed.
   useEffect(() => {
     if (inspectorNav.n > 0) setInspectorOpen(true);
   }, [inspectorNav.n]);
 
-  // Global undo/redo, except while typing in a text field (native text undo applies there).
+  // The key handler runs the Save Project of the latest render.
+  const saveRef = useRef<() => Promise<void>>(async () => {});
+
+  // Global Ctrl/Cmd+S, and undo/redo except while typing in a text field (native text undo applies there).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.isComposing || isTextEntryTarget(e.target)) return;
+      if (e.isComposing) return;
+      // Saving is not a text-editing key, so it works in a cell editor or any input too. The browser's own "Save page" never opens.
+      if (isSaveShortcut(e)) {
+        e.preventDefault();
+        if (!e.repeat && !document.querySelector('.modal-backdrop')) void saveRef.current();
+        return;
+      }
+      if (isTextEntryTarget(e.target)) return;
       if (document.querySelector('.modal-backdrop')) return; // a dialog is open: its shortcuts are not the project's
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
@@ -113,24 +130,26 @@ function Shell() {
     setStatus(`Project saved to ${suggested}.`);
   };
 
+  saveRef.current = saveProject;
+
   const confirmDiscard = (what: string) =>
     !hasUnsavedChanges() || window.confirm(`The project has unsaved changes. ${what} will discard them.\n\nSave the project first if you want to keep them. Continue?`);
 
   const startNewProject = () => {
-    if (confirmDiscard('Starting a new project')) newProject();
+    if (!confirmDiscard('Starting a new project')) return;
+    newProject();
+    setRepairs(null);
   };
 
   const openProject = async (file: File) => {
     try {
       const { project: p, notes } = await readProjectFile(file);
       replaceProject(p);
-      setStatus(
-        notes.length === 0
-          ? `Opened ${file.name}.`
-          : `Opened ${file.name}. ${notes.length} stored value${notes.length === 1 ? ' was' : 's were'} reset to defaults: ${notes[0]}`,
-      );
+      setRepairs(notes.length > 0 ? { file: file.name, notes } : null);
+      setStatus(openedStatus(file.name, notes));
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : String(err));
+      // Refused: the project that was open stays as it is.
+      setStatus(refusedStatus(file.name, err));
     }
   };
 
@@ -140,7 +159,7 @@ function Shell() {
   const activeZoom = chart ? zoom : tableZoom;
   const setActiveZoom = chart ? setZoom : setTableZoom;
   // The chart draws the data sets that are on it, which may include some from other tables.
-  const chartTable = useMemo(() => (chart ? effectiveTable(project, chart) : undefined), [project, chart]);
+  const prepared = useMemo(() => (chart ? prepareChartInput(project, chart) : undefined), [project, chart]);
 
   return (
     <div
@@ -173,8 +192,8 @@ function Shell() {
             onChange={(e) => run('Rename project', setProjectName(e.target.value), 'project:name')}
           />
         </label>
-        <button className="icon-text" onClick={startNewProject}><NewProjectIcon /> New Project</button>
-        <button className="icon-text" onClick={() => confirmDiscard('Opening another project') && fileRef.current?.click()}><OpenProjectIcon /> Open Project</button>
+        <button className="icon-text topbar-late" onClick={startNewProject}><NewProjectIcon /> New Project</button>
+        <button className="icon-text topbar-late" onClick={() => confirmDiscard('Opening another project') && fileRef.current?.click()}><OpenProjectIcon /> Open Project</button>
         <button className="icon-text" onClick={() => void saveProject()} title="Save the project to a file (you choose the name)"><SaveProjectIcon /> Save Project</button>
         <span className="topbar-sep" />
         <UndoRedo labeled />
@@ -190,7 +209,7 @@ function Shell() {
           }}
         />
         <button className="icon-text topbar-end" onClick={() => setSettingsOpen(true)}><SettingsIcon /> Settings</button>
-        <button className="icon-text" onClick={() => setInfoOpen(true)} title="About OctavaPlot and credits"><InfoIcon /> Info</button>
+        <button className="icon-text topbar-late" onClick={() => setInfoOpen(true)} title="About OctavaPlot and credits"><InfoIcon /> Info</button>
         <button
           className="icon-only"
           onClick={() => setInspectorOpen(!inspectorOpen)}
@@ -208,21 +227,22 @@ function Shell() {
       <main className="workspace">
         <Suspense fallback={<div className="empty">Loading…</div>}>
           {table && <DataTableView table={table} />}
-          {chart && chartTable && <GraphView chart={chart} table={chartTable} />}
+          {chart && prepared && <GraphView prepared={prepared} />}
           {view.kind === 'analysis' && <AnalysisView analysisId={view.id} />}
           {view.kind === 'layout' && <LayoutView layoutId={view.id} />}
           {view.kind === 'folder' && <FolderView folder={view.id} />}
           {!table && !chart && view.kind !== 'analysis' && view.kind !== 'layout' && view.kind !== 'folder' && <div className="empty">Select an item in the navigator.</div>}
         </Suspense>
       </main>
-      {chart && chartTable && (
+      {chart && prepared && (
         <Suspense fallback={<aside className="inspector" aria-busy="true" />}>
-          <Inspector chart={chart} table={chartTable} />
+          <Inspector chart={chart} table={prepared.table} />
         </Suspense>
       )}
       <footer className="statusbar">
         <span className="statusbar-message" role="status">{status}</span>
-        {settings.autosave && !autosaveOk && <span className="statusbar-warning" role="alert">Autosave failed: save the project to a file. Retrying…</span>}
+        {repairs && <button className="icon-text" onClick={() => setRepairsOpen(true)} title="List every value that was reset, with its place in the file">Details ({repairs.notes.length})</button>}
+        {recoveryText.text !== '' && <span className={recoveryText.warning ? 'statusbar-warning' : 'muted'} role={recoveryText.warning ? 'alert' : 'status'} style={recoveryText.warning ? undefined : { whiteSpace: 'nowrap' }}>{recoveryText.text}</span>}
         {(chart || table) && (
           <span className="zoom">
             <button className="icon-btn" aria-label="Zoom out" onClick={() => setActiveZoom(Math.max(0.25, Math.round((activeZoom - 0.25) * 100) / 100))}>−</button>
@@ -244,6 +264,8 @@ function Shell() {
         )}
       </footer>
       {infoOpen && <InfoDialog onClose={() => setInfoOpen(false)} />}
+      {repairsOpen && repairs && <RepairNotesDialog fileName={repairs.file} notes={repairs.notes} onClose={() => setRepairsOpen(false)} />}
+      {recoveryConflict && <RecoveryConflictBanner onKeep={keepThisTab} onLoad={() => window.confirm(LOAD_OTHER_TAB_WARNING) && loadOtherTab()} onSave={() => void saveProject()} />}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </div>
   );

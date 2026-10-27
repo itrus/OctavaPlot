@@ -374,7 +374,7 @@ export function layerRows(chart: Chart, table: DataTable, seriesName: (id: Id, f
     if (r) return `${LAYER_NAMES.referenceLine}: ${r.axis.toUpperCase()} = ${r.value}`;
     const a = noteOf.get(layer.id);
     if (a) {
-      const text = a.text.replace(/s+/g, ' ').trim();
+      const text = a.text.replace(/\s+/g, ' ').trim();
       return `${LAYER_NAMES.annotation}: ${text.length > 24 ? `${text.slice(0, 24)}…` : text || '(empty)'}`;
     }
     if (layer.kind === 'atRisk') return LAYER_NAMES.atRisk;

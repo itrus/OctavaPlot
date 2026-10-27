@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useId, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { formatNum, sliderStep, snapToStep } from '../../data/numberFormat';
 import { WheelRange } from '../../components/WheelRange';
+import { useRoving } from './roving';
 
 export function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
   const [openState, setOpen] = useState(defaultOpen);
@@ -71,6 +72,12 @@ export function Field({
   );
 }
 
+/** A text box inside a Field: named by the field (or `ariaLabel`), with the field's error and note as its description. */
+export function FieldInput({ ariaLabel, ...rest }: InputHTMLAttributes<HTMLInputElement> & { ariaLabel?: string }) {
+  const aria = useFieldAria(ariaLabel);
+  return <input type="text" {...rest} {...aria} />;
+}
+
 export function SubHeading({ children }: { children: ReactNode }) {
   return <div className="sub-heading">{children}</div>;
 }
@@ -114,13 +121,15 @@ export function SelectInput<T extends string>({
   options,
   onChange,
   disabled,
+  ariaLabel,
 }: {
   value: T;
   options: Array<{ value: T; label: string }>;
   onChange: (v: T) => void;
   disabled?: boolean;
+  ariaLabel?: string;
 }) {
-  const aria = useFieldAria();
+  const aria = useFieldAria(ariaLabel);
   return (
     <select value={value} disabled={disabled} {...aria} onChange={(e) => onChange(e.target.value as T)}>
       {options.map((o) => (
@@ -132,8 +141,8 @@ export function SelectInput<T extends string>({
   );
 }
 
-export function TextInput({ value, onChange, placeholder, disabled }: { value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean }) {
-  const aria = useFieldAria();
+export function TextInput({ value, onChange, placeholder, disabled, ariaLabel }: { value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean; ariaLabel?: string }) {
+  const aria = useFieldAria(ariaLabel);
   return <input type="text" value={value} placeholder={placeholder} disabled={disabled} {...aria} onChange={(e) => onChange(e.target.value)} />;
 }
 
@@ -203,11 +212,9 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
             }}
           />
         )}
-        <input
-          type="text"
+        <FieldInput
           inputMode="decimal"
-          aria-label={label}
-          aria-invalid={error ? true : undefined}
+          ariaLabel={label}
           className={error ? 'invalid' : ''}
           value={text}
           disabled={disabled}
@@ -272,9 +279,9 @@ export function OptionalNumField({ label, value, onCommit, validate, hint, autoV
   return (
     <Field label={label} hint={hint} error={error}>
       <span className="num-wrap">
-        <input
-          type="text"
+        <FieldInput
           inputMode="decimal"
+          ariaLabel={label}
           className={error ? 'invalid' : ''}
           value={value === null && !focused ? '' : text}
           placeholder="auto"
@@ -291,6 +298,7 @@ export function OptionalNumField({ label, value, onCommit, validate, hint, autoV
           <input
             id={id}
             type="checkbox"
+            aria-label={`Automatic ${label}`}
             checked={value === null}
             onChange={(e) => {
               if (e.target.checked) {
@@ -347,10 +355,11 @@ export function GroupBox({
 }
 
 export function TabBar<T extends string>({ tabs, value, onChange }: { tabs: Array<{ id: T; label: string }>; value: T; onChange: (t: T) => void }) {
+  const roving = useRoving(tabs.map(() => true), tabs.findIndex((t) => t.id === value), (i) => onChange(tabs[i].id));
   return (
-    <div className="tab-bar" role="tablist">
-      {tabs.map((t) => (
-        <button key={t.id} role="tab" aria-selected={value === t.id} className={`tab${value === t.id ? ' active' : ''}`} onClick={() => onChange(t.id)}>
+    <div className="tab-bar" role="tablist" aria-label="Formatting tabs" {...roving.groupProps}>
+      {tabs.map((t, i) => (
+        <button key={t.id} role="tab" aria-selected={value === t.id} {...roving.itemProps(i)} className={`tab${value === t.id ? ' active' : ''}`} onClick={() => onChange(t.id)}>
           {t.label}
         </button>
       ))}
@@ -360,10 +369,11 @@ export function TabBar<T extends string>({ tabs, value, onChange }: { tabs: Arra
 
 /** Second-level navigation inside a tab, as a row of small buttons. */
 export function SectionBar<T extends string>({ sections, value, onChange }: { sections: Array<{ id: T; label: string }>; value: T; onChange: (t: T) => void }) {
+  const roving = useRoving(sections.map(() => true), sections.findIndex((t) => t.id === value), (i) => onChange(sections[i].id));
   return (
-    <div className="section-bar" role="tablist" aria-label="Appearance sections">
-      {sections.map((t) => (
-        <button key={t.id} role="tab" aria-selected={value === t.id} className={`section-chip${value === t.id ? ' active' : ''}`} onClick={() => onChange(t.id)}>
+    <div className="section-bar" role="tablist" aria-label="Appearance sections" {...roving.groupProps}>
+      {sections.map((t, i) => (
+        <button key={t.id} role="tab" aria-selected={value === t.id} {...roving.itemProps(i)} className={`section-chip${value === t.id ? ' active' : ''}`} onClick={() => onChange(t.id)}>
           {t.label}
         </button>
       ))}

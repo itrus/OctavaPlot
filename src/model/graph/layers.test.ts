@@ -103,6 +103,14 @@ describe('layer rows and hiding', () => {
     expect(rows.map((r) => r.layer.z)).toEqual([...rows.map((r) => r.layer.z)].sort((a, b) => b - a));
     expect(rows.filter((r) => r.layer.kind === 'fitBand').map((r) => r.label)).toEqual(['Fit band: Series B', 'Fit band: Series A']);
   });
+  it('collapse white space in an annotation label without touching the letter s', () => {
+    const label = (text: string) => {
+      const p = addAnnotation('c', { id: 'n1', text, xFrac: 0.1, yFrac: 0.1, fontSizePt: 20, color: '#000000', opacity: 1 })(projectWith());
+      return layerRows(chartOf(p), tableOf(p)).find((r) => r.layer.kind === 'annotation')!.label;
+    };
+    expect(label('Stress results')).toBe('Annotation: Stress results');
+    expect(label('a   b\tc')).toBe('Annotation: a b c');
+  });
   it('offer hiding only where the style has not already switched the layer off', () => {
     const p = withFitChart(projectWith(withStyle({ showLines: false })));
     const rows = layerRows(chartOf(p), tableOf(p));

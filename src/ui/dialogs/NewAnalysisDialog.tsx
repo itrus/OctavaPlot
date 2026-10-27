@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRoving } from '../inspector/common/roving';
 import { ANALYSIS_TYPES, analysisKindApplies, analysisTypeInfo } from '../../model/project/analysis';
 import { tableTypeInfo } from '../../model/graph/chartTypes';
 import type { AnalysisKind, DataTable, Id } from '../../model/types';
@@ -13,12 +14,13 @@ export function NewAnalysisDialog({ tables, initialTableId, onCreate, onClose }:
   // Changing the kind may leave the chosen table out (a curve fit needs an XY table): the first that suits is taken.
   const tableId = applicable.some((t) => t.id === chosen) ? chosen : (applicable[0]?.id ?? '');
   const info = analysisTypeInfo(kind);
+  const roving = useRoving(ANALYSIS_TYPES.map(() => true), ANALYSIS_TYPES.findIndex((a) => a.kind === kind), (i) => setKind(ANALYSIS_TYPES[i].kind), 'both');
   return (
     <Modal title="New analysis" confirmLabel="Create analysis" onConfirm={() => tableId && onCreate(tableId, kind)} onClose={onClose} confirmDisabled={!tableId}>
       <p className="muted">Choose the analysis and the table it is made from. The results are calculated from the data, so they stay current as the data change.</p>
-      <div className="choice-grid" role="radiogroup" aria-label="Analysis">
-        {ANALYSIS_TYPES.map((a) => (
-          <button key={a.kind} className={`choice-card${kind === a.kind ? ' selected' : ''}`} role="radio" aria-checked={kind === a.kind} onClick={() => setKind(a.kind)}>
+      <div className="choice-grid" role="radiogroup" aria-label="Analysis" {...roving.groupProps}>
+        {ANALYSIS_TYPES.map((a, i) => (
+          <button key={a.kind} className={`choice-card${kind === a.kind ? ' selected' : ''}`} role="radio" aria-checked={kind === a.kind} {...roving.itemProps(i)} onClick={() => setKind(a.kind)}>
             <strong>{a.label}</strong>
             <span className="muted">{a.description}</span>
           </button>

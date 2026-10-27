@@ -27,6 +27,34 @@ export function Navigator() {
   const currentTableId =
     view.kind === 'table' ? view.id : project.charts.find((c) => c.id === view.id)?.dataTableId;
 
+  // The items tied to the one on screen are shown in bold: a table with its graphs, results and layouts, and back.
+  const related = new Set<Id>();
+  if (view.kind !== 'folder') {
+    const layouts = project.layouts ?? [];
+    const addTable = (tableId: Id) => {
+      related.add(tableId);
+      project.charts.filter((c) => c.dataTableId === tableId).forEach((c) => related.add(c.id));
+      (project.analyses ?? []).filter((a) => a.dataTableId === tableId).forEach((a) => related.add(a.id));
+    };
+    if (view.kind === 'table') addTable(view.id);
+    else if (view.kind === 'analysis') {
+      const tableId = (project.analyses ?? []).find((a) => a.id === view.id)?.dataTableId;
+      if (tableId) related.add(tableId);
+    } else if (view.kind === 'chart') {
+      if (currentTableId) related.add(currentTableId);
+    } else {
+      layouts.find((l) => l.id === view.id)?.panels.forEach((p) => {
+        if (!p) return;
+        related.add(p);
+        const tableId = project.charts.find((c) => c.id === p)?.dataTableId;
+        if (tableId) related.add(tableId);
+      });
+    }
+    // Layouts holding any graph that is on screen or shown with a selected table.
+    const graphs = new Set(project.charts.filter((c) => related.has(c.id) || (view.kind === 'chart' && c.id === view.id)).map((c) => c.id));
+    layouts.forEach((l) => l.panels.some((p) => p && graphs.has(p)) && related.add(l.id));
+  }
+
   // New items are made in two clear steps: the type of table first, then a chart type that suits that table.
   const [dialog, setDialog] = useState<'table' | 'graph' | 'analysis' | 'layout' | null>(null);
   const createLayout = (options: NewLayoutOptions, fillFrom?: Id) => {
@@ -136,7 +164,7 @@ export function Navigator() {
         />
       </div>
     ) : (
-      <button key={ref.id} className={`nav-item${sameView(view, ref) ? ' active' : ''}`} onClick={() => setView(ref)} onDoubleClick={() => setRenaming(ref.id)} onKeyDown={(e) => e.key === 'F2' && setRenaming(ref.id)} title="Double-click or press F2 to rename">
+      <button key={ref.id} className={`nav-item${sameView(view, ref) ? ' active' : related.has(ref.id) ? ' related' : ''}`} onClick={() => setView(ref)} onDoubleClick={() => setRenaming(ref.id)} onKeyDown={(e) => e.key === 'F2' && setRenaming(ref.id)} title="Double-click or press F2 to rename">
         <span className="nav-icon">{icon}</span> {name}
         {badges.map((badge) => (
           <span key={badge.text} className="nav-badge" title={badge.title}>{badge.text}</span>

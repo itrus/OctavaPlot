@@ -1,6 +1,7 @@
 import { isXyChartType } from '../../model/graph/chartTypes';
 import { layerLook, layersOf, type LayerKind, type LayerSpec } from '../../model/graph/layers';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
+import { legendEntries } from '../../model/graph/legendEntries';
 import { resolveSummary } from '../../model/graph/summary';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
@@ -157,6 +158,8 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     const obs: Array<{ x: number; y: number }> = [];
     // Each replicate as it is, for the individual-values layer.
     const rawObs: Array<{ id: Id; row: number; x: number; y: number }> = [];
+    // The X of each row that has an X but no Y: it is not drawn, and breaks a line joined in ascending X where it falls.
+    const gapXs: Array<{ row: number; x: number }> = [];
     let skipped = 0;
     let meaning: string | null = null;
     let noError = 0;
@@ -190,13 +193,14 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
       if (x === null || y === null) {
         // A row with an X or a value that cannot be drawn is reported; a wholly empty row is just empty.
         if (x !== null || any) skipped++;
+        if (x !== null) gapXs.push({ row, x });
         continue;
       }
       if (layout.kind !== 'replicates') obs.push({ x, y });
       pts.push({ id: s.columns[0].observations[row].id, row, x, y, stats });
     }
     if (noError > 0) warnings.push(`${s.name}: ${noError} row${noError === 1 ? ' has' : 's have'} a mean but no usable error, so no error bar is drawn there.`);
-    return { s, style, pts, rawObs, skipped, meaning, label: displayName(chart, s.id, s.name), fitRun: runFit(obs, fit) };
+    return { s, style, pts, gapXs, rawObs, skipped, meaning, label: displayName(chart, s.id, s.name), fitRun: runFit(obs, fit) };
   });
 
   // 2. Scales from every drawn value, error bar ends included, so manual limits clip but never exclude.
@@ -232,7 +236,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   warnings.push(...yAxis.warnings);
 
   // 3. Layout (title, axis titles, legend) with no category labels: the X axis carries numbers.
-  const legendSeries = raw.map((_, i) => i).filter((i) => !chart.legend.hiddenGroupIds.includes(raw[i].s.id));
+  const legendSeries = legendEntries(chart.legend, raw.map((r) => r.s.id));
   const layoutOut = computeLayout({
     fontFamily: chart.fontFamily,
     titleOffsetPt: chart.titleOffsetPt,
@@ -266,12 +270,20 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
       .filter((o) => onAxis(xAxis, o.x) && onAxis(yAxis, o.y) && !inBreak(xAxis, o.x) && !inBreak(yAxis, o.y))
       .map((o) => ({ ...o, px: xScale(o.x), py: yScale(o.y) }));
     // A run ends where a row between two drawn points is missing (Y or X), so a gap is a gap in the line.
+    // Joined in ascending X instead, a row with an X but no drawable Y (empty, or off a log axis) cuts the line at its sorted place; a row with no X is not there at all.
     const seq: Array<{ x: number; y: number } | null> = [];
-    let prevRow = -2;
-    for (const p of drawn) {
-      if (p.row !== prevRow + 1) seq.push(null);
-      seq.push({ x: p.x, y: p.y });
-      prevRow = p.row;
+    if (chart.lineConnect === 'x') {
+      const drawnRows = new Set(drawn.map((p) => p.row));
+      const visits = [...drawn.map((p) => ({ row: p.row, x: p.x, at: { x: p.x, y: p.y } as { x: number; y: number } | null })), ...r.gapXs.map((g) => ({ ...g, at: null })), ...r.pts.filter((p) => !drawnRows.has(p.row)).map((p) => ({ row: p.row, x: p.x, at: null }))];
+      visits.sort((a, b) => a.x - b.x || a.row - b.row);
+      for (const v of visits) if (v.at !== null || (seq.length > 0 && seq[seq.length - 1] !== null)) seq.push(v.at);
+    } else {
+      let prevRow = -2;
+      for (const p of drawn) {
+        if (p.row !== prevRow + 1) seq.push(null);
+        seq.push({ x: p.x, y: p.y });
+        prevRow = p.row;
+      }
     }
     const runs = polylinesThroughBreaks(seq, xAxis, yAxis);
     const outline = runs.map((part) => part.map((q, i) => `${i === 0 ? 'M' : 'L'}${n2(xScale(q.x))},${n2(yScale(q.y))}`).join('')).join('');

@@ -24,7 +24,7 @@ There is one version number, in the envelope: `1`. This version of OctavaPlot re
 | `version` | The number `1`. |
 | `project` | The project: see below. |
 
-The file is written with two-space indents and the keys in a fixed order, so saving a project that has not changed gives the same text. A complete small file is [tests/fixtures/example.oplot](../tests/fixtures/example.oplot).
+The file is written with two-space indents and the keys in a fixed order, so saving a project that has not changed gives the same text. A complete small file is [example.oplot](example.oplot).
 
 ## Project
 
@@ -34,8 +34,8 @@ The file is written with two-space indents and the keys in a fixed order, so sav
 | `name` | text | Name of the project; the suggested file name when saving. |
 | `dataTables` | list | The data tables; at least one. |
 | `charts` | list | The graphs. May be empty. |
-| `analyses` | list, optional | Analyses of the Results section (descriptive statistics, curve fits): their settings only. Results are not stored; they are calculated again from the tables. |
-| `layouts` | list, optional | A4 pages of graphs: `orientation` (`portrait` or `landscape`), `background` (`#rrggbb` or `null`), `arrangement` (`{"kind":"grid","cols":2,"rows":1}`, `{"kind":"inset"}`, or `{"kind":"free","frames":[{"x":10,"y":10,"w":120,"h":90}]}` with the boxes in mm from the top left of the page), `panels` (the graph `id` in each slot, or `null`), `scaling` (`smallest`, `largest`, `fit`, or `percent` with a number; `equal`, the earlier name of `smallest`, is still read), `labelStyle` (`none`, `A`, `a`, `I`, `1`), `labelSizePt`, `showTitle`, `title`, `marginMm`, `gapMm`. A panel whose graph is missing is emptied on opening. |
+| `analyses` | list, optional | Analyses of the Results section (descriptive statistics, curve fits): their settings only. Results are not stored; they are calculated again from the tables. Each has an `id` (not empty, not used twice), a `kind` (`descriptive` or `curvefit`) and a `dataTableId` of a table that exists; a curve fit needs an XY table and a known `model`. A file that breaks one of these is refused (see below), not repaired. |
+| `layouts` | list, optional | A4 pages of graphs: `orientation` (`portrait` or `landscape`), `background` (`#rrggbb` or `null`), `arrangement` (`{"kind":"grid","cols":2,"rows":1}`, `{"kind":"inset"}`, or `{"kind":"free","frames":[{"x":10,"y":10,"w":120,"h":90}]}` with the boxes in mm from the top left of the page), `panels` (the graph `id` in each slot, or `null`), `scaling` (`smallest`, `largest`, `fit`, or `percent` with a number; `equal`, the earlier name of `smallest`, is still read), `labelStyle` (`none`, `A`, `a`, `I`, `1`), `labelSizePt`, `showTitle`, `title`, `marginMm`, `gapMm`. A panel whose graph is missing is emptied on opening, with a note. A layout needs an `id`. |
 
 Every `id` in the file is a text. Identifiers are kept as they are on opening and saving, so a reference from one object to another stays valid.
 
@@ -56,7 +56,7 @@ The numbers of the project live in the data tables only.
 | Key | Meaning |
 |---|---|
 | `kind` | What the columns mean: `column`, `xy`, `grouped`, `contingency` or `survival`. |
-| `layout` | `xy` and `grouped` tables: how a Y series is entered: `{"kind":"single"}`, `{"kind":"replicates","n":3}` or `{"kind":"summary","format":"mean-sd-n"}` (other formats: see `SummaryFormat`). The columns then come in blocks of that width after the first column. |
+| `layout` | `xy` and `grouped` tables: how a Y series is entered: `{"kind":"single"}`, `{"kind":"replicates","n":3}` or `{"kind":"summary","format":"mean-sd-n"}` (other formats: see `SummaryFormat`). The columns then come in blocks of that width after the first column. A layout that cannot be read (an `n` that is not a whole number of at least 2, an unknown `format`) refuses the file: reading it as single values would change what the columns mean. A missing `layout`, and `{"kind":"single"}`, are the same. |
 | `rowCount` | The number of rows: a whole number, 0 or more. |
 | `rows` | One entry per row, so exactly `rowCount` of them. `title` is free text. Left out, it is made with empty titles. |
 | `groups` | The columns, in order. Each has a `name`, a `title` (free text under the name), a `paletteIndex` and its `observations`. XY and survival tables need the first column (X, or time). |
@@ -76,10 +76,12 @@ A chart draws one table, named by `dataTableId`; the table must exist. `type` is
 | `linkedTo` | Optional: the `id` of the graph this one was made like and still follows (see the README, Graph like another graph). A link to a missing graph, to itself or round in a circle is removed on opening, with a note. |
 | `widthPx`, `heightPx` | Size in CSS pixels (96 px = 1 inch). |
 | `xAxis`, `yAxis`, `y2Axis` | Settings of the axes: titles, limits, scale (linear, log), ticks, breaks, grid. `y2Axis` is drawn only while a data set is bound to it. |
-| `legend`, `grid`, `frame`, colours, `fontFamily` | The look of the whole chart. |
+| `legend`, `grid`, `frame`, colours, `fontFamily` | The look of the whole chart. `legend` may hold `order` (a list of data set ids: the order of the legend entries, without moving the marks; ids that do not exist are ignored) and `columns` (2 to 6; absent means one). |
 | `defaults`, `layers` | Styles of the data sets: see below. `layers` holds one layer, the one the graph is drawn from. A file with more is read with a note and only the first is kept; a file with none is refused. |
-| `bars`, `barLabels`, `distribution`, `heatmap`, `histogram`, `pie`, `survival`, `pairs`, `fit`, `jitter` | Settings that belong to one family of charts. They are always present. |
-| `hiddenGroupIds`, `groupOrder`, `extraGroups`, `displayNames` | Which data sets are on the graph, in what order, from which other tables, and under what names. An older file may hold `groupGaps` (a space before each data set): it is folded into `bars.gapPct` on opening and not written again. |
+| `printWidthMm` | Optional. The width in mm the graph is meant to be printed at (20 to 400; clamped on reading, anything that is not a number is dropped). Absent means none, and it is not written then. Only the export dialog's warnings use it. |
+| `lineConnect` | XY charts: `table` (default; the line joins the points in row order) or `x` (in ascending X, ties in row order). Only the order the line is joined in changes. |
+| `bars`, `barLabels` (optional `inside`: `{ "position": "end" or "base", "show": "none", "n" or "value", "color": a colour or null }`, left out when it is the default: no label inside the bar), `distribution`, `heatmap` (its `summary` is `mean`, `median`, `geomean`, `sd`, `sem`, `cv` or `n`; its `palette` is one of the 16 gradient names `gsea`, `bs-blue`, …, `md-deep-purple`, or `custom`, which uses `customColours`: `{ "low": "#rrggbb", "mid": "#rrggbb" or null, "high": "#rrggbb" }` (with a `mid` the scale is diverging; an invalid `low` or `high` falls back to white or black, anything but a colour in `mid` becomes null); the earlier names `viridis`, `magma`, `blue`, `greenred` and `grayscale` are still read and become the nearest of these), `histogram`, `histogram`, `pie`, `survival`, `pairs`, `fit`, `jitter` | Settings that belong to one family of charts. They are always present. |
+| `hiddenGroupIds`, `groupOrder`, `extraGroups`, `displayNames` | Which data sets are on the graph, in what order, from which other tables (`extraGroups`: `{ "tableId", "groupId", "slot" }`; `slot` is optional, a whole number 0 or more that keeps the colour of an added data set when another is removed; older files have none and use the order of the list), and under what names. An older file may hold `groupGaps` (a space before each data set): it is folded into `bars.gapPct` on opening and not written again. |
 | `annotations`, `referenceLines` | Text and lines placed on the chart. |
 | `layerStyles` | Look of single parts of a graph (layers) by layer ID, any of `color`, `widthPt`, `lineStyle`, `opacity`, `shape`. XY and survival charts: the line, error bars, points, individual values, fit curve and bands, area. Each kind of part takes only the settings that suit it. A setting that cannot be read is dropped, with a note. |
 | `hiddenLayerIds` | IDs of the parts of a graph that are not drawn (for example `<series id>:fitBand`, `<series id>:errorBars`, `<reference line id>:referenceLine`). Hiding changes no calculation and no axis. |
@@ -112,11 +114,18 @@ A file is refused as a whole, and the project that was open stays as it was, whe
 - its name does not end in `.oplot` (any case), or it is over 64 MB (checked before it is read);
 - it is not UTF-8 text, or the text is not JSON;
 - `format` or `version` is not the one above;
-- the structure is damaged: the project, a table, a group, an observation or a chart is not an object or lacks a required key; a value is not a finite number or `null`; there are no tables; two tables, charts, groups or observations of one table have the same `id`; a table has the wrong number of rows or observations; a chart refers to a table that does not exist or has no layer.
+- the structure is damaged: the project, a table, a group, an observation, a chart, an analysis or a layout is not an object or lacks a required key; a value is not a finite number or `null`; there are no tables; two tables, charts, groups or observations of one table have the same `id`; a table has the wrong number of rows or observations; a chart refers to a table that does not exist or has no layer;
+- something that would change what the figure or the numbers mean would have to be guessed: a replicate or summary layout of a table that cannot be read; two analyses with the same `id`, or one without an `id`, with an unknown `kind`, with a table that does not exist, with an unknown curve-fit model, or a curve fit of a table that is not XY; an entry of a graph's `extraGroups` that cannot be read, names a table or data set that does not exist, or is listed twice. The message names the place, for example `Invalid project file: project.analyses[1].id is duplicated.`, and the open project is not changed.
 
-A key whose value has the wrong type does not refuse the file. In a chart, its axes and its styles, a number must be a finite number, text must be text, a flag true or false, a list a list and a group of settings an object; a key that is not takes its default, and a note is shown in the status bar after opening. A key that may be empty (a limit, a colour, an ID) may also be `null`. Some numbers that are out of range (a font size, a line width, an offset, a pattern spacing) are brought to the nearest allowed value, also with a note. Annotations, reference lines and display names are checked one by one, and an entry that cannot be read is dropped, with a note. Keys that are missing are filled with the defaults, without a note. Keys that the program does not know are kept in the chart and written again on saving, but not used.
+Only the look is repaired, never the meaning. A key whose value has the wrong type does not refuse the file. In a chart, its axes and its styles, a number must be a finite number, text must be text, a flag true or false, a list a list and a group of settings an object; a key that is not takes its default, and a note is shown in the status bar after opening. A key that may be empty (a limit, a colour, an ID) may also be `null`. Some numbers that are out of range (a font size, a line width, an offset, a pattern spacing) are brought to the nearest allowed value, also with a note. Annotations, reference lines and display names are checked one by one, and an entry that cannot be read is dropped, with a note. A confidence level of an analysis that cannot be read is set to 0.95, with a note, and a panel of a layout that names a graph that does not exist is emptied, with a note. Keys that are missing are filled with the defaults, without a note. Keys that the program does not know are kept in the chart and written again on saving, but not used.
+
+Every note starts with the place of the value (for example `project.charts[2].heatmap.palette`). After opening, the status bar says how many values were changed and shows the first; the button Details lists all of them.
 
 Nothing in a file is run, fetched or shown as HTML.
+
+## The browser recovery copy
+
+The autosave in the browser stores the same text as a file, under the key `octavaplot:project:autosave`, so any version can read it. Beside it, under `octavaplot:project:autosave:meta`, the browser keeps a small record that is not part of the `.oplot` file: `{ "writer", "rev", "savedAt", "hash" }` (the tab that wrote it, a counter, the time, and a hash of the text). A tab uses it to see that another tab has written the copy since it last read or wrote it. It then stops writing and offers three choices: keep this tab's copy, load the other tab's copy, or save this tab as a file. Older versions ignore the record.
 
 ## Not in the file
 
@@ -128,4 +137,4 @@ The file is not encrypted. Row titles, data set names, values, annotations and t
 
 ## Checking and changing the format
 
-The tests in [src/state/serialize.test.ts](../src/state/serialize.test.ts) and [src/state/projectFile.test.ts](../src/state/projectFile.test.ts) cover reading, the checks above and the saving of one example, with UTF-8 text, annotations, styles and missing values. If the format is changed on purpose, delete `tests/fixtures/example.oplot`, run the tests (they write it again) and read the difference.
+The tests in [src/state/serialize.test.ts](../src/state/serialize.test.ts) and [src/state/projectFile.test.ts](../src/state/projectFile.test.ts) cover reading, the checks above and the saving of one example, with UTF-8 text, annotations, styles and missing values. If the format is changed on purpose, delete `docs/example.oplot`, run the tests (they write it again) and read the difference.

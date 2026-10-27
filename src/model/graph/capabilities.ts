@@ -15,6 +15,8 @@ export interface Capabilities {
   referenceLines: 'none' | 'y' | 'xy';
   /** A curve can be fitted to the series (XY charts). */
   curveFit: boolean;
+  /** The line joins its points in table order or ascending X (XY charts that draw the path: not spikes, which are stems). */
+  lineConnect: boolean;
   /** Each data set can be plotted against the left or the right Y axis. */
   secondaryAxis: boolean;
   /** The colour of a series is that of its symbols and lines, not of a filled bar. */
@@ -49,6 +51,7 @@ export function capabilitiesOf(type: ChartType): Capabilities {
     horizontal: supportsHorizontal(type),
     referenceLines: referenceLinesOf(type),
     curveFit: family === 'xy',
+    lineConnect: family === 'xy' && type !== 'xySpikes',
     secondaryAxis: SECONDARY_AXIS.has(type),
     seriesColour: isSeriesColourType(type),
     survivalOptions: family === 'survival',
@@ -69,7 +72,7 @@ export function capabilityTable(): string {
   const rows = CHART_TYPES.map((c) => {
     const k = capabilitiesOf(c.type);
     const lines = k.referenceLines === 'xy' ? 'X and Y' : k.referenceLines === 'y' ? 'Y' : '–';
-    return `| ${c.label} | ${yes(k.horizontal)} | ${lines} | ${yes(k.secondaryAxis)} | ${yes(k.curveFit)} | ${yes(k.survivalOptions)} |`;
+    return `| ${c.label} | ${yes(k.horizontal)} | ${lines} | ${yes(k.secondaryAxis)} | ${yes(k.curveFit)} | ${yes(k.lineConnect)} | ${yes(k.survivalOptions)} |`;
   });
-  return ['| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Survival options |', '|---|---|---|---|---|---|', ...rows].join('\n');
+  return ['| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options |', '|---|---|---|---|---|---|---|', ...rows].join('\n');
 }

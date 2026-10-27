@@ -1,27 +1,27 @@
 /** Parsing and formatting of table cell text. Pure; unit-tested. */
 
-import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
+import { MAX_TABLE_ROWS, rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import type { DataTable } from '../../model/types';
 import type { DecimalSeparator } from '../../model/types';
 
 const NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
-const COMMA_DECIMAL_RE = /^[+-]?\d+,\d+$/;
+/** A number with a decimal comma, with or without an exponent: 1,5  -2,5e-3 */
+const COMMA_DECIMAL_RE = /^[+-]?(\d+,\d*|,\d+)([eE][+-]?\d+)?$/;
 /** A comma followed by exactly three digits reads as a decimal comma and as a thousands separator alike. */
 const AMBIGUOUS_COMMA_RE = /^[+-]?\d{1,3},\d{3}$/;
-/** Whole thousands written with points and a decimal comma: 1.234,5 */
-const POINT_THOUSANDS_RE = /^[+-]?\d{1,3}(\.\d{3})+(,\d+)?$/;
-const LEADING_POINT_DECIMAL_RE = /^[+-]?\d*\.\d+/;
 
 type CellParse = { ok: true; value: number | null } | { ok: false; message: string };
 
-/** Empty text = missing observation (null). Anything else must be a finite number. */
+/**
+ * Empty text = missing observation (null). Anything else must be a finite number. There are no thousands separators:
+ * a point is the decimal separator unless the setting is comma, and then only a comma is.
+ */
 export function parseCell(text: string, separator: DecimalSeparator = 'auto'): CellParse {
   let t = text.trim();
   if (t === '') return { ok: true, value: null };
   if (separator === 'comma') {
-    if (POINT_THOUSANDS_RE.test(t)) t = t.replace(/\./g, '').replace(',', '.');
-    else if (COMMA_DECIMAL_RE.test(t)) t = t.replace(',', '.');
-    else if (LEADING_POINT_DECIMAL_RE.test(t) && !/[eE]/.test(t)) return { ok: false, message: `"${t}" uses a decimal point, but the decimal separator is set to comma (Settings)` };
+    if (COMMA_DECIMAL_RE.test(t)) t = t.replace(',', '.');
+    else if (t.includes('.')) return { ok: false, message: `"${t}" uses a decimal point, but the decimal separator is set to comma (Settings); thousands separators are not read` };
   } else if (COMMA_DECIMAL_RE.test(t)) {
     if (separator === 'point') return { ok: false, message: `"${t}" uses a comma: write a decimal point, or set the decimal separator to comma in Settings` };
     // Automatic: 1,5 is 1.5, but 1,234 could be 1.234 or one thousand two hundred thirty-four: it is not guessed.
@@ -108,7 +108,11 @@ export function parseClipboardBlock(text: string, withTitles: boolean, separator
   const titles: string[] = [];
   const matrix: Array<Array<number | null>> = [];
   const problems: string[] = [];
-  splitTsv(text).forEach((fields, r) => {
+  const records = splitTsv(text);
+  if (records.length > MAX_TABLE_ROWS) {
+    return { ok: false, message: `Paste rejected, it has ${records.length.toLocaleString('en-US')} rows and a table holds at most ${MAX_TABLE_ROWS.toLocaleString('en-US')}. Nothing was pasted.` };
+  }
+  records.forEach((fields, r) => {
     if (withTitles) titles.push(sanitizeRowTitle(fields[0]));
     const row: Array<number | null> = [];
     for (let c = withTitles ? 1 : 0; c < fields.length; c++) {
@@ -137,22 +141,25 @@ export function parseClipboard(text: string): PasteParse {
   return r.ok ? { ok: true, matrix: r.matrix } : r;
 }
 
-export function formatCell(value: number | null): string {
-  return value === null ? '' : String(value);
+/** A value as it is shown, edited, copied and exported: full precision, no thousands separator, the decimal separator of the setting (a point unless comma). */
+export function formatCell(value: number | null, separator: DecimalSeparator = 'auto'): string {
+  if (value === null) return '';
+  const s = String(value);
+  return separator === 'comma' ? s.replace('.', ',') : s;
 }
 
-export function matrixToText(rows: Array<Array<number | null>>): string {
-  return rows.map((r) => r.map(formatCell).join('\t')).join('\n');
+export function matrixToText(rows: Array<Array<number | null>>, separator: DecimalSeparator = 'auto'): string {
+  return rows.map((r) => r.map((v) => formatCell(v, separator)).join('\t')).join('\n');
 }
 
 const quoteField = (s: string) => (/["\t\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
 /** Clipboard text; titles (when given) lead each row and are quoted when they need it. */
-export function blockToText(titles: string[] | null, matrix: Array<Array<number | null>>): string {
+export function blockToText(titles: string[] | null, matrix: Array<Array<number | null>>, separator: DecimalSeparator = 'auto'): string {
   const height = Math.max(matrix.length, titles?.length ?? 0);
   const lines: string[] = [];
   for (let r = 0; r < height; r++) {
-    const cells = (matrix[r] ?? []).map(formatCell);
+    const cells = (matrix[r] ?? []).map((v) => formatCell(v, separator));
     lines.push((titles ? [quoteField(titles[r] ?? ''), ...cells] : cells).join('\t'));
   }
   return lines.join('\n');
@@ -218,7 +225,7 @@ export function planPaste(text: string, b: CellBounds, separator: DecimalSeparat
     matrix = Array.from({ length: b.r1 - b.r0 + 1 }, () => Array.from({ length: b.c1 - b.c0 + 1 }, () => value));
   }
   const h = titleMode ? titles.length : matrix.length;
-  const w = Math.max(0, ...matrix.map((r) => r.length));
+  const w = matrix.reduce((m, r) => Math.max(m, r.length), 0);
   const s = (n: number) => (n === 1 ? '' : 's');
   if (!titleMode) {
     return {

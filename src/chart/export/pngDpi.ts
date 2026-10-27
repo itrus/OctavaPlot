@@ -61,3 +61,10 @@ export function withPngDpi(png: Uint8Array, dpi: number): Uint8Array {
   }
   return result;
 }
+
+/** A canvas as a PNG file with its resolution written in; the one encode-and-patch step of every PNG export. */
+export function canvasToPngBlob(canvas: HTMLCanvasElement, dpi: number): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encoding failed.'))), 'image/png')).then(
+    async (png) => new Blob([withPngDpi(new Uint8Array(await png.arrayBuffer()), dpi) as BlobPart], { type: 'image/png' }),
+  );
+}

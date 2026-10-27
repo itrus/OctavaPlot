@@ -16,7 +16,8 @@ import { clearSummaryOverrides, patchSummary, removeGroup, resetStyle } from '..
 import { historyReducer, initialHistory } from '../../state/history';
 import type { ChartLayer } from '../types';
 
-const layer = (): ChartLayer => createChart('t').layers[0];
+/** A chart that starts with no spread (the charts made to show error bars start with the SD). */
+const layer = (): ChartLayer => createChart('t', undefined, 'scatter').layers[0];
 
 describe('defaults', () => {
   it('DEFAULT_SUMMARY values', () => {
@@ -113,8 +114,10 @@ describe('patch and clear', () => {
 });
 
 describe('commands', () => {
-  const p0 = createExampleProject();
-  const chartId = p0.charts[0].id;
+  const example = createExampleProject();
+  const chartId = example.charts[0].id;
+  // The example graph starts with the SD; these tests start from none.
+  const p0 = patchSummary(chartId, 'all', { spread: 'none' })(example);
   const g0 = p0.dataTables[0].groups[0].id;
 
   it('scope all and group', () => {
@@ -157,5 +160,13 @@ describe('commands', () => {
     const a = patchSummary(chartId, g0, { spread: 'sd' })(p0);
     const n = resetStyle(chartId, 'all', a.dataTables[0])(a);
     expect(n.charts[0].layers[0].groupSummary).toEqual({ [g0]: { spread: 'sd' } });
+  });
+});
+
+describe('the spread a new chart starts with', () => {
+  it('is the SD for the charts made to show error bars, and none for the others', () => {
+    const table = createExampleProject().dataTables[0];
+    for (const type of ['bar', 'mean', 'groupedBar', 'groupedLine', 'xyScatter', 'xyLine'] as const) expect(createChart(table.id, undefined, type).layers[0].summary.spread).toBe('sd');
+    for (const type of ['scatter', 'box', 'violin', 'floating', 'paired'] as const) expect(createChart(table.id, undefined, type).layers[0].summary.spread).toBe('none');
   });
 });

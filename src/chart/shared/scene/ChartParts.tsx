@@ -3,6 +3,7 @@ import { n2 } from '../../../model/units';
 import { backgroundElements, plotClipElement, titleElements } from './chrome';
 import type { hitAttrs } from './hitTest';
 import type { Layout, Rect } from '../parts/layout';
+import { prefixed, useSvgIdPrefix } from './idPrefix';
 import { SceneElements } from './SceneElements';
 import { svgId } from './svgIds';
 import { measureText } from '../parts/text';
@@ -56,6 +57,7 @@ function annotationBox(a: Annotation, x: number, y: number) {
 /** The text annotations of a chart, positioned as fractions of its size. */
 export function AnnotationLayer({ chart, editor, width, height, hit }: { chart: Chart; editor?: EditorState; width: number; height: number; hit: HitProps }) {
   const ed = !!editor;
+  const idPrefix = useSvgIdPrefix();
   const selected = editor?.selection.kind === 'annotation' ? editor.selection.annotationId : null;
   return (
     <>
@@ -65,7 +67,7 @@ export function AnnotationLayer({ chart, editor, width, height, hit }: { chart: 
         const y = (drag ? drag.yFrac : a.yFrac) * height;
         const box = annotationBox(a, x, y);
         return (
-          <g key={a.id} {...hit('annotation', undefined, undefined, a.id)} id={svgId('annotation', a.id)}>
+          <g key={a.id} {...hit('annotation', undefined, undefined, a.id)} id={prefixed(idPrefix, svgId('annotation', a.id))}>
             {ed && <rect x={n2(box.x - 6)} y={n2(box.y - 6)} width={n2(box.w + 12)} height={n2(box.h + 12)} fill="transparent" />}
             <text x={n2(x)} fontSize={a.fontSizePt} fill={a.color} fillOpacity={a.opacity < 1 ? a.opacity : undefined}>
               {box.lines.map((line, i) => (

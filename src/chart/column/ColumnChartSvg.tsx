@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import type { Chart } from '../../model/types';
 import { n2 } from '../../model/units';
-import { BarLabelText } from '../shared/parts/BarLabelText';
+import { BarLabelText, InsideBarLabelText } from '../shared/parts/BarLabelText';
 import { compileColumnMarks } from './columnMarks';
 import { AnnotationLayer, type EditorState, SELECT_COLOR } from '../shared/scene/ChartParts';
 import { hitAttrs } from '../shared/scene/hitTest';
@@ -56,6 +56,7 @@ export const ColumnChartSvg = forwardRef<SVGSVGElement, Props>(function ColumnCh
 
       {/* Labels above the bars. */}
       {chart.barLabels.show !== 'none' && groups.map((g) => g.barLabel && <BarLabelText key={g.barLabel.id} label={g.barLabel} cfg={chart.barLabels} textColor={chart.textColor} orient={orient} />)}
+      {groups.map((g) => g.insideLabel && <InsideBarLabelText key={g.insideLabel.id} label={g.insideLabel} sizePt={chart.barLabels.sizePt} orient={orient} />)}
 
       <SceneElements nodes={scene.front} editor={ed} />
 

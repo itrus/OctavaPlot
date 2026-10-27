@@ -49,12 +49,12 @@ function merge3(own: unknown, before: unknown, after: unknown): unknown {
 }
 
 /** Settings of any linked graph: how it looks, whatever its table. */
-const GENERAL: ReadonlyArray<keyof Chart> = ['widthPx', 'heightPx', 'aspect', 'showTitle', 'titleFontSizePt', 'titleBold', 'titleOffsetPt', 'fontFamily', 'textColor', 'axisColor', 'axisOpacity', 'plotColor', 'pageColor', 'frame', 'grid', 'jitter'];
+const GENERAL: ReadonlyArray<keyof Chart> = ['widthPx', 'heightPx', 'printWidthMm', 'aspect', 'showTitle', 'titleFontSizePt', 'titleBold', 'titleOffsetPt', 'fontFamily', 'textColor', 'axisColor', 'axisOpacity', 'plotColor', 'pageColor', 'frame', 'grid', 'jitter'];
 /** Also followed when the two graphs show tables of the same type. */
-const SAME_TYPE: ReadonlyArray<keyof Chart> = ['paletteId', 'orientation', 'lineOrder', 'bars', 'barLabels', 'distribution', 'pairs', 'heatmap', 'histogram', 'pie', 'survival', 'defaults'];
+const SAME_TYPE: ReadonlyArray<keyof Chart> = ['paletteId', 'orientation', 'lineOrder', 'lineConnect', 'bars', 'barLabels', 'distribution', 'pairs', 'heatmap', 'histogram', 'pie', 'survival', 'defaults'];
 /** Parts of an axis, the legend and the fit that belong to the data and are never inherited. */
 const AXIS_OWN = ['title', 'min', 'max', 'majorInterval', 'breaks', 'scale', 'reverse'] as const;
-const LEGEND_OWN = ['hiddenGroupIds'] as const;
+const LEGEND_OWN = ['hiddenGroupIds', 'order'] as const;
 const FIT_OWN = ['analysisId'] as const;
 
 const omit = (o: unknown, keys: readonly string[]): unknown => (isObj(o) ? Object.fromEntries(Object.entries(o).filter(([k]) => !keys.includes(k))) : o);

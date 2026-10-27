@@ -493,6 +493,7 @@
         },
         "orientation": "vertical",
         "lineOrder": "auto",
+        "lineConnect": "table",
         "origin": {
           "x": null,
           "y": null
@@ -530,7 +531,7 @@
           "bridge": false
         },
         "heatmap": {
-          "palette": "viridis",
+          "palette": "bs-blue",
           "reverse": false,
           "min": null,
           "max": null,
@@ -543,7 +544,12 @@
           "cellGapPt": 0,
           "transpose": false,
           "colourbar": true,
-          "missingColour": "#d9d9d9"
+          "missingColour": "#d9d9d9",
+          "customColours": {
+            "low": "#ffffff",
+            "mid": null,
+            "high": "#000000"
+          }
         },
         "histogram": {
           "binning": "auto",

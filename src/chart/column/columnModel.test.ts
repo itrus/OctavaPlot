@@ -28,7 +28,9 @@ describe('resolveYAxis', () => {
 });
 
 describe('style hierarchy and chart model', () => {
-  const project = createExampleProject();
+  // A new bar chart starts with the SD; these tests are about choosing a spread, so they start from none.
+  const example = createExampleProject();
+  const project = patchSummary(example.charts[0].id, 'all', { spread: 'none' })(example);
   const table = project.dataTables[0];
   const chart0 = project.charts[0];
 
@@ -265,10 +267,10 @@ describe('summary pipeline (S15)', () => {
     for (const g of m.groups) for (const pt of g.points) expect(pt.cy).toBeCloseTo(m.yScale(pt.value), 9);
   });
 
-  it('default regression: no error bars, no warnings, centre equals the mean', () => {
+  it('default regression: SD error bars, no warnings, centre equals the mean', () => {
     const m = model(project);
     expect(m.warnings).toEqual([]);
-    expect(m.groups.every((g) => g.errorBar === null)).toBe(true);
+    expect(m.groups.every((g) => g.errorBar !== null)).toBe(true);
     m.groups.forEach((g) => expect(g.centreValue).toBeCloseTo(g.summary.mean!, 12));
   });
 });

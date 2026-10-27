@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { buildAnyModelCached, ChartCanvas } from '../../chart/anyModel';
 import { hitFromTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
-import { analysesOf } from '../../model/project/analysis';
-import { resolveFit } from '../../model/options/fitOptions';
-import type { Chart, DataTable } from '../../model/types';
+import type { PreparedChart } from '../../model/table/preparedChart';
 import { useApp } from '../../state/AppContext';
 import { patchAnnotation, removeChart, resetAllDataSets, unlinkChart } from '../../state/commands';
-import { exportPixels, fitsCanvas } from '../../chart/export/pngDpi';
+import { exportPixels } from '../../chart/export/pngDpi';
+import { printSizeWarnings } from '../../chart/export/printSize';
+import { exportStatusText } from '../export/exportJob';
+import { ExportDialog } from '../export/ExportDialog';
+import { useExportJob } from '../export/useExportJob';
 import { downloadBlob, exportFileName } from '../../util/download';
 import { DeleteIcon, ResetIcon } from '../components/icons';
 import { inspectorTargetFor } from '../inspector/common/nav';
@@ -16,9 +18,9 @@ import { inspectorTargetFor } from '../inspector/common/nav';
 const CANVAS_PAD = 24;
 const SCROLLBAR_ROOM = 17;
 
-export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) {
+export function GraphView({ prepared }: { prepared: PreparedChart }) {
+  const { chart, table, fit: curve } = prepared;
   const { project, selection, setSelection, run, setStatus, zoom, setZoom, settings, fitRequest, navigateInspector } = useApp();
-  const curve = useMemo(() => resolveFit(chart.fit, analysesOf(project), table.id), [chart.fit, project.analyses, table.id]);
   const any = useMemo(() => buildAnyModelCached(chart, table, curve), [chart, table, curve]);
   const model = any.model;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -108,45 +110,40 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
     setDrag(null);
   };
 
+  // One export at a time: while one runs the Export button is disabled, and a second start is ignored.
+  const exportJob = useExportJob(setStatus);
+  const [exportOpen, setExportOpen] = useState(false);
   // The renderer behind export (react-dom/server) is loaded on first use, not at startup.
-  const exportSvg = async () => {
-    try {
-      const { chartToSvgString } = await import('../../chart/export/export');
-      downloadBlob(new Blob([chartToSvgString(chart, table, curve, { metadata: true })], { type: 'image/svg+xml' }), exportFileName(chart.name, 'svg', settings.timestampExports));
-      setStatus('Exported SVG.');
-    } catch (err) {
-      setStatus(`SVG export failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  };
-  const exportPng = async () => {
-    const { width: pw, height: ph } = exportPixels(chart, settings.pngDpi);
-    // Browsers limit the size of a canvas; refuse a size that would fail or come out blank.
-    if (!fitsCanvas(pw, ph)) {
-      setStatus(`PNG export at ${settings.pngDpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, lower the PNG resolution in Settings, or export SVG.`);
-      return;
-    }
-    try {
-      const { chartToPngBlob } = await import('../../chart/export/export');
-      downloadBlob(await chartToPngBlob(chart, table, settings.pngDpi, curve), exportFileName(chart.name, 'png', settings.timestampExports));
-      setStatus(`Exported PNG, ${pw} × ${ph} px (${settings.pngDpi} dpi).`);
-    } catch (err) {
-      setStatus(`PNG export failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  };
-
-  const exportPdf = async () => {
-    const { width: pw, height: ph } = exportPixels(chart, settings.exportDpi);
-    if (!fitsCanvas(pw, ph)) {
-      setStatus(`PDF export at ${settings.exportDpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, lower the PDF resolution in Settings, or export SVG.`);
-      return;
-    }
-    try {
-      const { chartToPdfBlob } = await import('../../chart/export/export');
-      downloadBlob(await chartToPdfBlob(chart, table, settings.exportDpi, curve), exportFileName(chart.name, 'pdf', settings.timestampExports));
-      setStatus(`Exported PDF, ${pw} × ${ph} px (${settings.exportDpi} dpi).`);
-    } catch (err) {
-      setStatus(`PDF export failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+  const exportSvg = () =>
+    exportJob.start({
+      label: 'SVG',
+      pixels: null,
+      tooBigMessage: '',
+      work: async (phase) => {
+        const { chartToSvgString } = await import('../../chart/export/export');
+        phase('encoding');
+        downloadBlob(new Blob([chartToSvgString(chart, table, curve, { metadata: true })], { type: 'image/svg+xml' }), exportFileName(chart.name, 'svg', settings.timestampExports));
+        return 'Exported SVG.';
+      },
+    });
+  const exportRaster = (kind: 'png' | 'pdf') => {
+    const dpi = kind === 'png' ? settings.pngDpi : settings.exportDpi;
+    const { width: pw, height: ph } = exportPixels(chart, dpi);
+    const name = kind.toUpperCase();
+    return exportJob.start({
+      label: name,
+      pixels: { width: pw, height: ph },
+      // Browsers limit the size of a canvas; a size above the limit fails or comes out blank.
+      tooBigMessage: `${name} export at ${dpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, lower the ${name} resolution in Settings, or export SVG.`,
+      work: async (phase) => {
+        const { chartToPngBlob, chartToPdfBlob } = await import('../../chart/export/export');
+        phase('rasterizing');
+        const blob = await (kind === 'png' ? chartToPngBlob(chart, table, dpi, curve) : chartToPdfBlob(chart, table, dpi, curve));
+        phase('encoding');
+        downloadBlob(blob, exportFileName(chart.name, kind, settings.timestampExports));
+        return `Exported ${name}, ${pw} × ${ph} px (${dpi} dpi).`;
+      },
+    });
   };
 
   return (
@@ -188,15 +185,26 @@ export function GraphView({ chart, table }: { chart: Chart; table: DataTable }) 
         )}
         <button
           className="icon-text toolbar-end"
-          onClick={() => void (settings.exportFormat === 'svg' ? exportSvg() : settings.exportFormat === 'pdf' ? exportPdf() : exportPng())}
-          title={`Export as ${settings.exportFormat.toUpperCase()}, ${settings.exportFormat === 'svg' ? `${chart.widthPx} × ${chart.heightPx} px` : (({ width, height }, dpi) => `${width} × ${height} px at ${dpi} dpi`)(exportPixels(chart, settings.exportFormat === 'pdf' ? settings.exportDpi : settings.pngDpi), settings.exportFormat === 'pdf' ? settings.exportDpi : settings.pngDpi)} (the format is chosen in Settings)`}
+          disabled={exportJob.busy}
+          onClick={() => setExportOpen(true)}
+          title="Export this graph: format, resolution, size, fonts and warnings are shown first"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11" />
           </svg>
           Export
         </button>
+        {exportJob.busy && <span className="toolbar-info export-status" role="status">{exportStatusText(exportJob.state)}</span>}
       </div>
+      {exportOpen && (
+        <ExportDialog
+          kind="graph"
+          subject={{ name: chart.name, widthPx: chart.widthPx, heightPx: chart.heightPx, fontFamilies: [chart.fontFamily], warnings: model.warnings, printWidthMm: chart.printWidthMm ?? null, printWarnings: printSizeWarnings(chart) }}
+          state={exportJob.state}
+          onExport={() => (settings.exportFormat === 'svg' ? exportSvg() : exportRaster(settings.exportFormat === 'pdf' ? 'pdf' : 'png'))}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
       <div className="chart-scroller" ref={scrollerRef}>
         <div className="chart-wrap" ref={wrapRef} style={{ width: cssW }}>
           <div

@@ -73,7 +73,7 @@ describe('analyses in the project', () => {
     expect(analysesOf(removeAnalysis('a')(p))).toEqual([]);
   });
 
-  it('are saved and loaded, and one whose table is gone or whose level is bad is repaired or dropped', () => {
+  it('are saved and loaded, and one whose table is gone or whose level is bad is repaired or refused', () => {
     let p = createExampleProject();
     p = addAnalysis('a', p.dataTables[0].id)(p);
     p = patchAnalysis('a', { level: 0.9 })(p);
@@ -81,9 +81,13 @@ describe('analyses in the project', () => {
     const file = JSON.parse(stringifyProject(p));
     file.project.analyses[0].level = 7;
     expect(parseProject(JSON.stringify(file)).analyses![0].level).toBe(0.95);
-    file.project.analyses.push({ id: 'x', name: 'x', kind: 'descriptive', dataTableId: 'missing', level: 0.95 });
-    file.project.analyses.push({ id: 'y', name: 'y', kind: 'nonsense', dataTableId: file.project.dataTables[0].id, level: 0.95 });
-    expect(parseProject(JSON.stringify(file)).analyses).toHaveLength(1);
+    // An analysis of a table that is gone is dropped; one of an unknown kind is not guessed at: the file is refused.
+    const withX = structuredClone(file);
+    withX.project.analyses.push({ id: 'x', name: 'x', kind: 'descriptive', dataTableId: 'missing', level: 0.95 });
+    expect(parseProject(JSON.stringify(withX)).analyses).toHaveLength(1);
+    const withY = structuredClone(file);
+    withY.project.analyses.push({ id: 'y', name: 'y', kind: 'nonsense', dataTableId: file.project.dataTables[0].id, level: 0.95 });
+    expect(() => parseProject(JSON.stringify(withY))).toThrow('project.analyses[1].kind');
   });
 
   it('a project from before analyses existed has none', () => {

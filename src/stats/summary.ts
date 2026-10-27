@@ -5,6 +5,7 @@
 
 import type { CentreKind, Observation, SpreadKind, SummarySpec } from '../model/types';
 import { cachedCalc } from './calcCache';
+import { meanOf, sdOf } from './moments';
 import { medianCiRank, studentTQuantileUpper } from './special';
 
 export interface GroupSummary {
@@ -33,15 +34,10 @@ export function summarize(values: ReadonlyArray<number | null | undefined>): Gro
   const n = xs.length;
   if (n === 0) return { n, mean: null, sd: null, sem: null };
 
-  let sum = 0;
-  for (const x of xs) sum += x;
-  const mean = sum / n;
+  const mean = meanOf(xs);
   if (n === 1) return { n, mean, sd: null, sem: null };
 
-  // Two-pass sum of squared deviations.
-  let ss = 0;
-  for (const x of xs) ss += (x - mean) * (x - mean);
-  const sd = Math.sqrt(ss / (n - 1));
+  const sd = sdOf(xs, mean);
   return { n, mean, sd, sem: sd / Math.sqrt(n) };
 }
 
@@ -165,35 +161,6 @@ export function quantileType6(sorted: ReadonlyArray<number>, p: number): number 
   if (h >= n) return sorted[n - 1];
   const lo = Math.floor(h);
   return sorted[lo - 1] + (h - lo) * (sorted[lo] - sorted[lo - 1]);
-}
-
-/** Neumaier compensated sum. */
-function neumaierSum(xs: ReadonlyArray<number>): number {
-  let sum = 0;
-  let c = 0;
-  for (const x of xs) {
-    const t = sum + x;
-    c += Math.abs(sum) >= Math.abs(x) ? sum - t + x : x - t + sum;
-    sum = t;
-  }
-  return sum + c;
-}
-
-function meanOf(xs: ReadonlyArray<number>): number {
-  const s = neumaierSum(xs);
-  if (Number.isFinite(s)) return s / xs.length;
-  // The plain sum overflowed; add the scaled values instead.
-  return neumaierSum(xs.map((x) => x / xs.length));
-}
-
-/** Sample SD (n - 1), scaled by the largest deviation so squares neither overflow nor underflow. */
-function sdOf(xs: ReadonlyArray<number>, m: number): number {
-  let scale = 0;
-  for (const x of xs) scale = Math.max(scale, Math.abs(x - m));
-  if (scale === 0) return 0;
-  if (!Number.isFinite(scale)) return Infinity;
-  const ss = neumaierSum(xs.map((x) => ((x - m) / scale) ** 2));
-  return scale * Math.sqrt(ss / (xs.length - 1));
 }
 
 export function isValidConfidence(level: number): boolean {

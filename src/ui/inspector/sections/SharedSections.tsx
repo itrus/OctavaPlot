@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../../model/graph/aspect';
 import { graphSources, type GraphSource } from '../../../model/table/chartTable';
 import { AXIS_LIMITS } from '../../../model/graph/axis';
-import { FONT_FAMILIES } from '../../../model/graph/look';
+import { FONT_FAMILIES, PRINT_WIDTH_MM } from '../../../model/graph/look';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../../model/defaults';
 import { newId } from '../../../model/ids';
 import { capabilitiesOf } from '../../../model/graph/capabilities';
@@ -26,6 +26,7 @@ import {
   removeReferenceLine,
   setDisplayName,
   setGroupOnGraph,
+  setLegendColumns,
   setLegendItemVisible,
 } from '../../../state/commands';
 import { LINE_STYLES } from '../../../model/graph/look';
@@ -33,6 +34,8 @@ import type { LineStyle } from '../../../model/types';
 import { DialogShell, trapTab } from '../../dialogs/DialogShell';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, SubHeading, TextInput } from '../common/controls';
 import { BarLabelSection, hasBarLabels } from './LookControls';
+import { LegendOrder } from './LegendOrder';
+import { LEGEND_MAX_COLUMNS, legendColumns } from '../../../model/graph/legendEntries';
 import { displayName } from '../../../chart/shared/parts/names';
 
 /**
@@ -136,6 +139,10 @@ export function TextSections({ chart, groups, yName, dual, axes = true }: { char
 
 export function DimensionsSection({ chart }: { chart: Chart }) {
   const setChart = useChartSetter(chart);
+  // Custom is a choice of its own, also while the width happens to equal a preset.
+  const [customPrint, setCustomPrint] = useState(false);
+  const print = chart.printWidthMm;
+  const printChoice = print === undefined ? 'none' : customPrint || !(PRINT_WIDTH_MM.presets as readonly number[]).includes(print) ? 'custom' : String(print);
   return (
     <div className="tab-body">
       <Field label="Shape" hint="Free keeps width and height independent; 4:3, 3:4 and Square move one when you change the other">
@@ -171,6 +178,19 @@ export function DimensionsSection({ chart }: { chart: Chart }) {
       </Field>
       <NumField label="Chart width" unit="px" value={chart.widthPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => setChart('Chart width', resizeChart(chart, chart.aspect, 'width', v), 'chart:w')} />
       <NumField label="Chart height" unit="px" value={chart.heightPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => setChart('Chart height', resizeChart(chart, chart.aspect, 'height', v), 'chart:h')} />
+      <Field label="Print width" hint="The width the graph will be printed at. The export dialog then warns about text and lines that would print too small. Nothing is resized.">
+        <SelectInput<string>
+          value={printChoice}
+          options={[{ value: 'none', label: 'None' }, ...PRINT_WIDTH_MM.presets.map((mm) => ({ value: String(mm), label: `${mm} mm` })), { value: 'custom', label: 'Custom' }]}
+          onChange={(v) => {
+            setCustomPrint(v === 'custom');
+            setChart('Print width', { printWidthMm: v === 'none' ? undefined : v === 'custom' ? (print ?? 100) : Number(v) });
+          }}
+        />
+      </Field>
+      {printChoice === 'custom' && (
+        <NumField label="Custom print width" unit="mm" step={1} slider={false} value={print ?? 100} min={PRINT_WIDTH_MM.min} max={PRINT_WIDTH_MM.max} onCommit={(v) => setChart('Print width', { printWidthMm: v }, 'chart:pw')} />
+      )}
       <div className="muted small">Sizes are in pixels. The default for new charts is set in Settings.</div>
     </div>
   );
@@ -207,6 +227,8 @@ export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[]
             onChange={(v) => run('Legend key shape', patchLegend(chart.id, { keyShape: v }))}
           />
         </Field>
+        <NumField label="Columns" value={legendColumns(chart.legend)} min={1} max={LEGEND_MAX_COLUMNS} step={1} disabled={!chart.legend.visible} onCommit={(v) => run('Legend columns', setLegendColumns(chart.id, v))} hint="Entries in a row; 1 is one under the other" />
+        <LegendOrder chart={chart} groups={groups} />
         <SubHeading>Data sets in legend</SubHeading>
         {groups.map((g) => (
           <Field key={g.id} label={displayName(chart, g.id, g.name)}>
@@ -308,7 +330,7 @@ export function AnnotationsTab({ chart }: { chart: Chart }) {
             {isSel && (
               <>
                 <Field label="Text">
-                  <textarea rows={2} value={a.text} onChange={(e) => run('Edit annotation text', patchAnnotation(chart.id, a.id, { text: e.target.value }), `ann:${a.id}:text`)} />
+                  <textarea rows={2} aria-label="Annotation text" value={a.text} onChange={(e) => run('Edit annotation text', patchAnnotation(chart.id, a.id, { text: e.target.value }), `ann:${a.id}:text`)} />
                 </Field>
                 <NumField label="Left" unit="% of chart width" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Position of the left edge of the text; arrow keys nudge a selected annotation (Shift 5%, Alt 0.1%)" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:x`)} />
                 <NumField label="Top" unit="% of chart height" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:y`)} />

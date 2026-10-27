@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockToText, matrixToText, parseCell, parseClipboard, parseClipboardBlock, planPaste, splitTsv } from './cellText';
+import { blockToText, formatCell, matrixToText, parseCell, parseClipboard, parseClipboardBlock, planPaste, splitTsv } from './cellText';
 
 describe('parseCell', () => {
   it('treats empty text as a missing value, not zero', () => {
@@ -135,17 +135,66 @@ describe('decimal separator', () => {
     expect(parseCell('12,5')).toEqual({ ok: true, value: 12.5 });
     expect(parseCell('1,2345')).toEqual({ ok: true, value: 1.2345 });
   });
-  it('point mode refuses a comma; comma mode reads 1.234,5 and refuses a point', () => {
+  it('point mode refuses a comma; comma mode reads only a comma and refuses a point', () => {
     expect(parseCell('1,5', 'point').ok).toBe(false);
     expect(parseCell('1.5', 'point')).toEqual({ ok: true, value: 1.5 });
-    expect(parseCell('1.234,5', 'comma')).toEqual({ ok: true, value: 1234.5 });
     expect(parseCell('1,234', 'comma')).toEqual({ ok: true, value: 1.234 });
     expect(parseCell('1.5', 'comma').ok).toBe(false);
     expect(parseCell('-2e3', 'comma')).toEqual({ ok: true, value: -2000 });
+    expect(parseCell('-2,5e-3', 'comma')).toEqual({ ok: true, value: -0.0025 });
+  });
+  it('has no thousands separator: 1.234 is a number only as a decimal, 1.234,5 and 1,234.5 are refused', () => {
+    expect(parseCell('1.234', 'point')).toEqual({ ok: true, value: 1.234 });
+    expect(parseCell('1.234', 'auto')).toEqual({ ok: true, value: 1.234 });
+    expect(parseCell('1.234', 'comma').ok).toBe(false);
+    expect(parseCell('1.234,5', 'comma').ok).toBe(false);
+    expect(parseCell('1.234,5', 'auto').ok).toBe(false);
+    expect(parseCell('1,234.5', 'point').ok).toBe(false);
+    expect(parseCell('1,234.5', 'auto').ok).toBe(false);
   });
   it('applies to pasted blocks', () => {
     expect(parseClipboard('1,234\t2').ok).toBe(false);
     expect(parseClipboardBlock('1,234\t2', false, 'comma')).toEqual({ ok: true, titles: [], matrix: [[1.234, 2]] });
+  });
+});
+
+describe('what is written reads back as the same number', () => {
+  const SEPARATORS = ['auto', 'point', 'comma'] as const;
+  const VALUES = [1.234, 1234, 0.001, -12.345, 1e-7, 1.5e-7, 123.456, 1.234567, 1e21, 1.5e21, -0.5, 0, 100, 12345.678];
+  // Every value, and a blank beside it, one row each.
+  const MATRIX: Array<Array<number | null>> = VALUES.map((v) => [v, null]);
+
+  it('through the edit box: format then parse, in every mode', () => {
+    for (const s of SEPARATORS) for (const v of VALUES) expect(parseCell(formatCell(v, s), s)).toEqual({ ok: true, value: v });
+    for (const s of SEPARATORS) expect(parseCell(formatCell(null, s), s)).toEqual({ ok: true, value: null });
+  });
+  it('writes the decimal separator of the setting and no thousands separator', () => {
+    expect(formatCell(1.234, 'comma')).toBe('1,234');
+    expect(formatCell(1.234, 'point')).toBe('1.234');
+    expect(formatCell(1.234, 'auto')).toBe('1.234');
+    expect(formatCell(12345.678, 'comma')).toBe('12345,678');
+    expect(formatCell(1.5e-7, 'comma')).toBe('1,5e-7');
+    expect(formatCell(1234, 'comma')).toBe('1234');
+  });
+  it('through copy and paste, with and without row titles', () => {
+    for (const s of SEPARATORS) {
+      const matrix = MATRIX;
+      const text = blockToText(null, matrix, s);
+      expect(parseClipboardBlock(text, false, s)).toEqual({ ok: true, titles: [], matrix });
+      const titles = matrix.map((_, i) => `row ${i}`);
+      expect(parseClipboardBlock(blockToText(titles, matrix, s), true, s)).toEqual({ ok: true, titles, matrix });
+      expect(parseClipboardBlock(matrixToText(matrix, s), false, s)).toEqual({ ok: true, titles: [], matrix });
+    }
+  });
+  it('through a paste plan into the grid', () => {
+    for (const s of SEPARATORS) {
+      const p = planPaste(blockToText(null, [[1.234, 1234], [0.001, -12.345]], s), { r0: 0, r1: 0, c0: 0, c1: 0 }, s);
+      expect(p).toMatchObject({ ok: true, matrix: [[1.234, 1234], [0.001, -12.345]] });
+    }
+  });
+  it('a pasted block in the other mode is refused whole, not misread', () => {
+    expect(parseClipboardBlock(blockToText(null, [[1.5, 2]], 'comma'), false, 'point').ok).toBe(false);
+    expect(parseClipboardBlock(blockToText(null, [[1.5, 2]], 'point'), false, 'comma').ok).toBe(false);
   });
 });
 
@@ -157,5 +206,23 @@ describe('numbers that cannot be stored', () => {
   });
   it('still accepts the smallest ordinary values', () => {
     expect(parseCell('1e-300')).toEqual({ ok: true, value: 1e-300 });
+  });
+});
+
+describe('planPaste size limit', () => {
+  const bounds = { r0: 0, r1: 0, c0: 0, c1: 0 };
+  const lines = (n: number) => Array.from({ length: n }, (_, i) => String(i)).join('\n');
+  it('refuses a paste past the row limit with a message, without throwing', () => {
+    const r = planPaste(lines(200000), bounds);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.message).toContain('100,000');
+  });
+  it('accepts a paste of exactly the row limit', () => {
+    const r = planPaste(lines(100000), bounds);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.matrix).toHaveLength(100000);
+  });
+  it('refuses a titles paste past the limit too', () => {
+    expect(planPaste(lines(100001), { r0: 0, r1: 0, c0: -1, c1: -1 }).ok).toBe(false);
   });
 });

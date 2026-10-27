@@ -1,12 +1,17 @@
 import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react';
-import type { DataTable, TableKind } from '../../model/types';
+import type { DataTable, DecimalSeparator, TableKind } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import { newId } from '../../model/ids';
-import { addAnalysis, addGroup, addRows, composeCommands, setExcluded, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
+import { addAnalysis, addGroup, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setExcluded, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../../util/download';
 import { AddColumnIcon, AddManyRowsIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon } from '../components/icons';
-import { importCsv, isCsvFile, tableToCsv } from '../data/csv';
+import { isCsvFile, tableToCsv, type CsvExportMode } from '../data/csv';
+import { excludedCount } from '../../model/table/exclusion';
+import { ExportCsvDialog } from '../dialogs/ExportCsvDialog';
+import { ImportCsvDialog, type CsvImportData } from '../dialogs/ImportCsvDialog';
+import { AppendRowsDialog } from '../dialogs/AppendRowsDialog';
+import { RowsMenu } from './RowsMenu';
 import { leadingColumns, usesSeriesBlocks } from '../../model/graph/chartTypes';
 import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../../model/table/tableLayout';
 import { blockToText, formatCell, parseCell, planPaste, selectionStrings } from '../data/cellText';
@@ -33,8 +38,8 @@ interface Editing {
 }
 
 /** Text shown when a cell opens for editing; col -1 is the Row title column. */
-const editText = (table: DataTable, row: number, col: number) =>
-  col < 0 ? rowTitleAt(table, row) : formatCell(table.groups[col]?.observations[row]?.value ?? null);
+const editText = (table: DataTable, row: number, col: number, separator: DecimalSeparator) =>
+  col < 0 ? rowTitleAt(table, row) : formatCell(table.groups[col]?.observations[row]?.value ?? null, separator);
 
 const bounds = (s: Sel) => ({
   r0: Math.min(s.ar, s.fr),
@@ -133,6 +138,9 @@ export function DataTableView({ table }: { table: DataTable }) {
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const scrollerRef = useRef<HTMLDivElement>(null);
   const csvRef = useRef<HTMLInputElement>(null);
+  const [dialog, setDialog] = useState<'append' | 'exportCsv' | null>(null);
+  // A picked file waits here, read but not imported, while the preview dialog is open.
+  const [pendingCsv, setPendingCsv] = useState<{ name: string; text: string } | null>(null);
   const dragging = useRef(false);
 
   const nRows = table.rowCount;
@@ -255,7 +263,7 @@ export function DataTableView({ table }: { table: DataTable }) {
 
   const startEdit = (row: number, col: number, text?: string) => {
     setMessage(null);
-    setEdit({ row, col, text: text ?? editText(table, row, col) });
+    setEdit({ row, col, text: text ?? editText(table, row, col, settings.decimalSeparator) });
   };
 
   const onEditKeyImpl = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -301,9 +309,11 @@ export function DataTableView({ table }: { table: DataTable }) {
   selRef.current = sel;
   const tableRef = useRef(table);
   tableRef.current = table;
+  const separatorRef = useRef(settings.decimalSeparator);
+  separatorRef.current = settings.decimalSeparator;
   const onDouble = useCallback((row: number, col: number) => {
     setMessage(null);
-    const ed = { row, col, text: editText(tableRef.current, row, col) };
+    const ed = { row, col, text: editText(tableRef.current, row, col, separatorRef.current) };
     editRef.current = ed;
     setEditing(ed);
   }, []);
@@ -322,7 +332,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   // ---- selection helpers
   const selectionText = () => {
     const { titles, matrix } = selectionStrings(table, bounds(sel));
-    return blockToText(titles, matrix);
+    return blockToText(titles, matrix, settings.decimalSeparator);
   };
 
   // One history entry: the selected row titles are emptied and the selected values cleared.
@@ -353,29 +363,84 @@ export function DataTableView({ table }: { table: DataTable }) {
   };
 
   // ---- CSV
-  const exportCsv = () => {
-    downloadBlob(new Blob([tableToCsv(table)], { type: 'text/csv;charset=utf-8' }), exportFileName(table.name, 'csv', settings.timestampExports));
+  const exportCsv = (mode: CsvExportMode = 'entered') => {
+    setDialog(null);
+    downloadBlob(new Blob([tableToCsv(table, settings.decimalSeparator, mode)], { type: 'text/csv;charset=utf-8' }), exportFileName(table.name, 'csv', settings.timestampExports));
     setMessage({ kind: 'info', text: `Exported ${table.name} as CSV.` });
   };
-  const importFile = async (file: File) => {
+  const pickFile = async (file: File) => {
     if (!isCsvFile(file)) {
-      setMessage({ kind: 'error', text: `${file.name} is not a CSV file. Choose a .csv file.` });
+      setMessage({ kind: 'error', text: `${file.name} is not a CSV file. Choose a .csv or .tsv file.` });
       return;
     }
-    const result = importCsv(await file.text(), settings.decimalSeparator);
-    if (!result.ok) {
-      setMessage({ kind: 'error', text: `Could not import ${file.name}: ${result.message}` });
-      return;
-    }
-    const { data } = result;
-    // A table of series blocks needs whole blocks: the leading column(s), then k series of the same width.
-    if (isSeries && (data.names.length < lead + blockWidth || (data.names.length - lead) % blockWidth !== 0)) {
-      setMessage({ kind: 'error', text: `Could not import ${file.name}: it has ${data.names.length} columns, but this ${kindText.label.toLowerCase()} needs ${lead > 0 ? `${lead} leading column${lead === 1 ? '' : 's'} plus ` : ''}a whole number of series of ${blockWidth} column${blockWidth === 1 ? '' : 's'} each.` });
-      return;
-    }
+    // The file is read and shown in a dialog; nothing changes until the user confirms there.
+    setPendingCsv({ name: file.name, text: await file.text() });
+  };
+  // A table of series blocks needs whole blocks: the leading column(s), then k series of the same width.
+  const checkCsvShape = (data: CsvImportData): string | null =>
+    isSeries && (data.names.length < lead + blockWidth || (data.names.length - lead) % blockWidth !== 0)
+      ? `It has ${data.names.length} columns, but this ${kindText.label.toLowerCase()} needs ${lead > 0 ? `${lead} leading column${lead === 1 ? '' : 's'} plus ` : ''}a whole number of series of ${blockWidth} column${blockWidth === 1 ? '' : 's'} each.`
+      : null;
+  const importData = (data: CsvImportData, fileName: string) => {
+    setPendingCsv(null);
     run('Import CSV', replaceTableData(table.id, data));
     setSel({ ar: 0, ac: 0, fr: 0, fc: 0 });
-    setMessage({ kind: 'info', text: `Imported ${data.values.length} rows × ${data.names.length} groups from ${file.name}.` });
+    setMessage({ kind: 'info', text: `Imported ${data.values.length} rows × ${data.names.length} groups from ${fileName}.` });
+  };
+
+  // ---- rows: each operation is one undo step; afterwards the selection sits on the new rows, or near the removed ones
+  const rowsOfSelection = () => {
+    const { r0, r1 } = bounds(sel);
+    return { r0, r1, count: r1 - r0 + 1 };
+  };
+  const selectRows = (from: number, to: number) => setSel((s) => ({ ...s, ar: from, fr: to }));
+  const noRoom = (need: number) => {
+    if (need <= rowRoom(table)) return false;
+    setMessage({ kind: 'error', text: `A table holds at most ${MAX_TABLE_ROWS.toLocaleString('en-US')} rows; this one has room for ${rowRoom(table).toLocaleString('en-US')} more.` });
+    return true;
+  };
+  const insertRow = (where: 'above' | 'below') => {
+    if (noRoom(1)) return;
+    const { r0, r1 } = rowsOfSelection();
+    const at = where === 'above' ? r0 : r1 + 1;
+    run('Insert row', insertRows(table.id, at, 1));
+    selectRows(at, at);
+    setMessage({ kind: 'info', text: `Inserted an empty row ${where} row ${where === 'above' ? r0 + 1 : r1 + 1}.` });
+    focusGrid();
+  };
+  const duplicateSelectedRows = () => {
+    const { r0, r1, count } = rowsOfSelection();
+    if (noRoom(count)) return;
+    run(count === 1 ? 'Duplicate row' : 'Duplicate rows', duplicateRows(table.id, Array.from({ length: count }, (_, i) => r0 + i)));
+    selectRows(r1 + 1, r1 + count);
+    setMessage({ kind: 'info', text: `Duplicated ${count} row${count === 1 ? '' : 's'}: the copies are below, with their titles, values and exclusions.` });
+    requestAnimationFrame(() => ensureVisible(r1 + count, selRef.current.fc));
+    focusGrid();
+  };
+  const deleteSelectedRows = () => {
+    const { r0, count } = rowsOfSelection();
+    if (count >= nRows) {
+      setMessage({ kind: 'error', text: 'A table needs at least one row: select fewer rows to delete.' });
+      return;
+    }
+    run(count === 1 ? 'Delete row' : 'Delete rows', deleteRows(table.id, Array.from({ length: count }, (_, i) => r0 + i)));
+    const next = Math.min(r0, nRows - count - 1);
+    selectRows(next, next);
+    setMessage({ kind: 'info', text: `Deleted ${count} row${count === 1 ? '' : 's'}; their values no longer appear in graphs or results that use this table.` });
+    focusGrid();
+  };
+  const appendCount = (count: number) => {
+    setDialog(null);
+    const before = nRows;
+    const added = Math.min(count, rowRoom(table));
+    if (added < 1) {
+      setMessage({ kind: 'error', text: `A table holds at most ${MAX_TABLE_ROWS.toLocaleString('en-US')} rows.` });
+      return;
+    }
+    run('Append rows', appendRows(table.id, count));
+    selectRows(before, before);
+    setMessage({ kind: 'info', text: `Added ${added.toLocaleString('en-US')} empty row${added === 1 ? '' : 's'} at the end (${(before + added).toLocaleString('en-US')} in all).` });
+    requestAnimationFrame(() => ensureVisible(before, selRef.current.fc));
   };
 
   // ---- clipboard
@@ -443,6 +508,17 @@ export function DataTableView({ table }: { table: DataTable }) {
       });
       return;
     }
+    // Row operations. Alt combinations are free: browser zoom uses Ctrl, and typing a character ignores Alt.
+    if (e.altKey && !mod) {
+      const act = e.shiftKey
+        ? e.key === 'ArrowUp' ? () => insertRow('above') : e.key === 'ArrowDown' ? () => insertRow('below') : e.code === 'KeyD' ? duplicateSelectedRows : null
+        : e.key === 'Delete' || e.key === 'Backspace' ? deleteSelectedRows : null;
+      if (act) {
+        e.preventDefault();
+        act();
+        return;
+      }
+    }
     switch (e.key) {
       case 'ArrowDown': e.preventDefault(); moveTo(f.r + 1, f.c, e.shiftKey); return;
       case 'ArrowUp': e.preventDefault(); moveTo(f.r - 1, f.c, e.shiftKey); return;
@@ -509,9 +585,19 @@ export function DataTableView({ table }: { table: DataTable }) {
         <button className="icon-text" onClick={() => run(kindText.add.replace('+ ', ''), addGroup(table.id))} title={kindText.add.replace('+ ', '')}>
           <AddColumnIcon /> {kindText.add.replace('+ ', '')}
         </button>
-        <button className="icon-text" onClick={() => run('Add rows', addRows(table.id, 1000))} title="Add 1000 rows">
-          <AddManyRowsIcon /> Add 1000 rows
-        </button>
+        <RowsMenu
+          label="Rows"
+          icon={<AddManyRowsIcon />}
+          title="Rows: insert, duplicate, delete or append rows. Each is one Undo step."
+          items={[
+            { label: 'Insert row above', shortcut: 'Alt+Shift+↑', onSelect: () => insertRow('above') },
+            { label: 'Insert row below', shortcut: 'Alt+Shift+↓', onSelect: () => insertRow('below') },
+            { label: 'Duplicate selected rows', shortcut: 'Alt+Shift+D', onSelect: duplicateSelectedRows },
+            { label: 'Delete selected rows', shortcut: 'Alt+Delete', onSelect: deleteSelectedRows },
+            { label: 'Append 1000 rows', onSelect: () => appendCount(1000) },
+            { label: 'Append rows…', onSelect: () => setDialog('append') },
+          ]}
+        />
         <span className="sep" />
         <button className="icon-text" onClick={() => excludeSelection(true)} title="Exclude: keep the selected values in the table but leave them out of every chart and calculation">
           <ExcludeIcon /> Exclude
@@ -520,10 +606,10 @@ export function DataTableView({ table }: { table: DataTable }) {
           <IncludeIcon /> Include
         </button>
         <span className="sep" />
-        <button className="icon-text" onClick={() => csvRef.current?.click()} title="Import CSV: replace this table with the contents of a .csv file (Undo restores it)">
+        <button className="icon-text" onClick={() => csvRef.current?.click()} title="Import CSV: choose a .csv or .tsv file, check what it will become, then replace this table with it (Undo restores it)">
           <ImportIcon /> Import CSV
         </button>
-        <button className="icon-text" onClick={exportCsv} title="Export CSV: download this table as a .csv file">
+        <button className="icon-text" onClick={() => (excludedCount(table) > 0 ? setDialog('exportCsv') : exportCsv())} title="Export CSV: download this table as a .csv file (a table with excluded values asks how to write them)">
           <ExportIcon /> Export CSV
         </button>
         {table.kind === 'xy' && (
@@ -537,12 +623,12 @@ export function DataTableView({ table }: { table: DataTable }) {
         <input
           ref={csvRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.tsv,text/csv,text/tab-separated-values"
           hidden
           onChange={(e) => {
             const f = e.target.files?.[0];
             e.target.value = '';
-            if (f) void importFile(f);
+            if (f) void pickFile(f);
           }}
         />
       </div>
@@ -685,7 +771,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                     row={r}
                     col={c}
                     width={COL_W}
-                    text={formatCell(g.observations[r].value)}
+                    text={formatCell(g.observations[r].value, settings.decimalSeparator)}
                     inRange={r >= r0 && r <= r1 && c >= c0 && c <= c1}
                     active={r === sel.fr && c === sel.fc}
                     editing={isEditing}
@@ -706,6 +792,18 @@ export function DataTableView({ table }: { table: DataTable }) {
           </div>
         </div>
       </div>
+      {dialog === 'exportCsv' && <ExportCsvDialog excluded={excludedCount(table)} onExport={exportCsv} onClose={() => setDialog(null)} />}
+      {dialog === 'append' && <AppendRowsDialog room={rowRoom(table)} limit={MAX_TABLE_ROWS} onAppend={appendCount} onClose={() => setDialog(null)} />}
+      {pendingCsv && (
+        <ImportCsvDialog
+          fileName={pendingCsv.name}
+          text={pendingCsv.text}
+          defaultSeparator={settings.decimalSeparator}
+          check={checkCsvShape}
+          onImport={(data) => importData(data, pendingCsv.name)}
+          onClose={() => setPendingCsv(null)}
+        />
+      )}
       <div className={`table-status${message?.kind === 'error' ? ' error' : ''}`} role="status">
         {message ? message.text : kindText.hint + 'Click a cell, type to edit. Enter ↓, Tab →. Paste tab-separated values from Excel (Ctrl+V); pasting at the Row title column fills titles first, then the value columns.'}
       </div>

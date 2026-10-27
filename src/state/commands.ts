@@ -3,6 +3,7 @@ import { sanitizeBarLabels, sanitizeBars } from '../model/options/columnOptions'
 import { sanitizeDistribution } from '../model/options/distributionOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLook } from '../model/graph/look';
+import { sanitizeLegendLayout, withoutLegendColumns, withoutLegendOrder } from '../model/graph/legendEntries';
 import { sanitizeOrder } from '../model/table/groupOrder';
 import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createGroup, createXyTable, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
 import { analysisKindApplies, analysisTypeInfo } from '../model/project/analysis';
@@ -18,7 +19,7 @@ import { applyVariant, type ChartVariant, variantFits } from '../model/graph/cha
 import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns, usesSeriesBlocks } from '../model/graph/chartTypes';
 import { newId } from '../model/ids';
 import { paletteColor, type Palette } from '../model/graph/palettes';
-import { createRows, sanitizeRowTitle } from '../model/table/rows';
+import { createRows, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { clearGroupSummary, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/graph/summary';
 import { folderItems, nudge, reorder, sortedByName } from '../model/project/folderItems';
 import { clearPartStyles, layersOf, layerStylesAvailable, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
@@ -173,7 +174,7 @@ export const pasteMatrix = (
 ): Command => (p) =>
   mapTable(p, tableId, (t0) => {
     const height = Math.max(matrix.length, titles?.length ?? 0);
-    const width = Math.max(0, ...matrix.map((r) => r.length));
+    const width = matrix.reduce((m, r) => Math.max(m, r.length), 0);
     let t = growRows(t0, Math.max(t0.rowCount, row0 + height));
     if (width > 0 && col0 + width > t.groups.length) {
       const groups = t.groups.slice();
@@ -196,6 +197,71 @@ export const pasteMatrix = (
 
 export const addRows = (tableId: Id, count: number): Command => (p) =>
   mapTable(p, tableId, (t) => growRows(t, t.rowCount + count));
+
+export { MAX_TABLE_ROWS };
+
+/** How many more rows the table can take. */
+export const rowRoom = (t: Pick<DataTable, 'rowCount'>): number => Math.max(0, MAX_TABLE_ROWS - t.rowCount);
+
+/** Where a row of a rebuilt table comes from: an old row (kept as it is), a copy of an old row, or nothing (blank). */
+type RowSource = number | { copy: number } | null;
+
+/**
+ * Rebuild a table from a list of row sources. Kept rows keep their row and observation objects, so their ids, titles and
+ * exclusions travel with them; copies get new ids and keep title, value and exclusion; blank rows are empty. A row
+ * the table never stored (ragged rows or observations) comes out blank, so the result always has aligned rows.
+ */
+function reshapeRows(t: DataTable, plan: RowSource[]): DataTable {
+  const blankRow = (): DataRow => ({ id: newId('row'), title: '' });
+  const blankObs = (): Observation => ({ id: newId('obs'), value: null });
+  const row = (s: RowSource): DataRow =>
+    s === null ? blankRow() : typeof s === 'number' ? (t.rows[s] ?? blankRow()) : { ...(t.rows[s.copy] ?? blankRow()), id: newId('row') };
+  const obs = (g: Group, s: RowSource): Observation => {
+    if (s === null) return blankObs();
+    const o = g.observations[typeof s === 'number' ? s : s.copy];
+    if (!o) return blankObs();
+    return typeof s === 'number' ? o : { ...o, id: newId('obs') };
+  };
+  return { ...t, rowCount: plan.length, rows: plan.map(row), groups: t.groups.map((g) => ({ ...g, observations: plan.map((s) => obs(g, s)) })) };
+}
+
+/** The valid, distinct rows of a table among `rows`, in table order. */
+const validRows = (t: DataTable, rows: readonly number[]): number[] =>
+  [...new Set(rows.filter((r) => Number.isInteger(r) && r >= 0 && r < t.rowCount))].sort((a, b) => a - b);
+
+const range = (from: number, to: number): number[] => Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i);
+
+/** Insert `count` blank rows so the first of them is row `at` (clamped to the table). Refused when the table would pass MAX_TABLE_ROWS. */
+export const insertRows = (tableId: Id, at: number, count = 1): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    if (!Number.isInteger(count) || count < 1 || count > rowRoom(t)) return t;
+    const i = Math.max(0, Math.min(t.rowCount, Math.floor(at)));
+    return reshapeRows(t, [...range(0, i), ...Array.from({ length: count }, () => null), ...range(i, t.rowCount)]);
+  });
+
+/** Remove rows with everything in them. The last remaining row is never removed: that would leave a table with no rows. */
+export const deleteRows = (tableId: Id, rows: readonly number[]): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    const gone = new Set(validRows(t, rows));
+    if (gone.size === 0 || gone.size >= t.rowCount) return t;
+    return reshapeRows(t, range(0, t.rowCount).filter((r) => !gone.has(r)));
+  });
+
+/** Copy rows (title, values, exclusions) as one block placed right after the last of them. Refused past MAX_TABLE_ROWS. */
+export const duplicateRows = (tableId: Id, rows: readonly number[]): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    const copied = validRows(t, rows);
+    if (copied.length === 0 || copied.length > rowRoom(t)) return t;
+    const last = copied[copied.length - 1];
+    return reshapeRows(t, [...range(0, last + 1), ...copied.map((copy) => ({ copy })), ...range(last + 1, t.rowCount)]);
+  });
+
+/** Add `count` blank rows at the end: as many as fit under MAX_TABLE_ROWS. */
+export const appendRows = (tableId: Id, count: number): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    const n = Math.min(count, rowRoom(t));
+    return Number.isInteger(count) && n >= 1 ? reshapeRows(t, [...range(0, t.rowCount), ...Array.from({ length: n }, () => null)]) : t;
+  });
 
 /**
  * The columns of one new series of a block table (XY, grouped, contingency, survival): a single column, or a whole
@@ -297,6 +363,14 @@ export const patchBothAxes = (chartId: Id, patch: Partial<AxisConfig>): Command 
 export const patchLegend = (chartId: Id, patch: Partial<LegendConfig>): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, legend: { ...c.legend, ...patch } }));
 
+/** The order of the legend entries (series ids); an empty list puts them back in series order. The marks stay where they are. */
+export const setLegendOrder = (chartId: Id, order: readonly Id[]): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, legend: { ...withoutLegendOrder(c.legend), ...sanitizeLegendLayout({ order }) } }));
+
+/** The number of columns of the legend (1 to 6; 1 is the usual layout). */
+export const setLegendColumns = (chartId: Id, columns: number): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, legend: { ...withoutLegendColumns(c.legend), ...sanitizeLegendLayout({ columns }) } }));
+
 /** Show or hide one data set in the legend, leaving the others as they are. */
 export const setLegendItemVisible = (chartId: Id, groupId: Id, visible: boolean): Command => (p) =>
   mapChart(p, chartId, (c) => {
@@ -317,7 +391,13 @@ export const setGroupOnGraph = (chartId: Id, tableId: Id, groupId: Id, on: boole
       return { ...c, hiddenGroupIds: hidden };
     }
     const extra = c.extraGroups.filter((e) => e.groupId !== groupId);
-    if (on) extra.push({ tableId, groupId });
+    if (on) {
+      // The lowest colour slot no other added data set holds: it stays with this one while the others come and go.
+      const taken = new Set(extra.map((e, i) => e.slot ?? i));
+      let slot = 0;
+      while (taken.has(slot)) slot++;
+      extra.push({ tableId, groupId, slot });
+    }
     return { ...c, extraGroups: extra };
   });
 
@@ -526,7 +606,7 @@ export const addDataTable = (id: Id, kind: TableKind = 'column', options: NewTab
  * Replace a table's rows and group values (CSV import) as one command. Groups keep their IDs, and so their chart
  * styling, by position; extra groups are added and missing ones dropped. Row titles are kept when the file has none.
  */
-export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>> }): Command => (p) =>
+export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>>; excluded?: Array<Array<{ reason: string } | null>> }): Command => (p) =>
   mapTable(p, tableId, (t) => {
     const rowCount = Math.max(1, data.values.length);
     const width = usesSeriesBlocks(t.kind) ? tableSeriesWidth(t) : 1;
@@ -544,7 +624,10 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
         name: sub ? (old?.name ?? subs[k]) : name,
         title: sub ? (old?.title ?? (k === 0 ? defaultSeriesName((i - lead) / width, t.kind) : '')) : (old?.title ?? ''),
         paletteIndex: old?.paletteIndex ?? i,
-        observations: fresh.observations.map((o, r) => ({ ...o, value: data.values[r]?.[i] ?? null })),
+        observations: fresh.observations.map((o, r) => {
+          const ex = data.excluded?.[r]?.[i];
+          return { ...o, value: data.values[r]?.[i] ?? null, ...(ex ? { excluded: true as const, ...(ex.reason !== '' ? { excludedReason: ex.reason } : {}) } : {}) };
+        }),
       };
     });
     const rows = createRows(rowCount).map((row, r) => ({ ...row, title: data.titles ? (data.titles[r] ?? '') : (t.rows[r]?.title ?? '') }));
@@ -605,7 +688,7 @@ export const addChartLike = (chartId: Id, tableId: Id, sourceChartId: Id, linked
 export const unlinkChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId && c.linkedTo !== undefined) ? mapChart(p, chartId, ({ linkedTo: _gone, ...c }) => c) : p);
 
 /** Colours, frame and gridline style of the chart (see model/graph/axis.ts: sanitizeLook). */
-export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
+export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'lineConnect' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
     const { grid, ...rest } = patch;
     return { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };
@@ -738,11 +821,27 @@ const clearPanels = (p: Project, gone: ReadonlySet<Id>): Project =>
     ? p
     : { ...p, layouts: (p.layouts ?? []).map((l) => ({ ...l, panels: l.panels.map((id) => (id !== null && gone.has(id) ? null : id)) })) };
 
+/**
+ * The layers of a graph that belong to the graph as a whole (the at-risk table, the titles, the pair lines, the cells of a heat map)
+ * have IDs that begin with the graph's own ID (see model/graph/layers.ts). In a copy those keys must name the copy's layers: this
+ * is the one place that owns the old-to-new map, for everything the chart keeps by layer ID.
+ */
+const withChartIdOf = (c: Chart, copyId: Id): Pick<Chart, 'hiddenLayerIds' | 'rangeExcludedLayerIds' | 'layerOrder' | 'layerStyles'> => {
+  const prefix = `${c.id}:`;
+  const map = (id: Id): Id => (id.startsWith(prefix) ? `${copyId}:${id.slice(prefix.length)}` : id);
+  return {
+    hiddenLayerIds: c.hiddenLayerIds.map(map),
+    rangeExcludedLayerIds: c.rangeExcludedLayerIds.map(map),
+    layerOrder: c.layerOrder.map(map),
+    layerStyles: Object.fromEntries(Object.entries(c.layerStyles).map(([id, style]) => [map(id), style])),
+  };
+};
+
 /** A copy of a graph (same data table, same settings) with new IDs for it and its layers. */
 export const duplicateChart = (chartId: Id, copyId: Id): Command => (p) => {
   const c = p.charts.find((x) => x.id === chartId);
   if (!c) return p;
-  const copy: Chart = { ...c, id: copyId, name: copyName(c.name, p.charts.map((x) => x.name)), layers: c.layers.map((l) => ({ ...l, id: newId('layer') })) };
+  const copy: Chart = { ...c, ...withChartIdOf(c, copyId), id: copyId, name: copyName(c.name, p.charts.map((x) => x.name)), layers: c.layers.map((l) => ({ ...l, id: newId('layer') })) };
   return { ...p, charts: [...p.charts, copy] };
 };
 

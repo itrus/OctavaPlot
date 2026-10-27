@@ -231,6 +231,28 @@ describe('duplicating and deleting items', () => {
     const h = historyReducer(initialHistory(p), { type: 'commit', label: 'Delete table', command: removeTable(t.id), now: 0 });
     expect(historyReducer(h, { type: 'undo' }).present).toBe(p);
   });
+  it('keeps hidden, ordered, range-switched and own-look layers of a duplicated graph (their ids hold the graph id)', async () => {
+    const { addChart, duplicateChart } = await import('./commands');
+    const { layersOf } = await import('../model/graph/layers');
+    for (const [type, kind] of [['survival', 'survival'], ['paired', 'column'], ['pie', 'contingency'], ['heatmap', 'grouped']] as const) {
+      let p = addChart('g', 'tb', undefined, type)(addDataTable('tb', kind, { sample: true })(createExampleProject()));
+      const tb = p.dataTables.find((t) => t.id === 'tb')!;
+      const own = layersOf(p.charts.find((c) => c.id === 'g')!, tb).filter((l) => l.id.startsWith('g:'));
+      expect(own.length, type).toBeGreaterThan(0);
+      const ids = own.map((l) => l.id);
+      p = { ...p, charts: p.charts.map((c) => (c.id === 'g' ? { ...c, hiddenLayerIds: ids, rangeExcludedLayerIds: ids, layerOrder: ids, layerStyles: Object.fromEntries(ids.map((i) => [i, { opacity: 0.5 }])) } : c)) };
+      p = duplicateChart('g', 'h')(p);
+      const copy = p.charts.find((c) => c.id === 'h')!;
+      const remap = (i: string) => `h${i.slice(1)}`;
+      expect(copy.hiddenLayerIds, type).toEqual(ids.map(remap));
+      expect(copy.rangeExcludedLayerIds, type).toEqual(ids.map(remap));
+      expect(copy.layerOrder, type).toEqual(ids.map(remap));
+      expect(Object.keys(copy.layerStyles), type).toEqual(ids.map(remap));
+      const view = (c: typeof copy, back: (i: string) => string) => layersOf(c, tb).map((l) => [back(l.id), l.visible, l.rangeContribution, l.z]);
+      expect(view(copy, (i) => (i.startsWith('h:') ? `g${i.slice(1)}` : i))).toEqual(view(p.charts.find((c) => c.id === 'g')!, (i) => i));
+      expect(layersOf(copy, tb).filter((l) => l.id.startsWith('h:')).every((l) => !l.visible), type).toBe(true);
+    }
+  });
   it('duplicates and deletes graphs and analyses', async () => {
     const { duplicateChart, removeChart, addAnalysis, duplicateAnalysis, removeAnalysis } = await import('./commands');
     let p = createExampleProject();

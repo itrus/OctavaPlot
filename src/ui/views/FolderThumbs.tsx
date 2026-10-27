@@ -1,10 +1,9 @@
 import { Component, useMemo, type ReactNode } from 'react';
-import { analysesOf } from '../../model/project/analysis';
-import { effectiveTable } from '../../model/table/chartTable';
-import { resolveFit } from '../../model/options/fitOptions';
+import { prepareChartInput } from '../../model/table/preparedChart';
 import { framesOf, pageMm, panelLabel } from '../../model/project/layout';
 import type { Analysis, Chart, DataTable, Layout, Project } from '../../model/types';
 import { buildAnyModelCached, ChartCanvas } from '../../chart/anyModel';
+import { SvgIdPrefix } from '../../chart/shared/scene/idPrefix';
 
 /** The small pictures of a folder overview: what a page looks like, drawn from the page itself. */
 
@@ -45,17 +44,20 @@ function TableThumb({ table }: { table: DataTable }) {
   );
 }
 
-/** The graph as it is drawn on its page, scaled to the frame. */
-function ChartThumb({ chart, project }: { chart: Chart; project: Project }) {
-  const table = useMemo(() => effectiveTable(project, chart), [project, chart]);
-  const any = useMemo(() => {
-    if (!table) return null;
-    return buildAnyModelCached(chart, table, resolveFit(chart.fit, analysesOf(project), table.id));
-  }, [chart, project, table]);
+/**
+ * The graph as it is drawn on its page, scaled to the frame. Its drawing gets ids of its own: every picture on a page would
+ * otherwise share the drawing's ids ("plot-clip") and a browser may apply another picture's clip. A chart is on the page once,
+ * and its id is its own.
+ */
+export function ChartThumb({ chart, project }: { chart: Chart; project: Project }) {
+  const prepared = useMemo(() => prepareChartInput(project, chart), [project, chart]);
+  const any = useMemo(() => (prepared ? buildAnyModelCached(chart, prepared.table, prepared.fit) : null), [chart, prepared]);
   if (!any) return <div className="thumb-missing">No data</div>;
   return (
     <div className="thumb-chart" aria-hidden="true">
-      <ChartCanvas chart={chart} any={any} cssWidth="100%" cssHeight="100%" />
+      <SvgIdPrefix.Provider value={`thumb-${chart.id.replace(/[^A-Za-z0-9_-]/g, '_')}-`}>
+        <ChartCanvas chart={chart} any={any} cssWidth="100%" cssHeight="100%" />
+      </SvgIdPrefix.Provider>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRoving } from '../inspector/common/roving';
 import { GRID_MAX, pageMm, slotRects, standardArrangements } from '../../model/project/layout';
 import type { Chart, Id, LayoutArrangement, PageOrientation } from '../../model/types';
 import { Modal } from './NewItemDialogs';
@@ -46,15 +47,18 @@ export function NewLayoutDialog({ charts, initialChartId, onCreate, onClose }: {
   const arrangement: LayoutArrangement = mode === 'array' ? { kind: 'grid', cols, rows } : (standards.find((s) => s.id === standardId) ?? standards[0]).arrangement;
   const create = () => onCreate({ orientation, background: transparent ? null : background, showTitle, arrangement }, fill && first !== '' ? first : undefined);
   const counts = Array.from({ length: GRID_MAX }, (_, i) => i + 1);
+  const orientations = ['landscape', 'portrait'] as const;
+  const rovingOrientation = useRoving(orientations.map(() => true), orientations.indexOf(orientation), (i) => setOrientation(orientations[i]));
+  const rovingArrangement = useRoving(standards.map(() => true), mode === 'standard' ? standards.findIndex((s) => s.id === standardId) : -1, (i) => { setMode('standard'); setStandardId(standards[i].id); }, 'both');
 
   return (
     <Modal title="New layout" confirmLabel="Create layout" onConfirm={create} onClose={onClose} wide>
       <p className="muted">A layout is an A4 page of graphs, exported as one SVG or PNG. Graphs are scaled together, so their fonts and lines match.</p>
       <fieldset className="layout-fieldset">
         <legend>Page</legend>
-        <span className="switch-group" role="radiogroup" aria-label="Orientation">
-          {(['landscape', 'portrait'] as const).map((o) => (
-            <button key={o} role="radio" aria-checked={orientation === o} className={`switch${orientation === o ? ' on' : ''}`} onClick={() => setOrientation(o)}>
+        <span className="switch-group" role="radiogroup" aria-label="Orientation" {...rovingOrientation.groupProps}>
+          {orientations.map((o, i) => (
+            <button key={o} role="radio" aria-checked={orientation === o} {...rovingOrientation.itemProps(i)} className={`switch${orientation === o ? ' on' : ''}`} onClick={() => setOrientation(o)}>
               {o === 'landscape' ? 'Landscape' : 'Portrait'}
             </button>
           ))}
@@ -74,9 +78,9 @@ export function NewLayoutDialog({ charts, initialChartId, onCreate, onClose }: {
       </fieldset>
       <fieldset className="layout-fieldset">
         <legend>Arrangement of graphs</legend>
-        <div className="choice-grid layout-choices" role="radiogroup" aria-label="Arrangement">
-          {standards.map((s) => (
-            <button key={s.id} role="radio" aria-checked={mode === 'standard' && standardId === s.id} className={`choice-card${mode === 'standard' && standardId === s.id ? ' selected' : ''}`} onClick={() => { setMode('standard'); setStandardId(s.id); }}>
+        <div className="choice-grid layout-choices" role="radiogroup" aria-label="Arrangement" {...rovingArrangement.groupProps}>
+          {standards.map((s, i) => (
+            <button key={s.id} role="radio" aria-checked={mode === 'standard' && standardId === s.id} {...rovingArrangement.itemProps(i)} className={`choice-card${mode === 'standard' && standardId === s.id ? ' selected' : ''}`} onClick={() => { setMode('standard'); setStandardId(s.id); }}>
               <ArrangementSketch arrangement={s.arrangement} orientation={orientation} />
               <span>{s.label}</span>
             </button>

@@ -2,6 +2,7 @@ import { legendKeyWidthPt } from '../../../model/graph/look';
 import { numberStartPt } from '../../../model/graph/axis';
 import { FONT_FAMILY } from '../../../model/defaults';
 import type { AxisConfig, LegendConfig } from '../../../model/types';
+import { legendColumns } from '../../../model/graph/legendEntries';
 import { measureText } from './text';
 
 /** Layout constants in pt (spec section 20 starting tokens). */
@@ -97,6 +98,19 @@ function layoutLegendRows(
   return { rows, rowHeight: fontSize * 1.55, widths };
 }
 
+/**
+ * The entries in rows of `columns`, one entry after the other along each row. Each column is as wide as its widest entry, so the
+ * entries stand in lines; `colX` is where each column starts from the left of the legend, and `width` the whole legend.
+ */
+function layoutLegendGrid(widths: number[], columns: number, rowHeight: number): { rows: number[][]; rowHeight: number; widths: number[]; colX: number[]; width: number } {
+  const count = Math.min(columns, widths.length);
+  const rows: number[][] = [];
+  for (let i = 0; i < widths.length; i += count) rows.push(widths.slice(i, i + count).map((_, k) => i + k));
+  const colWidths = Array.from({ length: count }, (_, c) => Math.max(...rows.flatMap((r) => (r[c] === undefined ? [] : [widths[r[c]]]))));
+  const colX = colWidths.map((_, c) => colWidths.slice(0, c).reduce((a, w) => a + w + LEGEND_ITEM_GAP, 0));
+  return { rows, rowHeight, widths, colX, width: colX[count - 1] + colWidths[count - 1] };
+}
+
 export function computeLayout(input: LayoutInput): Layout {
   const { widthPt: W, heightPt: H, xAxis, yAxis, legend } = input;
   const warnings: string[] = [];
@@ -119,10 +133,19 @@ export function computeLayout(input: LayoutInput): Layout {
 
   // ---- Legend sizing.
   let legendRows: ReturnType<typeof layoutLegendRows> | null = null;
+  let legendGrid: ReturnType<typeof layoutLegendGrid> | null = null;
   let legendWidth = 0;
   let legendHeight = 0;
+  const legendCols = legendColumns(legend);
   if (showLegend) {
-    if (legend.position === 'right') {
+    if (legendCols > 1) {
+      // Entries in rows of that many columns, measured from the real text.
+      const widths = input.legendLabels.map((l) => keyWidth + LEGEND_KEY_GAP + measureText(l, legendFont, false, false, ff));
+      legendGrid = layoutLegendGrid(widths, legendCols, legendFont * 1.55);
+      legendRows = legendGrid;
+      legendWidth = legendGrid.width;
+      legendHeight = legendGrid.rows.length * legendGrid.rowHeight;
+    } else if (legend.position === 'right') {
       legendRows = {
         rows: input.legendLabels.map((_, i) => [i]),
         rowHeight: legendFont * 1.55,
@@ -213,7 +236,13 @@ export function computeLayout(input: LayoutInput): Layout {
   if (showLegend && legendRows) {
     const items: LegendItemLayout[] = [];
     let rect: Rect;
-    if (legend.position === 'right') {
+    if (legendGrid) {
+      const grid = legendGrid;
+      const y0 = legend.position === 'right' ? plot.y + Math.max(0, (plot.height - legendHeight) / 2) : legend.position === 'top' ? legendTop : legendBottomY;
+      const x0 = legend.position === 'right' ? W - M - legendWidth : plot.x + (plot.width - legendWidth) / 2;
+      rect = { x: x0, y: y0, width: legendWidth, height: legendHeight };
+      grid.rows.forEach((row, r) => row.forEach((i, c) => items.push({ index: i, x: x0 + grid.colX[c], y: y0 + (r + 0.5) * grid.rowHeight, label: input.legendLabels[i] })));
+    } else if (legend.position === 'right') {
       rect = {
         x: W - M - legendWidth,
         y: plot.y + Math.max(0, (plot.height - legendHeight) / 2),

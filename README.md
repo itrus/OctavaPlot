@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://itrus.github.io/OctavaPlot/"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6%20try%20it-live%20demo-2ea44f?style=for-the-badge"></a>
-  <a href="https://www.buymeacoffee.com/itrus"><img height="28" src="branding/buymeacoffee.svg" alt="Buy me a coffee"></a>
+  <a href="https://www.buymeacoffee.com/itrus"><img height="28" src="docs/assets/buymeacoffee.svg" alt="Buy me a coffee"></a>
 </p>
 
 <p align="center">
@@ -33,7 +33,7 @@ Deployed from `main` by GitHub Actions. Data stays in your browser's `localStora
 
 A project is saved as a `.oplot` file: UTF-8 JSON, not compressed, signed or encrypted, so it can be read and diffed with any text tool. The envelope is `{ "format": "octavaplot-project", "version": 1, "project": { ... } }`, with one version number; this app reads version 1 only. A file is refused, and the open project kept, when it is not named `*.oplot`, is over 64 MB, is not UTF-8 JSON, has another format or version, or holds a damaged project; a value of the wrong type is reset to its default and listed in the status bar. Lengths in `...Pt` keys are true points, the chart size is in px. Autosave in the browser stores the same text.
 
-The full description (contents, units, what is checked, what is not stored, privacy) is in [docs/FILE_FORMAT.md](docs/FILE_FORMAT.md); a small example is [tests/fixtures/example.oplot](tests/fixtures/example.oplot).
+The full description (contents, units, what is checked, what is not stored, privacy) is in [docs/FILE_FORMAT.md](docs/FILE_FORMAT.md); a small example is [docs/example.oplot](docs/example.oplot).
 
 ## Run
 
@@ -48,6 +48,8 @@ npm run typecheck # type-check only (no unused locals or parameters allowed)
 ```
 
 ## Structure
+
+Repository: `src/` (the app and its tests), `docs/` (specifications, the example `.oplot`, README assets, `loc-history.csv`), `public/` (static files served by the app, such as the logo), `scripts/` (`loc-history.mjs`, `logo.rs`), `.github/` (workflows).
 
 The source is in `src/`, in layers. A layer imports from its own folder and from the layers under it, never upward; `src/architecture.test.ts` checks this, and that no folder grows past 30 files. Tests sit next to the code they test.
 
@@ -103,45 +105,45 @@ A table has a **type**, chosen when it is created (Navigator → New Data Table�
 
 Survival curves use the product-limit estimate (events are counted before censoring at a tied time); censored subjects are marked on the curve. An optional pointwise confidence band uses the Greenwood standard error (log-log by default, or plain, at the level you choose), and an optional at-risk table lists the subjects still under observation at each tick of the time axis. Grouped bars of replicates can show the individual values over the bars. Contingency percentages are shares of each row's own total. Grouped and contingency charts treat a row with a title or any value as a category; empty rows are ignored.
 
-XY charts follow spec §3.1 and §7: symbols and a path layer per series, a numeric X axis with Auto/Manual limits, input-order paths that break at a missing value (never bridged, never zero), and the automatic range including zero only when the data starts near it. `src/model/graph/chartTypes.ts` is the catalogue; adding a chart type means adding it there, a preset in `defaults.ts`, and its drawing.
+XY charts follow spec §3.1 and §7: symbols and a path layer per series (the line joins the points in table order; Connect points in: Ascending X joins them by X instead, still breaking at a missing Y and changing nothing else), a numeric X axis with Auto/Manual limits, input-order paths that break at a missing value (never bridged, never zero), and the automatic range including zero only when the data starts near it. `src/model/graph/chartTypes.ts` is the catalogue; adding a chart type means adding it there, a preset in `defaults.ts`, and its drawing.
 
-**New Graph…** shows a gallery per graph family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. The gallery has 56 entries: 39 can be made now (24 chart types, some offered as several presets) and 17 are planned presets of the catalogue in docs/calculation-contracts.md (bars and areas at numeric X, spikes, vectors, bubbles, repeated measures, offset traces, smooth curves, aligned, nested, interleaved and separated dots, grouped and three-way variants, grouped box and violin). The planned ones are shown locked with their thumbnail and their preset ID, so the whole range is visible. The catalogue is `src/model/graph/chartGallery.ts`; to make a planned graph available, give its entry a `type`.
+**New Graph…** shows a gallery per graph family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. The gallery has 56 entries: 45 can be made now (28 chart types, some offered as several presets) and 11 are planned presets of the catalogue in docs/calculation-contracts.md (bars at numeric X, vectors, bubbles, trajectories, offset traces, smooth curves, nested dots, separated and paired dots, three-way bars and dots; the IDs are listed in the ROADMAP). The counts are those of the catalogue at the time of writing, counted from `src/model/graph/chartGallery.ts`. The planned ones are shown locked with their thumbnail and their preset ID, so the whole range is visible. The catalogue is `src/model/graph/chartGallery.ts`; to make a planned graph available, give its entry a `type`.
 
 ## What each chart type can do
 
 The table below is generated from the capability registry (`src/model/graph/capabilities.ts`) and checked against it by a test, so it cannot drift from the code: a control that a drawing does not honour is not offered.
 
 <!-- capabilities:start -->
-| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Survival options |
-|---|---|---|---|---|---|
-| Bar chart | yes | Y | yes | – | – |
-| Scatter dot plot | yes | Y | yes | – | – |
-| Mean with error bars | yes | Y | yes | – | – |
-| Box and whiskers | yes | Y | – | – | – |
-| Floating bars (min to max) | yes | Y | – | – | – |
-| Before and after | yes | Y | – | – | – |
-| Histogram | – | X and Y | – | – | – |
-| Cumulative distribution | – | X and Y | – | – | – |
-| Violin plot | yes | Y | – | – | – |
-| XY scatter | – | X and Y | – | yes | – |
-| Line | – | X and Y | – | yes | – |
-| Line with symbols | – | X and Y | – | yes | – |
-| Spikes | – | X and Y | – | yes | – |
-| Area under the curve | – | X and Y | – | yes | – |
-| Grouped bars | yes | Y | – | – | – |
-| Stacked bars | yes | Y | – | – | – |
-| Floating bars (min to max) | yes | Y | – | – | – |
-| Grouped box and whiskers | yes | Y | – | – | – |
-| Grouped violin | yes | Y | – | – | – |
-| Heat map | – | – | – | – | – |
-| Lines over categories | – | Y | – | – | – |
-| Pie charts | – | – | – | – | – |
-| Doughnut charts | – | – | – | – | – |
-| Side-by-side bars | yes | Y | – | – | – |
-| Stacked bars | yes | Y | – | – | – |
-| 100% stacked bars | yes | Y | – | – | – |
-| Survival curve | – | X and Y | – | – | yes |
-| Cumulative events | – | X and Y | – | – | yes |
+| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options |
+|---|---|---|---|---|---|---|
+| Bar chart | yes | Y | yes | – | – | – |
+| Scatter dot plot | yes | Y | yes | – | – | – |
+| Mean with error bars | yes | Y | yes | – | – | – |
+| Box and whiskers | yes | Y | – | – | – | – |
+| Floating bars (min to max) | yes | Y | – | – | – | – |
+| Before and after | yes | Y | – | – | – | – |
+| Histogram | – | X and Y | – | – | – | – |
+| Cumulative distribution | – | X and Y | – | – | – | – |
+| Violin plot | yes | Y | – | – | – | – |
+| XY scatter | – | X and Y | – | yes | yes | – |
+| Line | – | X and Y | – | yes | yes | – |
+| Line with symbols | – | X and Y | – | yes | yes | – |
+| Spikes | – | X and Y | – | yes | – | – |
+| Area under the curve | – | X and Y | – | yes | yes | – |
+| Grouped bars | yes | Y | – | – | – | – |
+| Stacked bars | yes | Y | – | – | – | – |
+| Floating bars (min to max) | yes | Y | – | – | – | – |
+| Grouped box and whiskers | yes | Y | – | – | – | – |
+| Grouped violin | yes | Y | – | – | – | – |
+| Heat map | – | – | – | – | – | – |
+| Lines over categories | – | Y | – | – | – | – |
+| Pie charts | – | – | – | – | – | – |
+| Doughnut charts | – | – | – | – | – | – |
+| Side-by-side bars | yes | Y | – | – | – | – |
+| Stacked bars | yes | Y | – | – | – | – |
+| 100% stacked bars | yes | Y | – | – | – | – |
+| Survival curve | – | X and Y | – | – | – | yes |
+| Cumulative events | – | X and Y | – | – | – | yes |
 <!-- capabilities:end -->
 
 ## Box plots, violins, columns and axes
@@ -150,7 +152,7 @@ The table below is generated from the capability registry (`src/model/graph/capa
 
 **Direction.** A column chart (bars, dots, means, boxes, violins) can run horizontally: Layout → Direction, or the "Horizontal" graphs of the New Graph gallery. The chart is built vertically in a "virtual" plotting region and turned a quarter by one SVG matrix (`Orientation` in `src/chart/column/columnModel.ts`); symbols and text stay upright. The numbers then run along the bottom with the value axis (Y) settings, and the data set names down the left. Horizontal charts have no right axis and no point labels yet.
 
-**Columns.** Layout → Columns sets the space between columns, before the first and after the last (percent of a column's width, Auto = the usual layout) and where bars begin. Data Sets on Graph orders the data sets of a column chart. Labels above the bars (Annotations tab) show the plotted value or the sample size with decimals, thousands separator, prefix and suffix.
+**Columns.** Layout → Columns sets the space between columns, before the first and after the last (percent of a column's width, Auto = the usual layout) and where bars begin. Data Sets on Graph orders the data sets of a column chart. Labels above the bars (Annotations tab) show the plotted value or the sample size with decimals, thousands separator, prefix and suffix. A bar can carry a second label inside it, at its end or at its base (so n can sit in the base and the value beyond the end); its colour is black or white by contrast with the bar as drawn (the pattern background for a patterned bar) unless one is chosen, and a bar too small for the text gets no inside label and a warning that names the group. Column and side-by-side grouped bars only.
 
 **Axes.** Each numeric axis has a scale (linear, log 10, log 2, natural log; values of 0 or less are left out and counted), reverse, major and minor ticks (direction and length, 2 to 9 times the power on a base 10 log axis), minor gridlines and number format (automatic, decimal, scientific, decimals, thousands, prefix, suffix). The Frame section sets axis, plotting area and page colours (no page colour gives a transparent PNG), a box frame and the colour, thickness and pattern of the gridlines; Text sets font, text colour, bold, and the distances of titles and numbers from the axis. Survival curves and stacked or percentage bars keep a plain linear axis.
 
@@ -160,7 +162,7 @@ The table below is generated from the capability registry (`src/model/graph/capa
 
 **Pie and doughnut charts** make one pie for each row of a contingency table, the parts being its columns. Labels (name, count, percent), start angle, direction, hole and totals are in the Style section. A row with a negative count, or counts that add up to zero, is not drawn and a notice says so. **Histograms** put the values of each column into bins (automatic: about log2(n) + 1 bins of a round width; or a width you set), as counts, fractions, percents or densities of all the values, optionally cumulative; several data sets share the same bins. **Cumulative distributions** step up at each different value (ties are one jump), at-or-below or above, as a fraction, percent or count. Code: `src/stats/histogram.ts`, `src/chart/histogram/histogramModel.ts`.
 
-**Heat maps** colour the cells of a grouped table (the centre of replicates, or the entered value) by a scale (viridis, magma, blue, diverging green-black-red, grayscale), with a colour bar. Each row or column can be normalised (z-score, min-max, or centred); a row without spread has no z-score and its cells are shown as missing. Code: `src/stats/matrix.ts`, `src/chart/heatmap/heatmapModel.ts`.
+**Heat maps** colour the cells of a grouped table (the centre of replicates, or the entered value) by one of 16 continuous gradients from ggsci (GSEA, which is diverging; 11 Bootstrap 5 hues; 4 Material Design hues; stops joined in RGB, in `src/model/options/heatGradients.ts`; the list is grouped by origin) or by a Custom scale of two colours (low, high) or three (low, middle, high; with a middle colour the scale is diverging and uses the Centre value, as GSEA does). The inspector shows a preview strip and the colours of the scale at its ends, always editable; the check box Middle colour is on for a diverging scale; editing a gradient's colours turns it into Custom, starting from the colours on screen (a gradient with several stops loses its in-between shades; the two ends stay), with a colour bar. Files saved with the earlier scales open with the nearest new one (viridis and blue as Bootstrap blue, magma as Bootstrap purple, green-black-red as GSEA, grayscale as Bootstrap gray). The cell shows the mean, median, geometric mean, SD (n-1), SEM, %CV or the number of values of its replicates (SD and SEM need 2 values, the geometric mean needs all values above 0, %CV needs a mean that is not 0; a cell that cannot be calculated is drawn as missing and a warning says why); for a table of values already calculated the entered mean, SD, SEM, %CV or N is shown as entered and nothing is derived from it. The colour bar is titled with the statistic and the normalisation unless it is the plain mean. Each row or column can be normalised (z-score, min-max, or centred); a row without spread has no z-score and its cells are shown as missing. Code: `src/stats/matrix.ts`, `src/chart/heatmap/heatmapModel.ts`.
 
 **Axis origin, breaks and scale bars.** Frame → Origin moves the axis lines to a value of the other axis (the numbers stay at the edge). An axis can have up to two **breaks**: a range of values left out, with a gap and a mark on the axis; what is drawn across the gap is cut off by the clip, never joined. Breaks are for linear, not reversed, axes (the left axis, and either axis of an XY chart). A hidden axis can have a **scale bar** instead: a bar one major interval long, with that interval written beside it. Code: `src/chart/shared/axes/axisScale.ts`.
 
@@ -184,7 +186,7 @@ Lines (XY, grouped, survival, cumulative distribution and fitted curves) and gri
 
 ## Order of objects
 
-The series of XY, grouped, contingency and survival graphs can be put in another order (Data Sets on Graph: first to last, Top / Up / Down / Bottom / Reverse); the last is drawn on top, and each series keeps its colour. Under Layout, "Lines and error bars go" chooses whether lines and error bars are drawn over the symbols and bars (On top), behind them (Underneath), or as the chart type usually does (Auto).
+The legend has its own order of entries (Legend: Top, Up, Down, Bottom, Reverse, Reset order) that never moves the marks, and a number of columns (1 to 6). 'Graph like another graph' copies the number of columns but not the order. The series of XY, grouped, contingency and survival graphs can be put in another order (Data Sets on Graph: first to last, Top / Up / Down / Bottom / Reverse); the last is drawn on top, and each series keeps its colour. Under Layout, "Lines and error bars go" chooses whether lines and error bars are drawn over the symbols and bars (On top), behind them (Underneath), or as the chart type usually does (Auto).
 
 ## Analyses (Results)
 
@@ -206,8 +208,8 @@ The series of XY, grouped, contingency and survival graphs can be put in another
 - "All groups" edits clear conflicting per-group overrides of the same property.
 - Switching graph type only changes the visibility presets (bars/symbols/lines/mean line); data, colours and axis settings are kept.
 - Undo/redo covers data and formatting; Ctrl+Z / Ctrl+Y when not typing in a text field.
-- Project save/open as `.oplot` files, autosave to `localStorage` (a failed autosave is shown in the status bar and retried; the copy found at start-up is kept as a backup), SVG export (vector, with a title, a description and ids that cannot collide with another export), PNG export at 1×, 2×, 3.125× (300 dpi), 4× or 6.25× (600 dpi) of the chart's size (Settings → Export).
-- Numbers are read by the decimal separator of Settings → Numbers in tables; in the automatic setting a comma is a decimal comma, but `1,234` is refused as ambiguous. A pasted block with rows of different lengths is padded with missing values.
+- Project save/open as `.oplot` files, autosave to `localStorage` (a failed autosave is shown in the status bar and retried; the copy found at start-up is kept as a backup), SVG export (vector, with a title, a description and ids that cannot collide with another export), PNG export at 1×, 2×, 3.125× (300 dpi), 4× or 6.25× (600 dpi) of the chart's size (Settings → Export). The Export button of a graph and of a layout opens a dialog with the size in px, pt and mm, the format and resolution (the same as Settings → Export), the fonts the drawing asks for and whether the browser has them (diagnosed only; fonts are not embedded), the warnings of the chart, and the known limits (PDF is a picture; an SVG does not carry its fonts); it can copy this as a JSON report. A graph can have a print width (Inspector → size: 90, 140, 180 mm or your own): the dialog then warns when text would print below 6 pt or a line below 0.25 pt (guideline values, not checked against a journal). Only one export runs at a time. Ctrl or Cmd+S saves the project.
+- The decimal separator of Settings → Numbers in tables (point, comma or automatic) decides how numbers are read, shown, edited, copied and exported to CSV, so what is written reads back as the same number. There is no thousands separator: it is neither read nor written, so `1.234` is the decimal 1.234, never 1234, and `1.234,5` is refused. Point and comma are strict (the other character is refused); automatic reads either, writes points, and refuses `1,234` as ambiguous. In comma mode CSV files are semicolon-separated. A pasted block with rows of different lengths is padded with missing values.
 - Tables, graphs and results can be duplicated and deleted from the navigator (deleting a table takes its graphs and results with it); both can be undone, and the panels can be resized by their edges.
 - A curve fit gives no errors or bands when the fit did not converge; its parameter intervals and bands are at the confidence level chosen, and the Results are copied at full precision.
 

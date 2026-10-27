@@ -1,6 +1,7 @@
 import type { ChartStyle, ChartType, DataTable, Id, PointLabelPlacement, Selection } from '../../../model/types';
 import { LABEL_OFFSET_LIMITS, type Box, type PlacementCode, type PointLabelModel } from '../../../chart/shared/parts/labels';
 import { LABEL_STYLE_KEYS } from '../../../model/graph/style';
+import { groupRowTitle } from '../../../model/table/rows';
 import { describePointLabelUi, placementPatch, type PointLabelUi } from './pointLabelUi';
 
 /** What the Inspector edits for the current selection, and the selection to fall back to when it is stale. */
@@ -32,7 +33,7 @@ export function pointSelectionState(table: DataTable, selection: Selection, type
   if (selection.kind === 'group') return inGroup;
   const row = type === 'mean' ? -1 : group.observations.findIndex((o) => o.id === selection.pointId);
   if (row < 0) return { ...inGroup, fallback: { kind: 'group', groupId: group.id } };
-  return { ...inGroup, pointId: selection.pointId, row, rowTitle: table.rows[row]?.title ?? '' };
+  return { ...inGroup, pointId: selection.pointId, row, rowTitle: groupRowTitle(table, group, row) };
 }
 
 type PointLabelMode = 'inherit' | 'show' | 'hide';

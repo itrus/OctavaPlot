@@ -8,10 +8,11 @@ import { sanitizeAxis } from '../model/graph/axis';
 import { analysisTypeInfo } from '../model/project/analysis';
 import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
-import { sanitizeLook } from '../model/graph/look';
+import { sanitizeLegendLayout, withoutLegendLayout } from '../model/graph/legendEntries';
+import { sanitizeLook, sanitizePrintWidthMm } from '../model/graph/look';
 import { applyOrder, sanitizeOrder } from '../model/table/groupOrder';
 import { foldGroupGaps } from '../model/options/columnOptions';
-import { createRows, sanitizeRowTitle } from '../model/table/rows';
+import { createRows, MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
 import { defaultLayout, sanitizeLayout } from '../model/project/layout';
 import type { Analysis, Chart, ChartLayer, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SummarySpec } from '../model/types';
@@ -54,12 +55,23 @@ function parseRows(raw: unknown, path: string, rowCount: number): DataRow[] {
   });
 }
 
-/** A stored layout; anything unrecognised means a single Y value. */
-function parseLayout(raw: unknown): ReplicateLayout | undefined {
-  if (!isObj(raw)) return undefined;
-  if (raw.kind === 'replicates' && typeof raw.n === 'number' && Number.isInteger(raw.n) && raw.n >= MIN_REPLICATES && raw.n <= MAX_REPLICATES) return { kind: 'replicates', n: raw.n };
-  if (raw.kind === 'summary' && SUMMARY_FORMATS.some((f) => f.id === raw.format)) return { kind: 'summary', format: raw.format as SummaryFormat };
-  return undefined;
+/**
+ * A stored layout. Absent or {"kind":"single"} means a single Y value. Anything else that is not a valid replicate or
+ * summary layout is refused: reading it as single values would change what the columns mean.
+ */
+function parseLayout(raw: unknown, path: string): ReplicateLayout | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!isObj(raw)) fail(path, 'must be an object');
+  if (raw.kind === 'single') return undefined;
+  if (raw.kind === 'replicates') {
+    if (typeof raw.n === 'number' && Number.isInteger(raw.n) && raw.n >= MIN_REPLICATES && raw.n <= MAX_REPLICATES) return { kind: 'replicates', n: raw.n };
+    fail(`${path}.n`, `must be a whole number from ${MIN_REPLICATES} to ${MAX_REPLICATES}`);
+  }
+  if (raw.kind === 'summary') {
+    if (SUMMARY_FORMATS.some((f) => f.id === raw.format)) return { kind: 'summary', format: raw.format as SummaryFormat };
+    fail(`${path}.format`, `must be one of ${SUMMARY_FORMATS.map((f) => f.id).join(', ')}`);
+  }
+  fail(`${path}.kind`, 'must be single, replicates or summary');
 }
 
 /** Stored survival options merged over the defaults; a level outside 0 to 1 or an unknown method falls back. */
@@ -81,6 +93,10 @@ function parseTable(raw: unknown, path: string): DataTable {
   const t = obj(raw, path);
   const rowCount = num(t.rowCount, `${path}.rowCount`);
   if (!Number.isInteger(rowCount) || rowCount < 0) fail(`${path}.rowCount`, 'must be a non-negative integer');
+  // Declared sizes are checked before anything is allocated for them.
+  if (rowCount > MAX_TABLE_ROWS) fail(`${path}.rowCount`, `is ${rowCount.toLocaleString('en-US')}; a table holds at most ${MAX_TABLE_ROWS.toLocaleString('en-US')} rows`);
+  const columns = arr(t.groups, `${path}.groups`).length;
+  if (rowCount * columns > MAX_TABLE_CELLS) fail(path, `declares ${rowCount.toLocaleString('en-US')} rows in ${columns} columns; a table holds at most ${MAX_TABLE_CELLS.toLocaleString('en-US')} cells`);
   const ids = new Set<string>();
   const obsIds = new Set<string>();
   const groups: Group[] = arr(t.groups, `${path}.groups`).map((rg, gi) => {
@@ -110,7 +126,7 @@ function parseTable(raw: unknown, path: string): DataTable {
   const kind: TableKind = TABLE_KINDS.find((k) => k === t.kind) ?? 'column';
   const lead = leadingColumns(kind);
   if (groups.length < lead) fail(`${path}.groups`, `a ${kind} table needs its first column (${kind === 'survival' ? 'time' : 'X'})`);
-  const layout = kind === 'xy' || kind === 'grouped' ? parseLayout(t.layout) : undefined;
+  const layout = kind === 'xy' || kind === 'grouped' ? parseLayout(t.layout, `${path}.layout`) : undefined;
   if (layout && (groups.length - lead) % seriesWidth(layout) !== 0) fail(`${path}.groups`, `do not fit the table layout: the columns must come in blocks of ${seriesWidth(layout)}`);
   return { id: str(t.id, `${path}.id`), name: str(t.name, `${path}.name`), kind, ...(layout ? { layout } : {}), rowCount, rows: parseRows(t.rows, `${path}.rows`, rowCount), groups };
 }
@@ -167,7 +183,7 @@ const isHexColour = (v: unknown): boolean => typeof v === 'string' && /^#[0-9a-f
 /**
  * Checks the keys of `raw` that `base` (the defaults) also has against the type of the default: a number must be
  * a finite number, text text, a flag true or false, a list a list, an object an object (checked in turn). A key whose
- * default is null holds a number or null; or, if its name ends in "colour", a #rrggbb colour or null; or, if it ends in "Id", an ID or null. A key that
+ * default is null holds a number or null; or, if its name ends in "colour" (or is "mid", the middle colour of a heat map scale), a #rrggbb colour or null; or, if it ends in "Id", an ID or null. A key that
  * fails is taken out, so the default applies, and noted. Keys `base` does not have, and the keys in `skip`, stay as they are.
  */
 function conform(raw: Obj, base: Obj, path: string, notes: string[], skip: ReadonlySet<string> = new Set()): Obj {
@@ -183,7 +199,7 @@ function conform(raw: Obj, base: Obj, path: string, notes: string[], skip: Reado
       ok = isObj(got);
       if (ok) out[key] = conform(got as Obj, want, `${path}.${key}`, notes);
     } else if (Array.isArray(want)) ok = Array.isArray(got);
-    else if (want === null) ok = /colou?r$/i.test(key) ? isHexColour(got) : /Id$/.test(key) ? typeof got === 'string' : typeof got === 'number' && Number.isFinite(got);
+    else if (want === null) ok = /colou?r$|^mid$/i.test(key) ? isHexColour(got) : /Id$/.test(key) ? typeof got === 'string' : typeof got === 'number' && Number.isFinite(got);
     else if (typeof want === 'number') ok = typeof got === 'number' && Number.isFinite(got);
     else ok = typeof got === typeof want;
     if (!ok) {
@@ -342,10 +358,37 @@ function cleanReferenceLines(raw: unknown, path: string, notes: string[]): Chart
   return out;
 }
 
-function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: string[]): Chart {
+/**
+ * Data sets taken from other tables. An entry that cannot be read, or a data set listed twice, refuses the file (which
+ * of two copies is meant would be a guess). An entry whose table or data set no longer exists is dropped, with a note: the
+ * data set is gone, so the graph never showed it.
+ */
+function parseExtraGroups(raw: unknown, path: string, tables: DataTable[], notes: string[]): Chart['extraGroups'] {
+  if (raw === undefined) return [];
+  const seen = new Set<string>();
+  const out: Chart['extraGroups'] = [];
+  arr(raw, path).forEach((e, i) => {
+    const ep = `${path}[${i}]`;
+    const o = obj(e, ep);
+    const tableId = str(o.tableId, `${ep}.tableId`);
+    const groupId = str(o.groupId, `${ep}.groupId`);
+    const table = tables.find((t) => t.id === tableId);
+    const key = JSON.stringify([tableId, groupId]);
+    if (seen.has(key)) fail(ep, 'lists the same data set twice');
+    seen.add(key);
+    if (!table || !table.groups.some((g) => g.id === groupId)) {
+      notes.push(`${ep} named a data set that does not exist (${table ? 'missing data set' : 'missing data table'}) and was dropped.`);
+      return;
+    }
+    out.push({ tableId, groupId, ...(Number.isInteger(o.slot) && (o.slot as number) >= 0 ? { slot: o.slot as number } : {}) });
+  });
+  return out;
+}
+
+function parseChart(raw: unknown, path: string, tables: DataTable[], notes: string[]): Chart {
   const c0 = obj(raw, path);
   const dataTableId = str(c0.dataTableId, `${path}.dataTableId`);
-  if (!tableIds.has(dataTableId)) fail(`${path}.dataTableId`, 'refers to a missing data table');
+  if (!tables.some((t) => t.id === dataTableId)) fail(`${path}.dataTableId`, 'refers to a missing data table');
   if (typeof c0.type !== 'string' || !CHART_TYPES.some((t) => t.type === c0.type)) fail(`${path}.type`, `must be one of ${CHART_TYPES.map((t) => t.type).join(', ')}`);
   const base = createChart(dataTableId, undefined, c0.type as ChartType);
   // Styles and layers have their own checks below.
@@ -363,12 +406,11 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     ...(c as Partial<Chart>),
     widthPx: typeof c.widthPx === 'number' ? c.widthPx : base.widthPx,
     heightPx: typeof c.heightPx === 'number' ? c.heightPx : base.heightPx,
+    printWidthMm: sanitizePrintWidthMm(c.printWidthMm),
     groupOrder: sanitizeOrder(c.groupOrder),
     hiddenGroupIds: Array.isArray(c.hiddenGroupIds) ? c.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
     survival: parseSurvival(c.survival),
-    extraGroups: Array.isArray(c.extraGroups)
-      ? c.extraGroups.flatMap((e) => (isObj(e) && typeof e.tableId === 'string' && typeof e.groupId === 'string' ? [{ tableId: e.tableId, groupId: e.groupId }] : []))
-      : [],
+    extraGroups: parseExtraGroups(c.extraGroups, `${path}.extraGroups`, tables, notes),
     aspect: c.aspect === '4:3' || c.aspect === '3:4' || c.aspect === '1:1' ? c.aspect : 'free',
     paletteId: typeof c.paletteId === 'string' ? c.paletteId : null,
     ...sanitizeLook(c, base),
@@ -377,9 +419,10 @@ function parseChart(raw: unknown, path: string, tableIds: Set<string>, notes: st
     y2Axis: sanitizeAxis({ ...base.y2Axis, ...(isObj(c.y2Axis) ? c.y2Axis : {}) }, base.y2Axis),
     legend: {
       ...base.legend,
-      ...legendIn,
+      ...withoutLegendLayout(legendIn),
       keyShape: legendIn.keyShape === 'square' ? 'square' : 'rectangle',
       hiddenGroupIds: Array.isArray(legendIn.hiddenGroupIds) ? legendIn.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
+      ...sanitizeLegendLayout(legendIn),
     },
     jitter: { ...base.jitter, ...(isObj(c.jitter) ? c.jitter : {}) },
     defaults: { ...DEFAULT_STYLE, ...defaults },
@@ -416,34 +459,56 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
   const dataTables = arr(p.dataTables, 'project.dataTables').map((t, i) => parseTable(t, `project.dataTables[${i}]`));
   const tableIds = new Set(dataTables.map((t) => t.id));
   if (tableIds.size !== dataTables.length) fail('project.dataTables', 'has two tables with the same ID');
-  const charts = arr(p.charts, 'project.charts').map((c, i) => parseChart(c, `project.charts[${i}]`, tableIds, notes));
+  const charts = arr(p.charts, 'project.charts').map((c, i) => parseChart(c, `project.charts[${i}]`, dataTables, notes));
   if (new Set(charts.map((c) => c.id)).size !== charts.length) fail('project.charts', 'has two graphs with the same ID');
   if (dataTables.length === 0) fail('project.dataTables', 'must contain at least one table');
-  // Analyses refer to tables by ID: one whose table is gone, or that is not recognised, is dropped.
-  const analyses: Analysis[] = (Array.isArray(p.analyses) ? p.analyses : []).flatMap((a): Analysis[] => {
-    if (!isObj(a) || typeof a.id !== 'string' || (a.kind !== 'descriptive' && a.kind !== 'curvefit') || typeof a.dataTableId !== 'string' || !tableIds.has(a.dataTableId)) return [];
-    const kind = a.kind;
-    const level = typeof a.level === 'number' && a.level > 0 && a.level < 1 ? a.level : 0.95;
-    const name = typeof a.name === 'string' && a.name !== '' ? a.name : analysisTypeInfo(kind).label;
-    if (kind === 'descriptive') return [{ id: a.id, name, kind, dataTableId: a.dataTableId, level }];
-    // A curve fit applies to an XY table and names one of the models; one that does not is dropped.
-    const model = FIT_MODEL_IDS.find((m) => m === a.model);
-    if (!model || dataTables.find((t) => t.id === a.dataTableId)?.kind !== 'xy') return [];
-    return [{ id: a.id, name, kind, dataTableId: a.dataTableId, level, model, degree: sanitizeDegree(a.degree, 2) }];
-  });
-  // Older files held a space before each data set: it is now part of Space between columns (and never kept as it was).
-  for (const c of charts) {
+  // Analyses refer to tables by ID. Each must be readable and have an ID of its own, or the file is refused. One whose table no
+  // longer exists is dropped, with a note (its results were of that table). A confidence level that cannot be read is reset, with a note.
+  const analyses: Analysis[] = [];
+  const analysisIds = new Set<string>();
+  arr(p.analyses === undefined ? [] : p.analyses, 'project.analyses').forEach((a, i) => {
+    const ap = `project.analyses[${i}]`;
+    const o = obj(a, ap);
+    const id = str(o.id, `${ap}.id`);
+    if (id === '') fail(`${ap}.id`, 'must not be empty');
+    if (analysisIds.has(id)) fail(`${ap}.id`, 'is duplicated');
+    analysisIds.add(id);
+    if (o.kind !== 'descriptive' && o.kind !== 'curvefit') fail(`${ap}.kind`, 'must be descriptive or curvefit');
+    const kind = o.kind;
+    const dataTableId = str(o.dataTableId, `${ap}.dataTableId`);
+    const table = dataTables.find((t) => t.id === dataTableId);
+    if (!table) {
+      notes.push(`${ap} ("${typeof o.name === 'string' ? o.name : kind}") was of a data table that does not exist and was dropped.`);
+      return;
+    }
+    let level = 0.95;
+    if (o.level !== undefined) {
+      if (typeof o.level === 'number' && o.level > 0 && o.level < 1) level = o.level;
+      else notes.push(`${ap}.level had an invalid value and was reset to 0.95.`);
+    }
+    const name = typeof o.name === 'string' && o.name !== '' ? o.name : analysisTypeInfo(kind).label;
+    if (kind === 'descriptive') {
+      analyses.push({ id, name, kind, dataTableId, level });
+      return;
+    }
+    // A curve fit applies to an XY table and names one of the models.
+    const model = FIT_MODEL_IDS.find((m) => m === o.model);
+    if (!model) fail(`${ap}.model`, `must be one of ${FIT_MODEL_IDS.join(', ')}`);
+    if (table.kind !== 'xy') fail(`${ap}.dataTableId`, 'must be an XY table for a curve fit');
+    analyses.push({ id, name, kind, dataTableId, level, model, degree: sanitizeDegree(o.degree, 2) });
+  });  // Older files held a space before each data set: it is now part of Space between columns (and never kept as it was).
+  for (const [ci, c] of charts.entries()) {
     const legacy = (c as unknown as Record<string, unknown>).groupGaps;
     delete (c as unknown as Record<string, unknown>).groupGaps;
     const table = dataTables.find((t) => t.id === c.dataTableId);
     if (!table || legacy === undefined) continue;
     const folded = foldGroupGaps(legacy, applyOrder(table.groups, c.groupOrder).map((g) => g.id), c.bars);
     c.bars = folded.bars;
-    if (folded.note) notes.push(`Graph "${c.name}": ${folded.note}`);
+    if (folded.note) notes.push(`project.charts[${ci}] ("${c.name}"): ${folded.note}`);
   }
   // A link refers to another graph: one to a graph that is missing, to itself, or round in a circle is dropped.
   const linkOf = new Map(charts.map((c) => [c.id, typeof c.linkedTo === 'string' ? c.linkedTo : undefined]));
-  for (const c of charts) {
+  for (const [ci, c] of charts.entries()) {
     let at: string | undefined = c.linkedTo;
     const seen = new Set<string>([c.id]);
     while (at !== undefined && charts.some((x) => x.id === at) && !seen.has(at)) {
@@ -451,25 +516,32 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
       at = linkOf.get(at);
     }
     if (c.linkedTo !== undefined && (typeof c.linkedTo !== 'string' || at !== undefined)) {
-      notes.push(`Graph "${c.name}" was linked to a graph that is missing or to itself; the link was removed.`);
+      notes.push(`project.charts[${ci}].linkedTo ("${c.name}") referred to a graph that is missing or to itself; the link was removed.`);
       delete c.linkedTo;
     }
   }
-  // Layouts refer to graphs by ID: a panel whose graph is gone is emptied; a layout without an ID is dropped.
+  // Layouts refer to graphs by ID: a panel whose graph is gone is emptied, with a note. A layout must be an object with an ID.
   const chartIds = new Set(charts.map((c) => c.id));
-  const layouts: Layout[] = (Array.isArray(p.layouts) ? p.layouts : []).flatMap((l): Layout[] => {
-    if (!isObj(l) || typeof l.id !== 'string') return [];
-    const made = sanitizeLayout(l, defaultLayout(l.id, typeof l.name === 'string' && l.name.trim() !== '' ? l.name.trim() : 'Layout'));
-    return [{ ...made, panels: made.panels.map((id) => (id !== null && chartIds.has(id) ? id : null)) }];
+  const layouts: Layout[] = arr(p.layouts === undefined ? [] : p.layouts, 'project.layouts').map((l, li) => {
+    const lp = `project.layouts[${li}]`;
+    const o = obj(l, lp);
+    const id = str(o.id, `${lp}.id`);
+    const made = sanitizeLayout(o, defaultLayout(id, typeof o.name === 'string' && o.name.trim() !== '' ? o.name.trim() : 'Layout'));
+    const panels = made.panels.map((pid, pi) => {
+      if (pid === null || chartIds.has(pid)) return pid;
+      notes.push(`${lp}.panels[${pi}] referred to a graph that is missing and was emptied.`);
+      return null;
+    });
+    return { ...made, panels };
   });
   if (new Set(layouts.map((l) => l.id)).size !== layouts.length) fail('project.layouts', 'has two layouts with the same ID');
   // A chart type that does not suit its table's type (a hand-edited file) is switched to the table's default chart
   // type, so a graph is never drawn with the wrong reading of the columns.
-  for (const c of charts) {
+  for (const [ci, c] of charts.entries()) {
     const kind = dataTables.find((t) => t.id === c.dataTableId)?.kind ?? 'column';
     if (chartTypeInfo(c.type)?.tableKind !== kind) {
       const fixed = defaultChartTypeFor(kind);
-      notes.push(`Graph "${c.name}" was a ${c.type} chart of a ${kind} table; it was changed to ${fixed}.`);
+      notes.push(`project.charts[${ci}].type ("${c.name}") was a ${c.type} chart of a ${kind} table; it was changed to ${fixed}.`);
       c.type = fixed;
       c.layers = c.layers.map((l) => ({ ...l, style: { ...l.style, ...TYPE_PRESETS[fixed] } }));
     }

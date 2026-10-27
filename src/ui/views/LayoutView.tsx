@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { drawLayout, layoutPngSize, layoutToPdfBlob, layoutToPngBlob, layoutToSvgString } from '../../chart/export/layoutExport';
+import { FONT_FAMILY } from '../../model/defaults';
 import { clampFrame, FREE_MAX, GAP_MM_MAX, GRID_MAX, LABEL_PT_MAX, LABEL_PT_MIN, MARGIN_MM_MAX, pageMm, PERCENT_MAX, PERCENT_MIN, standardArrangements, sameArrangement } from '../../model/project/layout';
 import type { FrameMm, Layout, LayoutArrangement, LayoutScaling, PanelLabelStyle } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { addFreePanel, freeLayout, patchLayout, removeFreePanel, removeLayout, setFrame, setLayoutPanel } from '../../state/commands';
 import { downloadBlob, exportFileName } from '../../util/download';
+import { exportStatusText } from '../export/exportJob';
+import { ExportDialog } from '../export/ExportDialog';
+import { useExportJob } from '../export/useExportJob';
 import { DeleteIcon, ExportIcon } from '../components/icons';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, TextInput } from '../inspector/common/controls';
 
 const CANVAS_PAD = 24;
 const SCROLLBAR_ROOM = 17;
-/** Browsers limit the size of a canvas. */
-const PNG_MAX_SIDE = 16000;
 
 const LABEL_STYLES: ReadonlyArray<{ value: PanelLabelStyle; label: string }> = [
   { value: 'A', label: 'A, B, C' },
@@ -142,27 +144,35 @@ function LayoutPage({ layout }: { layout: Layout }) {
     setDrag(null);
   };
 
-  const exportSvg = () => {
-    try {
-      downloadBlob(new Blob([layoutToSvgString(layout, project)], { type: 'image/svg+xml' }), exportFileName(layout.name, 'svg', settings.timestampExports));
-      setStatus('Exported SVG.');
-    } catch (err) {
-      setStatus(`SVG export failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  };
-  const exportRaster = async (kind: 'png' | 'pdf') => {
+  // One export at a time: while one runs the Export button is disabled, and a second start is ignored.
+  const exportJob = useExportJob(setStatus);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportSvg = () =>
+    exportJob.start({
+      label: 'SVG',
+      pixels: null,
+      tooBigMessage: '',
+      work: async (phase) => {
+        phase('encoding');
+        downloadBlob(new Blob([layoutToSvgString(layout, project)], { type: 'image/svg+xml' }), exportFileName(layout.name, 'svg', settings.timestampExports));
+        return 'Exported SVG.';
+      },
+    });
+  const exportRaster = (kind: 'png' | 'pdf') => {
     const { width, height } = layoutPngSize(layout, dpi);
-    if (Math.max(width, height) > PNG_MAX_SIDE) {
-      setStatus(`${kind.toUpperCase()} export at ${dpi} dpi needs ${width} × ${height} px, more than the browser can make. Choose a lower resolution, or export SVG.`);
-      return;
-    }
-    try {
-      const blob = kind === 'png' ? await layoutToPngBlob(layout, project, dpi) : await layoutToPdfBlob(layout, project, dpi);
-      downloadBlob(blob, exportFileName(layout.name, kind, settings.timestampExports));
-      setStatus(`Exported ${kind.toUpperCase()}, ${width} × ${height} px (${dpi} dpi).`);
-    } catch (err) {
-      setStatus(`${kind.toUpperCase()} export failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    const name = kind.toUpperCase();
+    return exportJob.start({
+      label: name,
+      pixels: { width, height },
+      tooBigMessage: `${name} export at ${dpi} dpi needs ${width} × ${height} px, more than the browser can make. Choose a lower resolution, or export SVG.`,
+      work: async (phase) => {
+        phase('rasterizing');
+        const blob = kind === 'png' ? await layoutToPngBlob(layout, project, dpi) : await layoutToPdfBlob(layout, project, dpi);
+        phase('encoding');
+        downloadBlob(blob, exportFileName(layout.name, kind, settings.timestampExports));
+        return `Exported ${name}, ${width} × ${height} px (${dpi} dpi).`;
+      },
+    });
   };
 
   const standards = standardArrangements(layout.orientation);
@@ -198,13 +208,33 @@ function LayoutPage({ layout }: { layout: Layout }) {
         <span className="toolbar-info">{layout.orientation === 'landscape' ? 'A4 landscape, 297 × 210 mm' : 'A4 portrait, 210 × 297 mm'}</span>
         <button
           className="icon-text toolbar-end"
-          onClick={() => void (settings.exportFormat === 'svg' ? exportSvg() : exportRaster(settings.exportFormat))}
-          title={`Export the page as ${settings.exportFormat.toUpperCase()}${settings.exportFormat === 'svg' ? ' (vector)' : ` at ${dpi} dpi`} (the format and resolution are chosen in Settings)`}
+          disabled={exportJob.busy}
+          onClick={() => setExportOpen(true)}
+          title="Export the page: format, resolution, size, fonts and notices are shown first"
         >
           <ExportIcon />
           Export
         </button>
+        {exportJob.busy && <span className="toolbar-info export-status" role="status">{exportStatusText(exportJob.state)}</span>}
       </div>
+      {exportOpen && (
+        <ExportDialog
+          kind="layout"
+          subject={{
+            name: layout.name,
+            widthPx: (drawing.widthPt * 96) / 72,
+            heightPx: (drawing.heightPt * 96) / 72,
+            // The page's own font (labels and title), then those of the graphs on it.
+            fontFamilies: [FONT_FAMILY, ...layout.panels.flatMap((id) => project.charts.find((c) => c.id === id)?.fontFamily ?? [])],
+            warnings: drawing.notices,
+            printWidthMm: null,
+            printWarnings: [],
+          }}
+          state={exportJob.state}
+          onExport={() => (settings.exportFormat === 'svg' ? exportSvg() : exportRaster(settings.exportFormat))}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
       <div className="layout-body">
         <div className="chart-scroller" ref={scrollerRef}>
           <div className="chart-wrap" style={{ width: pageW }}>

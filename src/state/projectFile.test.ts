@@ -153,9 +153,9 @@ describe('project file (.oplot)', () => {
   });
 
   it('matches the checked-in example file', async () => {
-    // tests/fixtures/example.oplot is written by this test when it is missing. To regenerate it after a deliberate
+    // docs/example.oplot is written by this test when it is missing. To regenerate it after a deliberate
     // change of the format, delete the file and run `npm test`; review the new file in the diff.
-    const path = resolve(__dirname, '../../tests/fixtures/example.oplot');
+    const path = resolve(__dirname, '../../docs/example.oplot');
     const example = createExampleProject();
     const chart = { ...example.charts[0], id: 'chart-1', dataTableId: 'table-1', layers: example.charts[0].layers.map((l, i) => ({ ...l, id: `layer-${i}` })) };
     const project: Project = {

@@ -104,3 +104,26 @@ describe('bin edges of large values', () => {
     expect(binHeights(counts, edges, 3, 'density', 'off').every(Number.isFinite)).toBe(true);
   });
 });
+
+describe('every observation falls in exactly one bin', () => {
+  const total = (v: number[]) => {
+    const sorted = [...v].sort((a, b) => a - b);
+    const edges = binEdges(sorted, autoBinWidth(sorted));
+    const { counts, outside } = countBins(sorted, edges);
+    return { sum: counts.reduce((a, b) => a + b, 0), outside, edges };
+  };
+  it.each([
+    ['tiny gap', [1, 1 + 1e-15]],
+    ['tiny gaps, several', [1, 1 + 1e-15, 1 + 2e-15, 1 + 4e-15]],
+    ['huge magnitude', [1e300, 1.5e300, 2e300, 9.9e307]],
+    ['large offset', [1e15, 1e15 + 1, 1e15 + 2, 1e15 + 3]],
+    ['ties', [2, 2, 2, 5, 5, 9]],
+    ['negative', [-7.3, -1e-9, -2.2, -100]],
+    ['a single repeated value', [4, 4, 4, 4]],
+    ['a single repeated tiny gap value', [0.1 + 0.2, 0.1 + 0.2]],
+  ])('%s', (_name, v) => {
+    const { sum, outside } = total(v);
+    expect(outside).toBe(0);
+    expect(sum).toBe(v.length);
+  });
+});

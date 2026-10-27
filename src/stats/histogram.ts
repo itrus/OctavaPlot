@@ -42,11 +42,15 @@ export function binEdges(sorted: readonly number[], width: number, anchor: numbe
   const origin = anchor ?? 0;
   let first = origin + Math.floor((lo - origin) / width + 1e-9) * width;
   if (first > lo) first -= width;
-  const edges = [clean(first)];
-  // Edges must strictly increase: a width below the resolution of the values cannot make bins.
+  // Rounding is only for show: where it would move the first edge above the smallest value, the exact edge is kept.
+  const edges = [clean(first) <= lo ? clean(first) : first];
+  // Edges must strictly increase: a width below the resolution of the values cannot make bins. Where rounding would
+  // merge two edges (gaps below 15 digits), the exact edge is used so that no value is left outside the last one.
   const next = (k: number) => {
-    const e = clean(first + k * width);
-    return e > edges[edges.length - 1] ? e : null;
+    const prev = edges[edges.length - 1];
+    const raw = first + k * width;
+    const e = clean(raw);
+    return e > prev ? e : raw > prev ? raw : null;
   };
   while (edges[edges.length - 1] <= hi + width * 1e-9 && edges.length <= maxBins) {
     const e = next(edges.length);

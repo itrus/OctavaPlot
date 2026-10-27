@@ -72,3 +72,55 @@ describe('a style or axis edit does not calculate again (metamorphic)', () => {
     expect(summaryOf(values, { ...DEFAULT_SUMMARY, spread: 'sd' })).toBe(a);
   });
 });
+
+describe('the cost of a key and the size of the cache', () => {
+  beforeEach(clearCalcCache);
+
+  it('a fresh array with the same numbers finds the result, a changed number does not', () => {
+    let n = 0;
+    const calc = (data: number[]) => cachedCalc(id({ data }), () => ++n);
+    calc([1, 2, 3]);
+    calc([1, 2, 3]);
+    expect(n).toBe(1);
+    calc([1, 2, 3.0000000001]);
+    expect(n).toBe(2);
+  });
+  it('the second lookup of a large array does not walk it again', () => {
+    const data = Array.from({ length: 1_000_000 }, (_, i) => i * 0.5);
+    const t0 = performance.now();
+    calcKey(id({ data }));
+    const first = performance.now() - t0;
+    const t1 = performance.now();
+    for (let i = 0; i < 100; i++) calcKey(id({ data }));
+    const hundred = performance.now() - t1;
+    // A hundred repeats cost less than one walk of the data would.
+    expect(hundred).toBeLessThan(first);
+    expect(calcKey(id({ data }))).toBe(calcKey(id({ data: data.slice() })));
+  });
+  it('keeps results by the size of their input, dropping the least recently used first', () => {
+    let n = 0;
+    const big = (k: number) => Array.from({ length: 1_000_000 }, (_, i) => i + k);
+    const calc = (k: number) => cachedCalc(id({ data: big(k) }), () => ++n);
+    calc(0);
+    calc(1);
+    calc(2);
+    calc(0); // 0 is now the most recent of three
+    expect(n).toBe(3);
+    calc(3);
+    calc(4); // five million of input: the oldest (1, then 2) are dropped
+    const before = n;
+    calc(0);
+    expect(n).toBe(before);
+    calc(1);
+    expect(n).toBe(before + 1);
+  });
+  it('does not keep an input larger than the whole budget, and does not keep a throw', () => {
+    let n = 0;
+    const huge = Array.from({ length: 4_100_000 }, () => 1);
+    cachedCalc(id({ data: huge }), () => ++n);
+    cachedCalc(id({ data: huge }), () => ++n);
+    expect(n).toBe(2);
+    expect(() => cachedCalc(id(), () => { throw new Error('x'); })).toThrow();
+    expect(cachedCalc(id(), () => 'ok')).toBe('ok');
+  });
+});

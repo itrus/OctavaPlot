@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createChart } from '../../../model/defaults';
 import type { AxisConfig } from '../../../model/types';
 import { TICK_LENGTH_PT as TICK_LENGTH } from '../../../model/defaults';
+import { FONT_FAMILY } from '../../../model/defaults';
+import { measureText } from './text';
 import { AXIS_TITLE_GAP, Y_TICK_LABEL_GAP, computeLayout, type LayoutInput } from './layout';
 
 // Without a canvas measureText is len * fontSize * 0.58 (bold), so widths are exact.
@@ -109,5 +111,43 @@ describe('computeLayout right axis', () => {
     expect(l.plot.x).toBe(14);
     expect(l.plot.width).toBeCloseTo(800 - 14 - 14 - 63.484, 3);
     expect(l.yTitle).toBeNull();
+  });
+});
+
+describe('computeLayout legend columns', () => {
+  const legend = (position: 'right' | 'top' | 'bottom', columns?: number) => ({ visible: true, keyShape: 'rectangle' as const, position, fontSizePt: 22.4, hiddenGroupIds: [], ...(columns ? { columns } : {}) });
+  const labels = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'];
+
+  it('one column is the layout there always was', () => {
+    const one = computeLayout(input({ legend: legend('right'), legendLabels: labels }));
+    expect(computeLayout(input({ legend: legend('right', 1), legendLabels: labels }))).toEqual(one);
+    expect(new Set(one.legend!.items.map((i) => i.x)).size).toBe(1);
+  });
+  it('two columns set the entries in rows of two, measured from the text', () => {
+    const l = computeLayout(input({ legend: legend('right', 2), legendLabels: labels }));
+    const items = l.legend!.items;
+    expect(items.map((i) => i.index)).toEqual([0, 1, 2, 3, 4]);
+    expect(items[1].x).toBeGreaterThan(items[0].x);
+    expect(items[2].x).toBe(items[0].x);
+    expect(items[1].y).toBe(items[0].y);
+    expect(items[2].y).toBeGreaterThan(items[0].y);
+    expect(l.legend!.rect.height).toBeCloseTo(3 * 22.4 * 1.55, 3);
+    // The first column is as wide as Epsilon, the widest of Alpha, Gamma and Epsilon.
+    const col0 = 36 + 10 + measureText('Epsilon', 22.4, false, false, FONT_FAMILY);
+    expect(items[1].x - items[0].x).toBeCloseTo(col0 + 28, 1);
+  });
+  it('the plot area shrinks to make room for a wider legend', () => {
+    const one = computeLayout(input({ legend: legend('right'), legendLabels: labels }));
+    const two = computeLayout(input({ legend: legend('right', 2), legendLabels: labels }));
+    expect(two.plot.width).toBeLessThan(one.plot.width);
+    expect(two.legend!.rect.x + two.legend!.rect.width).toBeLessThanOrEqual(800 - 14 + 0.001);
+    expect(two.plot.x + two.plot.width).toBeLessThanOrEqual(two.legend!.rect.x);
+  });
+  it('a legend at the top or bottom in columns takes the height of its rows from the plot', () => {
+    const plain = computeLayout(input({ legend: { ...legend('top'), visible: false }, legendLabels: labels }));
+    const top = computeLayout(input({ legend: legend('top', 2), legendLabels: labels }));
+    expect(plain.plot.height - top.plot.height).toBeCloseTo(3 * 22.4 * 1.55 + 12, 3);
+    const bottom = computeLayout(input({ legend: legend('bottom', 5), legendLabels: labels }));
+    expect(new Set(bottom.legend!.items.map((i) => i.y)).size).toBe(1);
   });
 });

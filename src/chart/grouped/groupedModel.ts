@@ -1,17 +1,20 @@
 import { rowTitleAt } from '../../model/table/rows';
 import { isGroupedChartType, supportsHorizontal } from '../../model/graph/chartTypes';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
+import { legendEntries } from '../../model/graph/legendEntries';
 import { resolveSummary } from '../../model/graph/summary';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
 import type { Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
+import { resolveBarFill } from '../../model/graph/fill';
 import { chartPx2Pt, extent, n2 } from '../../model/units';
 import { summaryOf, type GroupStats } from '../../stats/summary';
 import { boxSummary, densityProfile, normaliseProfiles, quantile6, sortedFinite, type BoxSummary, type DensityProfile } from '../../stats/distribution';
 import { buildBox, buildViolin, type DistGeom } from '../shared/parts/distributionGeom';
-import { buildErrorBar, clippedEndpointCount, rangeValuesFor } from '../shared/parts/errorGeometry';
+import { boxNeeds, unplacedMarkNote } from '../shared/parts/distributionNotes';
+import { buildErrorBar, clippedEndpointCount, errorEndValues, rangeValuesFor } from '../shared/parts/errorGeometry';
 import { computeLayout, type Layout } from '../shared/parts/layout';
-import { barLabelText, placeBarLabel, type BarLabelGeom } from '../shared/parts/barLabels';
-import { axisMapper, onAxis, resolveAxis } from '../shared/axes/axisScale';
+import { barLabelText, insideLabelText, placeBarLabel, placeInsideBarLabel, type BarLabelGeom, type InsideLabelGeom } from '../shared/parts/barLabels';
+import { axisMapper, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
 import { layersOf, type LayerSpec } from '../../model/graph/layers';
 import { compileGroupedMarks } from './groupedMarks';
@@ -54,6 +57,8 @@ interface GroupedBar {
   count?: number;
   /** Value or sample size written above the bar, when the chart asks for it (side by side bars only). */
   label?: BarLabelGeom | null;
+  /** Value or sample size written inside the bar, when the chart asks for it (side by side bars only). */
+  insideLabel?: InsideLabelGeom | null;
   /** Floating bars: the lower and upper value of the bar, and the line across it at the centre. */
   range?: [number, number];
   centerLine?: { x1: number; x2: number; y: number };
@@ -180,10 +185,10 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         if (reps.length > 0) span = extent(reps.map((x) => x.value));
         else if (stats?.interval.status === 'ok' && stats.interval.lower !== null && stats.interval.upper !== null) span = [stats.interval.lower, stats.interval.upper];
       }
-      // Box plots and violins work on the replicate values: on a log axis only the ones above 0 count.
+      // Box plots and violins work on all the replicate values, whatever the axis: the axis only decides what of them can be drawn.
       let dist: { values: number[]; summary: BoxSummary | null; profile: DensityProfile | null; sorted: number[] } | null = null;
       if (isDist && reps.length > 0) {
-        const values = reps.map((x) => x.value).filter((v) => chart.yAxis.scale === 'linear' || v > 0);
+        const values = reps.map((x) => x.value);
         dist = { values, summary: chart.type === 'groupedBox' ? boxSummary(values, opts.whisker, opts.tukeyK) : null, profile: chart.type === 'groupedViolin' ? densityProfile(values, { smoothing: opts.smoothing, bandwidth: opts.bandwidth, trim: opts.trim }) : null, sorted: sortedFinite(values) };
         value = dist.sorted.length > 0 ? quantile6(dist.sorted, 0.5) : null;
       }
@@ -234,7 +239,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   warnings.push(...yAxis.warnings);
 
   // 4. Layout with the category labels along the X axis.
-  const legendSeries = raw.map((_, i) => i).filter((i) => !chart.legend.hiddenGroupIds.includes(raw[i].s.id));
+  const legendSeries = legendEntries(chart.legend, raw.map((r) => r.s.id));
   const labels = categoryRows.map((r) => rowTitleAt(table, r).trim() || `Row ${r + 1}`);
   const lay = computeLayout({
     fontFamily: chart.fontFamily,
@@ -273,32 +278,50 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const stackDown = new Array<number>(categoryRows.length).fill(0);
   let clipped = 0;
   let offAxis = 0;
+  let inGap = 0;
+  let gapErrorBars = 0;
   let noSpan = 0;
+  // Marks of a box or violin are made from whole-sample statistics; a value with no place gives no coordinate, so the mark is not drawn.
+  const toYDraw = (v: number) => (placeable(yAxis, v) ? yScale(v) : NaN);
+  // An end inside an omitted range would be drawn at the edge of the gap as if that were its value: the bar is not drawn then.
+  const errorEndInGap = (stats: GroupStats, style: ChartStyle): boolean => {
+    const bad = errorEndValues(stats, style.showErrorBars, style.errorDirection).some((v) => inBreak(yAxis, v));
+    if (bad) gapErrorBars++;
+    return bad;
+  };
   const series: GroupedSeries[] = raw.map((r, si) => {
     const bars: GroupedBar[] = [];
     const points: GroupedPoint[] = [];
     const dots: GroupedPoint[] = [];
-    let linePath = '';
+    // Lines over categories, in data units: a missing category (null) ends a line.
+    const lineSeq: Array<{ x: number; y: number } | null> = [];
     let errorPath = '';
     let errorMeaning: string | null = null;
     let prevCi = -2;
     for (const cell of r.cells) {
       cellIndex++;
       if (cell.value === null) continue;
-      // A value with no position on a log axis (0 or less) is left out and counted.
-      if (!onAxis(yAxis, cell.value)) {
+      // A value with no position on a log axis (0 or less) is left out and counted. A box or a violin is made from the
+      // whole sample, so only what it needs of the axis decides whether it is drawn.
+      if (!isDist && !onAxis(yAxis, cell.value)) {
         offAxis++;
         continue;
       }
+      const valueInGap = !isDist && !floating && arrangement === 'side' && inBreak(yAxis, cell.value);
       const cat = categories[cell.ci];
       const id = `${r.s.id}:${cell.row}`;
       if (asLines) {
         const px = cat.centerX;
-        const py = yScale(cell.value);
-        points.push({ id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, px, py, value: cell.value, stats: cell.stats });
-        linePath += `${cell.ci === prevCi + 1 ? 'L' : 'M'}${n2(px)},${n2(py)}`;
+        if (cell.ci !== prevCi + 1) lineSeq.push(null);
+        lineSeq.push({ x: px, y: cell.value });
         prevCi = cell.ci;
-        if (cell.stats) {
+        // A value inside an omitted range has no point, but the line still runs to the edge of the gap.
+        if (valueInGap) {
+          inGap++;
+          continue;
+        }
+        points.push({ id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, px, py: yScale(cell.value), value: cell.value, stats: cell.stats });
+        if (cell.stats && !errorEndInGap(cell.stats, r.style)) {
           const bar = buildErrorBar({ groupId: r.s.id, centerX: px, stats: cell.stats, style: r.style, yScale, domain: yAxis.domain, log: !!yAxis.log });
           if (bar) {
             errorPath += bar.d;
@@ -313,13 +336,29 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       const x = stacked ? cat.centerX - bw / 2 : cat.centerX - cluster / 2 + si * bw;
       // Box plots and violins of a cell with no replicate values have nothing to draw.
       if (isDist && !cell.dist) continue;
+      // A bar whose value is inside an omitted range would be drawn as if it ended at the edge of the gap.
+      if (valueInGap) {
+        inGap++;
+        continue;
+      }
       if (isDist && cell.dist) {
         const centerX = x + bw / 2;
-        const common = { groupId: id, centerX, toY: yScale, opts, lineColor: r.style.lineColor, lineWidthPt: r.style.lineWidthPt, lineOpacity: r.style.lineOpacity };
+        const common = { groupId: id, centerX, toY: toYDraw, opts, lineColor: r.style.lineColor, lineWidthPt: r.style.lineWidthPt, lineOpacity: r.style.lineOpacity };
         const dist = chart.type === 'groupedBox' ? buildBox({ ...common, width: bw * opts.boxWidth, summary: cell.dist.summary }) : buildViolin({ ...common, halfWidth: (bw * opts.violinWidth) / 2, profile: cell.dist.profile, widths: violinWidths[cellIndex] ?? null, values: cell.dist.values });
-        const rect = dist?.rect ?? { x: centerX, y: yScale(cell.value), width: 0, height: 0 };
-        bars.push({ id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, categoryIndex: cell.ci, value: cell.value, ...rect, stats: null, dist });
+        const rect = dist?.rect ?? { x: centerX, y: toYDraw(cell.value), width: 0, height: 0 };
         const summary = cell.dist.summary;
+        const owner = `${r.label}, ${categories[cell.ci].label}`;
+        const n = cell.dist.sorted.length;
+        if (!dist && summary) {
+          const note = unplacedMarkNote(yAxis, 'Box', owner, boxNeeds(summary), n);
+          if (note) warnings.push(note);
+        } else if (chart.type === 'groupedViolin') {
+          const v = cell.dist.profile?.v ?? cell.dist.sorted;
+          const all = `The statistics include all ${n} value${n === 1 ? '' : 's'}.`;
+          if (!dist) warnings.push(`Violin of ${owner} is not drawn: too little of it lies where the axis can show it. ${all}`);
+          else if (cell.dist.profile && (!placeable(yAxis, v[0]) || !placeable(yAxis, v[v.length - 1]))) warnings.push(`Violin of ${owner} is drawn only where the axis can show it. ${all}`);
+        }
+        if (Number.isFinite(rect.y)) bars.push({ id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, categoryIndex: cell.ci, value: cell.value, ...rect, stats: null, dist });
         const wantDot = (v: number): boolean => {
           if (!r.style.showSymbols) return false;
           if (opts.points === 'all') return true;
@@ -330,9 +369,13 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         const dotWidth = dist?.kind === 'box' ? bw * opts.boxWidth : bw * opts.violinWidth;
         for (const rep of cell.reps) {
           if (!onAxis(yAxis, rep.value) || (!showAll && !wantDot(rep.value))) continue;
+          if (inBreak(yAxis, rep.value)) {
+            inGap++;
+            continue;
+          }
           dots.push({ id: rep.id, row: cell.row, px: centerX + (chart.jitter.enabled ? (hash01(rep.id) - 0.5) * chart.jitter.widthFraction * dotWidth : 0), py: yScale(rep.value), value: rep.value, stats: null });
         }
-        if (opts.showMean && summary && Number.isFinite(yScale(summary.mean))) dots.push({ id: `${id}:mean`, row: cell.row, px: centerX, py: yScale(summary.mean), value: summary.mean, stats: null, shape: 'plus' });
+        if (opts.showMean && summary && Number.isFinite(toYDraw(summary.mean))) dots.push({ id: `${id}:mean`, row: cell.row, px: centerX, py: toYDraw(summary.mean), value: summary.mean, stats: null, shape: 'plus' });
         if (dist?.note) warnings.push(`${r.label}, ${categories[cell.ci].label}: ${dist.note}.`);
         continue;
       }
@@ -349,6 +392,10 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
           offAxis++;
           continue;
         }
+        if (inBreak(yAxis, from) || inBreak(yAxis, to)) {
+          inGap++;
+          continue;
+        }
       }
       if (stacked) {
         // A part is as high as its own value; positive values pile up from the baseline, negative ones down from it.
@@ -356,6 +403,11 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         from = pile[cell.ci];
         to = from + cell.value;
         pile[cell.ci] = to;
+        // A part with an end inside an omitted range would be drawn as if it ended at the edge of the gap; the pile still grows by it.
+        if (inBreak(yAxis, from) || inBreak(yAxis, to)) {
+          inGap++;
+          continue;
+        }
       }
       const pa = yScale(from);
       const pb = yScale(to);
@@ -364,7 +416,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       const gbar: GroupedBar = { id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, categoryIndex: cell.ci, value: cell.value, x, y: yTop, width: bw, height: Math.max(0, yBottom - yTop), stats: cell.stats, count: cell.count };
       if (floating) {
         gbar.range = [from, to];
-        gbar.centerLine = { x1: x, x2: x + bw, y: yScale(cell.value) };
+        if (placeable(yAxis, cell.value)) gbar.centerLine = { x1: x, x2: x + bw, y: yScale(cell.value) };
       } else if (chart.type === 'groupedBar' && r.style.showMeanLine) {
         gbar.centerLine = { x1: x, x2: x + bw, y: yScale(cell.value) };
       }
@@ -372,11 +424,11 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       if (showDots(r.style)) {
         // Spread across the bar's width by a fixed hash of the observation, so the picture is the same every time.
         const spread = chart.jitter.enabled ? bw * chart.jitter.widthFraction : 0;
-        for (const rep of cell.reps) if (onAxis(yAxis, rep.value)) dots.push({ id: rep.id, row: cell.row, px: x + bw / 2 + (hash01(rep.id) - 0.5) * spread, py: yScale(rep.value), value: rep.value, stats: null });
+        for (const rep of cell.reps) if (placeable(yAxis, rep.value)) dots.push({ id: rep.id, row: cell.row, px: x + bw / 2 + (hash01(rep.id) - 0.5) * spread, py: yScale(rep.value), value: rep.value, stats: null });
       }
       let errTop: number | null = null;
       let errBottom: number | null = null;
-      if (cell.stats && !stacked && !floating) {
+      if (cell.stats && !stacked && !floating && !errorEndInGap(cell.stats, r.style)) {
         const bar = buildErrorBar({ groupId: r.s.id, centerX: x + bw / 2, stats: cell.stats, style: r.style, yScale, domain: yAxis.domain, log: !!yAxis.log });
         if (bar) {
           errorPath += bar.d;
@@ -393,11 +445,21 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
           const far = pb <= yBase ? (errTop ?? pb) : (errBottom ?? pb);
           gbar.label = { id: `${id}:label`, ...placeBarLabel(chart.barLabels, x + bw / 2, pb, far, yBase), text };
         }
+        const insideText = insideLabelText(chart.barLabels, cell.value, cell.count ?? cell.stats?.n ?? null);
+        if (insideText !== null && chart.barLabels.inside && r.style.showBars && Number.isFinite(pb) && Number.isFinite(yBase)) {
+          const visible = (y: number) => Math.min(plot.y + plot.height, Math.max(plot.y, y));
+          const placed = placeInsideBarLabel({ id, owner: `${r.label}, ${categories[cell.ci].label}`, cfg: chart.barLabels, inside: chart.barLabels.inside, text: insideText, fontFamily: chart.fontFamily, x: x + bw / 2, width: bw, yEnd: visible(pb), yBase: visible(yBase), horizontal, fill: { ...resolveBarFill(r.style), mode: r.style.barFillMode === 'none' ? 'none' : 'solid' }, page: chart.pageColor ?? '#ffffff' });
+          gbar.insideLabel = placed.label;
+          if (placed.warning) warnings.push(placed.warning);
+        }
       }
     }
+    const linePath = pathOfRuns(polylinesThroughBreaks(lineSeq, { log: null, reverse: false }, yAxis), yScale, n2);
     return { groupId: r.s.id, label: r.label, style: r.style, bars, points, dots, linePath, errorPath, errorMeaning };
   });
-  if (offAxis > 0) warnings.push(`${offAxis} value${offAxis === 1 ? ' is' : 's are'} 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
+  if (offAxis > 0) warnings.push(`${offAxis} value${offAxis === 1 ? ' is' : 's are'} 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn; the statistics include ${offAxis === 1 ? 'it' : 'them'}.`);
+  if (inGap > 0) warnings.push(`${inGap} value${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);
+  if (gapErrorBars > 0) warnings.push(`${gapErrorBars} error bar${gapErrorBars === 1 ? ' has' : 's have'} an end inside an omitted range of the axis and ${gapErrorBars === 1 ? 'is' : 'are'} not drawn.`);
   if (noSpan > 0) warnings.push(`${noSpan} value${noSpan === 1 ? ' has' : 's have'} no range to draw a floating bar from: enter replicates, or limits as the values already calculated.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
 

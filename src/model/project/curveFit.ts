@@ -1,4 +1,5 @@
-import { fitCurve, fitModelById, isFailure, type FitResult } from '../../stats/fit';
+import { cachedCalc } from '../../stats/calcCache';
+import { FIT_ALGORITHM_VERSION, fitCurve, fitModelById, isFailure, type FitFailure, type FitModelId, type FitResult } from '../../stats/fit';
 import { withoutExcluded } from '../table/exclusion';
 import { layoutOf, xySeries } from '../table/tableLayout';
 import type { Analysis, DataTable, Id } from '../types';
@@ -49,6 +50,32 @@ export function fitObservations(source: DataTable): Array<{ id: Id; label: strin
   });
 }
 
+/** How many fits were actually calculated (not taken from the cache); for the tests. */
+export const fitStats = { calculated: 0 };
+
+type Obs = ReadonlyArray<{ x: number; y: number }>;
+/** The numbers of a set of observations as one list, made once for each array so the cache can know it by identity. */
+const flatOf = new WeakMap<Obs, number[]>();
+
+/**
+ * A fit kept by its identity (the points, model, degree where it matters, level and algorithm version). The graph and the
+ * Results sheet both ask here, so one fit of the same data is calculated once; a style or axis edit never gets here.
+ */
+export function cachedFit(obs: Obs, fit: { model: FitModelId; degree?: number; level: number }): FitResult | FitFailure {
+  let data = flatOf.get(obs);
+  if (!data) {
+    data = [];
+    for (const p of obs) data.push(p.x, p.y);
+    flatOf.set(obs, data);
+  }
+  // The degree matters only to a polynomial, and the fit clamps it: write it as the fit reads it.
+  const degree = fit.model === 'polynomial' ? Math.min(6, Math.max(2, Math.round(fit.degree ?? 2))) : null;
+  return cachedCalc({ kind: 'fit', algorithm: FIT_ALGORITHM_VERSION, data, method: fit.model, params: [degree], level: fit.level }, () => {
+    fitStats.calculated++;
+    return fitCurve(obs, { model: fit.model, degree: fit.degree, level: fit.level });
+  });
+}
+
 /** Six significant digits for the screen. */
 const num = (v: number | null | undefined): string => (v === null || v === undefined || !Number.isFinite(v) ? '' : String(Number(v.toPrecision(6))));
 /** The number as it is held (shortest text that reads back as the same double), for copying and files. */
@@ -58,7 +85,7 @@ const full = (v: number | null | undefined): string => (v === null || v === unde
 function fitsOf(table: DataTable, analysis: Pick<Analysis, 'model' | 'degree' | 'level'>): Array<{ id: Id; label: string; result: FitResult | null; failure: string | null }> {
   const model = analysis.model ?? 'linear';
   return fitObservations(table).map((s) => {
-    const r = fitCurve(s.obs, { model, degree: analysis.degree, level: analysis.level });
+    const r = cachedFit(s.obs, { model, degree: analysis.degree, level: analysis.level });
     return isFailure(r) ? { id: s.id, label: s.label, result: null, failure: r.message } : { id: s.id, label: s.label, result: r, failure: null };
   });
 }

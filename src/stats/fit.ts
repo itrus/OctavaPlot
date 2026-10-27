@@ -6,7 +6,7 @@
 import { studentTQuantileUpper } from './special';
 
 /** Raise when the numbers a fit gives change, so that no cached result of the old algorithm is shown. */
-export const FIT_ALGORITHM_VERSION = 1;
+export const FIT_ALGORITHM_VERSION = 2;
 
 export type FitModelId = 'linear' | 'polynomial' | 'exp_decay' | 'exp_association' | 'exp_two_phase' | 'gaussian_peak' | 'hyperbola' | 'hill_4pl' | 'asymmetric_5pl';
 
@@ -26,6 +26,8 @@ export interface FitModel {
   upper?: (n: number) => number[];
   /** X must be above 0 (the formula has x in a denominator or a power). */
   positiveX?: boolean;
+  /** X may be 0 but not negative (the formula is defined at 0, and a negative X can put a pole in the denominator). */
+  nonNegativeX?: boolean;
   /** Fewest points that can fix the parameters. */
   minPoints: (degree: number) => number;
 }
@@ -146,7 +148,7 @@ export const FIT_MODELS: readonly FitModel[] = [
       return [0, top, Math.max(mean(xs), 1e-12)];
     },
     lower: () => [-INF, -INF, 1e-12],
-    positiveX: true,
+    nonNegativeX: true,
     minPoints: () => 3,
   },
   {
@@ -287,12 +289,15 @@ export interface FitFailure {
 
 const MAX_ITERATIONS = 1000;
 const REL_TOL = 1e-8;
+/** The fit works on data scaled to about unit range, so these are relative to the problem and not to its units. */
+const COST_FLOOR = 1e-28;
+const MAX_CONDITION = 1e10;
 
-/** The Jacobian of the model at the data, by central differences. */
+/** The Jacobian of the model at the data, by central differences; the step is relative to the parameter (parameters are scaled to about 1, which is the floor). */
 function numericJacobian(model: FitModel, xs: readonly number[], p: readonly number[]): Mat {
   const rows: Mat = xs.map(() => new Array<number>(p.length).fill(0));
   for (let k = 0; k < p.length; k++) {
-    const h = Math.max(Math.abs(p[k]) * 1e-6, 1e-9);
+    const h = Math.max(Math.abs(p[k]), 1) * 1e-6;
     const up = [...p];
     const down = [...p];
     up[k] += h;
@@ -311,19 +316,37 @@ const cost = (model: FitModel, xs: readonly number[], ys: readonly number[], p: 
   return Number.isFinite(s) ? s : Infinity;
 };
 
-/** Levenberg-Marquardt from `p0`, with the parameters held within their bounds. Returns where it stopped and whether it settled. */
+/** The largest cosine between the residual and a column of the Jacobian (the scaled gradient), ignoring parameters pressed against a bound. */
+function scaledGradient(j: Mat, r: readonly number[], g: readonly number[], p: readonly number[], lower: readonly number[], upper: readonly number[]): number {
+  const rn = Math.sqrt(r.reduce((s, v) => s + v * v, 0));
+  if (!(rn > 0)) return 0;
+  let worst = 0;
+  for (let k = 0; k < p.length; k++) {
+    if ((p[k] <= lower[k] && g[k] < 0) || (p[k] >= upper[k] && g[k] > 0)) continue;
+    const cn = Math.sqrt(j.reduce((s, row) => s + row[k] * row[k], 0));
+    if (cn > 0) worst = Math.max(worst, Math.abs(g[k]) / (cn * rn));
+  }
+  return worst;
+}
+
+/**
+ * Levenberg-Marquardt from `p0`, with the parameters held within their bounds. The data and parameters are expected to be of
+ * order 1, so every stopping test is relative: the step against the parameters, the fall of the cost against the cost, and the
+ * scaled gradient. Returns where it stopped and whether it settled.
+ */
 function levenbergMarquardt(model: FitModel, xs: readonly number[], ys: readonly number[], p0: number[], lower: number[], upper: number[], maxIterations: number, relTol: number): { p: number[]; converged: boolean } {
   const clampP = (p: number[]) => p.map((v, i) => Math.min(upper[i], Math.max(lower[i], v)));
   let p = clampP(p0);
   let c = cost(model, xs, ys, p);
   let lambda = 1e-3;
   for (let it = 0; it < maxIterations; it++) {
+    if (c <= COST_FLOOR) return { p, converged: true };
     const j = numericJacobian(model, xs, p);
     const r = xs.map((x, i) => ys[i] - model.fn(x, p));
     const a = jtj(j);
     const g = p.map((_, k) => j.reduce((s, row, i) => s + row[k] * r[i], 0));
-    const gradNorm = Math.sqrt(g.reduce((s, v) => s + v * v, 0));
-    if (gradNorm <= 1e-12 * Math.max(1, Math.sqrt(c))) return { p, converged: true };
+    const sg = scaledGradient(j, r, g, p, lower, upper);
+    if (sg <= 1e-8) return { p, converged: true };
     let improved = false;
     for (let tries = 0; tries < 40; tries++) {
       const damped = a.map((row, i) => row.map((v, k) => (i === k ? v + lambda * Math.max(v, 1e-12) : v)));
@@ -338,7 +361,7 @@ function levenbergMarquardt(model: FitModel, xs: readonly number[], ys: readonly
           c = tc;
           lambda = Math.max(lambda / 10, 1e-12);
           improved = true;
-          if (rel < relTol || move < 1e-12 || c <= 1e-30) return { p, converged: true };
+          if (move < 1e-10 || c <= COST_FLOOR || (rel < relTol && move < 1e-5)) return { p, converged: true };
           break;
         }
       }
@@ -346,8 +369,8 @@ function levenbergMarquardt(model: FitModel, xs: readonly number[], ys: readonly
       if (lambda > 1e15) break;
     }
     if (!improved) {
-      // No step lowers the cost: at a minimum when the gradient is small against the cost, else it is stuck.
-      return { p, converged: gradNorm <= 1e-6 * Math.max(1, Math.sqrt(c)) || c <= 1e-30 };
+      // No step lowers the cost: at a minimum when the scaled gradient is small, else it is stuck.
+      return { p, converged: sg <= 1e-6 || c <= COST_FLOOR };
     }
   }
   return { p, converged: false };
@@ -447,6 +470,85 @@ function linearLeastSquares(xs: readonly number[], ys: readonly number[], degree
 }
 
 /**
+ * What a parameter is in, which says how it moves when X or Y is shifted or rescaled: a level of Y (shifts and scales with Y),
+ * an amplitude of Y (scales only), a position in X (shifts and scales), a width in X (scales), a rate (scales with 1 / X), or
+ * a pure number.
+ */
+type Dim = 'yloc' | 'yamp' | 'xloc' | 'x' | 'rate' | 'one';
+
+const PARAM_DIMS: Partial<Record<FitModelId, Dim[]>> = {
+  exp_decay: ['yloc', 'yamp', 'rate'],
+  exp_association: ['yloc', 'yamp', 'rate'],
+  exp_two_phase: ['yloc', 'yamp', 'rate', 'yamp', 'rate'],
+  gaussian_peak: ['yloc', 'yamp', 'xloc', 'x'],
+  hyperbola: ['yloc', 'yamp', 'x'],
+  hill_4pl: ['yloc', 'yloc', 'x', 'one'],
+  asymmetric_5pl: ['yloc', 'yloc', 'x', 'one', 'one'],
+};
+
+interface Normalisation {
+  xShift: number;
+  xScale: number;
+  yShift: number;
+  yScale: number;
+}
+
+/**
+ * The shift and scale that bring X and Y to order 1. A model with a ratio of X (hyperbola, logistics) is only scaled, since a
+ * shift would change what it says; a peak is centred on the middle of X; an exponential starts at the smallest X (its
+ * amplitude is taken back to X = 0 afterwards). Y is centred on its mean and scaled by its range.
+ */
+function normalisation(id: FitModelId, xs: readonly number[], ys: readonly number[]): Normalisation {
+  const [x0, x1] = range(xs);
+  const [y0, y1] = range(ys);
+  const ratio = id === 'hyperbola' || id === 'hill_4pl' || id === 'asymmetric_5pl';
+  // Values that are all equal are centred on themselves exactly, so that rounding in the mean cannot make a signal of them.
+  const yShift = y0 === y1 ? y0 : mean(ys);
+  return {
+    xShift: ratio ? 0 : id === 'gaussian_peak' ? (x0 + x1) / 2 : x0,
+    xScale: ratio ? geoMid(xs) : x1 - x0 || 1,
+    yShift,
+    yScale: y1 - y0 || Math.abs(yShift) || 1,
+  };
+}
+
+/** The parameters of the fit in normalised units (`w`, already multiplied back by their start sizes) in the units of the data. */
+function reportedParams(id: FitModelId, w: readonly number[], nm: Normalisation): number[] {
+  const dims = PARAM_DIMS[id] ?? [];
+  const out = w.map((v, i) => {
+    switch (dims[i]) {
+      case 'yloc': return nm.yShift + nm.yScale * v;
+      case 'yamp': return nm.yScale * v;
+      case 'xloc': return nm.xShift + nm.xScale * v;
+      case 'x': return nm.xScale * v;
+      case 'rate': return v / nm.xScale;
+      default: return v;
+    }
+  });
+  // An exponential in the shifted X is the same exponential in X with its amplitude multiplied by exp(rate * shift).
+  const pairs: Array<[number, number]> = id === 'exp_two_phase' ? [[1, 2], [3, 4]] : id === 'exp_decay' || id === 'exp_association' ? [[1, 2]] : [];
+  for (const [a, k] of pairs) {
+    const was = out[a];
+    out[a] = was * Math.exp(out[k] * nm.xShift);
+    // c + A (1 - exp(-k x)) has its constant moved too, since the term A is part of the level at the shifted origin.
+    if (id === 'exp_association') out[0] += was - out[a];
+  }
+  return out;
+}
+
+/** The inverse of a symmetric matrix J'J, or null when it is too close to singular (columns equalised to unit length first). */
+function conditioned(a: Mat): { inverse: Mat | null } {
+  const d = a.map((row, i) => Math.sqrt(row[i]));
+  if (d.some((v) => !(v > 0) || !Number.isFinite(v))) return { inverse: null };
+  const eq = a.map((row, i) => row.map((v, j) => v / (d[i] * d[j])));
+  const inv = invert(eq);
+  if (!inv) return { inverse: null };
+  const norm = (m: Mat) => m.reduce((mx, row) => Math.max(mx, row.reduce((s, v) => s + Math.abs(v), 0)), 0);
+  if (!(norm(eq) * norm(inv) < MAX_CONDITION)) return { inverse: null };
+  return { inverse: inv.map((row, i) => row.map((v, j) => v / (d[i] * d[j]))) };
+}
+
+/**
  * Fit a model to points (x, y) (spec 17.3). A fit that cannot be made, or did not settle, is reported and not drawn as
  * if it had succeeded; the uncertainty of the curve is the local (Jacobian) approximation for the nonlinear models and the
  * classical one for a line or a polynomial (spec 17.3), pointwise, never simultaneous.
@@ -454,12 +556,12 @@ function linearLeastSquares(xs: readonly number[], ys: readonly number[], degree
 export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, options: FitOptions): FitResult | FitFailure {
   const model = fitModelById(options.model);
   const degree = model.id === 'polynomial' ? Math.min(6, Math.max(2, Math.round(options.degree ?? 2))) : model.id === 'linear' ? 1 : 0;
-  const pts = points.filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y) && (!model.positiveX || q.x > 0));
+  const pts = points.filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y) && (!model.positiveX || q.x > 0) && (!model.nonNegativeX || q.x >= 0));
   const dropped = points.length - pts.length;
   const names = model.paramNames(degree);
   const p = names.length;
   const needed = model.minPoints(degree);
-  if (pts.length < needed) return { failed: true, message: `${model.label} needs at least ${needed} points with ${model.positiveX ? 'X above 0 and ' : ''}a value; there ${pts.length === 1 ? 'is' : 'are'} ${pts.length}.` };
+  if (pts.length < needed) return { failed: true, message: `${model.label} needs at least ${needed} points with ${model.positiveX ? 'X above 0 and ' : model.nonNegativeX ? 'X of 0 or above and ' : ''}a value; there ${pts.length === 1 ? 'is' : 'are'} ${pts.length}.` };
   const xs = pts.map((q) => q.x);
   const ys = pts.map((q) => q.y);
   if (new Set(xs).size < Math.min(needed, 2)) return { failed: true, message: 'The points have the same X: no curve can be fitted.' };
@@ -469,6 +571,10 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
   let converged = true;
   /** Evaluates the curve, the gradient with respect to the working parameters, and their covariance (unit sigma). */
   let evalAt: (x: number, q: readonly number[]) => number;
+  /** The unit of Y in which the working covariance is expressed (1 when the working parameters are already in the units of the data). */
+  let unitScale = 1;
+  /** J'J is too close to singular for the parameters to be told apart. */
+  let illConditioned = false;
   let gradientAt: (x: number) => number[];
   let unscaledCov: Mat | null;
   /** Takes the covariance of the working parameters to that of the reported ones. */
@@ -484,23 +590,46 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
     unscaledCov = ls.unscaledCov;
     toReported = (c) => ls.transform.map((ti) => ls.transform.map((tj) => ti.reduce((s, a, k) => s + a * tj.reduce((t, bb, l) => t + c[k][l] * bb, 0), 0)));
   } else {
-    // Work in parameters divided by their starting size, so that no parameter is small against the finite-difference step.
-    const start = model.init(xs, ys, degree);
-    const yScale = Math.max(maxOf(ys.map(Math.abs)), 1e-300);
-    const scales = start.map((v) => (Math.abs(v) > 0 && Number.isFinite(v) ? Math.abs(v) : yScale));
+    // Fit in units where X and Y are of order 1 (shifted and scaled by the data), then take every parameter back with its own
+    // dimension. Parameters are further divided by their starting size, so none is small against the finite-difference step.
+    const nm = normalisation(model.id, xs, ys);
+    const xn = xs.map((x) => (x - nm.xShift) / nm.xScale);
+    const yn = ys.map((y) => (y - nm.yShift) / nm.yScale);
+    const start = model.init(xn, yn, degree);
+    const scales = start.map((v) => (Math.abs(v) > 1e-6 && Number.isFinite(v) ? Math.abs(v) : 1));
     const scaledModel: FitModel = { ...model, fn: (x, t) => model.fn(x, t.map((v, i) => v * scales[i])) };
-    const lo = (model.lower ? model.lower(p) : new Array<number>(p).fill(-Infinity)).map((v, i) => v / scales[i]);
-    const hi = (model.upper ? model.upper(p) : new Array<number>(p).fill(Infinity)).map((v, i) => v / scales[i]);
-    const r = levenbergMarquardt(scaledModel, xs, ys, start.map((v, i) => v / scales[i]), lo, hi, options.maxIterations ?? MAX_ITERATIONS, options.relativeTolerance ?? REL_TOL);
+    const dims = PARAM_DIMS[model.id] ?? [];
+    const bound = (raw: number[] | undefined, fallback: number) => (raw ?? new Array<number>(p).fill(fallback)).map((v, i) => (v > 0 && Number.isFinite(v) && dims[i] === 'x' ? 1e-9 : v) / scales[i]);
+    const lo = bound(model.lower?.(p), -Infinity);
+    const hi = bound(model.upper?.(p), Infinity);
+    const r = levenbergMarquardt(scaledModel, xn, yn, start.map((v, i) => v / scales[i]), lo, hi, options.maxIterations ?? MAX_ITERATIONS, options.relativeTolerance ?? REL_TOL);
     working = r.p;
-    params = r.p.map((v, i) => v * scales[i]);
+    const report = (t: readonly number[]) => reportedParams(model.id, t.map((v, i) => v * scales[i]), nm);
+    params = report(working);
+    if (!params.every(Number.isFinite)) return { failed: true, message: 'The fit did not give a curve (the parameters cannot be expressed in the units of the data).' };
     converged = r.converged;
-    evalAt = (x, q) => scaledModel.fn(x, q);
-    gradientAt = (x) => numericJacobian(scaledModel, [x], working)[0];
-    const inv0 = invert(jtj(numericJacobian(scaledModel, xs, working)));
-    unscaledCov = inv0;
-    toReported = (c) => c.map((row, i) => row.map((v, j) => v * scales[i] * scales[j]));
+    unitScale = nm.yScale;
+    evalAt = (x, q) => nm.yShift + nm.yScale * scaledModel.fn((x - nm.xShift) / nm.xScale, q);
+    gradientAt = (x) => numericJacobian(scaledModel, [(x - nm.xShift) / nm.xScale], working)[0];
+    const jac = numericJacobian(scaledModel, xn, working);
+    const cond = conditioned(jtj(jac));
+    unscaledCov = cond.inverse;
+    illConditioned = cond.inverse === null;
+    toReported = (c) => {
+      // The covariance of the reported parameters from that of the working ones, by the Jacobian of the mapping between them.
+      const d: Mat = Array.from({ length: p }, () => new Array<number>(p).fill(0));
+      for (let k = 0; k < p; k++) {
+        const h = Math.max(Math.abs(working[k]), 1) * 1e-6;
+        const up = report(working.map((v, i) => (i === k ? v + h : v)));
+        const down = report(working.map((v, i) => (i === k ? v - h : v)));
+        for (let i = 0; i < p; i++) d[i][k] = (up[i] - down[i]) / (2 * h);
+      }
+      return d.map((di) => d.map((dj) => di.reduce((s, a, k) => s + a * dj.reduce((t, b, l) => t + c[k][l] * b, 0), 0)));
+    };
   }
+  /** Whether the search itself settled; a settled fit whose parameters cannot be told apart is still not reported as converged. */
+  const settled = converged;
+  if (illConditioned) converged = false;
   const predict = (x: number) => evalAt(x, working);
   let rss = 0;
   for (let i = 0; i < xs.length; i++) rss += (ys[i] - predict(xs[i])) ** 2;
@@ -515,7 +644,7 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
 
   // Covariance of the parameters: sigma^2 (J'J)^-1. Unavailable without degrees of freedom, when J'J is singular, and
   // when the fit did not settle (a local approximation about a point that is not the minimum says nothing true).
-  const cov = converged && df > 0 && unscaledCov && sigma !== null ? unscaledCov.map((row) => row.map((v) => v * sigma * sigma)) : null;
+  const cov = converged && df > 0 && unscaledCov && sigma !== null ? unscaledCov.map((row) => row.map((v) => v * (sigma / unitScale) ** 2)) : null;
   const reportedCov = cov ? toReported(cov) : null;
   const se = (k: number): number | null => (reportedCov && reportedCov[k][k] >= 0 ? Math.sqrt(reportedCov[k][k]) : null);
   const tcrit = (lv: number) => studentTQuantileUpper((1 - lv) / 2, df);
@@ -533,11 +662,12 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
     if (!(v >= 0)) return null;
     const t = tcrit(lv);
     if (!Number.isFinite(t)) return null;
-    return t * Math.sqrt(kind === 'prediction' ? v + sigma * sigma : v);
+    return t * unitScale * Math.sqrt(kind === 'prediction' ? v + (sigma / unitScale) ** 2 : v);
   };
 
   let message: string | null = null;
-  if (!converged) message = 'The fit did not settle within the iterations allowed: a provisional curve is shown, with no errors or bands, because they would not be valid.';
+  if (!settled) message = 'The fit did not settle within the iterations allowed: a provisional curve is shown, with no errors or bands, because they would not be valid.';
+  else if (illConditioned) message = 'The parameters are not fixed independently by the data (the fit is ill-conditioned: a change in one is made up by the others): no error or band can be given.';
   else if (df <= 0) message = 'There are no degrees of freedom left (as many parameters as points): no error or band can be given.';
   else if (!cov) message = 'The parameters are not fixed independently by the data (singular covariance): no error or band can be given.';
   if (dropped > 0) message = `${message ? `${message} ` : ''}${dropped} point${dropped === 1 ? ' was' : 's were'} left out (missing, or X not above 0).`;

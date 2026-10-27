@@ -1,19 +1,19 @@
 import { ticks as d3Ticks } from 'd3';
-import { HEAT_PALETTES } from '../../model/options/heatmapOptions';
+import { HEAT_STATISTICS, isDiverging } from '../../model/options/heatmapOptions';
 import { layersOf, type LayerSpec } from '../../model/graph/layers';
 import { rowTitleAt } from '../../model/table/rows';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
 import { DEFAULT_SUMMARY } from '../../model/defaults';
-import type { Chart, DataTable, Id } from '../../model/types';
+import type { Chart, DataTable, HeatmapOptions, Id } from '../../model/types';
 import { chartPx2Pt } from '../../model/units';
-import { matrixRange, normaliseMatrix, type Matrix } from '../../stats/matrix';
+import { cellStatistic, matrixRange, normaliseMatrix, type CellResult, type Matrix, type Unavailable } from '../../stats/matrix';
 import { computeGroupStats } from '../../stats/summary';
-import { contrastColour, paletteColour, scalePosition, type HeatScale } from './heatColours';
+import { contrastColour, scaleColour, type HeatScale } from './heatColours';
 import { computeLayout, type Layout, type Rect } from '../shared/parts/layout';
 import { compileHeatMarks } from './heatMarks';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { displayName } from '../shared/parts/names';
-import { suppliedStats } from '../../model/table/suppliedStats';
+import { suppliedStats, suppliedStatistic } from '../../model/table/suppliedStats';
 
 interface HeatCell {
   id: Id;
@@ -44,6 +44,8 @@ interface HeatBar {
   /** Strips from the top (high) to the bottom (low). */
   strips: Array<{ y: number; height: number; fill: string }>;
   ticks: Array<{ value: number; y: number }>;
+  /** The name of what the colours stand for; null while it is the plain mean (the colour bar then has no title). */
+  title: string | null;
 }
 
 export interface HeatModel {
@@ -57,6 +59,8 @@ export interface HeatModel {
   rowLabelX: number;
   colLabelY: number;
   bar: HeatBar | null;
+  /** What the cells show, as the colour bar and the tooltip name it: "SD", or "Row z-score of mean" when normalised. */
+  valueName: string;
   warnings: string[];
   /** The layers the chart is drawn from, lowest first (see model/graph/layers.ts). */
   layers: LayerSpec[];
@@ -68,6 +72,21 @@ export interface HeatModel {
 const BAR_ROOM = 128;
 const BAR_WIDTH = 24;
 const STRIPS = 64;
+
+type StatisticOnly = Exclude<HeatmapOptions['summary'], 'mean' | 'median'>;
+const NORMALISE_NAME = { zscore: 'z-score', minmax: 'min-max', centre: 'centred' } as const;
+
+/** One warning for each reason cells have no value for the statistic, with how many cells and why. */
+function unavailableWarnings(counts: ReadonlyMap<Unavailable, number>, summary: HeatmapOptions['summary']): string[] {
+  const name = HEAT_STATISTICS.find((x) => x.value === summary)!.name;
+  const reasons: Record<Unavailable, string> = {
+    few: `fewer than 2 values, so their ${name} is not available`,
+    nonpositive: 'a value that is not above zero, so their geometric mean is not available',
+    zeroMean: 'a mean of zero, so their %CV is not available',
+    supplied: `been entered as calculated values that do not give their ${name}`,
+  };
+  return [...counts].map(([reason, n]) => `${n} cell${n === 1 ? ' has' : 's have'} ${reasons[reason]}.`);
+}
 
 const nice = (v: number): string => String(Number(v.toPrecision(3)));
 
@@ -88,11 +107,22 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
     const hasValue = defs.some((s) => s.columns.some((c) => c.observations[r]?.value != null));
     if (rowTitleAt(table, r).trim() !== '' || hasValue) categoryRows.push(r);
   }
+  // The mean and the median are the group summary; the other statistics come from stats/matrix.ts (or, for entered values, suppliedStats.ts).
+  const centreOnly = o.summary === 'mean' || o.summary === 'median';
+  const unavailable = new Map<Unavailable, number>();
   const cellValue = (s: (typeof defs)[number], r: number): number | null => {
     const values = s.columns.map((c) => c.observations[r]?.value ?? null);
-    if (layoutKind.kind === 'single') return values[0] !== null && Number.isFinite(values[0]) ? values[0] : null;
-    if (layoutKind.kind === 'replicates') return computeGroupStats(values, { ...DEFAULT_SUMMARY, centre: o.summary, spread: 'none' }).centre;
-    return suppliedStats(layoutKind.format, values)?.stats.centre ?? null;
+    let result: CellResult;
+    if (layoutKind.kind === 'single') {
+      const v = values[0] !== null && Number.isFinite(values[0]) ? values[0] : null;
+      result = centreOnly || v === null ? { value: v, unavailable: null } : cellStatistic(values, o.summary as StatisticOnly);
+    } else if (layoutKind.kind === 'replicates') {
+      result = centreOnly ? { value: computeGroupStats(values, { ...DEFAULT_SUMMARY, centre: o.summary as 'mean' | 'median', spread: 'none' }).centre, unavailable: null } : cellStatistic(values, o.summary as StatisticOnly);
+    } else {
+      result = centreOnly ? { value: suppliedStats(layoutKind.format, values)?.stats.centre ?? null, unavailable: null } : suppliedStatistic(layoutKind.format, values, o.summary as StatisticOnly);
+    }
+    if (result.unavailable) unavailable.set(result.unavailable, (unavailable.get(result.unavailable) ?? 0) + 1);
+    return result.value;
   };
   const rowNames = categoryRows.map((r) => rowTitleAt(table, r).trim() || `Row ${r + 1}`);
   const colNames = defs.map((s) => displayName(chart, s.id, s.name));
@@ -106,11 +136,15 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
     colLabels = rowNames;
   }
 
+  warnings.push(...unavailableWarnings(unavailable, o.summary));
+
   // 2. Normalising, then the colour range.
   const { values, undefinedCount } = normaliseMatrix(matrix, o.normalise, o.method);
   if (undefinedCount > 0) warnings.push(`${undefinedCount} cell${undefinedCount === 1 ? ' has' : 's have'} no ${o.method === 'zscore' ? 'z-score' : 'min-max value'} (their ${o.normalise === 'row' ? 'row' : 'column'} has no spread) and ${undefinedCount === 1 ? 'is' : 'are'} shown as missing.`);
+  const stat = HEAT_STATISTICS.find((x) => x.value === o.summary)!;
+  const valueName = o.normalise === 'none' ? stat.name : `${o.normalise === 'row' ? 'Row' : 'Column'} ${NORMALISE_NAME[o.method]} of ${stat.lower}`;
   const range = matrixRange(values);
-  const palette = HEAT_PALETTES.find((p) => p.value === o.palette)!;
+  const diverging = isDiverging(o);
   let lo = o.min ?? range?.[0] ?? 0;
   let hi = o.max ?? range?.[1] ?? 1;
   if (!(hi > lo)) {
@@ -121,8 +155,8 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
     if (!(hi > lo)) [lo, hi] = [lo - 0.5, lo + 0.5];
   }
   const centre = o.centre ?? (o.normalise !== 'none' && o.method !== 'minmax' ? 0 : (lo + hi) / 2);
-  const scale: HeatScale = { palette: o.palette, reverse: o.reverse, lo, hi, centre };
-  const colourOf = (v: number) => paletteColour(o.palette, scalePosition(Math.min(hi, Math.max(lo, v)), scale, palette.diverging), o.reverse);
+  const scale: HeatScale = { palette: o.palette, reverse: o.reverse, lo, hi, centre, custom: o.customColours };
+  const colourOf = (v: number) => scaleColour(v, scale, diverging);
   if (!range) warnings.push('Enter numbers in the table to see the heat map.');
   const outside = values.flat().filter((v) => v !== null && (v < lo || v > hi)).length;
   if (outside > 0) warnings.push(`${outside} value${outside === 1 ? ' lies' : 's lie'} outside the colour range and ${outside === 1 ? 'is' : 'are'} drawn in the end colour.`);
@@ -188,7 +222,7 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
       return { y: rect.y + (i * rect.height) / STRIPS, height: rect.height / STRIPS + 0.6, fill: colourOf(v) };
     });
     const tickValues = d3Ticks(lo, hi, 5).filter((t) => t >= lo && t <= hi);
-    bar = { rect, lo, hi, diverging: palette.diverging, strips, ticks: tickValues.map((value) => ({ value, y: rect.y + rect.height * (1 - (value - lo) / (hi - lo || 1)) })) };
+    bar = { rect, lo, hi, diverging, strips, ticks: tickValues.map((value) => ({ value, y: rect.y + rect.height * (1 - (value - lo) / (hi - lo || 1)) })), title: o.summary === 'mean' && o.normalise === 'none' ? null : valueName };
   }
 
   const model: HeatModel = {
@@ -201,6 +235,7 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
     rowLabelX: plot.x,
     colLabelY: plot.y + plot.height,
     bar,
+    valueName,
     warnings: [...new Set(warnings)],
     layers: layersOf(chart, table),
   };

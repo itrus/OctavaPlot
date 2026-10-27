@@ -1,6 +1,7 @@
 import { isSurvivalChartType } from '../../model/graph/chartTypes';
 import { DEFAULT_BAND_OPACITY, layersOf } from '../../model/graph/layers';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
+import { legendEntries } from '../../model/graph/legendEntries';
 import { xySeries } from '../../model/table/tableLayout';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
 import type { Chart, DataTable, SurvivalBandMethod } from '../../model/types';
@@ -161,7 +162,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   warnings.push(...xAxis.warnings.map((w) => w.replace(/^Y /, 'X ').replace(/ Y limit/, ' X limit')), ...yAxis.warnings);
 
   // The at-risk table sits under the plot: one row per group and a heading, at the ticks of the time axis.
-  const legendSeries = raw.map((_, i) => i).filter((i) => !chart.legend.hiddenGroupIds.includes(raw[i].s.id));
+  const legendSeries = legendEntries(chart.legend, raw.map((r) => r.s.id));
   const atRiskTimes = xAxis.ticks.filter((t) => t >= xAxis.domain[0] && t <= xAxis.domain[1]);
   const atRiskFont = chart.legend.fontSizePt;
   const rowHeight = atRiskFont * 1.3;

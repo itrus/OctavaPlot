@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, normalize, relative, resolve, sep } from 'node:path';
+import { parseSync } from 'vite';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -19,27 +20,106 @@ const rel = (file: string) => relative(SRC, file).split(sep).join('/');
 const all = walk(SRC).map(rel);
 const sources = all.filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f) && !f.endsWith('.d.ts'));
 
+type AstNode = { type?: string; [key: string]: unknown };
+
+/** The text of a string literal, or of a template literal with nothing in it to fill in; null for anything else. */
+function literalText(node: unknown): string | null {
+  const n = node as AstNode | null;
+  if (!n) return null;
+  if (n.type === 'Literal' && typeof n.value === 'string') return n.value;
+  const quasis = n.quasis as { value: { cooked: string | null } }[] | undefined;
+  if (n.type === 'TemplateLiteral' && (n.expressions as unknown[]).length === 0 && quasis) return quasis[0].value.cooked;
+  return null;
+}
+
+/**
+ * Every module a source text names by a relative specifier ('./x', '../x'), found in the syntax tree, so that quotes,
+ * line breaks, comments and strings cannot fool it: import and export declarations (`from`, `export *`, side-effect
+ * and type-only forms), `import x = require()`, `import()` calls and `import('./x').T` types.
+ * The parser is the oxc one that comes with vite (TypeScript 7 has no compiler API in JavaScript). The project has no path aliases.
+ */
+function specifiersOf(text: string, fileName: string): string[] {
+  const found: string[] = [];
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) return value.forEach(visit);
+    const node = value as AstNode;
+    switch (node.type) {
+      case 'ImportDeclaration':
+      case 'ExportAllDeclaration':
+      case 'ExportNamedDeclaration':
+      case 'ImportExpression':
+      case 'TSImportType':
+        found.push(literalText(node.source) ?? '');
+        break;
+      case 'TSExternalModuleReference':
+        found.push(literalText(node.expression) ?? '');
+        break;
+    }
+    for (const key in node) visit(node[key]);
+  };
+  visit(parseSync(fileName, text).program);
+  return found.filter((s) => s.startsWith('.'));
+}
+
+/** Where a specifier written in `file` points, as a path under src among the `known` files (.ts, .tsx, index.ts, bare); null if none. */
+function resolveSpecifier(file: string, specifier: string, known: Set<string>): string | null {
+  const base = normalize(join(dirname(file), specifier)).split(sep).join('/');
+  return [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`, base].find((c) => known.has(c)) ?? null;
+}
+
 /** The files a source file imports, as paths under src (relative imports only). */
 function importsOf(file: string): string[] {
   const text = readFileSync(join(SRC, file), 'utf8');
-  const set = new Set(all);
-  return [...text.matchAll(/(?:from|import\()\s*'(\.[^']*)'/g)].flatMap((m) => {
-    const base = normalize(join(dirname(file), m[1])).split(sep).join('/');
-    const found = [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`, base].find((c) => set.has(c));
-    return found ? [found] : [];
-  });
+  const known = new Set(all);
+  return specifiersOf(text, file).flatMap((s) => resolveSpecifier(file, s, known) ?? []);
 }
 
+describe('the scanner of imports', () => {
+  const scan = (text: string, file = 'a/x.ts') => specifiersOf(text, file);
+  it('reads single and double quotes', () => {
+    expect(scan(`import a from './one'; import b from "../two";`)).toEqual(['./one', '../two']);
+  });
+  it('reads an export from over several lines, and export *', () => {
+    expect(scan(`export {\n  a,\n  b,\n} from\n  "./three";\nexport * from './four';\nexport * as ns from './five';`)).toEqual(['./three', './four', './five']);
+  });
+  it('reads side-effect imports and dynamic imports', () => {
+    expect(scan(`import './six'; import "./seven"; const m = import('./eight'); const n = import(\`./nine\`);`)).toEqual(['./six', './seven', './eight', './nine']);
+  });
+  it('reads type-only forms, import-equals and import types', () => {
+    const text = `import type { T } from './ten'; import { type U } from './eleven'; export type { V } from './twelve';
+import legacy = require('./thirteen'); type W = import('./fourteen').W;`;
+    expect(scan(text)).toEqual(['./ten', './eleven', './twelve', './thirteen', './fourteen']);
+  });
+  it('reads a tsx file', () => {
+    expect(scan(`import { a } from './z'; export const x = <div>{a}</div>;`, 'a/x.tsx')).toEqual(['./z']);
+  });
+  it('does not count a specifier inside a comment or a string', () => {
+    const text = `// import a from './no1'\n/* export * from './no2' */\nconst s = "from './no3'"; const t = \`import('./no4')\`; const u = 'import x from "./no5"';`;
+    expect(scan(text)).toEqual([]);
+  });
+  it('ignores packages and a dynamic import that is not a plain string', () => {
+    expect(scan(`import React from 'react'; import { x } from 'node:path'; import y from '@scope/pkg'; const m = import(name);`)).toEqual([]);
+  });
+  it('resolves to .ts, .tsx, index.ts or the bare name, and finds nothing outside the known files', () => {
+    const known = new Set(['a/b.ts', 'a/c.tsx', 'a/d/index.ts', 'a/e.css']);
+    expect(['./b', './c', './d', './e.css', '../../outside'].map((s) => resolveSpecifier('a/x.ts', s, known))).toEqual(['a/b.ts', 'a/c.tsx', 'a/d/index.ts', 'a/e.css', null]);
+  });
+});
+
 const layerOf = (file: string): string => (file.includes('/') ? file.split('/')[0] : 'app');
+/** The layers from the bottom up: a layer may import its own and the ones before it, except as the table below says. */
+const LAYER_ORDER = ['util', 'stats', 'model', 'state', 'chart', 'ui'];
+const upTo = (layer: string): string[] => LAYER_ORDER.slice(0, LAYER_ORDER.indexOf(layer) + 1);
 const MAY_IMPORT: Record<string, string[]> = {
-  util: ['util'],
-  stats: ['stats', 'util'],
-  model: ['model', 'stats', 'util'],
-  state: ['state', 'model', 'stats', 'util', 'chart'],
-  chart: ['chart', 'model', 'stats', 'util'],
+  util: upTo('util'),
+  stats: ['stats', 'util'], // and model/types.ts, see the test
+  model: upTo('model'),
+  state: [...upTo('state'), 'chart'], // the project in memory uses the charts' models
+  chart: upTo('chart').filter((l) => l !== 'state'), // a chart does not know the project's state
   testing: ['testing', 'model', 'state', 'chart', 'stats', 'util'],
-  ui: ['ui', 'state', 'model', 'stats', 'chart', 'util', 'testing'],
-  app: ['app', 'ui', 'state', 'model', 'stats', 'chart', 'util'],
+  ui: [...upTo('ui'), 'testing'],
+  app: ['app', ...LAYER_ORDER],
 };
 
 describe('the layers of the source', () => {
@@ -87,6 +167,16 @@ describe('the chart folder', () => {
     const known = new Set([...FAMILIES, 'shared', 'export']);
     const strays = sources.filter((f) => f.startsWith('chart/') && f.split('/').length > 2 && !known.has(f.split('/')[1]));
     expect(strays).toEqual([]);
+  });
+});
+
+describe('the data of a graph', () => {
+  it('comes from prepareChartInput: no renderer looks a table up itself, and the app and the views do not call effectiveTable', () => {
+    const read = (f: string) => readFileSync(join(SRC, f), 'utf8');
+    const lookups = sources.filter((f) => f.startsWith('chart/') && /\bdataTables\b/.test(read(f)));
+    const bypasses = sources.filter((f) => (f.startsWith('ui/') || f === 'App.tsx') && /\beffectiveTable\b/.test(read(f)));
+    expect(lookups).toEqual([]);
+    expect(bypasses).toEqual([]);
   });
 });
 

@@ -1,11 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { analysesOf } from '../../model/project/analysis';
-import { resolveFit } from '../../model/options/fitOptions';
+import { prepareChartInput } from '../../model/table/preparedChart';
 import { arrangeLayout, type Arranged, type NaturalSize } from '../../model/project/layout';
 import type { Layout, Project } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { buildAnyModelCached, ChartCanvas } from '../anyModel';
 import { buildPdf, rgbaToFlateRgb } from './pdf';
+import { canvasToPngBlob } from './pngDpi';
+import { prefixIds } from './prefixIds';
 
 /**
  * A layout page as SVG: the page, an optional title, and each graph drawn by the same renderer as the editor and the graph
@@ -14,22 +15,12 @@ import { buildPdf, rgbaToFlateRgb } from './pdf';
  */
 const escapeXml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-/** Gives every id in a drawing a prefix, so graphs placed on one page cannot take each other's clip paths and patterns. */
-function prefixIds(markup: string, prefix: string): string {
-  const ids = new Set([...markup.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]));
-  let out = markup;
-  for (const id of ids) {
-    out = out.split(` id="${id}"`).join(` id="${prefix}${id}"`).split(`url(#${id})`).join(`url(#${prefix}${id})`).split(`href="#${id}"`).join(`href="#${prefix}${id}"`);
-  }
-  return out;
-}
-
 export interface LayoutDrawing {
   svg: string;
   arranged: Arranged;
   widthPt: number;
   heightPt: number;
-  /** Notes about the page: a graph that does not fit its panel at the chosen percentage, and the like. */
+  /** Notes about the page: a graph that does not fit its panel at the chosen percentage, and the warnings of each graph, prefixed by panel. */
   notices: string[];
 }
 
@@ -45,10 +36,9 @@ export function drawLayout(layout: Layout, project: Project, options: { metadata
   placements.forEach((pl, i) => {
     const chart = layout.panels[i] === null ? undefined : project.charts.find((c) => c.id === layout.panels[i]);
     if (chart && pl.graph) {
-      const table = project.dataTables.find((t) => t.id === chart.dataTableId);
-      if (table) {
-        const curve = resolveFit(chart.fit, analysesOf(project), table.id);
-        const any = buildAnyModelCached(chart, table, curve);
+      const prepared = prepareChartInput(project, chart);
+      if (prepared) {
+        const any = buildAnyModelCached(chart, prepared.table, prepared.fit);
         // The nested <svg> takes its size from width and height in user units (pt of the page); its viewBox is the graph's own.
         const markup = renderToStaticMarkup(<ChartCanvas chart={chart} any={any} cssWidth={n2(pl.graph.w)} cssHeight={n2(pl.graph.h)} />);
         const g = pl.graph;
@@ -57,6 +47,9 @@ export function drawLayout(layout: Layout, project: Project, options: { metadata
         const clipId = `layout-panel-${i}`;
         parts.push(`<clipPath id="${clipId}"><rect x="${n2(pl.rect.x)}" y="${n2(pl.rect.y)}" width="${n2(pl.rect.w)}" height="${n2(pl.rect.h)}"/></clipPath><g clip-path="url(#${clipId})">${inner}</g>`);
         if (g.w > pl.rect.w + 0.5 || g.h > pl.rect.h + 0.5) notices.push(`Graph ${pl.label || i + 1} is larger than its panel at ${Math.round(pl.factor * 100)}% and is cut off.`);
+        // What the graph itself warns about in the editor (values left out of a log axis, rows not drawn, ...), named by panel.
+        const who = `${pl.label || i + 1} (${chart.name})`;
+        for (const w of new Set(any.model.warnings)) notices.push(`${who}: ${w}`);
       }
     }
     if (pl.label !== '') {
@@ -112,7 +105,7 @@ async function layoutToCanvas(layout: Layout, project: Project, dpi: number): Pr
 
 export async function layoutToPngBlob(layout: Layout, project: Project, dpi: number): Promise<Blob> {
   const canvas = await layoutToCanvas(layout, project, dpi);
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encoding failed.'))), 'image/png'));
+  return canvasToPngBlob(canvas, dpi);
 }
 
 /** A one-page PDF of the page, at A4 size, holding the picture at a resolution (see pdf.ts). A transparent page is white. */

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRoving } from '../inspector/common/roving';
 import { MAX_REPLICATES, MIN_REPLICATES, SUMMARY_FORMATS, subLabels } from '../../model/table/tableLayout';
 import type { ReplicateLayout, SummaryFormat, TableKind } from '../../model/types';
 import type { NewTableOptions } from '../../state/commands';
@@ -176,14 +177,16 @@ export function NewTableDialog({ defaultSample, onCreate, onClose }: { defaultSa
     if (current.kind) onCreate(current.kind, { sample, layout });
   };
   const nValid = Number.isInteger(n) && n >= MIN_REPLICATES && n <= MAX_REPLICATES;
+  const roving = useRoving(FORMATS.map(() => true), FORMATS.findIndex((f) => f.id === formatId), (i) => setFormatId(FORMATS[i].id));
   return (
     <Modal title="New data table" confirmLabel="Create table" onConfirm={() => (!hasLayoutOptions || mode !== 'replicates' || nValid) && create()} onClose={onClose} confirmDisabled={current.kind === null || (mode === 'replicates' && hasLayoutOptions && !nValid)}>
-      <div className="format-tabs" role="tablist" aria-label="Table format">
-        {FORMATS.map((f) => (
+      <div className="format-tabs" role="tablist" aria-label="Table format" {...roving.groupProps}>
+        {FORMATS.map((f, i) => (
           <button
             key={f.id}
             role="tab"
             aria-selected={formatId === f.id}
+            {...roving.itemProps(i)}
             className={`format-tab${formatId === f.id ? ' active' : ''}${f.gapBefore ? ' format-tab-gap' : ''}`}
             title={f.blurb}
             onClick={() => setFormatId(f.id)}

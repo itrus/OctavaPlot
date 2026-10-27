@@ -106,6 +106,7 @@ button.icon-only { display: inline-flex; align-items: center; justify-content: c
 .nav-folder { font-weight: 600; }
 .nav-item { margin-left: 18px; }
 .nav-item.active { background: var(--accent-soft); }
+.nav-item.active, .nav-item.related { font-weight: 700; }
 .chev { display: inline-block; width: 12px; color: var(--muted); }
 
 .workspace { grid-area: main; min-width: 0; min-height: 0; display: flex; background: #fff; }
@@ -545,3 +546,58 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
 .thumb-panel { position: absolute; border: 1px solid var(--accent); background: var(--accent-soft); font-size: 10px; padding: 1px 3px; overflow: hidden; }
 .thumb-panel.empty { border-style: dashed; background: transparent; }
 .thumb-missing { color: var(--muted); font-size: 12px; }
+
+/* ------------------------------------------------------------ export status */
+.export-status { margin-left: 0; white-space: nowrap; }
+
+/* ------------------------------------------------------------ small screens (only max-width queries: wide screens are unchanged) */
+@media (max-width: 900px) {
+  /* The side panels float over the workspace instead of squeezing it; their toggles in the top bar open and close them. */
+  .app { grid-template-columns: 0 minmax(0, 1fr) 0; }
+  .app > .navigator, .app > .inspector, .app > .inspector-host {
+    position: absolute;
+    top: 36px;
+    bottom: 30px;
+    z-index: 20;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.3);
+  }
+  .app > .navigator { left: 0; width: min(var(--nav-px, 250px), 88vw); }
+  .app > .inspector, .app > .inspector-host { right: 0; width: min(var(--insp-px, 360px), 92vw); }
+  .app[data-nav='closed'] .navigator, .app[data-insp='closed'] .inspector, .app[data-insp='closed'] .inspector-host { box-shadow: none; }
+  .splitter { display: none; }
+
+  .toolbar { flex-wrap: wrap; }
+  .toolbar-info { margin-left: 0; }
+  .toolbar-end { margin-left: auto; }
+  .statusbar { overflow-x: auto; gap: 8px; }
+  .settings-body { overflow-x: auto; }
+
+  /* Layouts: the settings go under the page instead of beside it; the page keeps its own scroller. */
+  .layout-body { flex-direction: column; overflow-y: auto; }
+  .layout-body .chart-scroller { flex: 0 0 clamp(240px, 55vh, 520px); }
+  .layout-panel { width: auto; flex: none; overflow: visible; border-left: 0; border-top: 1px solid var(--border); }
+}
+
+@media (max-width: 900px) and (pointer: coarse), (max-width: 600px) {
+  .toolbar button, .topbar button, .statusbar button, .section-chip, .tab { min-height: 32px; }
+  .icon-only, .icon-btn { min-width: 32px; }
+}
+
+@media (max-width: 600px) {
+  .zoom input[type='range'] { width: 64px; }
+  .project-name { min-width: 90px; }
+  .folder-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .gallery-preview { width: 100%; max-width: 360px; }
+}
+
+/* The top bar on a narrow window: the name and version give way, and what is used most (the panel toggles, Save, Undo and Redo, Settings) comes first, so it is reachable without scrolling the bar. */
+@media (max-width: 900px) {
+  .topbar .brand, .topbar .app-version, .topbar .topbar-sep, .topbar .project-name-field > span { display: none; }
+  .topbar .topbar-late, .topbar .brand-logo, .topbar .project-name-field { order: 10; }
+  .topbar [aria-label$="inspector"] { order: -1; }
+  .topbar .project-name { min-width: 70px; width: 18ch; }
+}
+@media (max-width: 600px) {
+  /* Icons only: the buttons keep their names for screen readers and tooltips. */
+  .topbar .icon-text { font-size: 0; gap: 0; }
+}

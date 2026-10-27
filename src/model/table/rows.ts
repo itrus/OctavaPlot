@@ -1,5 +1,5 @@
 import { newId } from '../ids';
-import type { DataRow, DataTable } from '../types';
+import type { DataRow, DataTable, Group } from '../types';
 
 /** Longest stored row title, in code points (P). */
 export const MAX_ROW_TITLE_CHARS = 200;
@@ -38,3 +38,12 @@ export function sanitizeRowTitle(raw: string): string {
 
 /** The title of row i; '' when the row does not exist. */
 export const rowTitleAt = (table: DataTable, i: number): string => table.rows[i]?.title ?? '';
+
+/** The title of row i as the points of this column are named: from the table the column came from, when it is not the graph's own. */
+export const groupRowTitle = (table: DataTable, group: Group | undefined, i: number): string => (group?.sourceRowTitles ? group.sourceRowTitles[i] ?? '' : rowTitleAt(table, i));
+
+/** Most rows a table may hold: past this the grid and every calculation over it become unusably slow. */
+export const MAX_TABLE_ROWS = 100000;
+
+/** Most cells (rows x columns) a table in a file may declare: past this the file is refused before anything is allocated. */
+export const MAX_TABLE_CELLS = 20_000_000;

@@ -1,3 +1,4 @@
+import { meanOf, neumaierSum, scaledMoments, sdOf } from './moments';
 import { medianCiRank, studentTQuantileUpper } from './special';
 import { quantileType6 } from './summary';
 
@@ -43,24 +44,6 @@ export interface Descriptive {
   /** Sample excess kurtosis G2 (needs 4 values). */
   kurtosis: number | null;
   sum: number | null;
-}
-
-/** Neumaier compensated sum. */
-function sumOf(xs: ReadonlyArray<number>): number {
-  let sum = 0;
-  let c = 0;
-  for (const x of xs) {
-    const t = sum + x;
-    c += Math.abs(sum) >= Math.abs(x) ? sum - t + x : x - t + sum;
-    sum = t;
-  }
-  return sum + c;
-}
-
-const meanOf = (xs: ReadonlyArray<number>): number => sumOf(xs) / xs.length;
-
-function sdOf(xs: ReadonlyArray<number>, m: number): number {
-  return Math.sqrt(sumOf(xs.map((x) => (x - m) ** 2)) / (xs.length - 1));
 }
 
 /** t interval of the mean of `xs` (n >= 2) at `level`. */
@@ -110,15 +93,10 @@ export function describeValues(values: ReadonlyArray<number | null | undefined>,
   // Skewness and excess kurtosis with the usual small-sample corrections.
   let skewness: number | null = null;
   let kurtosis: number | null = null;
-  const m2 = sumOf(xs.map((x) => (x - mean) ** 2)) / n;
-  if (n >= 3 && m2 > 0) {
-    const m3 = sumOf(xs.map((x) => (x - mean) ** 3)) / n;
-    skewness = (Math.sqrt(n * (n - 1)) / (n - 2)) * (m3 / m2 ** 1.5);
-  }
-  if (n >= 4 && m2 > 0) {
-    const m4 = sumOf(xs.map((x) => (x - mean) ** 4)) / n;
-    const g2 = m4 / (m2 * m2) - 3;
-    kurtosis = ((n - 1) / ((n - 2) * (n - 3))) * ((n + 1) * g2 + 6);
+  const mo = n >= 3 ? scaledMoments(xs, mean) : null;
+  if (mo && mo.m2 > 0) {
+    skewness = (Math.sqrt(n * (n - 1)) / (n - 2)) * (mo.m3 / mo.m2 ** 1.5);
+    if (n >= 4) kurtosis = ((n - 1) / ((n - 2) * (n - 3))) * ((n + 1) * (mo.m4 / (mo.m2 * mo.m2) - 3) + 6);
   }
 
   return {
@@ -143,7 +121,7 @@ export function describeValues(values: ReadonlyArray<number | null | undefined>,
     geoMeanCi: logCi ? { lower: Math.exp(logCi.lower), upper: Math.exp(logCi.upper) } : null,
     skewness,
     kurtosis,
-    sum: sumOf(xs),
+    sum: neumaierSum(xs),
   };
 }
 

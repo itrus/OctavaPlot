@@ -113,10 +113,10 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'heat',
       label: 'Heat map',
       items: [
-        item('heat.viridis', 'Viridis heat map', 'Each cell coloured by its value, dark purple to yellow.', 'heatmap', 'matrix.heatmap', { heatPalette: 'viridis' }),
-        item('heat.magma', 'Magma heat map', 'Each cell coloured by its value, black to pale yellow.', 'heatmap', 'matrix.heatmap', { heatPalette: 'magma' }),
-        item('heat.blue', 'Blue-white heat map', 'A single-hue scale for values that are all positive.', 'heatmap', 'matrix.heatmap', { heatPalette: 'blue' }),
-        item('heat.greenred', 'Green-black-red heat map', 'A diverging scale around a middle value.', 'heatmap', 'matrix.heatmap', { heatPalette: 'greenred' }),
+        item('heat.blue', 'Blue heat map', 'A single-hue scale, pale to dark blue, for values that are all positive. Fifteen more gradients are in the Inspector.', 'heatmap', 'matrix.heatmap', { heatPalette: 'bs-blue' }),
+        item('heat.purple', 'Purple heat map', 'A single-hue scale, pale to dark purple.', 'heatmap', 'matrix.heatmap', { heatPalette: 'bs-purple' }),
+        item('heat.red', 'Red heat map', 'A single-hue scale, pale to dark red.', 'heatmap', 'matrix.heatmap', { heatPalette: 'md-red' }),
+        item('heat.gsea', 'GSEA heat map', 'A diverging scale, blue through pale to red, around a middle value.', 'heatmap', 'matrix.heatmap', { heatPalette: 'gsea' }),
       ],
     },
     {
@@ -170,3 +170,18 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
 /** Every gallery item of a table type, in order. */
 export const galleryItems = (kind: TableKind): GalleryItem[] => GALLERY[kind].flatMap((t) => t.items);
 export const availableItems = (kind: TableKind): GalleryItem[] => galleryItems(kind).filter((i) => i.type !== null);
+
+const KINDS = Object.keys(GALLERY) as TableKind[];
+
+/** How many graphs the gallery holds over all table types: those that can be made and those still planned. */
+export function galleryCounts(): { available: number; planned: number; total: number } {
+  const all = KINDS.flatMap(galleryItems);
+  const available = all.filter((i) => i.type !== null).length;
+  return { available, planned: all.length - available, total: all.length };
+}
+
+/** The tabs of a table type with only the graphs to show: the creatable ones, plus the planned ones when asked. Every tab is kept. */
+export const visibleTabs = (kind: TableKind, showPlanned: boolean): GalleryTab[] =>
+  GALLERY[kind].map((t) => ({ ...t, items: showPlanned ? t.items : t.items.filter((i) => i.type !== null) }));
+
+export const visibleItems = (kind: TableKind, showPlanned: boolean): GalleryItem[] => visibleTabs(kind, showPlanned).flatMap((t) => t.items);

@@ -1,9 +1,9 @@
 import { FRAME_STYLES, GRID_LIMITS, LINE_STYLES } from '../../../model/graph/look';
-import type { BarLabelMode, Chart, FrameStyle, LineOrder, LineStyle } from '../../../model/types';
+import type { BarLabelMode, Chart, FrameStyle, InsideBarLabel, InsideLabelPosition, LineOrder, LineStyle } from '../../../model/types';
 import { useApp } from '../../../state/AppContext';
 import { patchLook } from '../../../state/commands';
 import { AUTO_BAR_GAP_PCT, AUTO_BAR_OUTER_PCT, BAR_LIMITS } from '../../../model/options/columnOptions';
-import { BAR_LABEL_MODES } from '../../../model/options/columnOptions';
+import { BAR_LABEL_MODES, INSIDE_LABEL_POSITIONS } from '../../../model/options/columnOptions';
 import { BAR_LABEL_LIMITS } from '../../../chart/shared/parts/barLabels';
 import { patchBarLabels, patchBars, patchBothAxes } from '../../../state/commands';
 import { Check, ColorInput, Field, NumField, OptionalNumField, Section, SelectInput, TextInput } from '../common/controls';
@@ -129,16 +129,33 @@ export function BarLabelSection({ chart }: { chart: Chart }) {
   const { run } = useApp();
   const l = chart.barLabels;
   const set = (label: string, patch: Partial<Chart['barLabels']>, key?: string) => run(label, patchBarLabels(chart.id, patch), key);
-  const off = l.show === 'none';
+  const inside: InsideBarLabel = l.inside ?? { position: 'end', show: 'none', color: null };
+  const setInside = (label: string, patch: Partial<InsideBarLabel>) => run(label, patchBarLabels(chart.id, { inside: { ...inside, ...patch } }));
+  const insideOff = inside.show === 'none';
+  const off = l.show === 'none' && insideOff;
   return (
     <Section title="Labels above the bars">
       <Field label="Show" hint="The plotted value (mean, median...) or the number of values behind the bar">
         <SelectInput<BarLabelMode> value={l.show} options={BAR_LABEL_MODES.map((m) => ({ value: m.value, label: m.label }))} onChange={(v) => set('Bar labels', { show: v })} />
       </Field>
+      <Field label="Inside the bar" hint="A second label inside each bar, for example the sample size at the base while the value is above the end. It is left out, with a note, where the bar is too small for the text.">
+        <SelectInput<BarLabelMode> value={inside.show} options={BAR_LABEL_MODES.map((m) => ({ value: m.value, label: m.label }))} onChange={(v) => setInside('Bar label inside', { show: v })} />
+      </Field>
+      <Field label="Inside at">
+        <SelectInput<InsideLabelPosition> value={inside.position} disabled={insideOff} options={INSIDE_LABEL_POSITIONS.map((m) => ({ value: m.value, label: m.label }))} onChange={(v) => setInside('Bar label inside position', { position: v })} />
+      </Field>
+      <Field label="Inside colour" hint="Auto: black or white, whichever reads better on the bar">
+        <span className="inline-controls">
+          <ColorInput value={inside.color ?? '#000000'} disabled={insideOff || inside.color === null} ariaLabel="Inside bar label colour" onChange={(v) => setInside('Bar label inside colour', { color: v })} />
+          <label className="inline-check">
+            <Check checked={inside.color === null} disabled={insideOff} onChange={(auto) => setInside('Bar label inside colour', { color: auto ? null : '#000000' })} ariaLabel="Inside bar label colour: automatic" /> Auto
+          </label>
+        </span>
+      </Field>
       <Field label="Decimals">
         <SelectInput<(typeof LABEL_DECIMALS)[number]>
           value={l.decimals === null || l.decimals > 6 ? 'auto' : (String(l.decimals) as (typeof LABEL_DECIMALS)[number])}
-          disabled={l.show !== 'value'}
+          disabled={l.show !== 'value' && inside.show !== 'value'}
           options={LABEL_DECIMALS.map((d) => ({ value: d, label: d === 'auto' ? 'Auto' : d }))}
           onChange={(v) => set('Bar label decimals', { decimals: v === 'auto' ? null : Number(v) })}
         />

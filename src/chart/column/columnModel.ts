@@ -1,25 +1,27 @@
 import { scaleLinear, scaleLog } from 'd3';
 import { BAR_PALETTE } from '../../model/defaults';
 import { paletteById } from '../../model/graph/palettes';
+import { legendEntries } from '../../model/graph/legendEntries';
 import { isPatternInvisible, resolveBarFill } from '../../model/graph/fill';
-import { rowTitleAt } from '../../model/table/rows';
+import { groupRowTitle } from '../../model/table/rows';
 import { resolveSummary } from '../../model/graph/summary';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { statsFor, summarize, type GroupStats, type GroupSummary, type Notice } from '../../stats/summary';
 import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, populateAxes, type RangeRow } from '../shared/axes/axes';
-import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, type ErrorBarGeom } from '../shared/parts/errorGeometry';
+import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, errorEndValues, type ErrorBarGeom } from '../shared/parts/errorGeometry';
 import { countMarks, patternMarks, type Point, type Rect } from '../shared/parts/hatch';
 import { computeLayout, type Layout } from '../shared/parts/layout';
 import { anyLabelsRequested, buildPointLabels, emptyPointLabelModel, labelWarnings, type PointLabelModel } from '../shared/parts/labels';
 import { memoFor } from '../../stats/memo';
 import { boxSummary, densityProfile, normaliseProfiles, sortedFinite, type BoxSummary, type DensityProfile } from '../../stats/distribution';
 import { supportsHorizontal } from '../../model/graph/chartTypes';
-import { barLabelText, placeBarLabel, type BarLabelGeom } from '../shared/parts/barLabels';
+import { barLabelText, insideLabelText, placeBarLabel, placeInsideBarLabel, type BarLabelGeom, type InsideLabelGeom } from '../shared/parts/barLabels';
 import { buildBox, buildFloating, buildViolin, type DistGeom } from '../shared/parts/distributionGeom';
+import { boxNeeds, floatingNeeds, unplacedMarkNote } from '../shared/parts/distributionNotes';
 import { columnLayout } from './columnLayout';
-import { axisMapper, onAxis, resolveAxis } from '../shared/axes/axisScale';
+import { axisMapper, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
 import { layersOf, type LayerSpec } from '../../model/graph/layers';
 import { compileColumnMarks } from './columnMarks';
@@ -90,6 +92,8 @@ export interface GroupGeom {
   connector: LineGeom | null;
   /** Value or sample size written above the bar (or error bar), when the chart asks for it. */
   barLabel: BarLabelGeom | null;
+  /** Value or sample size written inside the bar, when the chart asks for it. */
+  insideLabel?: InsideLabelGeom | null;
   /** Box plot or violin of the data set (those chart types only). */
   dist: DistGeom | null;
 }
@@ -174,18 +178,19 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     }
   }
 
-  // Box plots and violins work on the raw values: on a log axis only the ones above 0 count (the rest are reported).
+  // Box plots and violins work on all the finite values, whatever the axis: the axis only decides what of them can be drawn.
   const isDist = chart.type === 'box' || chart.type === 'violin' || chart.type === 'floating';
   const opts = chart.distribution;
   let offAxis = 0;
+  let inGap = 0;
+  let gapErrorBars = 0;
   const distPre = rows.map((r) => {
     if (!isDist) return null;
     const logAxis = axisConfigFor(chart, r.binding).scale !== 'linear';
-    const all = r.group.observations.map((o) => o.value);
-    const values = logAxis ? all.filter((v) => v === null || v > 0) : all;
-    offAxis += all.filter((v) => v !== null && Number.isFinite(v) && logAxis && v <= 0).length;
+    const values = r.group.observations.map((o) => o.value);
+    offAxis += values.filter((v) => v !== null && Number.isFinite(v) && logAxis && v <= 0).length;
     // The box and the density depend on the values and a few settings only: kept while the observations stay the same.
-    const calc = memoFor(r.group.observations, JSON.stringify([chart.type, logAxis, opts.whisker, opts.tukeyK, opts.smoothing, opts.bandwidth, opts.trim]), () => ({
+    const calc = memoFor(r.group.observations, JSON.stringify([chart.type, opts.whisker, opts.tukeyK, opts.smoothing, opts.bandwidth, opts.trim]), () => ({
       summary: (chart.type === 'box' ? boxSummary(values, opts.whisker, opts.tukeyK) : chart.type === 'floating' ? boxSummary(values, 'minmax') : null) as BoxSummary | null,
       profile: (chart.type === 'violin' ? densityProfile(values, { smoothing: opts.smoothing, bandwidth: opts.bandwidth, trim: opts.trim }) : null) as DensityProfile | null,
       sorted: sortedFinite(values),
@@ -239,8 +244,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   if (y2) warnings.push(...y2.warnings.map((w) => prefixFor('secondary') + w));
 
   // Data sets listed in the legend: all except those the user hid one by one.
-  const hidden = new Set(chart.legend.hiddenGroupIds);
-  const legendGroups = rows.flatMap((r, i) => (hidden.has(r.group.id) ? [] : [i]));
+  const legendGroups = legendEntries(chart.legend, rows.map((r) => r.group.id));
   const legendRows = legendGroups.map((i) => rows[i]);
 
   // 3. Layout.
@@ -317,13 +321,22 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   };
 
   // 5. Geometry. Values with no position on a log axis (0 or less) are left out and counted.
+  // For paired plots: the value of each subject (table row) in each data set, with its place across, whether or not its dot can be drawn.
+  const pairValues = rows.map(() => new Map<number, { x: number; y: number }>());
   const groups: GroupGeom[] = rows.map(({ group, summary, stats, style, name, binding }, gi) => {
     const { scale, toY, baseline } = axisOf(binding);
     const x0 = cols.x(group.id) ?? plot.x;
     const centerX = x0 + bw / 2;
     const slotX = x0 - (slotStep - bw) / 2;
     const centre = stats.centre;
-    const yCentre = centre === null ? null : toY(centre);
+    // The centre has a place only where the axis can show it (not 0 or less on a log axis, not inside an omitted range).
+    const yCentre = centre === null || !placeable(scale, centre) ? null : toY(centre);
+    // Marks of the distribution are made from whole-sample statistics; a value with no place gives no coordinate, so the mark is not drawn.
+    const toYDraw = (v: number) => (placeable(scale, v) ? toY(v) : NaN);
+    if (!isDist && style.showBars && centre !== null && yCentre === null) {
+      const note = unplacedMarkNote(scale, 'Bar', name, [['centre value', centre]], stats.n);
+      if (note) warnings.push(note);
+    }
 
     // Bar: from baseline (0 when visible, else the nearest domain edge) to the centre.
     let bar: BarGeom | null = null;
@@ -353,8 +366,21 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
       };
     }
 
+    // A label inside the bar, against its end or its base; left out, with a note, when the text does not fit.
+    let insideLabel: InsideLabelGeom | null = null;
+    const insideText = insideLabelText(chart.barLabels, centre, stats.n);
+    if (bar && insideText !== null && chart.barLabels.inside && yCentre !== null) {
+      const visible = (y: number) => Math.min(plot.y + plot.height, Math.max(plot.y, y));
+      const placed = placeInsideBarLabel({ id: group.id, owner: name, cfg: chart.barLabels, inside: chart.barLabels.inside, text: insideText, fontFamily: chart.fontFamily, x: centerX, width: bw, yEnd: visible(yCentre), yBase: visible(toY(baseline)), horizontal, fill: bar.fillSpec, page: chart.pageColor ?? '#ffffff' });
+      insideLabel = placed.label;
+      if (placed.warning) warnings.push(placed.warning);
+    }
+
     // Error bar: independent of bars and symbols; endpoints come only from the interval (spec 9.2 L679).
-    const errorBar = isDist ? null : buildErrorBar({ groupId: group.id, centerX, stats, style, yScale: toY, domain: scale.domain, log: !!scale.log });
+    // An end inside an omitted range would be drawn at the edge of the gap, as if that were its value: the bar is not drawn then.
+    const endInGap = !isDist && errorEndValues(stats, style.showErrorBars, style.errorDirection).some((v) => inBreak(scale, v));
+    if (endInGap) gapErrorBars++;
+    const errorBar = isDist || endInGap || (centre !== null && inBreak(scale, centre)) ? null : buildErrorBar({ groupId: group.id, centerX, stats, style, yScale: toY, domain: scale.domain, log: !!scale.log });
 
     // Symbols: raw observations (bar overlay / scatter) or the mean marker (mean chart).
     const points: PointGeom[] = [];
@@ -385,9 +411,15 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
             offAxis++;
             return;
           }
-          const ps = resolveStyle(chart, layer, group, o.id);
           // The dots of a paired plot stay on the line of their column: a subject's line would not meet them otherwise.
           const offset = chart.jitter.enabled && chart.type !== 'paired' ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * bw : 0;
+          // A value inside an omitted range has no dot, but its subject's line still runs to the edge of the gap.
+          if (chart.type === 'paired') pairValues[gi].set(row, { x: centerX + offset, y: o.value });
+          if (inBreak(scale, o.value)) {
+            inGap++;
+            return;
+          }
+          const ps = resolveStyle(chart, layer, group, o.id);
           points.push({
             id: o.id,
             groupId: group.id,
@@ -412,7 +444,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     let dist: DistGeom | null = null;
     const pre = distPre[gi];
     if (pre) {
-      const common = { groupId: group.id, centerX, toY, opts, lineColor: style.lineColor, lineWidthPt: style.lineWidthPt, lineOpacity: style.lineOpacity };
+      const common = { groupId: group.id, centerX, toY: toYDraw, opts, lineColor: style.lineColor, lineWidthPt: style.lineWidthPt, lineOpacity: style.lineOpacity };
       const slotWidth = slotStep;
       if (chart.type === 'box') {
         dist = buildBox({ ...common, width: slotWidth * opts.boxWidth, summary: pre.summary });
@@ -420,6 +452,16 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
         dist = buildFloating({ ...common, width: bw, summary: pre.summary, centre });
       } else {
         dist = buildViolin({ ...common, halfWidth: (slotWidth * opts.violinWidth) / 2, profile: pre.profile, widths: violinWidths[gi] ?? null, values: pre.values });
+      }
+      if (!dist && pre.summary && chart.type !== 'violin') {
+        const note = unplacedMarkNote(scale, chart.type === 'floating' ? 'Floating bar' : 'Box', name, chart.type === 'floating' ? floatingNeeds(pre.summary) : boxNeeds(pre.summary), pre.summary.n);
+        if (note) warnings.push(note);
+      } else if (chart.type === 'violin' && pre.sorted.length > 0) {
+        const v = pre.profile?.v ?? pre.sorted;
+        const cut = !!pre.profile && (!placeable(scale, v[0]) || !placeable(scale, v[v.length - 1]));
+        const all = `The statistics include all ${pre.sorted.length} value${pre.sorted.length === 1 ? '' : 's'}.`;
+        if (!dist) warnings.push(`Violin of ${name} is not drawn: too little of it lies where the axis can show it. ${all}`);
+        else if (cut) warnings.push(`Violin of ${name} is drawn only where the axis can show it. ${all}`);
       }
       if (dist && style.showBars && dist.rect) {
         const fillSpec = resolveBarFill(style);
@@ -441,12 +483,16 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
       group.observations.forEach((o, row) => {
         if (o.value === null || !Number.isFinite(o.value) || !onAxis(scale, o.value)) return;
         if (!showAll && !wantDot(o.value)) return;
+        if (inBreak(scale, o.value)) {
+          inGap++;
+          return;
+        }
         const ps = resolveStyle(chart, layer, group, o.id);
         const offset = chart.jitter.enabled ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * dotWidth : 0;
         points.push({ id: o.id, groupId: group.id, observationId: o.id, row, value: o.value, cx: centerX + offset, cy: toY(o.value), shape: ps.symbolShape, size: ps.symbolSizePt, color: ps.symbolColor, fillOpacity: ps.symbolFillOpacity, borderColor: ps.symbolBorderColor, borderWidth: ps.symbolBorderWidthPt, borderOpacity: ps.symbolBorderOpacity });
       });
       if (opts.showMean && pre.summary) {
-        const my = toY(pre.summary.mean);
+        const my = toYDraw(pre.summary.mean);
         if (Number.isFinite(my)) points.push({ id: `${group.id}:mean`, groupId: group.id, observationId: null, row: -1, value: pre.summary.mean, cx: centerX, cy: my, shape: 'plus', size: style.symbolSizePt, color: style.symbolColor, fillOpacity: style.symbolFillOpacity, borderColor: style.symbolBorderColor, borderWidth: Math.max(style.symbolBorderWidthPt, 2), borderOpacity: style.symbolBorderOpacity });
       }
       if (dist?.note) warnings.push(`${name}: ${dist.note}.`);
@@ -482,6 +528,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
       points,
       meanLine,
       connector: null,
+      insideLabel,
       barLabel: isDist ? null : columnLabel(group.id, centerX, centre, yCentre, toY(baseline), errorBar, stats.n, points),
       dist,
     };
@@ -493,25 +540,25 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   const pairLines: PairLine[] = [];
   if (chart.type === 'paired' && groups[0]?.style.showLines) {
     const rowsSeen = new Set<number>();
-    for (const g of groups) for (const p of g.points) if (p.observationId !== null) rowsSeen.add(p.row);
+    for (const values of pairValues) for (const row of values.keys()) rowsSeen.add(row);
     const first = groups[0]?.style;
+    const sharedAxis = groups.every((g) => g.axis === groups[0].axis);
     for (const row of [...rowsSeen].sort((x, y) => x - y)) {
-      let d = '';
-      let segments = 0;
-      let joined = false;
+      // The subject's values in data units, cut where the line crosses an omitted range (never drawn through it). With
+      // data sets on both value axes there is no common data scale: the line then joins the places on the page.
+      const seq: Array<{ x: number; y: number } | null> = [];
       let anchor: Id | undefined;
-      for (const g of groups) {
-        const p = g.points.find((q) => q.row === row && q.observationId !== null);
-        if (!p || !Number.isFinite(p.cy)) {
-          if (!chart.pairs.bridge) joined = false;
+      for (let gi = 0; gi < groups.length; gi++) {
+        const v = pairValues[gi].get(row);
+        if (!v) {
+          if (!chart.pairs.bridge) seq.push(null);
           continue;
         }
-        anchor ??= p.observationId ?? undefined;
-        d += `${joined ? 'L' : 'M'}${n2(p.cx)},${n2(p.cy)}`;
-        if (joined) segments++;
-        joined = true;
+        anchor ??= table.groups[gi].observations[row]?.id;
+        seq.push(sharedAxis ? v : { x: v.x, y: axisOf(groups[gi].axis).toY(v.y) });
       }
-      if (segments > 0 && first) pairLines.push({ id: `pair:${row}`, obsId: anchor, row, d, color: first.lineColor, strokeWidth: first.lineWidthPt, opacity: first.lineOpacity });
+      const d = pathOfRuns(polylinesThroughBreaks(seq, { log: null, reverse: false }, sharedAxis ? axisOf(groups[0].axis).scale : { log: null, reverse: false }), sharedAxis ? axisOf(groups[0].axis).toY : (v) => v, n2);
+      if (d !== '' && first) pairLines.push({ id: `pair:${row}`, obsId: anchor, row, d, color: first.lineColor, strokeWidth: first.lineWidthPt, opacity: first.lineOpacity });
     }
   }
 
@@ -528,11 +575,14 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
         skippedConnectors++;
         continue;
       }
-      const { toY } = axisOf(a.axis);
+      const { toY, scale } = axisOf(a.axis);
+      // Cut in data units where it crosses an omitted range; the X "data" is the page position, which has none.
+      const d = pathOfRuns(polylinesThroughBreaks([{ x: a.centerX, y: a.centreValue }, { x: b.centerX, y: b.centreValue }], { log: null, reverse: false }, scale), toY);
+      if (d === '') continue;
       a.connector = {
         id: `${a.groupId}:line`,
         groupId: a.groupId,
-        d: `M${a.centerX},${toY(a.centreValue)}L${b.centerX},${toY(b.centreValue)}`,
+        d,
         color: a.style.lineColor,
         strokeWidth: a.style.lineWidthPt,
         opacity: a.style.lineOpacity,
@@ -571,7 +621,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
             cy: p.cy,
             size: p.size,
             value: p.value,
-            rowTitle: p.observationId === null ? '' : rowTitleAt(table, p.row),
+            rowTitle: p.observationId === null ? '' : groupRowTitle(table, group, p.row),
             style: group && p.observationId !== null ? resolveStyle(chart, layer, group, p.observationId) : g.style,
           })),
         };
@@ -580,7 +630,10 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
       chart: { width: widthPt, height: heightPt },
     });
   }
-  if (offAxis > 0) patternWarnings.push(`${offAxis} value${offAxis === 1 ? ' is' : 's are'} 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
+  // The statistics always use every value: the axis only decides which marks can be drawn.
+  if (offAxis > 0) patternWarnings.push(`${offAxis} value${offAxis === 1 ? ' is' : 's are'} 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn; the statistics include ${offAxis === 1 ? 'it' : 'them'}.`);
+  if (inGap > 0) patternWarnings.push(`${inGap} value${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);
+  if (gapErrorBars > 0) patternWarnings.push(`${gapErrorBars} error bar${gapErrorBars === 1 ? ' has' : 's have'} an end inside an omitted range of the axis and ${gapErrorBars === 1 ? 'is' : 'are'} not drawn.`);
   warnings.splice(patternWarningsAt, 0, ...patternWarnings, ...labelWarnings(labels.report));
 
   // Two-axis setup notices (silent with one axis).

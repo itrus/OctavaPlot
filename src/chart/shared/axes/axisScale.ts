@@ -264,6 +264,9 @@ export function dataGaps(scale: Pick<YAxisScale, 'segments' | 'log' | 'reverse'>
 /** True when the value lies strictly inside a gap of the axis: it has no place there and is not drawn. */
 export const inBreak = (scale: Pick<YAxisScale, 'segments' | 'log' | 'reverse'>, v: number): boolean => dataGaps(scale).some(([a, b]) => v > a && v < b);
 
+/** True when a value can be drawn on the axis: it has a position (not 0 or less on a log axis) and is not inside an omitted range. */
+export const placeable = (scale: Pick<YAxisScale, 'segments' | 'log' | 'reverse'>, v: number): boolean => onAxis(scale, v) && !inBreak(scale, v);
+
 interface DataPoint {
   x: number;
   y: number;
@@ -338,4 +341,12 @@ export function polylinesThroughBreaks(seq: ReadonlyArray<DataPoint | null>, xAx
     prev = item;
   }
   return parts;
+}
+
+/** Path data for lines cut by polylinesThroughBreaks: one stroke for each run of two points or more, Y mapped from data to the page. */
+export function pathOfRuns(runs: ReadonlyArray<ReadonlyArray<DataPoint>>, toY: (v: number) => number, fmt: (v: number) => number | string = (v) => v): string {
+  return runs
+    .filter((run) => run.length >= 2)
+    .map((run) => run.map((p, i) => `${i === 0 ? 'M' : 'L'}${fmt(p.x)},${fmt(toY(p.y))}`).join(''))
+    .join('');
 }

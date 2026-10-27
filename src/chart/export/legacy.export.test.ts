@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import type { ChartType } from '../../model/types';
-import { patchStyle, setChartType } from '../../state/commands';
+import { patchStyle, patchSummary, setChartType } from '../../state/commands';
 import { chartToSvgString } from './export';
 
 /**
@@ -87,6 +87,8 @@ function frozenExample(type: ChartType) {
     })),
   };
   p = setChartType(p.charts[0].id, type)(p);
+  // The goldens predate the SD being the default spread of a bar chart and a mean chart.
+  p = patchSummary(p.charts[0].id, 'all', { spread: 'none' })(p);
   // The bar golden predates symbols being on by default for bar charts.
   if (type === 'bar') p = patchStyle(p.charts[0].id, 'all', { showSymbols: false })(p);
   return p;

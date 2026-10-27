@@ -56,11 +56,13 @@ function effectiveTableWithExcluded(p: Project, chart: Chart): DataTable | undef
   if (blocks) for (const s of xySeries(own)) if (hidden.has(s.id)) s.columns.forEach((c) => hiddenColumns.add(c.id));
   const picked: Group[] = blocks ? own.groups.filter((g) => !hiddenColumns.has(g.id)) : own.groups.filter((g) => !hidden.has(g.id));
   const ownCount = picked.length;
+  const extraSlots: number[] = [];
   for (const e of chart.extraGroups) {
     const g = tableById(p, e.tableId)?.groups.find((x) => x.id === e.groupId);
     if (g && e.tableId !== chart.dataTableId && !blocks) {
+      extraSlots.push(e.slot ?? extraSlots.length);
       // Named with its table, so it cannot be mistaken for a data set of the same name in the graph's own table.
-      picked.push({ ...g, name: `${tableById(p, e.tableId)!.name}: ${g.name}` });
+      picked.push({ ...g, name: `${tableById(p, e.tableId)!.name}: ${g.name}`, sourceRowTitles: tableById(p, e.tableId)!.rows.map((r) => r.title) });
     }
   }
   const ownPaletteEnd = Math.max(-1, ...own.groups.map((g) => g.paletteIndex)) + 1;
@@ -68,8 +70,9 @@ function effectiveTableWithExcluded(p: Project, chart: Chart): DataTable | undef
   const unordered = picked.map((g, i) => ({
     ...g,
     // A data set of the graph's own table keeps its colour whatever is hidden or reordered; data sets added from other
-    // tables take fresh colours after the table's own, so they do not share a colour by accident.
-    paletteIndex: i < ownCount ? g.paletteIndex : ownPaletteEnd + (i - ownCount),
+    // tables take fresh colours after the table's own (each its stored slot, so removing another added data set does
+    // not shift it), so they do not share a colour by accident.
+    paletteIndex: i < ownCount ? g.paletteIndex : ownPaletteEnd + extraSlots[i - ownCount],
     observations:
       g.observations.length === rowCount
         ? g.observations

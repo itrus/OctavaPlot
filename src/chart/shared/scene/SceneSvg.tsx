@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { SELECT_COLOR } from './ChartParts';
 import { hitAttrs } from './hitTest';
+import { prefixed, scopeRefs, useSvgIdPrefix } from './idPrefix';
 import { SceneElements } from './SceneElements';
 import type { Scene } from './scene';
 
@@ -9,6 +10,7 @@ import type { Scene } from './scene';
  * attributes, a thin line has a transparent twin to be hit by, and the selected series is glowing; none of this is in an export.
  */
 export function SceneSvg({ scene, editor, selectedGroup }: { scene: Scene; editor: boolean; selectedGroup: string | null }) {
+  const prefix = useSvgIdPrefix();
   return (
     <>
       {scene.layers.map((layer) => (
@@ -19,9 +21,9 @@ export function SceneSvg({ scene, editor, selectedGroup }: { scene: Scene; edito
               <Fragment key={p.id}>
                 <path
                   d={p.d}
-                  fill={p.fill}
+                  fill={scopeRefs(prefix, p.fill)}
                   fillOpacity={p.fillOpacity}
-                  stroke={p.stroke}
+                  stroke={scopeRefs(prefix, p.stroke)}
                   strokeWidth={p.strokeWidth === 0 ? undefined : p.strokeWidth}
                   strokeOpacity={p.strokeOpacity}
                   strokeDasharray={p.dashArray}
@@ -29,7 +31,7 @@ export function SceneSvg({ scene, editor, selectedGroup }: { scene: Scene; edito
                   strokeLinejoin={p.lineJoin}
                   pointerEvents={p.hit || !editor ? undefined : 'none'}
                   {...hit}
-                  id={p.id}
+                  id={prefixed(prefix, p.id)}
                 />
                 {editor && p.hit && p.hitWidthPt !== undefined && <path d={p.d} fill="none" stroke="transparent" strokeWidth={p.hitWidthPt} {...hitAttrs(p.hit.kind, p.hit.groupId, p.hit.objectId)} />}
                 {editor && p.glow && p.hit && selectedGroup === p.hit.groupId && (

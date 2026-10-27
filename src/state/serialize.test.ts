@@ -205,3 +205,23 @@ describe('malformed persisted fields', () => {
     expect(() => parseProject(build((p) => (p.dataTables[0].groups[0].observations[1].id = p.dataTables[0].groups[0].observations[0].id)))).toThrow(/duplicated/);
   });
 });
+
+describe('table size limits in a file', () => {
+  const withTable = (patch: Any) => {
+    const raw = JSON.parse(stringifyProject(createExampleProject())) as Any;
+    Object.assign(raw.project.dataTables[0], patch);
+    return JSON.stringify(raw);
+  };
+  it('refuses a huge declared rowCount quickly, naming the path and the limit', () => {
+    const t0 = performance.now();
+    expect(() => parseProject(withTable({ rowCount: 1e9, rows: undefined }))).toThrow(/dataTables\[0\]\.rowCount.*100,000/);
+    expect(performance.now() - t0).toBeLessThan(1000);
+  });
+  it('refuses a rowCount times columns past the cell limit', () => {
+    const raw = JSON.parse(stringifyProject(createExampleProject())) as Any;
+    const t = raw.project.dataTables[0];
+    t.rowCount = 100000;
+    t.groups = Array.from({ length: 300 }, (_, i) => ({ id: `g${i}`, name: `G${i}`, observations: [] }));
+    expect(() => parseProject(JSON.stringify(raw))).toThrow(/dataTables\[0\].*20,000,000 cells/);
+  });
+});

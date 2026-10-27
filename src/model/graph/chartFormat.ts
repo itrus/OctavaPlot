@@ -1,6 +1,7 @@
 import { chartTypeInfo, defaultChartTypeFor } from './chartTypes';
 import { createChart } from '../defaults';
 import { newId } from '../ids';
+import { withoutLegendOrder } from './legendEntries';
 import { xySeries } from '../table/tableLayout';
 import type { AxisConfig, Chart, ChartLayer, DataTable, Id, SummarySpec } from '../types';
 
@@ -41,6 +42,8 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
   const portable: Chart = {
     ...fresh,
     aspect: source.aspect,
+    // With the size: both describe the figure's place on the page.
+    ...(source.printWidthMm === undefined ? {} : { printWidthMm: source.printWidthMm }),
     showTitle: source.showTitle,
     titleFontSizePt: source.titleFontSizePt,
     titleBold: source.titleBold,
@@ -56,7 +59,8 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
     xAxis: axis(source.xAxis, fresh.xAxis),
     yAxis: axis(source.yAxis, fresh.yAxis),
     y2Axis: axis(source.y2Axis, fresh.y2Axis),
-    legend: { ...source.legend, hiddenGroupIds: [] },
+    // The order of the entries names the series of the source's table, so it is not carried over; the number of columns is.
+    legend: { ...withoutLegendOrder(source.legend), hiddenGroupIds: [] },
     jitter: { ...source.jitter },
   };
   if (!sameKind) return portable;
@@ -89,8 +93,9 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
     paletteId: source.paletteId,
     orientation: source.orientation,
     lineOrder: source.lineOrder,
+    lineConnect: source.lineConnect,
     bars: { ...source.bars },
-    barLabels: { ...source.barLabels },
+    barLabels: { ...source.barLabels, ...(source.barLabels.inside ? { inside: { ...source.barLabels.inside } } : {}) },
     distribution: { ...source.distribution },
     pairs: { ...source.pairs },
     heatmap: { ...source.heatmap },

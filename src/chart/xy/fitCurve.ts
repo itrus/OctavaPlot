@@ -1,7 +1,7 @@
 import type { FitSettings } from '../../model/types';
 import { n2 } from '../../model/units';
-import { cachedCalc } from '../../stats/calcCache';
-import { FIT_ALGORITHM_VERSION, fitCurve, fitModelById, isFailure, type FitFailure, type FitModelId, type FitParam, type FitResult } from '../../stats/fit';
+import { cachedFit } from '../../model/project/curveFit';
+import { fitModelById, isFailure, type FitParam, type FitResult } from '../../stats/fit';
 import { inBreak, onAxis, polylinesThroughBreaks } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
 
@@ -34,24 +34,13 @@ export interface FittedCurve {
 
 const NO_FIT: FittedCurve = { path: '', bandPath: '', summary: null, failure: null };
 
+export { fitStats } from '../../model/project/curveFit';
+
 export interface FitRun {
   result: FitResult | null;
   failure: string | null;
   /** Range of X of the data used. */
   xRange: [number, number] | null;
-}
-
-/** How many fits were actually calculated (not taken from the cache); for the tests. */
-export const fitStats = { calculated: 0 };
-
-/** Fits are kept by their identity, so changing a colour or a title does not fit the same data again. */
-function cachedFit(obs: ReadonlyArray<{ x: number; y: number }>, fit: FitSettings & { model: FitModelId }): FitResult | FitFailure {
-  const data: number[] = [];
-  for (const p of obs) data.push(p.x, p.y);
-  return cachedCalc({ kind: 'fit', algorithm: FIT_ALGORITHM_VERSION, data, method: fit.model, params: [fit.degree], level: fit.level }, () => {
-    fitStats.calculated++;
-    return fitCurve(obs, { model: fit.model, degree: fit.degree, level: fit.level });
-  });
 }
 
 /** Fit one series from its observations (every replicate counts as a point). */
@@ -107,7 +96,7 @@ export function drawFit(run: FitRun, fit: FitSettings, m: Mappers): FittedCurve 
     message: result.message,
   };
   const [lo, hi] = fit.extend ? m.xAxis.domain : xRange;
-  const xs = sampleXs(lo, hi, !!m.xAxis.log).filter((x) => onAxis(m.xAxis, x) && (!model.positiveX || x > 0));
+  const xs = sampleXs(lo, hi, !!m.xAxis.log).filter((x) => onAxis(m.xAxis, x) && (!model.positiveX || x > 0) && (!model.nonNegativeX || x >= 0));
 
   let path = '';
   let bandPath = '';

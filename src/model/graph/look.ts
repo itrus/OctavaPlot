@@ -7,7 +7,7 @@ import { sanitizeFit } from '../options/fitOptions';
 import { sanitizeHistogram } from '../options/histogramOptions';
 import { sanitizePie } from '../options/pieOptions';
 import { bool, clamp, hex, numberOrNull, oneOf, optionalHex, record, valuesOf } from '../sanitize';
-import type { Chart, ChartOrientation, FrameStyle, GridStyle, LegendKeyShape, LineOrder, LineStyle } from '../types';
+import type { Chart, ChartOrientation, FrameStyle, GridStyle, LegendKeyShape, LineConnect, LineOrder, LineStyle } from '../types';
 
 /** How a chart looks as a whole: fonts, colours, frame, gridlines, direction (and the column and box settings it carries). */
 
@@ -36,10 +36,17 @@ export const FRAME_STYLES: ReadonlyArray<{ value: FrameStyle; label: string }> =
 
 export const GRID_LIMITS = { widthPt: { min: 0.2, max: 10 } } as const;
 
+/** Print widths a graph is checked against (mm): the usual single column, 1.5 columns and double column; any width from min to max is allowed too. */
+export const PRINT_WIDTH_MM = { presets: [90, 140, 180], min: 20, max: 400 } as const;
+
+/** The print width of a graph from a file or a patch: held within the limits; anything that is not a number is none (undefined). */
+export const sanitizePrintWidthMm = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, PRINT_WIDTH_MM.min, PRINT_WIDTH_MM.max, PRINT_WIDTH_MM.min) : undefined);
+
 const LINES = valuesOf(LINE_STYLES);
 const FRAMES = valuesOf(FRAME_STYLES);
 const LINE_ORDERS: ReadonlyArray<LineOrder> = ['auto', 'onTop', 'underneath'];
-const ORIENTATIONS: readonly ChartOrientation[] = ['vertical', 'horizontal'];
+const LINE_CONNECTS: ReadonlyArray<LineConnect> = ['table', 'x'];
+const ORIENTATIONS:readonly ChartOrientation[] = ['vertical', 'horizontal'];
 
 /** Lengths of the dashes and gaps of each pattern, in units of the line's width (a line thinner than 2 pt counts as 2 pt). */
 const DASHES: Record<LineStyle, readonly number[]> = {
@@ -64,7 +71,7 @@ export const linePattern = (s: { lineStyle: LineStyle; lineWidthPt: number }) =>
 /** Width of the colour key in the legend, pt: 36 for a rectangle, 20 for a square (its height is 20). */
 export const legendKeyWidthPt = (shape: LegendKeyShape): number => (shape === 'square' ? 20 : 36);
 
-type Look = Pick<Chart, 'origin' | 'orientation' | 'lineOrder' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
+type Look = Pick<Chart, 'origin' | 'orientation' | 'lineOrder' | 'lineConnect' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
 
 /** The look of a chart from a file or a patch: a value that is not valid falls back to the one in `base`. */
 export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
@@ -83,6 +90,7 @@ export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
   return {
     orientation: oneOf(ORIENTATIONS, c.orientation, base.orientation),
     lineOrder: oneOf(LINE_ORDERS, c.lineOrder, base.lineOrder),
+    lineConnect: oneOf(LINE_CONNECTS, c.lineConnect, base.lineConnect),
     origin: { x: numberOrNull(record(c.origin).x, base.origin.x), y: numberOrNull(record(c.origin).y, base.origin.y) },
     bars: sanitizeBars(c.bars, base.bars),
     barLabels: sanitizeBarLabels(c.barLabels, base.barLabels),

@@ -3,6 +3,7 @@ import type { Chart } from '../../model/types';
 import { n2 } from '../../model/units';
 import { AnnotationLayer, type EditorState, SELECT_COLOR } from '../shared/scene/ChartParts';
 import { hitAttrs } from '../shared/scene/hitTest';
+import { scopeRefs, useSvgIdPrefix } from '../shared/scene/idPrefix';
 import { SceneElements } from '../shared/scene/SceneElements';
 import { SceneSvg } from '../shared/scene/SceneSvg';
 import type { XyModel } from './xyModel';
@@ -20,6 +21,7 @@ interface Props {
 
 /** The XY chart: a numeric X axis and one numeric Y axis, with a symbol layer and a path layer per series. */
 export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({ chart, model, editor, cssWidth, cssHeight }, ref) {
+  const idPrefix = useSvgIdPrefix();
   const { widthPt: W, heightPt: H, series } = model;
   const ed = !!editor;
   const hit = (kind: Parameters<typeof hitAttrs>[0], g?: string, o?: string, a?: string) => (ed ? hitAttrs(kind, g, o, a) : {});
@@ -37,7 +39,7 @@ export const XyChartSvg = forwardRef<SVGSVGElement, Props>(function XyChartSvg({
       <SceneElements nodes={scene.back} editor={ed} />
 
       {/* Data: the bars of a histogram, bands, lines, then symbols over them, clipped to the plotting region. */}
-      <g clipPath="url(#plot-clip)">
+      <g clipPath={scopeRefs(idPrefix, 'url(#plot-clip)')}>
         <SceneSvg scene={scene} editor={ed} selectedGroup={selectedGroup} />
       </g>
 
