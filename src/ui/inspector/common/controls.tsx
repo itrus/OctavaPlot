@@ -35,6 +35,21 @@ function useFieldAria(ariaLabel?: string): { 'aria-label'?: string; 'aria-labell
   };
 }
 
+/**
+ * Whether a setting has a value of its own for the data set being edited. A function is the way back: the dot is then a button
+ * that clears the data set's own value, so the graph's shows again.
+ */
+export type Overridden = boolean | (() => void);
+
+/** The dot that marks an overridden setting; a button that resets it when there is a way. */
+function OverrideMark({ overridden, what, where }: { overridden: Overridden | undefined; what: string; where: string }) {
+  if (!overridden) return null;
+  if (typeof overridden !== 'function') return <span className="override-dot" title={`Overridden for this ${where}`} />;
+  return (
+    <button type="button" className="override-dot override-reset" onClick={overridden} aria-label={`Reset ${what} to the graph's value`} title={`Overridden for this ${where}. Click to use the graph's value again.`} />
+  );
+}
+
 export function Field({
   label,
   children,
@@ -45,7 +60,7 @@ export function Field({
 }: {
   label: string;
   children: ReactNode;
-  overridden?: boolean;
+  overridden?: Overridden;
   hint?: string;
   error?: string | null;
   /** Muted explanation under the control, e.g. why it is disabled. */
@@ -60,7 +75,7 @@ export function Field({
         <div className="field-row">
           <span className="field-label" id={labelId} title={hint}>
             {label}
-            {overridden && <span className="override-dot" title="Overridden for this group" />}
+            <OverrideMark overridden={overridden} what={label} where="group" />
           </span>
           <span className="field-control">{children}</span>
         </div>
@@ -157,7 +172,7 @@ interface NumProps {
   validate?: (v: number) => string | null;
   label: string;
   hint?: string;
-  overridden?: boolean;
+  overridden?: Overridden;
   note?: string | null;
   /** Slider step; derived from the range when omitted. Bounded fields (min and max set) get a slider. */
   step?: number;
@@ -333,7 +348,7 @@ export function GroupBox({
   title: string;
   checked?: boolean;
   onCheckedChange?: (v: boolean) => void;
-  overridden?: boolean;
+  overridden?: Overridden;
   children: ReactNode;
 }) {
   return (
@@ -347,7 +362,7 @@ export function GroupBox({
         ) : (
           <span className="group-box-title">{title}</span>
         )}
-        {overridden && <span className="override-dot" title="Overridden for this data set" />}
+        <OverrideMark overridden={overridden} what={title} where="data set" />
       </legend>
       {children}
     </fieldset>

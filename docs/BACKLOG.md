@@ -200,7 +200,7 @@ From [AUDIT-P0.md](AUDIT-P0.md) and [AUDIT-P3.md](AUDIT-P3.md); sizes are the au
 | CSV import: BOM, `NaN` and `Infinity` text, file and column limit, duplicate or empty headers | P0 | **Done 27 Oct 2026**: tests for each; a file with more than 100,000 data lines is refused with the count (there is no limit on columns: the app has none to apply) |
 | Annotation anchor in data units (today: percent of the chart) | P3 | M |
 | Numeric legend offset (today: right, bottom or top only; no numeric route) | P3 | **Done 27 Oct 2026**: Move right and Move down (pt) under Legend; moves the legend only, the plot stays; a warning when it leaves the chart; saved as `offsetXPt` and `offsetYPt` (FILE_FORMAT) |
-| Reset ladder: field, data set or section, graph (`resetStyle` and `clearSummaryOverrides` have no UI) | P3 | M |
+| Reset ladder: field, data set or section, graph (`resetStyle` and `clearSummaryOverrides` have no UI) | P3 | **Done 27 Oct 2026** (column, XY, survival, histogram inspectors): the dot beside an overridden setting is a button that clears that setting for the data set; a Reset button beside the data set selector clears its style, summary, part looks and point settings; the graph's Reset button says what it keeps. Tried in Chrome. Not done: the pie, heat map and grouped inspectors have no per-data-set overrides to reset there (not checked in detail), and the reset of one annotation or reference line is the delete button |
 | Mixed-state multi-selection (`Selection` is single) | P3 | L |
 | Property search (no registry of field labels) | P3 | M to L |
 | Keyboard: chart canvas, Navigator arrows, grid Home and End | P3 | M |

@@ -15,14 +15,15 @@ import { IntervalFields, LineAtField } from './sections/SummaryControls';
 import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
 import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, Id, LineConnect, LineStyle, SummarySpec } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { composeCommands, patchAxis, patchChart, patchLook, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
+import { clearGroupStyleSettings, clearGroupSummarySettings, composeCommands, patchAxis, patchChart, patchLook, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
 import { LINE_STYLES } from '../../model/graph/look';
 import { analysesOf } from '../../model/project/analysis';
 import { resolveFit } from '../../model/options/fitOptions';
 import { DistributionControls } from './sections/DistributionControls';
 import { FitSection } from './sections/FitControls';
 import { LayersSection } from './sections/LayersSection';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './common/controls';
+import { DataSetReset } from './sections/DataSetReset';
+import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './common/controls';
 import { SECTIONS, TABS } from './common/nav';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
 import { displayName } from '../../chart/shared/parts/names';
@@ -106,7 +107,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
     const l = scope === 'all' ? { ...layer, groupOverrides: {}, objectOverrides: {} } : layer;
     return resolveStyle(chart, l, { id: sample.id, paletteIndex: sample.seriesSlot ?? sampleIndex });
   }, [chart, layer, sample, sampleIndex, scope]);
-  const ov = (key: keyof ChartStyle) => scope !== 'all' && isGroupOverridden(layer, scope, key);
+  // A setting this data set has its own value for: the dot beside it is the way back to the graph's value.
+  const ov = (key: keyof ChartStyle): Overridden => scope !== 'all' && isGroupOverridden(layer, scope, key) && (() => run('Reset setting', clearGroupStyleSettings(chart.id, scope, [key])));
   const setStyle = (patch: Partial<ChartStyle>) => {
     const recolours = 'symbolColor' in patch || 'lineColor' in patch || 'barFill' in patch;
     const command = recolours && chart.paletteId !== null ? composeCommands(patchStyle(chart.id, scope, patch), patchChart(chart.id, { paletteId: null })) : patchStyle(chart.id, scope, patch);
@@ -114,7 +116,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   };
   // Summary of replicate values: the layer's for Global, the resolved one for a series.
   const spec: SummarySpec = !sample || scope === 'all' ? layer.summary : resolveSummary(layer, scope);
-  const ovSum = (key: keyof SummarySpec) => scope !== 'all' && isSummaryOverridden(layer, scope, key);
+  const ovSum = (key: keyof SummarySpec): Overridden => scope !== 'all' && isSummaryOverridden(layer, scope, key) && (() => run('Reset setting', clearGroupSummarySettings(chart.id, scope, [key])));
   const setSummary = (patch: Partial<SummarySpec>, label = 'Change summary') => {
     if (!validateSummaryPatch(patch)) return;
     run(label, patchSummary(chart.id, scope, patch), `summary:${scope}:${Object.keys(patch).join(',')}`);
@@ -153,6 +155,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 <button title={`Next ${noun.toLowerCase()}`} aria-label={`Next ${noun.toLowerCase()}`} onClick={() => stepSeries(1)} disabled={series.length === 0}>
                   &gt;
                 </button>
+                <DataSetReset chart={chart} table={table} scope={scope} run={run} />
               </div>
 
               <GroupBox title="Style">

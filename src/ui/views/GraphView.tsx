@@ -155,7 +155,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
             run('Reset settings', resetAllDataSets(chart.id));
             setStatus('Settings reset to defaults.');
           }}
-          title="Reset the graph's settings (data set styles, axes, grid, legend, fonts, colours) to a new graph's defaults. Titles and data are kept. Undo restores them."
+          title="Reset the whole graph to a new graph's settings: data set styles, axes, grid, legend, fonts, colours, size. Kept: the title and axis titles, which data sets are shown and their order, annotations, reference lines and the chosen fit. Undo restores everything."
         >
           <ResetIcon />
           Reset

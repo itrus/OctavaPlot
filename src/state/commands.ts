@@ -20,10 +20,10 @@ import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns,
 import { newId } from '../model/ids';
 import { paletteColor, type Palette } from '../model/graph/palettes';
 import { createRows, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
-import { clearGroupSummary, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/graph/summary';
+import { clearGroupSummary, clearGroupSummaryKeys, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/graph/summary';
 import { folderItems, nudge, reorder, sortedByName } from '../model/project/folderItems';
 import { clearPartStyles, layersOf, layerStylesAvailable, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
-import { LABEL_STYLE_KEYS, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
+import { LABEL_STYLE_KEYS, clearGroupKeys, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
 import type {
   LayerStyle,
   Analysis,
@@ -540,6 +540,12 @@ export const patchSummary = (chartId: Id, scope: 'all' | Id, patch: Partial<Summ
   validateSummaryPatch(patch)
     ? mapLayer0(p, chartId, (l) => (scope === 'all' ? patchAllSummary(l, patch) : patchGroupSummary(l, scope, patch)))
     : p;
+
+/** Reset single settings of one data set (the dot beside an overridden field): its own value goes and the graph's shows again. Nothing else of the data set changes. */
+export const clearGroupStyleSettings = (chartId: Id, groupId: Id, keys: ReadonlyArray<keyof ChartStyle>): Command => (p) => mapLayer0(p, chartId, (l) => clearGroupKeys(l, groupId, keys));
+
+/** Reset single summary settings of one data set; the graph's value shows again. */
+export const clearGroupSummarySettings = (chartId: Id, groupId: Id, keys: ReadonlyArray<keyof SummarySpec>): Command => (p) => mapLayer0(p, chartId, (l) => clearGroupSummaryKeys(l, groupId, keys));
 
 /** Drop the data set summary overrides ('all' or one data set); layer values stay. */
 export const clearSummaryOverrides = (chartId: Id, scope: 'all' | Id): Command => (p) =>

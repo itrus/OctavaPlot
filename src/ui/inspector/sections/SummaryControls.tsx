@@ -7,7 +7,7 @@ import {
   parseConfidencePercent,
   spreadSelectModel,
 } from '../../../stats/describe';
-import { Check, Field, FieldInput, SelectInput } from '../common/controls';
+import { Check, Field, FieldInput, type Overridden, SelectInput } from '../common/controls';
 
 const CENTRES: CentreKind[] = ['mean', 'geometricMean', 'median'];
 
@@ -23,7 +23,7 @@ export function LineAtField({
   onChange,
 }: {
   centre: CentreKind;
-  overridden: boolean;
+  overridden: Overridden;
   onChange: (c: CentreKind) => void;
 }) {
   return (
@@ -49,8 +49,8 @@ export function IntervalFields({
   spread: SpreadKind;
   confidenceLevel: number;
   showErrorBars: boolean;
-  spreadOverridden: boolean;
-  levelOverridden: boolean;
+  spreadOverridden: Overridden;
+  levelOverridden: Overridden;
   captionLines: string[];
   onSpread: (s: SpreadKind) => void;
   onLevel: (level: number) => void;
@@ -137,8 +137,8 @@ export function CalculationOptions({
 }: {
   smallSamplePolicy: SmallSamplePolicy;
   invalidPolicy: InvalidPolicy;
-  smallOverridden: boolean;
-  invalidOverridden: boolean;
+  smallOverridden: Overridden;
+  invalidOverridden: Overridden;
   onChange: (patch: { smallSamplePolicy?: SmallSamplePolicy; invalidPolicy?: InvalidPolicy }) => void;
 }) {
   return (

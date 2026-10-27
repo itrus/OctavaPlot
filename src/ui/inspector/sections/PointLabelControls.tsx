@@ -1,6 +1,6 @@
 import type { ChartStyle, ChartType, PointLabelCollision, PointLabelSource } from '../../../model/types';
 import { LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS, LABEL_DECIMALS_LIMITS, type Box, type PointLabelModel } from '../../../chart/shared/parts/labels';
-import { Check, ColorInput, Field, GroupBox, NumField, SelectInput } from '../common/controls';
+import { Check, ColorInput, Field, GroupBox, NumField, type Overridden, SelectInput } from '../common/controls';
 import {
   KEEP_LABEL_PATCH,
   LABEL_MODE_OPTIONS,
@@ -33,7 +33,7 @@ export function PointLabelControls({
   type: ChartType;
   style: ChartStyle;
   labels: PointLabelModel;
-  overridden: (key: keyof ChartStyle) => boolean;
+  overridden: (key: keyof ChartStyle) => Overridden;
   onChange: (patch: Partial<ChartStyle>) => void;
 }) {
   const ui = describePointLabelUi(type, style);

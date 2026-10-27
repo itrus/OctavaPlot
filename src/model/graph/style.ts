@@ -77,6 +77,18 @@ export function patchGroup(layer: ChartLayer, groupId: Id, patch: Partial<ChartS
 /** IDs of a group's style objects: its bar and its observations. */
 export const groupObjectIds = (group: Group): Id[] => [`${group.id}:bar`, ...group.observations.map((o) => o.id)];
 
+/** Remove keys from one data set's override, so the graph's value shows again; an emptied override is dropped. The same layer when nothing was set. */
+export function clearGroupKeys(layer: ChartLayer, groupId: Id, keys: ReadonlyArray<keyof ChartStyle>): ChartLayer {
+  const current = layer.groupOverrides[groupId];
+  if (!current || !keys.some((k) => current[k] !== undefined)) return layer;
+  const copy = { ...current };
+  for (const k of keys) delete copy[k];
+  const groupOverrides = { ...layer.groupOverrides };
+  if (Object.keys(copy).length > 0) groupOverrides[groupId] = copy;
+  else delete groupOverrides[groupId];
+  return { ...layer, groupOverrides };
+}
+
 /** Remove a group's overrides and the object overrides of its bar and observations. */
 export function resetGroupStyle(layer: ChartLayer, group: Group): ChartLayer {
   const groupOverrides = { ...layer.groupOverrides };

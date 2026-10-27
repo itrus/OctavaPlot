@@ -115,6 +115,18 @@ export function patchGroupSummary(layer: ChartLayer, groupId: Id, patch: Partial
   return { ...layer, groupSummary: { ...layer.groupSummary, [groupId]: next } };
 }
 
+/** Remove keys from a data set's summary override, so the graph's value shows again; an emptied override is dropped. Same layer when none of them was set. */
+export function clearGroupSummaryKeys(layer: ChartLayer, groupId: Id, keys: ReadonlyArray<keyof SummarySpec>): ChartLayer {
+  const g = has(layer.groupSummary, groupId) ? layer.groupSummary[groupId] : undefined;
+  if (!g || !keys.some((k) => has(g, k) && g[k] !== undefined)) return layer;
+  const copy = { ...g };
+  for (const k of keys) delete copy[k];
+  const groupSummary = { ...layer.groupSummary };
+  if (Object.keys(copy).length > 0) groupSummary[groupId] = copy;
+  else delete groupSummary[groupId];
+  return { ...layer, groupSummary };
+}
+
 /** Remove a data set's overrides. Same layer when it has none. */
 export function clearGroupSummary(layer: ChartLayer, groupId: Id): ChartLayer {
   if (!has(layer.groupSummary, groupId)) return layer;

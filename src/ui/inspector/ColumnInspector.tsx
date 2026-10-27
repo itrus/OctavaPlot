@@ -23,6 +23,8 @@ import {
 } from '../../stats/describe';
 import { useApp } from '../../state/AppContext';
 import {
+  clearGroupStyleSettings,
+  clearGroupSummarySettings,
   composeCommands,
   patchAxis,
   clearPointStyle,
@@ -41,7 +43,8 @@ import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection }
 import { AxisStyleControls, TickFields } from './sections/AxisStyleControls';
 import { DataSetOrder } from './sections/DataSetOrder';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './common/controls';
+import { DataSetReset } from './sections/DataSetReset';
+import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './common/controls';
 import {
   backgroundDisplay,
   backgroundNonePatch,
@@ -111,7 +114,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
 
   // Summary settings: the layer value for Global, the resolved value for a data set.
   const spec: SummarySpec = !sample || scope === 'all' ? layer.summary : resolveSummary(layer, scope);
-  const ovSum = (key: keyof SummarySpec) => scope !== 'all' && isSummaryOverridden(layer, scope, key);
+  const ovSum = (key: keyof SummarySpec): Overridden => scope !== 'all' && isSummaryOverridden(layer, scope, key) && (() => run('Reset setting', clearGroupSummarySettings(chart.id, scope, [key])));
   const setSummary = (patch: Partial<SummarySpec>, label = 'Change summary') => {
     if (!validateSummaryPatch(patch)) return;
     run(label, patchSummary(chart.id, scope, patch), `summary:${scope}:${Object.keys(patch).join(',')}`);
@@ -144,7 +147,8 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
       ),
       coalesceKey,
     );
-  const ov = (key: keyof ChartStyle) => scope !== 'all' && isGroupOverridden(layer, scope, key);
+  // A setting this data set has its own value for: the dot beside it is the way back to the graph's value.
+  const ov = (key: keyof ChartStyle): Overridden => scope !== 'all' && isGroupOverridden(layer, scope, key) && (() => run('Reset setting', clearGroupStyleSettings(chart.id, scope, [key])));
 
   // "<" / ">" step through the data sets; stepping off either end returns to Global.
   const stepGroup = (dir: 1 | -1) => {
@@ -214,6 +218,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             <button title="Next data set" aria-label="Next data set" onClick={() => stepGroup(1)} disabled={table.groups.length === 0}>
               &gt;
             </button>
+            <DataSetReset chart={chart} table={table} scope={scope} run={run} />
           </div>
 
           <GroupBox title="Style">
