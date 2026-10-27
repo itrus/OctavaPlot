@@ -35,7 +35,7 @@ Checked against the exit criteria of each phase. "Not reviewed" means this pass 
 | **P2 Scene and export** | Mostly. The marks of every family are scene elements with stable ids, and the screen, the export and the editor's hit testing are made from them. PNG has an explicit resolution. Zoom-independence of sizes and the sameness of editor and export marks are tested for every family. Annotations and the bar labels of column and grouped charts (one hideable layer for each data set) are scene elements too (steps 1a, 1b), and so are the point labels of column charts and the editor's selection marks of column and XY charts (step 1c), and the legend of pie charts and the row and column labels of heat maps (step 1d). **Not yet:** glyph checks for page layouts, and rich text (sub- and superscripts as markup, P3). Font diagnostics and the export dialog are built (step 2). |
 | **P3 Editing** | Audited on 27 October 2026 ([docs/AUDIT-P3.md](docs/AUDIT-P3.md)); the exit criterion is not met. Mostly built: grid input. Keyboard is done for the chart, the Navigator and the grid, and several data sets can be selected and edited together with "Mixed" where they differ. Property search (decided not needed) and the small screens are the rest. Resets have three levels now (a setting, a data set, the graph). Not built: property search, mixed-state multi-selection. |
 | **P4 Chart families** | Started. In the gallery 11 graphs are still locked: `xy.bars`, `xy.vector`, `xy.bubble`, `xy.trajectory`, `xy.offset`, `curve.smooth`, `cat.nested`, `grp.scatterS`, `grp.paired`, `three.bars`, `three.dots`. Observation roles (subject) are not built, and five of those graphs wait for them. |
-| **P5 Release** | Not started: there are no Playwright workflows and no visual fixtures. |
+| **P5 Release** | Started: 20 Playwright tests (`e2e/`). Not started: visual fixtures, migrations, benchmarks, accessibility sweep, example gallery. |
 
 Also in place: a calculation cache keyed by identity (`src/stats/calcCache.ts`), PDF and layout export, linked graphs, a folder overview with thumbnails and multi-select (Navigator), and tags for tables and graphs.
 
@@ -63,7 +63,7 @@ Each phase ships on its own. A family moves to a new mechanism (layers, the scen
 - **Data integrity:** malformed CSV, ragged paste, missing values. No silent conversion or loss.
 - **State:** undo and redo, failed save, migrations.
 - **Architecture:** the layers, the shared parts and the folder sizes (`src/architecture.test.ts`).
-- **Browser (Playwright):** keyboard grid, inspector, drag and select, dialog focus. Not built yet.
+- **Browser (Playwright):** `e2e/` (`npm run e2e`): 20 tests in the installed Google Chrome, each in a fresh profile. Built (27 October 2026): editing a cell and Undo, exclusion, Duplicate with its status message, saving and opening a project, the size and resolution of a PNG export, the keyboard of the grid, the chart, the Navigator, Fill series, the focus of the Export dialog, several data sets together (Mixed, reset), dragging an annotation, an annotation anchored to data, the legend offset and the narrow window. Not yet: a test for each chart family and for layouts, the other dialogs, and the CI job has not run on GitHub.
 - **Visual:** one fixed fixture per catalogue preset, pinned font, tolerance 0.25 pt for placement. Not built yet.
 
 ## Performance targets (provisional, on a defined reference laptop)
@@ -111,7 +111,7 @@ Sizes are estimates (S: half a day, M: one to two days, L: several days). P0 and
 | 1 | Labels, annotations and the editor's overlays into the scene | Closes the open P2 criterion. Gives the export panel a complete list of what is drawn. |
 | 2 | Export panel and font diagnostics | Needs step 1: every text must be a scene element to check its font. |
 | 3 (done) | P0 and P3 audits, read-only, in parallel | Correctness defects should be known early. Results: [docs/AUDIT-P0.md](docs/AUDIT-P0.md), [docs/AUDIT-P3.md](docs/AUDIT-P3.md); the gaps are in [docs/BACKLOG.md](docs/BACKLOG.md) section 4a. |
-| 4 | P5 groundwork: Playwright workflows and visual fixtures | Protects the refactors of P3 and P4. Needs the font decision of step 2. |
+| 4 (Playwright done, visual fixtures not) | P5 groundwork: Playwright workflows and visual fixtures | Protects the refactors of P3 and P4. Needs the font decision of step 2. |
 | 5 | Fixes from the audits, then the P3 build items | |
 | 6 | P4 families, starting with observation roles | |
 | 7 | The rest of P5: migrations, benchmarks, gallery, docs | |
@@ -149,7 +149,7 @@ Step 1 is done (27 October 2026), with a zoom-independence test for every family
 |---|---|---|
 | **P3** | Property search (needs a registry of field labels), mixed state, the three reset levels made explicit, keyboard navigation, small screens (there are no media queries) | M each, L for search |
 | **P4** | Observation roles first (a subject column; exclusion exists). Then the locked graphs: `cat.nested`, `grp.paired`, `three.bars`, `three.dots` and `xy.trajectory` need roles; `xy.bars`, `xy.bubble` and `xy.vector` need more columns for an XY series; `curve.smooth` needs reference fixtures; `grp.scatterS` is a layout; `xy.offset` needs offset traces with a scale bar. Forest, ROC, Q-Q, Bland-Altman and residual plots each need a calculation contract with fixtures first. | roles L, each graph M, each new family L |
-| **P5** | Playwright workflows (none yet), visual fixtures with a pinned font, an explicit migration chain tested against old files, benchmarks against the performance table (not measured), fits in a worker, an example gallery, docs | M each, the worker L |
+| **P5** | Playwright workflows (20 built; one for each chart family and for layouts still to do), visual fixtures with a pinned font, an explicit migration chain tested against old files, benchmarks against the performance table (not measured), fits in a worker, an example gallery, docs | M each, the worker L |
 
 ### Open decisions
 

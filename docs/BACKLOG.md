@@ -150,7 +150,7 @@ Heat map colours, done today: the five palettes were replaced by the 16 ggsci gr
 |---|---|---|
 | OP-036 | Architecture test reads imports with a regex that matches only single-quoted relative `from` and `import(` | **Fixed 27 Oct 2026** (see Progress) |
 | P8-032 | Example projects that double as visual fixtures; one per catalogue preset | Matches roadmap "example gallery" and "visual fixtures" |
-| | Playwright smoke: edit cell, exclude, compare graph and layout, duplicate, save and reopen, export PNG | Roadmap, not built |
+| | Playwright smoke: edit cell, exclude, compare graph and layout, duplicate, save and reopen, export PNG | **Built 27 Oct 2026** (e2e/, 20 tests, `npm run e2e`): all of these except the comparison of a graph with a layout; also keyboard, dialog focus, several data sets, annotations, legend and the narrow window. Not run on GitHub yet |
 
 ### Documentation
 

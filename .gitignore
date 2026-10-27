@@ -9,3 +9,7 @@ old-repo/
 
 # Made by npm run loc from the git history; not kept in the repository
 docs/loc-history.csv
+
+# Browser tests (npm run e2e)
+test-results/
+playwright-report/

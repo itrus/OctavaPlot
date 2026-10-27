@@ -30,3 +30,20 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # The browser tests (e2e/): the installed Google Chrome of the runner, the development server, a fresh profile for each test.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Browser tests
+        run: npm run e2e

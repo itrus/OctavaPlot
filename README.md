@@ -44,12 +44,13 @@ npm install
 npm run dev      # development server
 npm run build    # type-check (strict) + production build
 npm test         # unit tests (vitest)
+npm run e2e      # browser tests (Playwright, in the installed Google Chrome; starts its own dev server on port 5199)
 npm run typecheck # type-check only (no unused locals or parameters allowed)
 ```
 
 ## Structure
 
-Repository: `src/` (the app and its tests), `docs/` (specifications, the example `.oplot`, README assets), `public/` (static files served by the app, such as the logo), `scripts/` (`loc-history.mjs`, which writes the git-ignored `docs/loc-history.csv`, and `logo.rs`), `.github/` (workflows).
+Repository: `src/` (the app and its unit tests), `e2e/` (the browser tests), `docs/` (specifications, the example `.oplot`, README assets), `public/` (static files served by the app, such as the logo), `scripts/` (`loc-history.mjs`, which writes the git-ignored `docs/loc-history.csv`, and `logo.rs`), `.github/` (workflows).
 
 The source is in `src/`, in layers. A layer imports from its own folder and from the layers under it, never upward; `src/architecture.test.ts` checks this, and that no folder grows past 30 files. Tests sit next to the code they test.
 
