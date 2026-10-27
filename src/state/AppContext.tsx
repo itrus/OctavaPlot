@@ -7,6 +7,7 @@ import { historyReducer, initialHistory, scopeCoalesceKey } from './history';
 import { affectsRecovery, flushDecision, isConflict, protectionOf, recoveryStatusText, shouldWarnOnUnload, bannerVisible } from './recovery';
 import { currentSignature, newEditorId, writeRecovery } from './recoveryStore';
 import { backupAutosave, loadAutosave } from './serialize';
+import { statusAfter, type StatusMemo } from './statusLine';
 import { loadSettings, saveSettings, sanitizeSettings, type Settings } from './settings';
 import type { InspectorTarget } from './inspectorNav';
 
@@ -148,6 +149,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!exists) setView(viewAfterRemoval(projectBefore.current, project, view));
     projectBefore.current = project;
   }, [project, view]);
+
+  // The status line clears on the next action (an edit, undo or redo, a new selection or page). This effect comes before the one below,
+  // so that the message of an undo or redo, set in the same commit, wins over the clearing of the one before it.
+  const statusSeen = useRef<StatusMemo<Project, Selection, ViewRef> | null>(null);
+  useEffect(() => {
+    const next = statusAfter(status, statusSeen.current, { project, selection, view });
+    statusSeen.current = next.seen;
+    if (next.status !== status) setStatus(next.status);
+  }, [status, project, selection, view]);
 
   // Undo/redo can remove the thing the selection points at; keep the status line informative.
   useEffect(() => {

@@ -205,7 +205,8 @@ From [AUDIT-P0.md](AUDIT-P0.md) and [AUDIT-P3.md](AUDIT-P3.md); sizes are the au
 | Property search (no registry of field labels) | P3 | M to L |
 | Keyboard: chart canvas, Navigator arrows, grid Home and End | P3 | M |
 | Grid fill down and right | P3 | **Done 27 Oct 2026**: Ctrl+D and Ctrl+R (planFill, `ui/data/fill.ts`; one undo step). Tried in Chrome: Ctrl+D fills and the browser does not take it; Ctrl+R could only be sent as a synthetic key event (the test tool reloads the page itself), where the grid handled it and called preventDefault. Series fill (1, 2, 3 ...) is not built |
-| Small screens: status text keeps old messages (needs a decision on when to clear); the inspector clip at 375 px was not reproduced in Chrome (it fits, 30 to 374 px, no sideways scroll); "no width queries" in section 1.4 is out of date | P3 | S to M |
+| Status text keeps old messages | P3 | **Done 27 Oct 2026**: the status line clears on the next action (the first edit, undo or redo, new selection or change of page after the message appeared); a message set by the same action stays. This includes error messages and the message about the restored recovery copy (the recovery line beside it is separate and stays). Tried in Chrome |
+| Small screens: the inspector clip at 375 px was not reproduced in Chrome (it fits, 30 to 374 px, no sideways scroll); "no width queries" in section 1.4 is out of date | P3 | S |
 
 ## 5. Not adopted from the reviews
 
