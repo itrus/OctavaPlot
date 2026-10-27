@@ -66,3 +66,53 @@ describe('planFill', () => {
     expect(planFill(t, { r0: t.rowCount + 3, r1: t.rowCount + 3, c0: 0, c1: 0 }, 'down')).toMatchObject({ ok: false, message: expect.stringMatching(/Select the cells/) });
   });
 });
+
+import { planSeries, suggestSeries } from './fill';
+import { gridJump } from './gridKeys';
+
+describe('planSeries', () => {
+  const t = tableOf();
+  it('down: start, start + step ... in each selected column, from the first selected row', () => {
+    const r = planSeries(t, { r0: 1, r1: 3, c0: 0, c1: 1 }, 5, 0.5, 'down');
+    expect(r.ok && r.edits).toEqual([
+      { row: 1, col: 0, value: 5 }, { row: 2, col: 0, value: 5.5 }, { row: 3, col: 0, value: 6 },
+      { row: 1, col: 1, value: 5 }, { row: 2, col: 1, value: 5.5 }, { row: 3, col: 1, value: 6 },
+    ]);
+  });
+  it('across: the series runs along the columns of each selected row', () => {
+    const r = planSeries(t, { r0: 0, r1: 1, c0: 0, c1: 2 }, 1, 2, 'across');
+    expect(r.ok && r.edits.filter((e) => e.row === 0).map((e) => e.value)).toEqual([1, 3, 5]);
+    expect(r.ok && r.edits).toHaveLength(6);
+  });
+  it('takes the rounding noise off, leaves the Row title column alone and stays inside the table', () => {
+    const r = planSeries(t, { r0: 0, r1: 3, c0: -1, c1: 0 }, 0, 0.1, 'down');
+    expect(r.ok && r.edits.map((e) => e.value)).toEqual([0, 0.1, 0.2, 0.3]);
+    expect(r.ok && r.edits.every((e) => e.col === 0)).toBe(true);
+    const wide = planSeries(t, { r0: 0, r1: t.rowCount + 20, c0: 0, c1: 99 }, 1, 1, 'down');
+    expect(wide.ok && wide.edits.every((e) => e.row < t.rowCount && e.col < t.groups.length)).toBe(true);
+  });
+  it('refuses a start or step that is not a number, and an empty selection', () => {
+    expect(planSeries(t, { r0: 0, r1: 1, c0: 0, c1: 0 }, NaN, 1, 'down')).toEqual({ ok: false, message: 'The start and the step must be numbers.' });
+    expect(planSeries(t, { r0: t.rowCount + 2, r1: t.rowCount + 3, c0: 0, c1: 0 }, 1, 1, 'down').ok).toBe(false);
+  });
+  it('suggests the first value and its distance to the next, or 1 and 1', () => {
+    expect(suggestSeries(t, { r0: 0, r1: 3, c0: 0, c1: 0 }, 'down')).toEqual({ start: 0, step: 10 });
+    expect(suggestSeries(t, { r0: 0, r1: 0, c0: 0, c1: 2 }, 'across')).toEqual({ start: 0, step: 1 });
+    expect(suggestSeries(t, { r0: t.rowCount + 5, r1: t.rowCount + 5, c0: 0, c1: 0 }, 'down')).toEqual({ start: 1, step: 1 });
+  });
+});
+
+describe('gridJump', () => {
+  it('Home goes to the Row title column of the row, Ctrl+Home to the first cell', () => {
+    expect(gridJump('Home', false, { r: 7, c: 2 }, 50, 4)).toEqual({ r: 7, c: -1 });
+    expect(gridJump('Home', true, { r: 7, c: 2 }, 50, 4)).toEqual({ r: 0, c: -1 });
+  });
+  it('End goes to the last column of the row, Ctrl+End to the last cell', () => {
+    expect(gridJump('End', false, { r: 7, c: 0 }, 50, 4)).toEqual({ r: 7, c: 3 });
+    expect(gridJump('End', true, { r: 7, c: 0 }, 50, 4)).toEqual({ r: 49, c: 3 });
+    expect(gridJump('End', true, { r: 0, c: 0 }, 0, 0)).toEqual({ r: 0, c: -1 });
+  });
+  it('ignores other keys', () => {
+    expect(gridJump('ArrowDown', false, { r: 0, c: 0 }, 5, 5)).toBeNull();
+  });
+});

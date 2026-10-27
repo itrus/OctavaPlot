@@ -11,11 +11,13 @@ import { excludedCount } from '../../model/table/exclusion';
 import { ExportCsvDialog } from '../dialogs/ExportCsvDialog';
 import { ImportCsvDialog, type CsvImportData } from '../dialogs/ImportCsvDialog';
 import { AppendRowsDialog } from '../dialogs/AppendRowsDialog';
+import { FillSeriesDialog, type SeriesDirection } from '../dialogs/FillSeriesDialog';
 import { RowsMenu } from './RowsMenu';
 import { leadingColumns, usesSeriesBlocks } from '../../model/graph/chartTypes';
 import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../../model/table/tableLayout';
 import { blockToText, formatCell, parseCell, planPaste, selectionStrings } from '../data/cellText';
-import { planFill } from '../data/fill';
+import { planFill, planSeries, suggestSeries } from '../data/fill';
+import { gridJump } from '../data/gridKeys';
 
 // Sizes at 100% zoom, in px; the table multiplies them by its zoom.
 const BASE_ROW_H = 24;
@@ -139,7 +141,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const scrollerRef = useRef<HTMLDivElement>(null);
   const csvRef = useRef<HTMLInputElement>(null);
-  const [dialog, setDialog] = useState<'append' | 'exportCsv' | null>(null);
+  const [dialog, setDialog] = useState<'append' | 'exportCsv' | 'series' | null>(null);
   // A picked file waits here, read but not imported, while the preview dialog is open.
   const [pendingCsv, setPendingCsv] = useState<{ name: string; text: string } | null>(null);
   const dragging = useRef(false);
@@ -456,6 +458,19 @@ export function DataTableView({ table }: { table: DataTable }) {
     setMessage({ kind: 'info', text: plan.message });
   };
 
+  // Fill series…: the dialog asks for the start and step; the selection is read when it is applied.
+  const fillSeries = (start: number, step: number, direction: SeriesDirection) => {
+    setDialog(null);
+    const plan = planSeries(table, bounds(sel), start, step, direction);
+    if (!plan.ok) {
+      setMessage({ kind: 'error', text: plan.message });
+      return;
+    }
+    run('Fill series', setCells(table.id, plan.edits));
+    setMessage({ kind: 'info', text: plan.message });
+    focusGrid();
+  };
+
   // ---- clipboard
   const fromInput = (e: { target: EventTarget }) => e.target instanceof HTMLInputElement;
   const onCopy = (e: ClipboardEvent) => {
@@ -557,6 +572,15 @@ export function DataTableView({ table }: { table: DataTable }) {
       case 'F2': e.preventDefault(); startEdit(sel.fr, sel.fc); return;
       case 'Delete':
       case 'Backspace': e.preventDefault(); clearSelection(); return;
+      case 'Home':
+      case 'End': {
+        const to = gridJump(e.key, mod, f, nRows, nCols);
+        if (to) {
+          e.preventDefault();
+          moveTo(to.r, to.c, e.shiftKey);
+        }
+        return;
+      }
       case 'PageDown': e.preventDefault(); moveTo(f.r + 15, f.c, e.shiftKey); return;
       case 'PageUp': e.preventDefault(); moveTo(f.r - 15, f.c, e.shiftKey); return;
       default:
@@ -615,6 +639,7 @@ export function DataTableView({ table }: { table: DataTable }) {
             { label: 'Delete selected rows', shortcut: 'Alt+Delete', onSelect: deleteSelectedRows },
             { label: 'Append 1000 rows', onSelect: () => appendCount(1000) },
             { label: 'Append rows…', onSelect: () => setDialog('append') },
+            { label: 'Fill series…', title: 'Fill the selected cells with start, start + step, start + 2 step ...', onSelect: () => setDialog('series') },
           ]}
         />
         <span className="sep" />
@@ -811,6 +836,11 @@ export function DataTableView({ table }: { table: DataTable }) {
           </div>
         </div>
       </div>
+      {dialog === 'series' && (() => {
+        const b = bounds(sel);
+        const direction: SeriesDirection = b.r1 === b.r0 && b.c1 > Math.max(0, b.c0) ? 'across' : 'down';
+        return <FillSeriesDialog initial={{ ...suggestSeries(table, b, direction), direction }} separator={settings.decimalSeparator} onFill={fillSeries} onClose={() => setDialog(null)} />;
+      })()}
       {dialog === 'exportCsv' && <ExportCsvDialog excluded={excludedCount(table)} onExport={exportCsv} onClose={() => setDialog(null)} />}
       {dialog === 'append' && <AppendRowsDialog room={rowRoom(table)} limit={MAX_TABLE_ROWS} onAppend={appendCount} onClose={() => setDialog(null)} />}
       {pendingCsv && (

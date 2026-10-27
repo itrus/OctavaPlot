@@ -86,3 +86,58 @@ export function describeSelection(marks: readonly StepGroup[], sel: Selection, a
   const set = `${m.label}, data set ${g + 1} of ${marks.length}`;
   return p < 0 ? `${set}, ${m.points.length} points` : `${m.label}, point ${p + 1} of ${m.points.length}: ${m.points[p].text}`;
 }
+
+/** Parts of a chart besides its data sets that the keyboard can stop at; each is the id of its element in the drawing. */
+export type ChromeStop = 'chart-title' | 'legend' | 'x-axis' | 'y-axis';
+
+/** The stops in the order the keys visit them (after the last data set). */
+export const CHROME_STOPS: readonly ChromeStop[] = ['chart-title', 'legend', 'x-axis', 'y-axis'];
+
+const STOP_NAME: Record<ChromeStop, string> = { 'chart-title': 'Chart title', legend: 'Legend', 'x-axis': 'X axis', 'y-axis': 'Y axis' };
+
+/** Where the keyboard is: a selection (the chart, a data set, a point, an annotation) or a part of the chart besides its data sets. */
+export interface Focus {
+  selection: Selection;
+  stop: ChromeStop | null;
+}
+
+/**
+ * The next place of the keyboard, or null when the key does nothing. Over the data sets the keys are those of `nextSelection`;
+ * Right (or Down) from the last data set goes on to the first of `stops` (the ones the chart has), and Left (or Up) from the
+ * first stop back to the last data set; Right and Left, Home and End move along the stops; Escape leaves for the whole chart.
+ */
+export function nextFocus(marks: readonly StepGroup[], stops: readonly ChromeStop[], focus: Focus, key: string): Focus | null {
+  const chart: Selection = { kind: 'chart' };
+  if (focus.stop !== null) {
+    const i = stops.indexOf(focus.stop);
+    switch (key) {
+      case 'Escape':
+        return { selection: chart, stop: null };
+      case 'ArrowRight':
+      case 'ArrowDown':
+        return i >= 0 && i < stops.length - 1 ? { selection: chart, stop: stops[i + 1] } : null;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        if (i > 0) return { selection: chart, stop: stops[i - 1] };
+        return { selection: marks.length > 0 ? group(marks, marks.length - 1) : chart, stop: null };
+      case 'Home':
+        return stops.length > 0 ? { selection: chart, stop: stops[0] } : null;
+      case 'End':
+        return stops.length > 0 ? { selection: chart, stop: stops[stops.length - 1] } : null;
+      default:
+        return null;
+    }
+  }
+  const next = nextSelection(marks, focus.selection, key);
+  if (next) return { selection: next, stop: null };
+  // Past the last data set (or on a chart with none) the stops follow.
+  const { g } = where(marks, focus.selection);
+  const atEnd = focus.selection.kind === 'chart' ? marks.length === 0 : g === marks.length - 1;
+  if (stops.length > 0 && atEnd && (key === 'ArrowRight' || (key === 'ArrowDown' && focus.selection.kind !== 'point'))) return { selection: chart, stop: stops[0] };
+  return null;
+}
+
+/** What a screen reader is told about the place of the keyboard. */
+export function describeFocus(marks: readonly StepGroup[], focus: Focus, annotationText?: string): string {
+  return focus.stop === null ? describeSelection(marks, focus.selection, annotationText) : `${STOP_NAME[focus.stop]}. Press Enter to open its settings.`;
+}

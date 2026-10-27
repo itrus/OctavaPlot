@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { buildAnyModelCached, ChartCanvas, chartTexts } from '../../chart/anyModel';
-import { describeSelection, nextSelection, selectableMarks } from '../../chart/selectionOrder';
+import { CHROME_STOPS, type ChromeStop, describeFocus, nextFocus, selectableMarks } from '../../chart/selectionOrder';
 import { hitFromTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
 import type { PreparedChart } from '../../model/table/preparedChart';
@@ -29,6 +29,10 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const [tip, setTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
   const [drag, setDrag] = useState<{ id: string; xFrac: number; yFrac: number; dx: number; dy: number; moved: boolean } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  // The part of the chart besides its data sets that the keyboard is on (title, legend, an axis), and its outline in the surface.
+  const [stop, setStop] = useState<ChromeStop | null>(null);
+  const [stopBox, setStopBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
   // Zoom 100% means the whole chart fits the window; the slider zooms relative to that.
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -62,6 +66,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const onPointerDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
     const hit = hitFromTarget(e.target, svgRef.current);
+    setStop(null);
     // The inspector goes to the settings of whatever was clicked.
     const target = inspectorTargetFor(hit);
     if (target) navigateInspector(target);
@@ -111,7 +116,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   // to the whole chart, Enter to its settings. On a selected annotation the arrows move it (1% of the chart, Shift 5%, Alt 0.1%).
   const marks = useMemo(() => selectableMarks(any), [any]);
   const selectedNote = selection.kind === 'annotation' ? chart.annotations.find((a) => a.id === selection.annotationId) : undefined;
-  const announcement = describeSelection(marks, selection, selectedNote?.text.split(String.fromCharCode(10))[0]);
+  const announcement = describeFocus(marks, { selection, stop }, selectedNote?.text.split(String.fromCharCode(10))[0]);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     // Shortcuts (Ctrl+Z, Ctrl+S ...) belong to the app; so does everything while a dialog or another field has the keys.
     if (e.ctrlKey || e.metaKey || e.target !== e.currentTarget) return;
@@ -127,19 +132,37 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
       return;
     }
     if (e.key === 'Enter') {
-      const target = inspectorTargetFor({ kind: selection.kind === 'annotation' ? 'annotation' : selection.kind === 'chart' ? 'background' : 'bar' });
+      const target = inspectorTargetFor({ kind: stop === 'legend' ? 'legend' : stop === 'chart-title' ? 'title' : stop ? 'axis' : selection.kind === 'annotation' ? 'annotation' : selection.kind === 'chart' ? 'background' : 'bar' });
       if (target) {
         e.preventDefault();
         navigateInspector(target);
       }
       return;
     }
-    const next = nextSelection(marks, selection, e.key);
+    // The title, legend and axes are stops after the last data set; only those the chart draws are visited.
+    const stops = CHROME_STOPS.filter((id) => svgRef.current?.querySelector(`[id="${id}"]`));
+    const next = nextFocus(marks, stops, { selection, stop }, e.key);
     if (next) {
       e.preventDefault();
-      setSelection(next);
+      setStop(next.stop);
+      setSelection(next.selection);
     }
   };
+
+  // A click, or any other new selection, ends a stop; a stop is outlined on the chart so that it can be seen.
+  useEffect(() => {
+    if (selection.kind !== 'chart') setStop(null);
+  }, [selection]);
+  useLayoutEffect(() => {
+    const el = stop && svgRef.current?.querySelector(`[id="${stop}"]`);
+    const box = surfaceRef.current?.getBoundingClientRect();
+    if (!el || !box) {
+      setStopBox(null);
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    setStopBox({ left: r.left - box.left - 4, top: r.top - box.top - 4, width: r.width + 8, height: r.height + 8 });
+  }, [stop, any, chart, cssW, cssH]);
 
   const endDrag = () => {
     if (drag?.moved) {
@@ -249,6 +272,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
         <div className="chart-wrap" ref={wrapRef} style={{ width: cssW }}>
           <div
             className="chart-surface"
+            ref={surfaceRef}
             tabIndex={0}
             role="group"
             aria-label="Chart. Arrow keys select data sets and points, Escape selects the whole chart, Enter opens its settings."
@@ -259,6 +283,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
             onPointerCancel={endDrag}
             onPointerLeave={() => setTip(null)}
           >
+            {stopBox && <div className="key-stop" style={stopBox} aria-hidden="true" />}
             <ChartCanvas ref={svgRef} chart={chart} any={any} editor={{ selection, dragging: drag }} cssWidth={`${cssW}px`} cssHeight={`${cssH}px`} />
           </div>
           <div className="visually-hidden" role="status" aria-live="polite">{announcement}</div>

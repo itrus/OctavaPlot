@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { newId } from '../../model/ids';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
@@ -8,6 +8,7 @@ import type { ChartVariant } from '../../model/graph/chartVariant';
 import { useApp } from '../../state/AppContext';
 import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, removeAnalysis, type NewTableOptions } from '../../state/commands';
 import { DeleteIcon } from '../components/icons';
+import { navFold, navStep } from './navKeys';
 import { NewAnalysisDialog } from '../dialogs/NewAnalysisDialog';
 import { NewLayoutDialog, type NewLayoutOptions } from '../dialogs/NewLayoutDialog';
 import { NewGraphDialog } from '../dialogs/NewGraphDialog';
@@ -137,7 +138,7 @@ export function Navigator() {
       <button className="nav-chev" onClick={() => setOpen({ ...open, [key]: !open[key] })} aria-expanded={open[key]} aria-label={`${open[key] ? 'Fold' : 'Unfold'} ${FOLDER_TITLE[key]}`} title={open[key] ? 'Fold the list' : 'Unfold the list'}>
         <span className="chev">{open[key] ? '▾' : '▸'}</span>
       </button>
-      <button className="nav-folder" onClick={() => setView({ kind: 'folder', id: key })} title={`See all ${FOLDER_TITLE[key].toLowerCase()} as pictures: select, rename, reorder or delete several`} aria-current={view.kind === 'folder' && view.id === key ? 'page' : undefined}>
+      <button className="nav-folder" data-folder={key} onClick={() => setView({ kind: 'folder', id: key })} title={`See all ${FOLDER_TITLE[key].toLowerCase()} as pictures: select, rename, reorder or delete several`} aria-current={view.kind === 'folder' && view.id === key ? 'page' : undefined}>
         {FOLDER_TITLE[key]}
       </button>
     </div>
@@ -171,6 +172,24 @@ export function Navigator() {
         ))}
       </button>
     );
+  // Up, Down, Home and End move between the folders and pages (the focus goes with them); Left and Right fold and unfold a folder.
+  const onTreeKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLElement;
+    if (e.ctrlKey || e.metaKey || e.altKey || t.tagName === 'INPUT') return;
+    const stops = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('button.nav-folder, button.nav-item')];
+    const folderKey = t.dataset.folder as FolderKey | undefined;
+    const fold = folderKey ? navFold(e.key, open[folderKey]) : null;
+    if (folderKey && fold !== null) {
+      e.preventDefault();
+      setOpen({ ...open, [folderKey]: fold });
+      return;
+    }
+    const to = navStep(e.key, stops.indexOf(t as HTMLButtonElement), stops.length);
+    if (to !== null && stops[to]) {
+      e.preventDefault();
+      stops[to].focus();
+    }
+  };
   const newItem = (label: string, onClick: () => void) => (
     <button className="nav-item nav-new" onClick={onClick}>
       <span className="nav-icon">⊕</span> {label}
@@ -180,7 +199,7 @@ export function Navigator() {
   return (
     <nav className="navigator" aria-label="Project navigator">
       <div className="nav-panel">
-        <div className="nav-tree">
+        <div className="nav-tree" onKeyDown={onTreeKey}>
           {folder('tables')}
           {open.tables && (
             <>

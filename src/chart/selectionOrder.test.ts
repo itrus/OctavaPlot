@@ -96,3 +96,45 @@ describe('what is read out', () => {
     expect(describeSelection(marks, annotationSel, 'Limit')).toBe('Text annotation "Limit"');
   });
 });
+
+import { describeFocus, nextFocus, type ChromeStop, type Focus } from './selectionOrder';
+
+describe('the title, legend and axes as stops of the keyboard', () => {
+  const stops: ChromeStop[] = ['chart-title', 'legend', 'x-axis', 'y-axis'];
+  const at = (selection: Selection, stop: ChromeStop | null = null): Focus => ({ selection, stop });
+
+  it('follow the last data set: Right goes on to the first stop, from a data set or its points', () => {
+    expect(nextFocus(marks, stops, at(g('c')), 'ArrowRight')).toEqual(at(chart, 'chart-title'));
+    expect(nextFocus(marks, stops, at(g('b')), 'ArrowRight')).toEqual(at(g('c')));
+    expect(nextFocus(marks, stops, at(g('c')), 'ArrowDown')).toEqual(at(chart, 'chart-title'));
+    expect(nextFocus(marks, stops, at(pt('b', 'b12')), 'ArrowRight')).toEqual(at(g('c')));
+    expect(nextFocus(marks, stops, at(pt('b', 'b12')), 'ArrowDown')).toBeNull();
+  });
+  it('are walked with Right and Left, Home and End, and Left from the first returns to the last data set', () => {
+    expect(nextFocus(marks, stops, at(chart, 'chart-title'), 'ArrowRight')).toEqual(at(chart, 'legend'));
+    expect(nextFocus(marks, stops, at(chart, 'y-axis'), 'ArrowRight')).toBeNull();
+    expect(nextFocus(marks, stops, at(chart, 'x-axis'), 'ArrowLeft')).toEqual(at(chart, 'legend'));
+    expect(nextFocus(marks, stops, at(chart, 'chart-title'), 'ArrowLeft')).toEqual(at(g('c')));
+    expect(nextFocus(marks, stops, at(chart, 'legend'), 'Home')).toEqual(at(chart, 'chart-title'));
+    expect(nextFocus(marks, stops, at(chart, 'legend'), 'End')).toEqual(at(chart, 'y-axis'));
+  });
+  it('Escape leaves a stop for the whole chart', () => {
+    expect(nextFocus(marks, stops, at(chart, 'legend'), 'Escape')).toEqual(at(chart));
+  });
+  it('skip the ones the chart does not have, and are the only places on a chart with no data sets to step through', () => {
+    expect(nextFocus(marks, ['legend'], at(g('c')), 'ArrowRight')).toEqual(at(chart, 'legend'));
+    expect(nextFocus(marks, [], at(g('c')), 'ArrowRight')).toBeNull();
+    expect(nextFocus([], stops, at(chart), 'ArrowRight')).toEqual(at(chart, 'chart-title'));
+    expect(nextFocus([], stops, at(chart, 'chart-title'), 'ArrowLeft')).toEqual(at(chart));
+  });
+  it('leave the keys of the data sets as they were', () => {
+    expect(nextFocus(marks, stops, at(chart), 'ArrowRight')).toEqual(at(g('a')));
+    expect(nextFocus(marks, stops, at(g('a')), 'ArrowDown')).toEqual(at(pt('a', 'a1')));
+    expect(nextFocus(marks, stops, at(g('a')), 'Escape')).toEqual(at(chart));
+    expect(nextFocus(marks, stops, at(annotationSel), 'ArrowRight')).toBeNull();
+  });
+  it('are read out with how to open their settings', () => {
+    expect(describeFocus(marks, at(chart, 'legend'))).toBe('Legend. Press Enter to open its settings.');
+    expect(describeFocus(marks, at(g('a')))).toBe('A, data set 1 of 3, 2 points');
+  });
+});
