@@ -62,7 +62,7 @@ The numbers of the project live in the data tables only.
 | `groups` | The columns, in order. Each has a `name`, a `title` (free text under the name), a `paletteIndex` and its `observations`. XY and survival tables need the first column (X, or time). |
 | `observations` | The values of a column, exactly `rowCount` of them, in row order: entry *i* belongs to `rows[i]`. |
 
-An observation is `{ "id": …, "value": … }`. `value` is a number or `null`. `null` means missing: it is never zero. `NaN` and infinity cannot be stored. A value can be kept but left out of every chart and calculation with `"excluded": true` and an optional `"excludedReason"`.
+An observation is `{ "id": …, "value": … }`. `value` is a number or `null`. `null` means missing: it is never zero. `NaN` and infinity cannot be stored. A value can be kept but left out of every chart and calculation with `"excluded": true` and an optional `"excludedReason"`. An observation can name the independent unit it belongs to with `"subject"` (a non-empty text, for example `"Mouse 3"`); absent means no subject, and a file without the field opens as before, so there is no migration. A subject is a label: it changes no value.
 
 The identifiers of groups must differ within a table, and those of observations must differ within a table.
 

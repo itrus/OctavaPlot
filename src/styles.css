@@ -459,6 +459,7 @@ input[type='color'].mixed { opacity: 0.45; }
 .nav-actions button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 
 /* An excluded value stays in the table but is not used. */
+.cell.has-subject { box-shadow: inset 3px 0 0 var(--accent, #3b82f6); }
 .cell.excluded { text-decoration: line-through; color: var(--muted); background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(120,120,120,0.12) 4px 5px); }
 
 /* Searching the inspector: sections with no matching setting are hidden. */

@@ -168,7 +168,7 @@ Exact and rational values keep exact tolerance; ordinary finite summaries target
 | Holm | p = 0.01, 0.03, 0.04 | 0.03, 0.06, 0.06 |
 | BH | same | 0.03, 0.04, 0.04 |
 | Log endpoint | centre 2, interval [−1, 5] on log Y | keep centre; clip or suppress the endpoint; warning |
-| Composition zero total | weights 0, 0 | blocking error; no angle or percent |
+| Composition zero total | weights 0, 0 | that row is not drawn (no angle, percent or fabricated slice) and a warning names it; other rows still draw |
 
 Interaction and applicability tests:
 

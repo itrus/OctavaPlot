@@ -12,6 +12,12 @@ export interface Observation {
   excluded?: boolean;
   /** Why it is excluded, for the record. */
   excludedReason?: string;
+  /**
+   * The independent unit this observation belongs to (a mouse, a patient, a plate), free text. Observations of one column
+   * that share a subject are repeats of that unit; one subject in several columns is the same unit measured again.
+   * Absent = no subject (see model/table/subjects.ts). Like the row titles it must not hold patient identifiers.
+   */
+  subject?: string;
 }
 
 export interface Group {

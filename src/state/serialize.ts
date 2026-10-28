@@ -112,7 +112,8 @@ function parseTable(raw: unknown, path: string): DataTable {
       if (obsIds.has(oid)) fail(`${gp}.observations[${oi}].id`, 'is duplicated');
       obsIds.add(oid);
       // An excluded value is kept, with its reason, but not used (model/table/exclusion.ts).
-      return { id: oid, value, ...(o.excluded === true ? { excluded: true as const, ...(typeof o.excludedReason === 'string' && o.excludedReason !== '' ? { excludedReason: o.excludedReason } : {}) } : {}) };
+      const subject = typeof o.subject === 'string' ? o.subject.trim() : '';
+      return { id: oid, value, ...(subject !== '' ? { subject } : {}), ...(o.excluded === true ? { excluded: true as const, ...(typeof o.excludedReason === 'string' && o.excludedReason !== '' ? { excludedReason: o.excludedReason } : {}) } : {}) };
     });
     if (observations.length !== rowCount) fail(`${gp}.observations`, `must have ${rowCount} entries`);
     return {

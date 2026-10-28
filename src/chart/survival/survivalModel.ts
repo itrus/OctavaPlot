@@ -8,7 +8,7 @@ import type { Chart, DataTable, SurvivalBandMethod } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { normalQuantile } from '../../stats/special';
 import { computeLayout } from '../shared/parts/layout';
-import { resolveAxis } from '../shared/axes/axisScale';
+import { axisMapper, placeable, resolveAxis } from '../shared/axes/axisScale';
 import type { AtRiskTable, XyModel, XyPoint, XySeries } from '../xy/xyModel';
 import { displayName } from '../shared/parts/names';
 import { attachLazyScene } from '../xy/xyScene';
@@ -189,10 +189,11 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   });
   warnings.push(...layout.warnings);
   const { plot } = layout;
-  const [x0, x1] = xAxis.domain;
-  const [y0, y1] = yAxis.domain;
-  const xScale = (v: number) => plot.x + ((v - x0) / (x1 - x0)) * plot.width;
-  const yScale = (v: number) => plot.y + plot.height - ((v - y0) / (y1 - y0)) * plot.height;
+  const [x0] = xAxis.domain;
+  // The axes may be broken: the data are placed through the pieces that are drawn, as the axis is.
+  const xScale = axisMapper(xAxis, plot.x, plot.width);
+  const yScale = axisMapper(yAxis, plot.y + plot.height, -plot.height);
+  let inGap = 0;
 
   // 3. Geometry: a step path (horizontal to each event time, then the drop), the censor marks and the band.
   const series: XySeries[] = raw.map((r) => {
@@ -202,9 +203,9 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
     const lastTime = Math.max(0, ...r.km.steps.map((x) => x.time), ...r.km.marks.map((m) => m.time));
     d += `H${n2(xScale(lastTime))}`;
     const col = r.s.columns[0];
-    const points: XyPoint[] = r.km.marks.map((m) => ({ id: col.observations[m.row].id, row: m.row, x: m.time, y: level(m.survival), px: xScale(m.time), py: yScale(level(m.survival)), stats: null }));
+    const points: XyPoint[] = r.km.marks.filter((m) => placeable(xAxis, m.time) && placeable(yAxis, level(m.survival)) ? true : (inGap++, false)).map((m) => ({ id: col.observations[m.row].id, row: m.row, x: m.time, y: level(m.survival), px: xScale(m.time), py: yScale(level(m.survival)), stats: null }));
     // Symbols at the events too, when asked: the estimate just after each drop, tied to the first subject with the event.
-    if (opts.eventSymbols) for (const st of r.km.steps) points.push({ id: `${col.observations[st.row].id}:event`, row: st.row, x: st.time, y: level(st.survival), px: xScale(st.time), py: yScale(level(st.survival)), stats: null });
+    if (opts.eventSymbols) for (const st of r.km.steps.filter((q) => placeable(xAxis, q.time) && placeable(yAxis, level(q.survival)) ? true : (inGap++, false))) points.push({ id: `${col.observations[st.row].id}:event`, row: st.row, x: st.time, y: level(st.survival), px: xScale(st.time), py: yScale(level(st.survival)), stats: null });
 
     // Error bars of one standard error at each event time: S +/- S sqrt(Greenwood sum), kept within 0..1; none where it is not finite.
     let errorPath = '';
@@ -213,6 +214,10 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
       for (const st of r.km.steps) {
         const se = st.survival * Math.sqrt(st.greenwood);
         if (!Number.isFinite(se)) continue;
+        if (!placeable(xAxis, st.time) || !placeable(yAxis, level(Math.min(1, st.survival + se))) || !placeable(yAxis, level(Math.max(0, st.survival - se)))) {
+          inGap++;
+          continue;
+        }
         const x = xScale(st.time);
         const hi = yScale(level(Math.min(1, st.survival + se)));
         const lo = yScale(level(Math.max(0, st.survival - se)));
@@ -248,6 +253,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
     }
     return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: r.km.n === 0 ? '' : d, errorPath, errorMeaning: errorPath === '' ? null : 'SE (Greenwood)', bandPath, skipped: 0 };
   });
+  if (inGap > 0) warnings.push(`${inGap} mark${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);
   if (allT.length === 0) warnings.push('Enter the times in the first column and a 1 (event) or 0 (censored) in the column of each subject\'s group.');
 
   // 4. The at-risk table: the subjects still under observation at each tick, per group.

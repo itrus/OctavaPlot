@@ -984,6 +984,31 @@ export const setExcluded = (tableId: Id, cells: CellRef[], excluded: boolean, re
     return changed ? { ...t, groups } : t;
   });
 
+/**
+ * Name the subject (the independent unit) of cells, or clear it with an empty text. Unlike an exclusion it can be set on an
+ * empty cell, so a table can be labelled before it is filled. The same table when nothing changes.
+ */
+export const setSubject = (tableId: Id, cells: CellRef[], subject: string): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    const next = subject.trim();
+    let changed = false;
+    const groups = t.groups.map((g, ci) => {
+      let observations: Observation[] | null = null;
+      for (const c of cells) {
+        if (c.col !== ci || c.row < 0 || c.row >= t.rowCount) continue;
+        const o = (observations ?? g.observations)[c.row];
+        if ((o.subject ?? '') === next) continue;
+        observations = observations ?? g.observations.slice();
+        const { subject: _s, ...rest } = o;
+        observations[c.row] = next === '' ? rest : { ...rest, subject: next };
+      }
+      if (!observations) return g;
+      changed = true;
+      return { ...g, observations };
+    });
+    return changed ? { ...t, groups } : t;
+  });
+
 // ---------------------------------------------------------------- layers
 
 /** Give a layer its own look, or take a setting back to the series' (null). A setting the layer's kind does not take is ignored. */
