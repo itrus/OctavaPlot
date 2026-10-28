@@ -1,6 +1,6 @@
 import type { FitSettings } from '../../model/types';
 import { n2 } from '../../model/units';
-import { cachedFit } from '../../model/project/curveFit';
+import { cachedFit, deferredFit } from '../../model/project/curveFit';
 import { fitModelById, isFailure, type FitParam, type FitResult } from '../../stats/fit';
 import { inBreak, onAxis, polylinesThroughBreaks } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
@@ -30,6 +30,8 @@ export interface FittedCurve {
   summary: FitSummary | null;
   /** Why there is no curve; null when there is one. */
   failure: string | null;
+  /** The fit is being made off the main thread: no curve, no band and no numbers yet, and no reason either. Never set with a curve. */
+  pending?: true;
 }
 
 const NO_FIT: FittedCurve = { path: '', bandPath: '', summary: null, failure: null };
@@ -41,12 +43,25 @@ export interface FitRun {
   failure: string | null;
   /** Range of X of the data used. */
   xRange: [number, number] | null;
+  /** The fit is being made off the main thread (see deferredFit); there is nothing to draw yet. */
+  pending?: true;
 }
 
-/** Fit one series from its observations (every replicate counts as a point). */
-export function runFit(obs: ReadonlyArray<{ x: number; y: number }>, fit: FitSettings): FitRun {
+/**
+ * Fit one series from its observations (every replicate counts as a point). With `slot` (who is waiting for it: a series of a graph)
+ * a fit that takes long is made off the main thread and the run is pending until it is done; without it, as for export, the fit is
+ * made here if it is not kept, so the result is always final.
+ */
+export function runFit(obs: ReadonlyArray<{ x: number; y: number }>, fit: FitSettings, slot?: string): FitRun {
   if (fit.model === 'none') return { result: null, failure: null, xRange: null };
-  const r = cachedFit(obs, { ...fit, model: fit.model });
+  const input = { ...fit, model: fit.model };
+  let r;
+  if (slot === undefined) r = cachedFit(obs, input);
+  else {
+    const status = deferredFit(obs, input, slot);
+    if (status.state === 'pending') return { result: null, failure: null, xRange: null, pending: true };
+    r = status.value;
+  }
   if (isFailure(r)) return { result: null, failure: r.message, xRange: null };
   const xs = obs.map((p) => p.x);
   return { result: r, failure: null, xRange: [xs.reduce((m, v) => (v < m ? v : m), Infinity), xs.reduce((m, v) => (v > m ? v : m), -Infinity)] };
@@ -81,6 +96,7 @@ const placed = (v: number) => Number.isFinite(v) && Math.abs(v) < FAR;
 
 /** Draw the fit: the curve and the band around it. */
 export function drawFit(run: FitRun, fit: FitSettings, m: Mappers): FittedCurve {
+  if (run.pending) return { ...NO_FIT, pending: true };
   if (run.failure) return { ...NO_FIT, failure: run.failure };
   const { result, xRange } = run;
   if (!result || !xRange) return NO_FIT;

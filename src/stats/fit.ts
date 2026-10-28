@@ -587,6 +587,36 @@ function conditioned(a: Mat): { inverse: Mat | null } {
  * classical one for a line or a polynomial (spec 17.3), pointwise, never simultaneous.
  */
 export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, options: FitOptions): FitResult | FitFailure {
+  const solved = solveFit(points, options);
+  return isFailure(solved) ? solved : fitFromSolution(solved);
+}
+
+/**
+ * A fit as plain data: numbers, arrays and strings only, so it can cross a worker boundary (a `FitResult` holds functions and cannot).
+ * `fitFromSolution` makes the `FitResult` from it; `fitCurve` is `solveFit` followed by it, so there is one way a result is made.
+ */
+export interface FitSolution {
+  model: FitModelId;
+  degree: number;
+  params: FitParam[];
+  n: number;
+  df: number;
+  rss: number;
+  rSquared: number | null;
+  sigma: number | null;
+  converged: boolean;
+  message: string | null;
+  /** The parameters the curve is evaluated with: in the centred X for a linear model, in normalised units for the others. */
+  working: number[];
+  /** The coordinates `working` lives in. */
+  frame: { kind: 'linear'; centre: number; scale: number } | { kind: 'nonlinear'; scales: number[]; normalisation: Normalisation };
+  /** The covariance of `working` (in the units of Y given by `unitScale`); null when no error or band can be given. */
+  cov: number[][] | null;
+  unitScale: number;
+}
+
+/** The numerical part of a fit: everything that takes time, and nothing that is a function. */
+export function solveFit(points: ReadonlyArray<{ x: number; y: number }>, options: FitOptions): FitSolution | FitFailure {
   const model = fitModelById(options.model);
   const degree = model.id === 'polynomial' ? Math.min(6, Math.max(2, Math.round(options.degree ?? 2))) : model.id === 'linear' ? 1 : 0;
   const pts = points.filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y) && (!model.positiveX || q.x > 0) && (!model.nonNegativeX || q.x >= 0));
@@ -608,18 +638,18 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
   let unitScale = 1;
   /** J'J is too close to singular for the parameters to be told apart. */
   let illConditioned = false;
-  let gradientAt: (x: number) => number[];
   let unscaledCov: Mat | null;
   /** Takes the covariance of the working parameters to that of the reported ones. */
   let toReported: (c: Mat) => Mat;
   let working: number[];
+  let frame: FitSolution['frame'];
   if (model.linear) {
     const ls = linearLeastSquares(xs, ys, degree);
     if (!ls) return { failed: true, message: 'The fit is singular: the points do not fix the parameters.' };
     params = ls.p;
     working = ls.b;
+    frame = { kind: 'linear', centre: ls.centre, scale: ls.scale };
     evalAt = (x, q) => model.fn((x - ls.centre) / ls.scale, q);
-    gradientAt = (x) => Array.from({ length: p }, (_, k) => ((x - ls.centre) / ls.scale) ** k);
     unscaledCov = ls.unscaledCov;
     toReported = (c) => ls.transform.map((ti) => ls.transform.map((tj) => ti.reduce((s, a, k) => s + a * tj.reduce((t, bb, l) => t + c[k][l] * bb, 0), 0)));
   } else {
@@ -656,7 +686,7 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
     converged = r.converged;
     unitScale = nm.yScale;
     evalAt = (x, q) => nm.yShift + nm.yScale * scaledModel.fn((x - nm.xShift) / nm.xScale, q);
-    gradientAt = (x) => numericJacobian(scaledModel, [(x - nm.xShift) / nm.xScale], working)[0];
+    frame = { kind: 'nonlinear', scales, normalisation: nm };
     const jac = numericJacobian(scaledModel, xn, working);
     const cond = conditioned(jtj(jac));
     unscaledCov = cond.inverse;
@@ -700,24 +730,42 @@ export function fitCurve(points: ReadonlyArray<{ x: number; y: number }>, option
     return { name, value: params[k], se: s, lower: s !== null && Number.isFinite(t0) ? params[k] - t0 * s : null, upper: s !== null && Number.isFinite(t0) ? params[k] + t0 * s : null };
   });
 
-  const halfWidth = (x: number, kind: 'confidence' | 'prediction', lv: number): number | null => {
-    if (!cov || sigma === null || !(lv > 0 && lv < 1)) return null;
-    const g = gradientAt(x);
-    let v = 0;
-    for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) v += g[a] * cov[a][b] * g[b];
-    if (!(v >= 0)) return null;
-    const t = tcrit(lv);
-    if (!Number.isFinite(t)) return null;
-    return t * unitScale * Math.sqrt(kind === 'prediction' ? v + (sigma / unitScale) ** 2 : v);
-  };
-
   let message: string | null = null;
   if (!settled) message = 'The fit did not settle within the iterations allowed: a provisional curve is shown, with no errors or bands, because they would not be valid.';
   else if (illConditioned) message = 'The parameters are not fixed independently by the data (the fit is ill-conditioned: a change in one is made up by the others): no error or band can be given.';
   else if (df <= 0) message = 'There are no degrees of freedom left (as many parameters as points): no error or band can be given.';
   else if (!cov) message = 'The parameters are not fixed independently by the data (singular covariance): no error or band can be given.';
   if (dropped > 0) message = `${message ? `${message} ` : ''}${dropped} point${dropped === 1 ? ' was' : 's were'} left out (missing, or X not above 0).`;
-  return { model: model.id, degree, params: out, n, df, rss, rSquared, sigma, converged, message, predict, halfWidth };
+  return { model: model.id, degree, params: out, n, df, rss, rSquared, sigma, converged, message, working, frame, cov, unitScale };
 }
 
-export const isFailure = (r: FitResult | FitFailure): r is FitFailure => 'failed' in r;
+/** The curve and its band from the numbers of a solution: the same code whether the solution was made here or in a worker. */
+export function fitFromSolution(sol: FitSolution): FitResult {
+  const model = fitModelById(sol.model);
+  const { working, cov, sigma, unitScale, df, frame: f } = sol;
+  const p = working.length;
+  let predict: (x: number) => number;
+  let gradientAt: (x: number) => number[];
+  if (f.kind === 'linear') {
+    predict = (x) => model.fn((x - f.centre) / f.scale, working);
+    gradientAt = (x) => Array.from({ length: p }, (_, k) => ((x - f.centre) / f.scale) ** k);
+  } else {
+    const nm = f.normalisation;
+    const scaledModel: FitModel = { ...model, fn: (x, t) => model.fn(x, t.map((v, i) => v * f.scales[i])) };
+    predict = (x) => nm.yShift + nm.yScale * scaledModel.fn((x - nm.xShift) / nm.xScale, working);
+    gradientAt = (x) => numericJacobian(scaledModel, [(x - nm.xShift) / nm.xScale], working)[0];
+  }
+  const halfWidth = (x: number, kind: 'confidence' | 'prediction', lv: number): number | null => {
+    if (!cov || sigma === null || !(lv > 0 && lv < 1)) return null;
+    const g = gradientAt(x);
+    let v = 0;
+    for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) v += g[a] * cov[a][b] * g[b];
+    if (!(v >= 0)) return null;
+    const t = studentTQuantileUpper((1 - lv) / 2, df);
+    if (!Number.isFinite(t)) return null;
+    return t * unitScale * Math.sqrt(kind === 'prediction' ? v + (sigma / unitScale) ** 2 : v);
+  };
+  return { model: sol.model, degree: sol.degree, params: sol.params, n: sol.n, df, rss: sol.rss, rSquared: sol.rSquared, sigma, converged: sol.converged, message: sol.message, predict, halfWidth };
+}
+
+export const isFailure = <T extends object>(r: T | FitFailure): r is FitFailure => 'failed' in r;

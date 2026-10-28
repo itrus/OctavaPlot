@@ -68,6 +68,7 @@ export function FitSection({ chart, table, model }: { chart: Chart; table: DataT
         fitted.map((s) => (
           <div key={s.groupId} className="small">
             <strong style={{ color: s.style.lineColor }}>{s.label}</strong>
+            {s.fit?.pending && <div className="muted">Fitting…</div>}
             {s.fit?.failure && <div className="muted">No curve: {s.fit.failure}</div>}
             {s.fit?.summary && (
               <>

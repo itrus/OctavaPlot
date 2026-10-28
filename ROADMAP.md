@@ -35,7 +35,7 @@ Checked against the exit criteria of each phase. "Not reviewed" means this pass 
 | **P2 Scene and export** | Mostly. The marks of every family are scene elements with stable ids, and the screen, the export and the editor's hit testing are made from them. PNG has an explicit resolution. Zoom-independence of sizes and the sameness of editor and export marks are tested for every family. Annotations and the bar labels of column and grouped charts (one hideable layer for each data set) are scene elements too (steps 1a, 1b), and so are the point labels of column charts and the editor's selection marks of column and XY charts (step 1c), and the legend of pie charts and the row and column labels of heat maps (step 1d). **Not yet:** glyph checks for page layouts, and rich text (sub- and superscripts as markup, P3). Font diagnostics and the export dialog are built (step 2). |
 | **P3 Editing** | Audited on 27 October 2026 ([docs/AUDIT-P3.md](docs/AUDIT-P3.md)); the exit criterion is not met. Mostly built: grid input. Keyboard is done for the chart, the Navigator and the grid, and several data sets can be selected and edited together with "Mixed" where they differ. Property search (decided not needed) and the small screens are the rest. Resets have three levels now (a setting, a data set, the graph). Not built: property search, mixed-state multi-selection. |
 | **P4 Chart families** | Started. In the gallery 11 graphs are still locked: `xy.bars`, `xy.vector`, `xy.bubble`, `xy.trajectory`, `xy.offset`, `curve.smooth`, `cat.nested`, `grp.scatterS`, `grp.paired`, `three.bars`, `three.dots`. Observation roles (subject) are not built, and five of those graphs wait for them. |
-| **P5 Release** | Started: 20 Playwright tests (`e2e/`) and the performance table measured (several targets not met, see below). Not started: visual fixtures, migrations, accessibility sweep, example gallery, fits in a worker. |
+| **P5 Release** | Started: 22 Playwright tests (`e2e/`), the performance table measured (several targets not met, see below), and the nonlinear fits run in a Web Worker (28 October 2026: tested in-process, and tried in Chrome on one case, see "Fits in a worker"). Not started: visual fixtures, migrations, accessibility sweep, example gallery. |
 
 Also in place: a calculation cache keyed by identity (`src/stats/calcCache.ts`), PDF and layout export, linked graphs, a folder overview with thumbnails and multi-select (Navigator), and tags for tables and graphs.
 
@@ -63,7 +63,7 @@ Each phase ships on its own. A family moves to a new mechanism (layers, the scen
 - **Data integrity:** malformed CSV, ragged paste, missing values. No silent conversion or loss.
 - **State:** undo and redo, failed save, migrations.
 - **Architecture:** the layers, the shared parts and the folder sizes (`src/architecture.test.ts`).
-- **Browser (Playwright):** `e2e/` (`npm run e2e`): 20 tests in the installed Google Chrome, each in a fresh profile. Built (27 October 2026): editing a cell and Undo, exclusion, Duplicate with its status message, saving and opening a project, the size and resolution of a PNG export, the keyboard of the grid, the chart, the Navigator, Fill series, the focus of the Export dialog, several data sets together (Mixed, reset), dragging an annotation, an annotation anchored to data, the legend offset and the narrow window. Not yet: a test for each chart family and for layouts, the other dialogs, and the CI job has not run on GitHub.
+- **Browser (Playwright):** `e2e/` (`npm run e2e`): 22 tests in the installed Google Chrome, each in a fresh profile. Built (27 October 2026): editing a cell and Undo, exclusion, Duplicate with its status message, saving and opening a project, the size and resolution of a PNG export, the keyboard of the grid, the chart, the Navigator, Fill series, the focus of the Export dialog, several data sets together (Mixed, reset), dragging an annotation, an annotation anchored to data, the legend offset and the narrow window. Not yet: a test for each chart family and for layouts, the other dialogs, and the CI job has not run on GitHub.
 - **Visual:** one fixed fixture per catalogue preset, pinned font, tolerance 0.25 pt for placement. Not built yet.
 
 ## Performance targets (provisional, on a defined reference laptop)
@@ -77,11 +77,24 @@ Measured on 27 October 2026 with `npm run perf` (`e2e/performance.spec.ts`, in t
 | Pan and zoom 100k points | 30+ fps | Not measured (there is no clipping of the preview to the viewport yet) |
 | Open a project with 100k observations | Under 3 s | The table shows after 1.4 s (met); the graph is drawn after 5.7 to 7.8 s (not met) |
 | Export a normal figure | Under 2 s, UI not blocked | 124 ms to the PNG (met); whether the UI stays responsive was not measured |
-| Style edit during a fit | Main thread not blocked (worker) | Not measured; there is no worker, so the fit runs on the main thread |
+| Style edit during a fit | Main thread not blocked (worker) | **Built and measured once, 28 October 2026** (`e2e/fitWorker.spec.ts`, development server, same i7-1185G7): a two-phase fit of 300 points. On the main thread the longest gap between frames was 2121 ms (curve after 2.5 s). In the worker 65 to 133 ms (curve after 2.4 to 2.7 s), and a title edit made during the fit was drawn after 80 to 140 ms. One data set, one machine, the development build; the production build was not measured, nor a fit of 100 000 points |
 
 The development server is slower (React in development mode): the same runs gave 10 s for the graph of 100 000 observations and 3.9 s for its title edit.
 
 Above about 100k points, clip to the viewport and simplify the preview only. Never downsample the data or the export silently.
+
+## Fits in a worker
+
+Done 28 October 2026. The design, so the next change does not undo it:
+
+- **The reference stays synchronous.** `fitCurve` (`src/stats/fit.ts`) is now `solveFit` (the numerical part; returns plain data, a `FitSolution`) followed by `fitFromSolution` (builds the curve and band functions, which cannot cross a worker boundary). The worker runs `solveFit`; the main thread runs `fitFromSolution`. A result is the same whichever thread solved it (tested bit for bit for every model, through a structured clone).
+- **The seam** is `CalculationEngine` (`src/stats/fitEngine.ts`): request in, reply with outcome, diagnostics and provenance (algorithm version, engine, model, points, level, ms) out. Two implementations: the main thread, and `WorkerFitEngine` (one worker, one fit at a time; aborting a running fit ends the worker; any worker error makes the main thread calculate, as before).
+- **Keyed by inputs.** The worker's result goes into the same calculation cache, under the same identity, as a synchronous one (rule 4). A style or axis edit asks, finds the result or finds the job already running, and starts nothing. The graph, the export and the Results sheet share it.
+- **Pending state.** `FitRun.pending`, `FittedCurve.pending`, `XyModel.fitsPending`. While pending a series has no curve, band, numbers or reason (rule 6), the graph says "Fitting the curve…" and its Export button waits. A model waiting for a fit is not kept in the model cache.
+- **Stale results.** A place that waits (a *slot*: one series of one graph) wants one identity at a time. Asking for another cancels the old job if nobody else wants it, and a result that still arrives for it is dropped, not kept.
+- **Export** (`buildAnyModel` without `deferFits`) calculates the fit itself if it is not in the cache, so a file holds the final fit. The preview differs from it only by the pending fit (tested).
+- **Threshold.** A fit is sent to the worker when its expected time on the main thread is over 8 ms (half a frame at 60 fps): milliseconds per point for each model, measured in node on the reference laptop (linear 0.001, exponentials, peak and hyperbola 0.007, four-parameter logistic 0.011, five-parameter 0.02, rounded up). The two-phase exponential is always sent: its time depends on the data more than on n (10 to 430 ms for 16 to 60 points; 0.7 s for 100 and 4.7 s for 1000 on one noisy set). The per-point costs are from node, not the browser.
+- **Not done:** the Results sheet still fits on the main thread (it is a view the user asks for, and its CSV and copy must not hold a missing fit); no worker pool (several series wait in turn); no cancel button; the axis rescales when a pending curve arrives; a layout export is synchronous.
 
 ## Output quality
 
@@ -151,7 +164,7 @@ Step 1 is done (27 October 2026), with a zoom-independence test for every family
 |---|---|---|
 | **P3** | Property search (needs a registry of field labels), mixed state, the three reset levels made explicit, keyboard navigation, small screens (there are no media queries) | M each, L for search |
 | **P4** | Observation roles first (a subject column; exclusion exists). Then the locked graphs: `cat.nested`, `grp.paired`, `three.bars`, `three.dots` and `xy.trajectory` need roles; `xy.bars`, `xy.bubble` and `xy.vector` need more columns for an XY series; `curve.smooth` needs reference fixtures; `grp.scatterS` is a layout; `xy.offset` needs offset traces with a scale bar. Forest, ROC, Q-Q, Bland-Altman and residual plots each need a calculation contract with fixtures first. | roles L, each graph M, each new family L |
-| **P5** | Playwright workflows (20 built; one for each chart family and for layouts still to do), visual fixtures with a pinned font, an explicit migration chain tested against old files, benchmarks against the performance table (not measured), fits in a worker, an example gallery, docs | M each, the worker L |
+| **P5** | Playwright workflows (22 built; one for each chart family and for layouts still to do), visual fixtures with a pinned font, an explicit migration chain tested against old files, benchmarks against the performance table (not measured), an example gallery, docs (fits in a worker: done, see "Fits in a worker") | M each |
 
 ### Open decisions
 

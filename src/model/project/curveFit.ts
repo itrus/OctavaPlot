@@ -1,4 +1,6 @@
-import { cachedCalc } from '../../stats/calcCache';
+import { cachedCalc, peekCalc, type CalcIdentity } from '../../stats/calcCache';
+import { shouldDeferFit } from '../../stats/fitEngine';
+import { deferredFitResult } from '../../stats/fitService';
 import { FIT_ALGORITHM_VERSION, fitCurve, fitModelById, isFailure, type FitFailure, type FitModelId, type FitResult } from '../../stats/fit';
 import { withoutExcluded } from '../table/exclusion';
 import { layoutOf, xySeries } from '../table/tableLayout';
@@ -54,14 +56,12 @@ export function fitObservations(source: DataTable): Array<{ id: Id; label: strin
 export const fitStats = { calculated: 0 };
 
 type Obs = ReadonlyArray<{ x: number; y: number }>;
+type FitInput = { model: FitModelId; degree?: number; level: number };
 /** The numbers of a set of observations as one list, made once for each array so the cache can know it by identity. */
 const flatOf = new WeakMap<Obs, number[]>();
 
-/**
- * A fit kept by its identity (the points, model, degree where it matters, level and algorithm version). The graph and the
- * Results sheet both ask here, so one fit of the same data is calculated once; a style or axis edit never gets here.
- */
-export function cachedFit(obs: Obs, fit: { model: FitModelId; degree?: number; level: number }): FitResult | FitFailure {
+/** What a fit is keyed by: the points, model, degree where it matters, level and algorithm version (the same for every path that makes it). */
+function fitIdentity(obs: Obs, fit: FitInput): CalcIdentity {
   let data = flatOf.get(obs);
   if (!data) {
     data = [];
@@ -70,10 +70,36 @@ export function cachedFit(obs: Obs, fit: { model: FitModelId; degree?: number; l
   }
   // The degree matters only to a polynomial, and the fit clamps it: write it as the fit reads it.
   const degree = fit.model === 'polynomial' ? Math.min(6, Math.max(2, Math.round(fit.degree ?? 2))) : null;
-  return cachedCalc({ kind: 'fit', algorithm: FIT_ALGORITHM_VERSION, data, method: fit.model, params: [degree], level: fit.level }, () => {
+  return { kind: 'fit', algorithm: FIT_ALGORITHM_VERSION, data, method: fit.model, params: [degree], level: fit.level };
+}
+
+/**
+ * A fit kept by its identity. The graph, the export and the Results sheet all ask here (or find what `deferredFit` left), so one fit
+ * of the same data is calculated once; a style or axis edit never gets here. This is the reference: it always calculates on the
+ * calling thread when the result is not kept.
+ */
+export function cachedFit(obs: Obs, fit: FitInput): FitResult | FitFailure {
+  return cachedCalc<FitResult | FitFailure>(fitIdentity(obs, fit), () => {
     fitStats.calculated++;
     return fitCurve(obs, { model: fit.model, degree: fit.degree, level: fit.level });
   });
+}
+
+/** A fit that may still be on its way: the result, or pending (the fit is being made off the main thread). */
+export type FitStatus = { state: 'ready'; value: FitResult | FitFailure } | { state: 'pending' };
+
+/**
+ * The fit for the screen. The result if it is kept; a small fit is calculated on the spot (see `shouldDeferFit`); otherwise the fit
+ * is started in the worker and the answer is pending until `fitsVersion` changes. `slot` names who is waiting (a series of a
+ * graph), so that asking for other inputs cancels the fit for the old ones. Never returns an old fit for other inputs.
+ */
+export function deferredFit(obs: Obs, fit: FitInput, slot: string): FitStatus {
+  const id = fitIdentity(obs, fit);
+  const kept = peekCalc<FitResult | FitFailure>(id);
+  if (kept !== undefined) return { state: 'ready', value: kept };
+  if (!shouldDeferFit(fit.model, obs.length)) return { state: 'ready', value: cachedFit(obs, fit) };
+  const value = deferredFitResult(id, slot, () => ({ data: Float64Array.from(id.data as number[]), model: fit.model, degree: fit.degree, level: fit.level }));
+  return value === undefined ? { state: 'pending' } : { state: 'ready', value };
 }
 
 /** Six significant digits for the screen. */

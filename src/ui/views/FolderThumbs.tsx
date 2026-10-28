@@ -3,6 +3,7 @@ import { prepareChartInput } from '../../model/table/preparedChart';
 import { framesOf, pageMm, panelLabel } from '../../model/project/layout';
 import type { Analysis, Chart, DataTable, Layout, Project } from '../../model/types';
 import { buildAnyModelCached, ChartCanvas } from '../../chart/anyModel';
+import { useFitsVersion } from '../components/useFitsVersion';
 import { SvgIdPrefix } from '../../chart/shared/scene/idPrefix';
 
 /** The small pictures of a folder overview: what a page looks like, drawn from the page itself. */
@@ -51,7 +52,8 @@ function TableThumb({ table }: { table: DataTable }) {
  */
 export function ChartThumb({ chart, project }: { chart: Chart; project: Project }) {
   const prepared = useMemo(() => prepareChartInput(project, chart), [project, chart]);
-  const any = useMemo(() => (prepared ? buildAnyModelCached(chart, prepared.table, prepared.fit) : null), [chart, prepared]);
+  const fitsVersion = useFitsVersion();
+  const any = useMemo(() => (prepared ? buildAnyModelCached(chart, prepared.table, prepared.fit, { deferFits: true }) : null), [chart, prepared, fitsVersion]);
   if (!any) return <div className="thumb-missing">No data</div>;
   return (
     <div className="thumb-chart" aria-hidden="true">
