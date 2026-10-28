@@ -27,8 +27,16 @@ export type AnyModel =
   | { family: 'pie'; model: PieModel }
   | { family: 'heatmap'; model: HeatModel };
 
-export function buildAnyModel(chart: Chart, table: DataTable, fit?: FitSettings): AnyModel {
-  const built = buildAnyModelUnchecked(chart, table, fit);
+/**
+ * With `deferFits` (the screen) a fit that takes long is made in a worker and the model is built without it, with `fitsPending` above 0,
+ * until it is done. Without (export, thumbnails of a layout) every fit is final when the model is built.
+ */
+export interface BuildOptions {
+  deferFits?: boolean;
+}
+
+export function buildAnyModel(chart: Chart, table: DataTable, fit?: FitSettings, options: BuildOptions = {}): AnyModel {
+  const built = buildAnyModelUnchecked(chart, table, fit, options);
   if (chart.referenceLines.length > 0) built.model.warnings.push(...referenceLineNotices(referenceLinesOf(chart, built)));
   // An annotation anchored to data values that are off the axes (or on a chart with none) is not drawn: say so, as for a reference line.
   if (chart.annotations.some((a) => a.anchor === 'data')) {
@@ -38,11 +46,11 @@ export function buildAnyModel(chart: Chart, table: DataTable, fit?: FitSettings)
   return built;
 }
 
-function buildAnyModelUnchecked(chart: Chart, table: DataTable, fit?: FitSettings): AnyModel {
+function buildAnyModelUnchecked(chart: Chart, table: DataTable, fit: FitSettings | undefined, options: BuildOptions): AnyModel {
   const family = chartFamily(chart.type);
   switch (family) {
     case 'xy':
-      return { family, model: buildXyModel(chart, table, fit) };
+      return { family, model: buildXyModel(chart, table, fit, options) };
     case 'survival':
       return { family, model: buildSurvivalModel(chart, table) };
     case 'grouped':
@@ -58,6 +66,9 @@ function buildAnyModelUnchecked(chart: Chart, table: DataTable, fit?: FitSetting
   }
 }
 
+/** How many fits the model waits for (only an XY chart has fits). */
+export const fitsPendingOf = (any: AnyModel): number => (any.family === 'xy' ? (any.model.fitsPending ?? 0) : 0);
+
 const modelCache = new WeakMap<Chart, WeakMap<DataTable, Map<string, AnyModel>>>();
 
 /**
@@ -65,14 +76,18 @@ const modelCache = new WeakMap<Chart, WeakMap<DataTable, Map<string, AnyModel>>>
  * the drawing and the inspector share it. Projects are immutable, so an edit gives new chart or table objects and the old
  * entry is simply never found again (and is collected with them).
  */
-export function buildAnyModelCached(chart: Chart, table: DataTable, fit?: FitSettings): AnyModel {
+export function buildAnyModelCached(chart: Chart, table: DataTable, fit?: FitSettings, options: BuildOptions = {}): AnyModel {
   let byTable = modelCache.get(chart);
   if (!byTable) modelCache.set(chart, (byTable = new WeakMap()));
   let byFit = byTable.get(table);
   if (!byFit) byTable.set(table, (byFit = new Map()));
-  const key = fit ? JSON.stringify(fit) : '';
+  const key = (options.deferFits ? 'deferred:' : '') + (fit ? JSON.stringify(fit) : '');
   let model = byFit.get(key);
-  if (!model) byFit.set(key, (model = buildAnyModel(chart, table, fit)));
+  if (!model) {
+    model = buildAnyModel(chart, table, fit, options);
+    // A model waiting for a fit is not kept: it is built again when the fit is done (the fit itself is kept by its identity).
+    if (!fitsPendingOf(model)) byFit.set(key, model);
+  }
   return model;
 }
 

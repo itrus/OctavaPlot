@@ -153,7 +153,7 @@ Heat map colours, done today: the five palettes were replaced by the 16 ggsci gr
 | OP-036 | Architecture test reads imports with a regex that matches only single-quoted relative `from` and `import(` | **Fixed 27 Oct 2026** (see Progress) |
 | P8-032 | Example projects that double as visual fixtures; one per catalogue preset | Matches roadmap "example gallery" and "visual fixtures" |
 | | Performance measurements (`npm run perf`) | The performance table of the roadmap was never measured | **Measured 27 Oct 2026**: 6 measurements of the table in the browser, on the production build; results in the roadmap and section 4b |
-| Playwright smoke: edit cell, exclude, compare graph and layout, duplicate, save and reopen, export PNG | **Built 27 Oct 2026** (e2e/, 20 tests, `npm run e2e`): all of these except the comparison of a graph with a layout; also keyboard, dialog focus, several data sets, annotations, legend and the narrow window. Not run on GitHub yet |
+| Playwright smoke: edit cell, exclude, compare graph and layout, duplicate, save and reopen, export PNG | **Built 27 Oct 2026** (e2e/, 22 tests, `npm run e2e`): all of these except the comparison of a graph with a layout; also keyboard, dialog focus, several data sets, annotations, legend and the narrow window. Not run on GitHub yet |
 
 ### Documentation
 
@@ -220,7 +220,8 @@ From `npm run perf` (see the performance table in [ROADMAP.md](../ROADMAP.md)); 
 | A style edit rebuilds everything | Changing a title on a graph of 100 000 observations takes 2.3 to 2.5 s to the next frame, 0.5 to 0.8 s of it until the drawing changes. The model and the whole scene are made again, and React writes every dot again, although only a text changed (roadmap rule 4: a style or axis edit must not recompute what it does not change). Ideas: key the geometry on what it depends on (not on the title or fonts), keep the scene of the marks when only chrome changes, and give the marks a stable identity so that React skips them. | L |
 | Drawing 100 000 dots | The graph of 100 000 observations takes 5.7 to 7.8 s to draw (target 3 s). Ideas: clip and simplify the preview to the viewport above about 100 000 points (the roadmap rule; export stays exact), draw dots of one style as one path. | L |
 | Picking a point of 10 000 | 25 to 32 ms to the drawing, but 246 to 297 ms to the next frame: browser layout and paint of 10 000 elements. | M |
-| Pan and zoom, UI during export, a fit in a worker | Not measured; the worker does not exist (P5 "fits in a worker"). | M to L |
+| Pan and zoom, UI during export | Not measured. | M |
+| A fit in a worker | **Built 28 Oct 2026** (design: roadmap, "Fits in a worker"). *Measured*: a two-phase fit of 300 points in Chrome (development server): longest gap between frames 2121 ms on the main thread, 65 to 133 ms in the worker; the curve appeared at about the same time (2.4 to 2.7 s against 2.5 s). *Measured in node only*: the cost of each model for each number of points, which sets the threshold for sending a fit away. *Only tested, not measured*: stale results dropped, a style edit not refitting, export computing the final fit, a worker failure falling back (unit tests with an in-process worker). The browser test covers the pending state, a title edit during the fit and the curve arriving. *Not done*: the Results sheet, a worker pool, a cancel button, 100 000 points, the production build | L |
 
 ## 5. Not adopted from the reviews
 

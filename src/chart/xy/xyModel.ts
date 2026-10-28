@@ -112,6 +112,8 @@ export interface XyModel {
   warnings: string[];
   /** The curve fit drawn, with its settings (none when the chart has no curve fit). */
   fit: FitSettings;
+  /** How many series wait for a fit that is being made off the main thread: they are drawn without curve, band and numbers until it is done. */
+  fitsPending?: number;
   /** The layers the chart is drawn from, lowest first; absent for the families that are not drawn from layers yet. */
   layers?: LayerSpec[];
   /** The data layers as shapes: what the drawing, the export and the editor's hit-testing are made from. */
@@ -140,7 +142,7 @@ const nearZero = (values: number[]): boolean => {
  * of replicate / supplied-summary sub-columns). Rows with a missing X or Y are not drawn (missing is never zero); a
  * missing Y breaks the connecting line rather than bridging it.
  */
-export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = NO_FIT_SETTINGS): XyModel {
+export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = NO_FIT_SETTINGS, options: { deferFits?: boolean } = {}): XyModel {
   if (!isXyChartType(chart.type) || table.groups.length === 0) throw new Error('buildXyModel needs an XY chart on an XY table');
   const [W, H] = [chartPx2Pt(chart.widthPx), chartPx2Pt(chart.heightPx)];
   const layer = dataLayer(chart);
@@ -200,7 +202,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
       pts.push({ id: s.columns[0].observations[row].id, row, x, y, stats });
     }
     if (noError > 0) warnings.push(`${s.name}: ${noError} row${noError === 1 ? ' has' : 's have'} a mean but no usable error, so no error bar is drawn there.`);
-    return { s, style, pts, gapXs, rawObs, skipped, meaning, label: displayName(chart, s.id, s.name), fitRun: runFit(obs, fit) };
+    return { s, style, pts, gapXs, rawObs, skipped, meaning, label: displayName(chart, s.id, s.name), fitRun: runFit(obs, fit, options.deferFits ? `${chart.id}:${s.id}` : undefined) };
   });
 
   // 2. Scales from every drawn value, error bar ends included, so manual limits clip but never exclude.
@@ -326,7 +328,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   if (skippedTotal > 0) warnings.push(`${skippedTotal} row${skippedTotal === 1 ? ' has' : 's have'} an X or Y value missing and ${skippedTotal === 1 ? 'is' : 'are'} not drawn.`);
   if (allX.length === 0) warnings.push('Enter numbers in the X column and in at least one Y column to see the chart.');
 
-  const model: XyModel = { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit, layers: layerList };
+  const model: XyModel = { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit, fitsPending: series.filter((q) => q.fit?.pending).length, layers: layerList };
   attachLazyScene(chart, model);
   return model;
 }

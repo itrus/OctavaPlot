@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { buildAnyModelCached, ChartCanvas, chartTexts } from '../../chart/anyModel';
+import { buildAnyModelCached, ChartCanvas, chartTexts, fitsPendingOf } from '../../chart/anyModel';
+import { useFitsVersion } from '../components/useFitsVersion';
 import { CHROME_STOPS, type ChromeStop, describeFocus, extendGroups, nextFocus, selectableMarks } from '../../chart/selectionOrder';
 import { toggleGroupSelection } from '../../model/graph/selection/scope';
 import { hitFromTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
@@ -24,7 +25,10 @@ const SCROLLBAR_ROOM = 17;
 export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const { chart, table, fit: curve } = prepared;
   const { project, selection, setSelection, run, setStatus, zoom, setZoom, settings, fitRequest, navigateInspector } = useApp();
-  const any = useMemo(() => buildAnyModelCached(chart, table, curve), [chart, table, curve]);
+  // A fit that takes long is made in a worker: the graph is drawn without it (and says so) until useFitsVersion changes.
+  const fitsVersion = useFitsVersion();
+  const any = useMemo(() => buildAnyModelCached(chart, table, curve, { deferFits: true }), [chart, table, curve, fitsVersion]);
+  const fitsPending = fitsPendingOf(any);
   const model = any.model;
   const svgRef = useRef<SVGSVGElement>(null);
   const [tip, setTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
@@ -259,15 +263,16 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
         )}
         <button
           className="icon-text toolbar-end"
-          disabled={exportJob.busy}
+          disabled={exportJob.busy || fitsPending > 0}
           onClick={() => setExportOpen(true)}
-          title="Export this graph: format, resolution, size, fonts and warnings are shown first"
+          title={fitsPending > 0 ? 'The curve is still being fitted: export is possible when it is done, so that the file holds the final fit' : 'Export this graph: format, resolution, size, fonts and warnings are shown first'}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11" />
           </svg>
           Export
         </button>
+        {fitsPending > 0 && <span className="toolbar-info export-status" role="status">Fitting the curve…</span>}
         {exportJob.busy && <span className="toolbar-info export-status" role="status">{exportStatusText(exportJob.state)}</span>}
       </div>
       {exportOpen && (

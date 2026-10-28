@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { SYMBOL_SHAPE_OPTIONS } from '../../chart/shared/parts/symbols';
 import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext, type YAxisScale } from '../../chart/shared/axes/scales';
 import { buildAnyModelCached } from '../../chart/anyModel';
+import { useFitsVersion } from '../components/useFitsVersion';
 import { capabilitiesOf } from '../../model/graph/capabilities';
 import { chartFamily, chartTypesFor, supportsHorizontal } from '../../model/graph/chartTypes';
 import { layoutOf, summaryFormatInfo, xySeries } from '../../model/table/tableLayout';
@@ -104,7 +105,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const sampleIndex = first ? series.indexOf(first) : 0;
   const sample = series[sampleIndex];
   const curve = useMemo(() => resolveFit(chart.fit, analysesOf(project), table.id), [chart.fit, project.analyses, table.id]);
-  const any = useMemo(() => buildAnyModelCached(chart, table, curve), [chart, table, curve]);
+  const fitsVersion = useFitsVersion();
+  const any = useMemo(() => buildAnyModelCached(chart, table, curve, { deferFits: true }), [chart, table, curve, fitsVersion]);
   // The numeric-X model (XY, survival) and the category model (grouped, contingency) differ in what an axis is.
   const xyModel = any.family === 'xy' || any.family === 'survival' ? any.model : null;
   const yScale = any.family === 'column' || any.family === 'pie' || any.family === 'heatmap' ? null : any.model.y;

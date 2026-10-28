@@ -73,28 +73,46 @@ export function calcKey(id: CalcIdentity): string {
   return JSON.stringify([id.kind, id.algorithm, id.method, id.params ?? [], id.level ?? null, id.seed ?? null]) + '|' + signatureOf(id.data);
 }
 
-/** The result for an identity: the one kept, or the one `compute` gives (and is then kept). Results are shared: do not change them. */
-export function cachedCalc<T>(id: CalcIdentity, compute: () => T): T {
+/** The result kept for an identity, or undefined; it counts as used. Nothing is calculated. */
+export function peekCalc<T>(id: CalcIdentity): T | undefined {
   const key = calcKey(id);
   const found = cache.get(key);
-  if (found) {
-    cache.delete(key);
-    cache.set(key, found);
-    calcStats.hits++;
-    return found.value as T;
-  }
-  calcStats.computed++;
-  // Nothing is stored until a result exists, so a throw leaves no entry; a failure value is kept only under its full key.
-  const made = compute();
+  if (!found) return undefined;
+  cache.delete(key);
+  cache.set(key, found);
+  return found.value as T;
+}
+
+/** Keep a result that was calculated elsewhere (a worker) under its identity; the oldest results go beyond the budget. */
+export function storeCalc(id: CalcIdentity, value: unknown): void {
+  const key = calcKey(id);
   const cost = id.data.length + 1;
-  if (cost > BUDGET) return made;
-  cache.set(key, { value: made, cost });
+  const old = cache.get(key);
+  if (old) {
+    cache.delete(key);
+    used -= old.cost;
+  }
+  if (cost > BUDGET) return;
+  cache.set(key, { value, cost });
   used += cost;
   for (const [oldest, e] of cache) {
     if (used <= BUDGET && cache.size <= MAX_ENTRIES) break;
     cache.delete(oldest);
     used -= e.cost;
   }
+}
+
+/** The result for an identity: the one kept, or the one `compute` gives (and is then kept). Results are shared: do not change them. */
+export function cachedCalc<T>(id: CalcIdentity, compute: () => T): T {
+  const found = peekCalc<T>(id);
+  if (found !== undefined) {
+    calcStats.hits++;
+    return found;
+  }
+  calcStats.computed++;
+  // Nothing is stored until a result exists, so a throw leaves no entry; a failure value is kept only under its full key.
+  const made = compute();
+  storeCalc(id, made);
   return made;
 }
 
