@@ -95,7 +95,7 @@ export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
     bars: sanitizeBars(c.bars, base.bars),
     barLabels: sanitizeBarLabels(c.barLabels, base.barLabels),
     distribution: sanitizeDistribution(c.distribution, base.distribution),
-    pairs: { bridge: bool(record(c.pairs).bridge, base.pairs.bridge) },
+    pairs: { bridge: bool(record(c.pairs).bridge, base.pairs.bridge), bySubject: bool(record(c.pairs).bySubject, base.pairs.bySubject) },
     heatmap: sanitizeHeatmap(c.heatmap, base.heatmap),
     histogram: sanitizeHistogram(c.histogram, base.histogram),
     fit: sanitizeFit(c.fit, base.fit),

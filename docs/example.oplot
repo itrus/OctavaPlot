@@ -528,7 +528,8 @@
           "showQuartiles": true
         },
         "pairs": {
-          "bridge": false
+          "bridge": false,
+          "bySubject": false
         },
         "heatmap": {
           "palette": "bs-blue",

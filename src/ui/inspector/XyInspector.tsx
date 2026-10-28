@@ -239,6 +239,17 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 </GroupBox>
               )}
 
+              {chart.type === 'groupedBar' && layout.kind === 'replicates' && (
+                <GroupBox title="Lines joining the subjects">
+                  <Field label="Join the values of each subject" hint="Inside each category, the replicates that share a subject (see Subject… in the data table) are joined from the first series to the last, as a before-and-after line. A subject's replicates in one series are joined at their mean. The dots stay on the line of their series.">
+                    <Check checked={chart.pairs.bySubject} onChange={(v) => run('Join the values of each subject', patchLook(chart.id, { pairs: { bySubject: v } }))} />
+                  </Field>
+                  <Field label="Join across a missing value" hint="A series with no value for the subject: join the values either side of it. Nothing is made up for the missing one.">
+                    <Check checked={chart.pairs.bridge} disabled={!chart.pairs.bySubject} onChange={(v) => run('Join across missing values', patchLook(chart.id, { pairs: { bridge: v } }))} />
+                  </Field>
+                </GroupBox>
+              )}
+
               {(!barChart || ((chart.type === 'groupedBar' || chart.type === 'groupedFloating' || distChart) && layout.kind === 'replicates')) && (
               <GroupBox title={family === 'survival' ? 'Censor marks' : distChart ? 'Points' : barChart ? 'Individual values' : 'Symbols'} checked={st.showSymbols} onCheckedChange={(v) => setStyle({ showSymbols: v })} overridden={ov('showSymbols')}>
                 {family === 'survival' && (

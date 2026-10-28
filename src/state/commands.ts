@@ -709,7 +709,7 @@ export const addChartLike = (chartId: Id, tableId: Id, sourceChartId: Id, linked
 export const unlinkChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId && c.linkedTo !== undefined) ? mapChart(p, chartId, ({ linkedTo: _gone, ...c }) => c) : p);
 
 /** Colours, frame and gridline style of the chart (see model/graph/axis.ts: sanitizeLook). */
-export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'lineConnect' | 'heatmap' | 'pairs' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle> }): Command => (p) =>
+export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'lineConnect' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle>; pairs?: Partial<Chart['pairs']> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
     const { grid, ...rest } = patch;
     return { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };

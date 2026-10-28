@@ -290,7 +290,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     barLabels: { ...DEFAULT_BAR_LABELS },
     // A violin shows its values from the start: the Points box then switches them off.
     distribution: { ...DEFAULT_DISTRIBUTION, ...(type === 'violin' || type === 'groupedViolin' ? { points: 'all' as const } : {}) },
-    pairs: { bridge: false },
+    pairs: { bridge: false, bySubject: false },
     heatmap: { ...DEFAULT_HEATMAP, customColours: { ...DEFAULT_CUSTOM_COLOURS } },
     histogram: { ...DEFAULT_HISTOGRAM },
     fit: { ...DEFAULT_FIT },

@@ -22,7 +22,7 @@ import { symbolPath } from '../shared/parts/symbols';
  * error bars) and the symbols. Layers that follow each other in the same pass share one matrix group on a horizontal chart; the
  * symbols are not turned.
  */
-const PASS: Partial<Record<LayerKind, 'body' | 'lines' | 'points'>> = { bars: 'body', meanLine: 'body', line: 'lines', errorBars: 'lines', points: 'points', rawPoints: 'points' };
+const PASS: Partial<Record<LayerKind, 'body' | 'lines' | 'points'>> = { bars: 'body', meanLine: 'body', pairLines: 'lines', line: 'lines', errorBars: 'lines', points: 'points', rawPoints: 'points' };
 
 export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneElement[] {
   const { series, orient } = model;
@@ -36,6 +36,12 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
 
   /** The shapes of one layer; each has an id made from its layer (and the observation it draws), the same whatever the style. */
   const elementsOf = (layer: LayerSpec): SceneElement[] => {
+    if (layer.kind === 'pairLines') {
+      // The values of each subject joined across the series: a layer of the chart, in the look of the first series with what the layer was given of its own.
+      const first = series[0] ? partStyle(chart, layer.id, series[0].style) : undefined;
+      if (!first) return [];
+      return model.pairLines.map((l) => ({ ...el('path', [['d', l.d], ['fill', 'none'], ['stroke', first.lineColor], ['stroke-width', first.lineWidthPt], ['stroke-opacity', first.lineOpacity < 1 ? first.lineOpacity : undefined], ['stroke-linecap', 'round'], ['stroke-linejoin', 'round']]), id: svgId(layer.id, l.id) }));
+    }
     const s = layer.binding ? seriesOf.get(layer.binding.seriesId) : undefined;
     if (!s) return [];
     const named = (e: SceneElement, ...part: Array<string | number>): SceneElement => ({ ...e, id: svgId(layer.id, ...part) });

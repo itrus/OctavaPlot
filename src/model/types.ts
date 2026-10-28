@@ -293,6 +293,8 @@ export interface DistributionOptions {
 interface PairOptions {
   /** A subject with a missing value: join the values either side of it (never invent one), or break the line there. */
   bridge: boolean;
+  /** Grouped bars of replicates: join the values of each subject (see `Observation.subject`) across the series, inside each category. */
+  bySubject: boolean;
 }
 
 /** Colour scales of a heat map (spec 13.1). */

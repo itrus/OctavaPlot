@@ -4,6 +4,7 @@ import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { legendEntries } from '../../model/graph/legendEntries';
 import { resolveSummary } from '../../model/graph/summary';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
+import { hasSubjects } from '../../model/table/subjects';
 import type { Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
 import { resolveBarFill } from '../../model/graph/fill';
 import { chartPx2Pt, extent, n2 } from '../../model/units';
@@ -93,6 +94,14 @@ interface GroupedSeries {
   errorMeaning: string | null;
 }
 
+/** The values of one subject joined across the series inside one category (grouped bars with `pairs.bySubject`). */
+interface GroupedPairLine {
+  id: Id;
+  subject: string;
+  categoryIndex: number;
+  d: string;
+}
+
 export interface GroupedModel {
   widthPt: number;
   heightPt: number;
@@ -105,6 +114,8 @@ export interface GroupedModel {
   y: YAxisScale;
   yScale: (v: number) => number;
   series: GroupedSeries[];
+  /** One line for each subject inside each category, when the chart joins them. */
+  pairLines: GroupedPairLine[];
   /** Index into `series` of each legend entry. */
   legendSeries: number[];
   warnings: string[];
@@ -178,7 +189,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         }
       }
       // The replicate values themselves, with the observation each came from, for the dots over the bars.
-      const reps = layout.kind === 'replicates' && !contingency ? s.columns.flatMap((c) => (c.observations[r]?.value === null || c.observations[r] === undefined ? [] : [{ id: c.observations[r].id, value: c.observations[r].value as number }])) : [];
+      const reps = layout.kind === 'replicates' && !contingency ? s.columns.flatMap((c) => (c.observations[r]?.value === null || c.observations[r] === undefined ? [] : [{ id: c.observations[r].id, value: c.observations[r].value as number, subject: c.observations[r].subject ?? '' }])) : [];
       // A floating bar spans the replicate values, or the interval of values entered as limits.
       let span: [number, number] | null = null;
       if (floating) {
@@ -204,6 +215,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const stackedTotals = categoryRows.flatMap((_, ci) => [raw.reduce((sum, r) => sum + Math.max(0, r.cells[ci].value ?? 0), 0), raw.reduce((sum, r) => sum + Math.min(0, r.cells[ci].value ?? 0), 0)]);
   // Individual values are shown over bars of replicates, not over lines or counts.
   if (isDist && layout.kind !== 'replicates') warnings.push('Box plots and violins need the replicate values: enter the data as replicates.');
+  // Grouped bars of replicates can join the values of each subject across the series, inside each category.
+  const subjectLines = chart.type === 'groupedBar' && chart.pairs.bySubject && layout.kind === 'replicates';
   const showDots = (style: ChartStyle) => (chart.type === 'groupedBar' || floating) && layout.kind === 'replicates' && style.showSymbols;
   // A part kept out of the range (see rangeContribution in model/graph/layers.ts) adds nothing to it; the centre of a bar is the data and always counts.
   const layerList = layersOf(chart, table);
@@ -430,7 +443,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       bars.push(gbar);
       if (showDots(r.style)) {
         // Spread across the bar's width by a fixed hash of the observation, so the picture is the same every time.
-        const spread = chart.jitter.enabled ? bw * chart.jitter.widthFraction : 0;
+        // The dots of a chart that joins the subjects stay on the line of their series, or a subject's line would not meet them.
+        const spread = chart.jitter.enabled && !subjectLines ? bw * chart.jitter.widthFraction : 0;
         for (const rep of cell.reps) if (placeable(yAxis, rep.value)) dots.push({ id: rep.id, row: cell.row, px: x + bw / 2 + (hash01(rep.id) - 0.5) * spread, py: yScale(rep.value), value: rep.value, stats: null });
       }
       let errTop: number | null = null;
@@ -470,7 +484,45 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   if (noSpan > 0) warnings.push(`${noSpan} value${noSpan === 1 ? ' has' : 's have'} no range to draw a floating bar from: enter replicates, or limits as the values already calculated.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
 
-  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
+  // Subject lines: inside each category, the mean of a subject's replicates in each series, joined from the first series to the last. A series
+  // without a value for the subject breaks the line unless the chart bridges it (the values either side are joined; none is made up). A line needs two values.
+  const pairLines: GroupedPairLine[] = [];
+  if (chart.type === 'groupedBar' && chart.pairs.bySubject) {
+    if (layout.kind !== 'replicates') warnings.push('Lines joining the subjects need the replicate values: enter the data as replicates.');
+    else if (!hasSubjects(table)) warnings.push('Lines are drawn for each subject, but no value has a subject: name the subjects in the data table (Subject…).');
+    else {
+      let loose = 0;
+      categories.forEach((cat, ci) => {
+        const subjects: string[] = [];
+        for (const r of raw) {
+          for (const rep of r.cells[ci]?.reps ?? []) {
+            if (rep.subject === '') loose++;
+            else if (!subjects.includes(rep.subject)) subjects.push(rep.subject);
+          }
+        }
+        for (const subject of subjects) {
+          const seq: Array<{ x: number; y: number } | null> = [];
+          let have = 0;
+          raw.forEach((r, si) => {
+            const values = (r.cells[ci]?.reps ?? []).filter((x) => x.subject === subject && onAxis(yAxis, x.value)).map((x) => x.value);
+            if (values.length === 0) {
+              if (!chart.pairs.bridge) seq.push(null);
+              return;
+            }
+            const bw = cluster / nSeries;
+            seq.push({ x: cat.centerX - cluster / 2 + si * bw + bw / 2, y: values.reduce((a, b) => a + b, 0) / values.length });
+            have++;
+          });
+          if (have < 2) continue;
+          const d = pathOfRuns(polylinesThroughBreaks(seq, { log: null, reverse: false }, yAxis), yScale, n2);
+          if (d !== '') pairLines.push({ id: `pair:${ci}:${subject}`, subject, categoryIndex: ci, d });
+        }
+      });
+      if (loose > 0) warnings.push(`${loose} value${loose === 1 ? ' has' : 's have'} no subject and ${loose === 1 ? 'is' : 'are'} not joined by a line.`);
+    }
+  }
+
+  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, pairLines, legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileGroupedScene(chart, model);
   // The marks are compiled when a drawing, an export or a hit test first asks for them.
   let marks: SceneElement[] | undefined;

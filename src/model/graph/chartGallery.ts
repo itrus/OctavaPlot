@@ -94,7 +94,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       items: [
         item('grp.scatterI', 'Interleaved scatter', 'Dots of every series side by side within each category.', 'groupedBar', 'category.grouped', { dotsOnly: true }),
         item('grp.scatterS', 'Separated scatter', 'Dots of each series in its own group of columns.', null, 'category.grouped'),
-        item('grp.paired', 'Before and after, grouped', 'Subject lines inside each category.', null, 'category.paired'),
+        item('grp.paired', 'Before and after, grouped', 'Subject lines inside each category: enter the values as replicates and name the subjects in the table (Subject…).', 'groupedBar', 'category.paired', { dotsOnly: true, subjectLines: true }),
       ],
     },
     {

@@ -188,7 +188,9 @@ function groupedLayers(chart: Chart, table: DataTable): Array<Omit<LayerSpec, 'z
   const means = perSeries('points', type === 'groupedLine', (st) => st.showSymbols);
   const values = perSeries('rawPoints', type === 'groupedBar' || type === 'groupedFloating' || dist, (st) => st.showSymbols, false, (st) => st.showSymbols);
   const body = [...bars, ...centres];
-  const lines = [...line, ...errors];
+  // Grouped bars of replicates can join the values of each subject across the series: one layer for the chart, as for a paired plot.
+  const subjectLines = type === 'groupedBar' && chart.pairs.bySubject && series.length > 0 ? [{ id: `${chart.id}:pairLines`, kind: 'pairLines' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: true }] : [];
+  const lines = [...subjectLines, ...line, ...errors];
   const symbols = [...means, ...values];
   const parts = chart.lineOrder === 'onTop' ? [...body, ...symbols, ...lines] : chart.lineOrder === 'underneath' ? [...lines, ...body, ...symbols] : [...body, ...lines, ...symbols];
   // The labels of the bars (side by side bars only): above everything else the chart draws from its series.
@@ -437,7 +439,7 @@ export function layerRows(chart: Chart, table: DataTable, seriesName: (id: Id, f
     }
     if (layer.kind === 'atRisk') return LAYER_NAMES.atRisk;
     const sid = layer.binding?.seriesId ?? '';
-    if (layer.kind === 'pairLines') return LAYER_NAMES.pairLines;
+    if (layer.kind === 'pairLines') return family === 'grouped' ? 'Lines joining the subjects' : LAYER_NAMES.pairLines;
     // A layer of the chart as a whole (the titles of the pies, the cells of a heat map) has no series to name.
     if (!layer.binding) return family === 'pie' ? pieName(layer.kind) : family === 'heatmap' ? heatName(layer.kind) : LAYER_NAMES[layer.kind];
     const kind = family === 'survival' ? SURVIVAL_NAMES[layer.kind] ?? LAYER_NAMES[layer.kind] : family === 'column' ? columnName(chart, layer.kind) : family === 'grouped' ? groupedName(chart, layer.kind) : family === 'histogram' ? histogramName(layer.kind) : family === 'pie' ? pieName(layer.kind) : layer.kind === 'points' && layer.calc ? centreName(chart, sid) : LAYER_NAMES[layer.kind];
@@ -504,6 +506,7 @@ export function lookKeysOf(type: ChartType, kind: LayerKind): ReadonlyArray<keyo
       if (kind === 'errorBars') return draws(['groupedBar', 'groupedLine']) ? keys : null;
       if (kind === 'points') return draws(['groupedLine']) ? keys : null;
       if (kind === 'line') return draws(['groupedLine']) ? keys : null;
+      if (kind === 'pairLines') return draws(['groupedBar']) ? keys : null;
       if (kind === 'meanLine') return draws(['groupedBar', 'groupedFloating']) ? keys : null;
       // The dots of a box plot or a violin have a fixed shape.
       if (kind === 'rawPoints') return draws(['groupedBox', 'groupedViolin']) ? without('shape') : draws(['groupedBar', 'groupedFloating']) ? keys : null;
