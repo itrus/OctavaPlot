@@ -81,6 +81,8 @@ export function layersOf(chart: Chart, table: DataTable): LayerSpec[] {
   ] : [
     // The area under the curve is behind its outline; it has no switch in Style, only the layer's own visibility.
     ...(chart.type === 'xyArea' ? ofKind('area', yes, yes) : []),
+    // The bars of a chart of bars at numeric X: their baseline and their width count in the range (the bars are the data).
+    ...(chart.type === 'xyBars' ? ofKind('bars', (st) => st.showBars, yes) : []),
     ...ofKind('line', (st) => st.showLines, yes),
     // The band is not part of the range: a wide band is cut off by the plot.
     ...(analysisId !== null && chart.fit.band !== 'none' ? ofKind('fitBand', yes, () => false, fitRef) : []),
@@ -310,6 +312,7 @@ export function rangeKindsOf(type: ChartType): ReadonlyArray<LayerKind> {
     case 'xyLineSymbols':
     case 'xySpikes':
     case 'xyArea':
+    case 'xyBars':
       return ['points', 'rawPoints', 'errorBars', 'fitCurve'];
     case 'bar':
     case 'scatter':

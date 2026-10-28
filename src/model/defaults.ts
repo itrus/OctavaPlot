@@ -52,6 +52,7 @@ function axisTitlesFor(type: ChartType): { x: string; y: string } {
     case 'xyLineSymbols':
     case 'xySpikes':
     case 'xyArea':
+    case 'xyBars':
       return { x: 'X', y: 'Y' };
     case 'contingencyBars':
     case 'contingencyStacked':
@@ -197,6 +198,8 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
   // Spikes: the line layer draws the stems; an area has its fill under the line, which is its outline.
   xySpikes: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   xyArea: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
+  // Bars at numeric X: the bars layer draws them; there is no line or symbol unless asked for.
+  xyBars: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedBar: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedStacked: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedFloating: { showBars: true, showSymbols: false, showLines: false, showMeanLine: true },

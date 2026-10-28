@@ -144,6 +144,8 @@ Roadmap order is kept: observation roles first, then graphs, then new families w
 | P8-025 | Panel crops and zoomed insets of the same graph | Not checked | M | |
 | P8-027 | Portable "recipes": role-mapped graph formats | Not checked | L | P8-026 |
 
+**`xy.bars` opened 28 Oct 2026** as the chart type `xyBars` (bars at numeric X): a bar at each X from the baseline (`bars.baseline`, default 0) to its Y; the room of an X is the smallest distance between two X values, the bars fill it less the space between bars (`bars.gapPct`, a percent of a bar's width, as for the columns), and several series stand side by side in it; the axes hold the bars (baseline and the outer edges); the bars are a layer that can be hidden; tested on the model, not tried in a browser. Not done: bar widths from a column (a width per bar), labels above the bars, bars on a log X axis that start at 0 (a bar edge at or below 0 has no place there), horizontal bars.
+
 Heat map colours, done today: the five palettes were replaced by the 16 ggsci gradients. P8-021 and P8-022 build on them.
 
 ### P5 Release

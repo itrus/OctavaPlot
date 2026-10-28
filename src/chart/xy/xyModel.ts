@@ -15,6 +15,7 @@ import { type Scene } from '../shared/scene/scene';
 import { axisMapper, inBreak, onAxis, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
 import { displayName } from '../shared/parts/names';
+import { AUTO_BAR_GAP_PCT } from '../../model/options/columnOptions';
 import { suppliedStats } from '../../model/table/suppliedStats';
 import { hasSubjects } from '../../model/table/subjects';
 import { attachLazyScene } from './xyScene';
@@ -149,7 +150,8 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   const layer = dataLayer(chart);
   const layout = layoutOf(table);
   const warnings: string[] = [];
-  const fromBaseline = chart.type === 'xySpikes' || chart.type === 'xyArea';
+  const fromBaseline = chart.type === 'xySpikes' || chart.type === 'xyArea' || chart.type === 'xyBars';
+  const isBars = chart.type === 'xyBars';
   const xs = table.groups[0].observations.map((o) => o.value);
 
   // 1. Per series and row: the centre and, where there is a spread, its stats.
@@ -210,7 +212,18 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   // Each layer says whether its values are part of the range (see rangeContribution in model/graph/layers.ts); a part with no layer counts.
   const layerList = layersOf(chart, table);
   const counts = (kind: LayerKind, seriesId: Id): boolean => layerList.find((l) => l.id === `${seriesId}:${kind}`)?.rangeContribution ?? true;
-  const allX = raw.flatMap((r) => [...(counts('points', r.s.id) ? r.pts.map((p) => p.x) : []), ...(counts('rawPoints', r.s.id) ? r.rawObs.map((o) => o.x) : [])]);
+  // Bars at numeric X: the slot of an X is the smallest distance between two X values of the chart (one X: a fifth of its size, or 1);
+  // the bars of the series fill the slot less the gap, side by side, and the axis holds their edges.
+  const distinctX = [...new Set(raw.flatMap((r) => r.pts.map((p) => p.x)))].sort((a, b) => a - b);
+  const slot = distinctX.length > 1 ? Math.min(...distinctX.slice(1).map((x, i) => x - distinctX[i])) : Math.abs(distinctX[0] ?? 0) * 0.2 || 1;
+  // The space between bars is a percent of a bar's width, as for the columns: the bars fill the slot less that space.
+  const barsWidth = slot / (1 + (chart.bars.gapPct ?? AUTO_BAR_GAP_PCT) / 100);
+  const barWidth = barsWidth / Math.max(1, raw.length);
+  const allX = raw.flatMap((r) => [
+    ...(counts('points', r.s.id) ? r.pts.map((p) => p.x) : []),
+    ...(counts('rawPoints', r.s.id) ? r.rawObs.map((o) => o.x) : []),
+    ...(isBars && counts('bars', r.s.id) ? r.pts.flatMap((p) => [p.x - barsWidth / 2, p.x + barsWidth / 2]) : []),
+  ]);
   // A fitted curve is part of the data the axis holds (its band is not: a wide band is cut off by the plot).
   const allY = raw.flatMap((r) => [
     ...(counts('points', r.s.id) ? r.pts.map((p) => p.y) : []),
@@ -266,7 +279,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   // Values inside an omitted range of a broken axis, and error bars with an end inside one: not drawn, and counted.
   let inGap = 0;
   let gapErrorBars = 0;
-  const series: XySeries[] = raw.map((r) => {
+  const series: XySeries[] = raw.map((r, si) => {
     // A point with no position on a log axis (X or Y at or below 0) is left out and counted.
     const drawn = r.pts.filter((p) => onAxis(xAxis, p.x) && onAxis(yAxis, p.y));
     offAxis += r.pts.length - drawn.length;
@@ -335,7 +348,19 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     const fitted = fit.model === 'none' ? undefined : drawFit(r.fitRun, fit, { xAxis, yAxis, xScale, yScale });
     if (fitted?.failure) warnings.push(`${r.label}: no curve was fitted. ${fitted.failure}`);
     else if (fitted?.summary?.message) warnings.push(`${r.label}: ${fitted.summary.message}`);
-    return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: d, ...(areaPath !== undefined ? { areaPath } : {}), errorPath, errorMeaning, skipped: r.skipped, ...(r.style.showRawPoints ? { rawPoints } : {}), fit: fitted, fitCurveLook: layerLook(chart, `${r.s.id}:fitCurve`, r.style), fitBandLook: layerLook(chart, `${r.s.id}:fitBand`, r.style) };
+    // Bars at numeric X: from the baseline (0, or the one set for the bars; the nearest edge of the axis when it is out of range) up to Y.
+    // A bar whose edge falls in an omitted range is one rectangle, trimmed by the plot clip, as for the columns.
+    const baseline = Math.min(Math.max(chart.bars.baseline ?? 0, yAxis.domain[0]), yAxis.domain[1]);
+    const bars: HistBar[] | undefined = isBars
+      ? points.flatMap((p) => {
+          const left = p.x - barsWidth / 2 + si * barWidth;
+          const [pa, pb] = [xScale(left), xScale(left + barWidth)];
+          const [top, base] = [yScale(p.y), yScale(baseline)];
+          if (![pa, pb, top, base].every(Number.isFinite)) return [];
+          return [{ id: p.id, x: Math.min(pa, pb), y: Math.min(top, base), width: Math.abs(pb - pa), height: Math.abs(base - top), bin: [left, left + barWidth] as [number, number], count: p.stats?.n ?? 1, value: p.y }];
+        })
+      : undefined;
+    return { groupId: r.s.id, label: r.label, style: r.style, points, ...(bars ? { bars } : {}), linePath: d, ...(areaPath !== undefined ? { areaPath } : {}), errorPath, errorMeaning, skipped: r.skipped, ...(r.style.showRawPoints ? { rawPoints } : {}), fit: fitted, fitCurveLook: layerLook(chart, `${r.s.id}:fitCurve`, r.style), fitBandLook: layerLook(chart, `${r.s.id}:fitBand`, r.style) };
   });
   if (offAxis > 0) warnings.push(`${offAxis} point${offAxis === 1 ? ' has' : 's have'} a value of 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
   if (inGap > 0) warnings.push(`${inGap} value${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);

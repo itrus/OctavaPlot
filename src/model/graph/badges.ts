@@ -33,6 +33,7 @@ const CHART_TAG: Record<ChartType, string> = {
   xyLine: 'LINE',
   xyLineSymbols: 'L+S',
   xySpikes: 'SPK',
+  xyBars: 'XBAR',
   xyArea: 'AREA',
   groupedBar: 'BAR',
   groupedStacked: 'STK',

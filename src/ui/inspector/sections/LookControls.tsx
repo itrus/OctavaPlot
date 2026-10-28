@@ -97,14 +97,17 @@ export function FrameSection({ chart, dual, origin = 'y' }: { chart: Chart; dual
  * Where the columns of a column chart sit: the space between them, before the first and after the last (percent of a
  * column's width, Auto = the usual layout), and where the bars begin.
  */
-export function ColumnLayoutSection({ chart, spacing, baseline }: { chart: Chart; spacing: boolean; baseline: boolean }) {
+export function ColumnLayoutSection({ chart, spacing, baseline, numericX }: { chart: Chart; spacing: boolean; baseline: boolean; numericX?: boolean }) {
   const { run } = useApp();
   const b = chart.bars;
   const { min, max } = BAR_LIMITS.spacingPct;
   const pct = (v: number) => (v >= min && v <= max ? null : `Between ${min} and ${max}.`);
   return (
-    <Section title="Columns">
-      {spacing && (
+    <Section title={numericX ? 'Bars' : 'Columns'}>
+      {spacing && numericX && (
+        <OptionalNumField label="Space between bars (%)" hint="Percent of a bar's width. The room of an X is the smallest distance between two X values; several series stand side by side in it." value={b.gapPct} autoValue={AUTO_BAR_GAP_PCT} validate={pct} onCommit={(v) => run('Space between bars', patchBars(chart.id, { gapPct: v }), 'bars:gap')} />
+      )}
+      {spacing && !numericX && (
         <>
           <OptionalNumField label="Space between columns (%)" hint="Percent of a column's width" value={b.gapPct} autoValue={AUTO_BAR_GAP_PCT} validate={pct} onCommit={(v) => run('Space between columns', patchBars(chart.id, { gapPct: v }), 'bars:gap')} />
           <OptionalNumField label="Before the first column (%)" value={b.beforePct} autoValue={AUTO_BAR_OUTER_PCT} validate={pct} onCommit={(v) => run('Space before the first column', patchBars(chart.id, { beforePct: v }), 'bars:before')} />

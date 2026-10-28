@@ -96,6 +96,7 @@ export type ChartType =
   | 'xyLine'
   | 'xyLineSymbols'
   | 'xySpikes'
+  | 'xyBars'
   | 'xyArea'
   | 'groupedBar'
   | 'groupedLine'

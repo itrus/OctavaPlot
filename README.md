@@ -130,6 +130,7 @@ The table below is generated from the capability registry (`src/model/graph/capa
 | XY scatter | – | X and Y | – | yes | yes | – | yes | yes |
 | Line | – | X and Y | – | yes | yes | – | yes | yes |
 | Line with symbols | – | X and Y | – | yes | yes | – | yes | yes |
+| Bars at numeric X | – | X and Y | – | yes | – | – | yes | yes |
 | Spikes | – | X and Y | – | yes | – | – | yes | yes |
 | Area under the curve | – | X and Y | – | yes | yes | – | yes | yes |
 | Grouped bars | yes | Y | – | – | – | – | yes | yes |

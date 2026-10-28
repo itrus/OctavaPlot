@@ -68,6 +68,7 @@ export const CHART_TYPES: readonly ChartTypeInfo[] = [
   { type: 'xyScatter', tableKind: 'xy', label: 'XY scatter', description: 'Symbols at (X, Y); no connecting line.' },
   { type: 'xyLine', tableKind: 'xy', label: 'Line', description: 'Points joined in table order; no symbols.' },
   { type: 'xyLineSymbols', tableKind: 'xy', label: 'Line with symbols', description: 'Points joined in table order, each marked.' },
+  { type: 'xyBars', tableKind: 'xy', label: 'Bars at numeric X', description: 'Bars placed at X values, from a baseline up to Y; several series stand side by side.' },
   { type: 'xySpikes', tableKind: 'xy', label: 'Spikes', description: 'Thin lines from the baseline up to each point.' },
   { type: 'xyArea', tableKind: 'xy', label: 'Area under the curve', description: 'The area between the baseline and the line through the points.' },
   { type: 'groupedBar', tableKind: 'grouped', label: 'Grouped bars', description: 'Bars side by side within each category, with error bars.' },
@@ -104,6 +105,7 @@ export function chartFamily(type: ChartType): ChartFamily {
     case 'xyLineSymbols':
     case 'xySpikes':
     case 'xyArea':
+    case 'xyBars':
       return 'xy';
     case 'groupedBar':
     case 'groupedStacked':

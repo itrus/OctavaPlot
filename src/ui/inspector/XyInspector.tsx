@@ -215,8 +215,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
 
               {barChart && supportsHorizontal(chart.type) && <DirectionSection chart={chart} />}
               {distChart && <DistributionControls chart={chart} lineColor={st.lineColor} lineWidthPt={st.lineWidthPt} lineOpacity={st.lineOpacity} onLine={(patch) => setStyle(patch)} />}
-              {barChart && (
-                <GroupBox title={distChart ? (chart.type === 'groupedBox' ? 'Box' : 'Violin') : 'Bars'} {...(chart.type === 'groupedBar' ? { checked: st.showBars, onCheckedChange: (v: boolean) => setStyle({ showBars: v }), overridden: ov('showBars') } : {})}>
+              {(barChart || chart.type === 'xyBars') && (
+                <GroupBox title={distChart ? (chart.type === 'groupedBox' ? 'Box' : 'Violin') : 'Bars'} {...(chart.type === 'groupedBar' || chart.type === 'xyBars' ? { checked: st.showBars, onCheckedChange: (v: boolean) => setStyle({ showBars: v }), overridden: ov('showBars') } : {})}>
                   <Field label="Fill" overridden={ov('barFill')}>
                     <ColorInput value={st.barFill} onChange={(v) => setStyle({ barFill: v })} />
                   </Field>
@@ -404,6 +404,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
             <div>
               <DimensionsSection chart={chart} />
               {(chart.type === 'groupedBar' || chart.type === 'groupedFloating' || chart.type === 'contingencyBars') && <ColumnLayoutSection chart={chart} spacing={false} baseline />}
+              {chart.type === 'xyBars' && <ColumnLayoutSection chart={chart} spacing baseline numericX />}
             </div>
           )}
           {section === 'legend' && <LegendSection chart={chart} groups={series} />}

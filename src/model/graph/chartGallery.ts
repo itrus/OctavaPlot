@@ -35,7 +35,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('xyScatter', 'Points only', 'Symbols at (X, Y); no connecting line.', 'xyScatter'),
         item('xyLineSymbols', 'Points and connecting line', 'Points joined in the order of the table, each marked.', 'xyLineSymbols'),
         item('xyLine', 'Connecting line', 'Points joined in the order of the table; no symbols.', 'xyLine'),
-        item('xy.bars', 'Bars at numeric X', 'Bars placed at X values, with a baseline.', null, 'xy.bars'),
+        item('xy.bars', 'Bars at numeric X', 'Bars placed at X values, with a baseline.', 'xyBars', 'xy.bars'),
         item('xy.area', 'Area under the curve', 'A filled area below, above or between curves.', 'xyArea', 'xy.area'),
         item('xy.spikes', 'Spikes', 'Thin lines from the baseline up to each point.', 'xySpikes', 'xy.spikes'),
         item('xy.vector', 'Vectors', 'Arrows from the origin or between two points.', null, 'xy.vector'),
