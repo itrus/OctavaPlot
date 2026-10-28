@@ -1009,6 +1009,24 @@ export const setSubject = (tableId: Id, cells: CellRef[], subject: string): Comm
     return changed ? { ...t, groups } : t;
   });
 
+/**
+ * Name the factor (the second grouping level) of series, or clear it with an empty text. `groupIds` are the first columns of the series
+ * (`xySeries(table)[i].id`); a column that is not the first of a series is ignored. The same table when nothing changes.
+ */
+export const setFactor = (tableId: Id, groupIds: Id[], factor: string): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    const next = factor.trim();
+    const firsts = new Set(xySeries(t).map((s) => s.id));
+    let changed = false;
+    const groups = t.groups.map((g) => {
+      if (!groupIds.includes(g.id) || !firsts.has(g.id) || (g.factor ?? '') === next) return g;
+      changed = true;
+      const { factor: _f, ...rest } = g;
+      return next === '' ? rest : { ...rest, factor: next };
+    });
+    return changed ? { ...t, groups } : t;
+  });
+
 // ---------------------------------------------------------------- layers
 
 /** Give a layer its own look, or take a setting back to the series' (null). A setting the layer's kind does not take is ignored. */

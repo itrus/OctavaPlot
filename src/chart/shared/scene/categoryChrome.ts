@@ -28,6 +28,8 @@ export interface CategoryChromeInput {
   y2: { scale: YAxisScale; map: (v: number) => number } | null;
   categories: ReadonlyArray<{ key: string | number; centerX: number; label: string }>;
   references: readonly PlacedReferenceLine[];
+  /** Shapes drawn with the category axis in front of the data (the names of the factors under their clusters of bars). */
+  extraFront?: readonly SceneElement[];
   /** The key of one legend entry: what is drawn at the item's place and width, and the data set a click on it selects. */
   keysOf: (item: LegendItemLayout, keyWidth: number) => { groupId: string; keys: SceneElement[] };
 }
@@ -74,6 +76,7 @@ export function compileCategoryChrome(chart: Chart, c: CategoryChromeInput): Chr
     ...valueAxis,
     ...(!horizontal && y2 ? secondaryAxisElements({ chart, cfg: y2a, scale: y2.scale, map: y2.map, plot }) : []),
     ...categoryAxisElements({ ...axis, cfg: xa, items: categories, horizontal, crossing: horizontal ? categoryAxisX : categoryAxisY, categoryY, rotated: layout.xTickRotated }),
+    ...(c.extraFront ?? []),
     ...[frameElement(chart, plot, ya.lineWidthPt), scaleBarElement(chart, ya, horizontal ? 'x' : 'y', y, horizontal ? valueX : yScale, plot)].flatMap((e) => (e ? [e] : [])),
     ...titleElements(chart, layout, horizontal ? ya : xa, horizontal ? xa : ya, y2 ? y2a : null),
     ...legendElements(chart, layout, c.keysOf),

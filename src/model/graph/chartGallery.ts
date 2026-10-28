@@ -123,8 +123,8 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'three',
       label: 'Three-way',
       items: [
-        item('three.bars', 'Three-way bars', 'Two grouping levels inside each category.', null, 'category.nested'),
-        item('three.dots', 'Three-way dots', 'Individual values for two grouping levels.', null, 'category.nested'),
+        item('three.bars', 'Three-way bars', 'Two grouping levels inside each category: name the factor of each series (Factor…) and the series that share one are drawn together.', 'groupedBar', 'category.nested'),
+        item('three.dots', 'Three-way dots', 'Individual values for two grouping levels: enter replicates, and name the factor of each series (Factor…).', 'groupedBar', 'category.nested', { dotsOnly: true }),
       ],
     },
     {

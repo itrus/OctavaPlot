@@ -29,6 +29,11 @@ export interface Group {
   paletteIndex: number;
   /** Set only on the columns a graph is drawn from: where the series of this column sat in its table, so its colour stays with it when the series are reordered or hidden. */
   seriesSlot?: number;
+  /**
+   * Grouped tables: the second grouping level of the series this column starts (set on the first column of a series, as `seriesSlot` is).
+   * Series that name the same factor are drawn together inside each category (see model/table/factors.ts). Free text; absent = none.
+   */
+  factor?: string;
   /** Set only on a column added to a graph from another table: the row titles of that table, which are the ones its points are named by. */
   sourceRowTitles?: string[];
   /** Always exactly `DataTable.rowCount` long. */

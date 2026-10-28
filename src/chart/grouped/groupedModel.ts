@@ -5,6 +5,7 @@ import { legendEntries } from '../../model/graph/legendEntries';
 import { resolveSummary } from '../../model/graph/summary';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
 import { hasSubjects } from '../../model/table/subjects';
+import { factorLayout, seriesPaletteIndex, usesFactors } from '../../model/table/factors';
 import type { Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
 import { resolveBarFill } from '../../model/graph/fill';
 import { chartPx2Pt, extent, n2 } from '../../model/units';
@@ -102,6 +103,16 @@ interface GroupedPairLine {
   d: string;
 }
 
+/** The name of a factor written under its cluster of bars in one category. */
+interface GroupedFactorLabel {
+  id: Id;
+  text: string;
+  /** The left and right ends of the cluster on the page, and the top of the row the name is written in. */
+  x1: number;
+  x2: number;
+  y: number;
+}
+
 export interface GroupedModel {
   widthPt: number;
   heightPt: number;
@@ -116,6 +127,8 @@ export interface GroupedModel {
   series: GroupedSeries[];
   /** One line for each subject inside each category, when the chart joins them. */
   pairLines: GroupedPairLine[];
+  /** The names of the factors under their clusters (see model/table/factors.ts); none when no series names a factor. */
+  factorLabels: GroupedFactorLabel[];
   /** Index into `series` of each legend entry. */
   legendSeries: number[];
   warnings: string[];
@@ -148,6 +161,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const contingency = table.kind === 'contingency';
   const warnings: string[] = [];
   const seriesDefs = xySeries(table);
+  // Series that name the same factor are drawn together: the clusters (null when none does, or the chart has no side-by-side bars).
+  const clusters = usesFactors(chart.type) && !contingency ? factorLayout(seriesDefs) : null;
   const labelOfRow = (r: number) => rowTitleAt(table, r).trim() || `row ${r + 1}`;
 
   // 1. Categories: rows with a title or any value.
@@ -162,7 +177,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   let negative = 0;
   const noError: string[] = [];
   const raw = seriesDefs.map((s, si) => {
-    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? si });
+    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: seriesPaletteIndex(chart.type, seriesDefs.map((d) => d.columns[0]), si) });
     const spec = resolveSummary(layer, s.id);
     let meaning: string | null = null;
     const cells = categoryRows.map((r, ci) => {
@@ -274,6 +289,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     legendLabels: legendSeries.map((i) => raw[i].label),
     categoryLabels: horizontal ? [] : labels,
     yTickLabels: horizontal ? labels : yAxis.ticks.map(yAxis.tickLabel),
+    categoryRowPt: clusters && !horizontal ? chart.xAxis.tickFontSizePt * 1.6 : 0,
   });
   warnings.push(...lay.warnings);
   // The geometry below is made in the virtual region (the real one when vertical).
@@ -352,8 +368,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         continue;
       }
       const stacked = arrangement !== 'side';
-      const bw = stacked ? cluster * 0.75 : cluster / nSeries;
-      const x = stacked ? cat.centerX - bw / 2 : cat.centerX - cluster / 2 + si * bw;
+      const bw = stacked ? cluster * 0.75 : cluster / (clusters?.units ?? nSeries);
+      const x = stacked ? cat.centerX - bw / 2 : cat.centerX - cluster / 2 + (clusters ? clusters.slot[si] : si) * bw;
       // Box plots and violins of a cell with no replicate values have nothing to draw.
       if (isDist && !cell.dist) continue;
       // A bar whose value is inside an omitted range would be drawn as if it ended at the edge of the gap.
@@ -509,8 +525,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
               if (!chart.pairs.bridge) seq.push(null);
               return;
             }
-            const bw = cluster / nSeries;
-            seq.push({ x: cat.centerX - cluster / 2 + si * bw + bw / 2, y: values.reduce((a, b) => a + b, 0) / values.length });
+            const bw = cluster / (clusters?.units ?? nSeries);
+            seq.push({ x: cat.centerX - cluster / 2 + (clusters ? clusters.slot[si] : si) * bw + bw / 2, y: values.reduce((a, b) => a + b, 0) / values.length });
             have++;
           });
           if (have < 2) continue;
@@ -522,7 +538,23 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     }
   }
 
-  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, pairLines, legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
+  // The names of the factors, one row under the category labels. A horizontal chart has no such row.
+  const factorLabels: GroupedFactorLabel[] = [];
+  if (clusters) {
+    if (horizontal) warnings.push('The names of the factors are not written on a horizontal chart.');
+    else if (lay.categoryRow) {
+      const unit = cluster / clusters.units;
+      for (const cat of categories) {
+        for (const c of clusters.clusters) {
+          if (c.factor === '') continue;
+          const x1 = cat.centerX - cluster / 2 + c.start * unit;
+          factorLabels.push({ id: `factor:${cat.row}:${c.factor}`, text: c.factor, x1, x2: x1 + c.series.length * unit, y: lay.categoryRow.y });
+        }
+      }
+    }
+  }
+
+  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, pairLines, factorLabels, legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileGroupedScene(chart, model);
   // The marks are compiled when a drawing, an export or a hit test first asks for them.
   let marks: SceneElement[] | undefined;

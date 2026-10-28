@@ -3,6 +3,7 @@ import { centreLower } from '../../stats/summary';
 import { resolveStyle, dataLayer } from './style';
 import { resolveSummary } from './summary';
 import { layoutOf, xySeries } from '../table/tableLayout';
+import { seriesPaletteIndex } from '../table/factors';
 import type { Chart, ChartStyle, ChartType, DataTable, Id, LayerStyle, LineStyle, SymbolShape } from '../types';
 
 /**
@@ -176,7 +177,8 @@ const hasBarLabels = (chart: Chart): boolean => chart.barLabels.show !== 'none' 
 function groupedLayers(chart: Chart, table: DataTable): Array<Omit<LayerSpec, 'z'>> {
   const type = chart.type;
   const layer = dataLayer(chart);
-  const series = xySeries(table).map((s, i) => ({ s, style: resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? i }) }));
+  const defs = xySeries(table);
+  const series = defs.map((s, i) => ({ s, style: resolveStyle(chart, layer, { id: s.id, paletteIndex: seriesPaletteIndex(type, defs.map((d) => d.columns[0]), i) }) }));
   // Error bars and individual values are part of the axis range only while they are on.
   const perSeries = (kind: LayerKind, on: boolean, visible: (st: ChartStyle) => boolean, calc = false, range: (st: ChartStyle) => boolean = () => true) =>
     on ? series.map(({ s, style }) => ({ id: `${s.id}:${kind}`, kind, binding: { tableId: table.id, seriesId: s.id }, calc: calc ? ({ kind: 'summary', seriesId: s.id } as CalcRef) : null, enabled: true, visible: visible(style), rangeContribution: range(style) })) : [];
@@ -569,7 +571,7 @@ export function layerBaseStyle(chart: Chart, table: DataTable, layer: Pick<Layer
   }
   const series = xySeries(table);
   const at = series.findIndex((s) => s.id === id);
-  return at < 0 ? null : resolveStyle(chart, dataLayer(chart), { id, paletteIndex: series[at].columns[0].seriesSlot ?? at });
+  return at < 0 ? null : resolveStyle(chart, dataLayer(chart), { id, paletteIndex: seriesPaletteIndex(chart.type, series.map((d) => d.columns[0]), at) });
 }
 
 /** The look the Layers section shows for a layer that takes one: its own settings, else those of its series. */

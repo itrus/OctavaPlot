@@ -6,6 +6,7 @@ import { useFitsVersion } from '../components/useFitsVersion';
 import { capabilitiesOf } from '../../model/graph/capabilities';
 import { chartFamily, chartTypesFor, supportsHorizontal } from '../../model/graph/chartTypes';
 import { layoutOf, summaryFormatInfo, xySeries } from '../../model/table/tableLayout';
+import { hasFactors, seriesPaletteIndex, usesFactors } from '../../model/table/factors';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/graph/summary';
 import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from '../../stats/describe';
 import { tooltipFmt } from '../../chart/tooltip';
@@ -123,10 +124,10 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const st: ChartStyle = useMemo(() => {
     if (!sample) return chart.defaults;
     const l = scope === 'all' ? { ...layer, groupOverrides: {}, objectOverrides: {} } : layer;
-    return resolveStyle(chart, l, { id: sample.id, paletteIndex: sample.seriesSlot ?? sampleIndex });
+    return resolveStyle(chart, l, { id: sample.id, paletteIndex: seriesPaletteIndex(chart.type, series, sampleIndex) });
   }, [chart, layer, sample, sampleIndex, scope]);
   // The series the edits reach (hidden ones are not drawn, so they do not count as differing).
-  const inScope = series.map((g, i) => ({ id: g.id, paletteIndex: g.seriesSlot ?? i })).filter((g) => scopeIds.includes(g.id) && !chart.hiddenGroupIds.includes(g.id));
+  const inScope = series.map((g, i) => ({ id: g.id, paletteIndex: seriesPaletteIndex(chart.type, series, i) })).filter((g) => scopeIds.includes(g.id) && !chart.hiddenGroupIds.includes(g.id));
   const inScopeKey = inScope.map((g) => g.id).join();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const mixedStyle = useMemo(() => mixedStyleKeys(chart, layer, inScope), [chart, layer, inScopeKey]);
@@ -237,6 +238,14 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <NumField label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showMeanLine} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
                   <div className="muted small">{chart.type === 'groupedBar' ? 'A line across each bar at the value it shows.' : 'The bar runs from the smallest to the largest value; the line marks the mean of the replicates.'}</div>
                 </GroupBox>
+              )}
+
+              {usesFactors(chart.type) && (
+                <div className="muted small">
+                  {hasFactors(series.map((g) => ({ columns: [g] })))
+                    ? 'The series that share a factor are drawn together; each series keeps the colour of its place in the cluster. Change factors with Factor… in the data table.'
+                    : 'Two grouping levels: name the factor of each series with Factor… in the data table, and the series that share one are drawn together inside each category.'}
+                </div>
               )}
 
               {chart.type === 'groupedBar' && layout.kind === 'replicates' && (

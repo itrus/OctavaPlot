@@ -3,7 +3,7 @@ import type { DataTable, DecimalSeparator, TableKind } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import { newId } from '../../model/ids';
-import { addAnalysis, addGroup, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setExcluded, setSubject, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
+import { addAnalysis, addGroup, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setExcluded, setFactor, setSubject, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../../util/download';
 import { AddColumnIcon, AddManyRowsIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon } from '../components/icons';
 import { isCsvFile, tableToCsv, type CsvExportMode } from '../data/csv';
@@ -13,6 +13,7 @@ import { ImportCsvDialog, type CsvImportData } from '../dialogs/ImportCsvDialog'
 import { AppendRowsDialog } from '../dialogs/AppendRowsDialog';
 import { FillSeriesDialog, type SeriesDirection } from '../dialogs/FillSeriesDialog';
 import { SubjectDialog } from '../dialogs/SubjectDialog';
+import { FactorDialog } from '../dialogs/FactorDialog';
 import { RowsMenu } from './RowsMenu';
 import { leadingColumns, usesSeriesBlocks } from '../../model/graph/chartTypes';
 import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../../model/table/tableLayout';
@@ -144,7 +145,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const scrollerRef = useRef<HTMLDivElement>(null);
   const csvRef = useRef<HTMLInputElement>(null);
-  const [dialog, setDialog] = useState<'append' | 'exportCsv' | 'series' | 'subject' | null>(null);
+  const [dialog, setDialog] = useState<'append' | 'exportCsv' | 'series' | 'subject' | 'factor' | null>(null);
   // A picked file waits here, read but not imported, while the preview dialog is open.
   const [pendingCsv, setPendingCsv] = useState<{ name: string; text: string } | null>(null);
   const dragging = useRef(false);
@@ -374,6 +375,19 @@ export function DataTableView({ table }: { table: DataTable }) {
     if (cells.length === 0) return;
     run(subject.trim() === '' ? 'Clear subject' : 'Set subject', setSubject(table.id, cells, subject));
     setMessage({ kind: 'info', text: subject.trim() === '' ? 'Cleared the subject of the selected cells.' : `Set the subject of the selected cells to ${subject.trim()}.` });
+  };
+
+  /** The first columns of the series that the selected columns belong to: what a factor is set on. */
+  const selectedSeriesIds = (): string[] => {
+    const ids = new Set(selectedCells().map((c) => table.groups[c.col]?.id));
+    return xySeries(table).filter((s) => s.columns.some((col) => ids.has(col.id))).map((s) => s.id);
+  };
+  const setSelectionFactor = (factor: string) => {
+    setDialog(null);
+    const ids = selectedSeriesIds();
+    if (ids.length === 0) return;
+    run(factor.trim() === '' ? 'Clear factor' : 'Set factor', setFactor(table.id, ids, factor));
+    setMessage({ kind: 'info', text: factor.trim() === '' ? 'Cleared the factor of the selected series.' : `Set the factor of the selected series to ${factor.trim()}.` });
   };
 
   // ---- CSV
@@ -663,6 +677,11 @@ export function DataTableView({ table }: { table: DataTable }) {
         <button className="icon-text" onClick={() => setDialog('subject')} title="Subject: name the independent unit (a mouse, a plate) of the selected cells, so repeats of one unit are not taken for independent observations">
           Subject…
         </button>
+        {table.kind === 'grouped' && (
+          <button className="icon-text" onClick={() => setDialog('factor')} title="Factor: name the second grouping level of the selected series; series with the same factor are drawn together inside each category">
+            Factor…
+          </button>
+        )}
         <span className="sep" />
         <button className="icon-text" onClick={() => csvRef.current?.click()} title="Import CSV: choose a .csv or .tsv file, check what it will become, then replace this table with it (Undo restores it)">
           <ImportIcon /> Import CSV
@@ -860,6 +879,11 @@ export function DataTableView({ table }: { table: DataTable }) {
         const cells = selectedCells();
         const subjects = new Set(cells.map((c) => table.groups[c.col]?.observations[c.row]?.subject ?? ''));
         return <SubjectDialog cells={cells.length} current={subjects.size === 1 ? [...subjects][0] : ''} onSet={setSelectionSubject} onClose={() => setDialog(null)} />;
+      })()}
+      {dialog === 'factor' && (() => {
+        const ids = selectedSeriesIds();
+        const factors = new Set(xySeries(table).filter((s) => ids.includes(s.id)).map((s) => s.columns[0].factor ?? ''));
+        return <FactorDialog series={ids.length} current={factors.size === 1 ? [...factors][0] : ''} onSet={setSelectionFactor} onClose={() => setDialog(null)} />;
       })()}
       {dialog === 'exportCsv' && <ExportCsvDialog excluded={excludedCount(table)} onExport={exportCsv} onClose={() => setDialog(null)} />}
       {dialog === 'append' && <AppendRowsDialog room={rowRoom(table)} limit={MAX_TABLE_ROWS} onAppend={appendCount} onClose={() => setDialog(null)} />}

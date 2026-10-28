@@ -121,6 +121,7 @@ function parseTable(raw: unknown, path: string): DataTable {
       name: str(g.name, `${gp}.name`),
       title: typeof g.title === 'string' ? g.title : '',
       paletteIndex: typeof g.paletteIndex === 'number' ? g.paletteIndex : gi,
+      ...(typeof g.factor === 'string' && g.factor.trim() !== '' ? { factor: g.factor.trim() } : {}),
       observations,
     };
   });

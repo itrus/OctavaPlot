@@ -47,6 +47,8 @@ export interface Layout {
   y2Title: { x: number; y: number } | null;
   /** Band reserved below the X title (above a bottom legend): top y and height, pt; null when none was asked for. */
   extraBottom: { y: number; height: number } | null;
+  /** Band reserved under the category labels (the names of the factors of grouped bars): top y and height, pt; null when none was asked for. */
+  categoryRow: { y: number; height: number } | null;
   warnings: string[];
 }
 
@@ -65,6 +67,8 @@ export interface LayoutInput {
   y2TickLabels?: string[];
   /** Height in pt to reserve under the X axis title, for a table of numbers under the plot. */
   extraBottomPt?: number;
+  /** Height in pt to reserve under the category labels, for a second row of names. */
+  categoryRowPt?: number;
   /** Font of the chart's text (for measuring) and the extra distance of the chart title from the top edge. */
   fontFamily?: string;
   titleOffsetPt?: number;
@@ -213,7 +217,8 @@ export function computeLayout(input: LayoutInput): Layout {
   const xTickRotated = xAxis.visible && maxLabelWidth > slot * 0.92;
 
   const extra = input.extraBottomPt && input.extraBottomPt > 0 ? input.extraBottomPt : 0;
-  bottom += tickLabelBlock(xTickRotated) + xTitleBlock + extra;
+  const categoryRow = input.categoryRowPt && input.categoryRowPt > 0 && xAxis.visible ? input.categoryRowPt : 0;
+  bottom += tickLabelBlock(xTickRotated) + xTitleBlock + extra + categoryRow;
 
   let plot: Rect = { x: left, y: top, width: W - left - right, height: H - top - bottom };
   if (plot.width < MIN_PLOT || plot.height < MIN_PLOT) {
@@ -278,7 +283,7 @@ export function computeLayout(input: LayoutInput): Layout {
   }
 
   const extraBottom = extra > 0 ? { y: H - M - (showLegend && legend.position === 'bottom' ? legendHeight + 12 : 0) - extra, height: extra } : null;
-  return { plot, title: titleLayout, legend: legendLayout, xTickRotated, xTitle, yTitle, y2Title, extraBottom, warnings };
+  return { plot, title: titleLayout, legend: legendLayout, xTickRotated, xTitle, yTitle, y2Title, extraBottom, categoryRow: categoryRow > 0 ? { y: plot.y + plot.height + tickLabelBlock(xTickRotated), height: categoryRow } : null, warnings };
 }
 
 export const LEGEND_KEY = { width: LEGEND_KEY_WIDTH, gap: LEGEND_KEY_GAP };
