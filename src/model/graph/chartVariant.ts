@@ -14,10 +14,16 @@ export interface ChartVariant {
   survival?: Partial<SurvivalOptions>;
   /** A dot plot made with (true) or without (false) sideways spreading of the dots. */
   jitter?: boolean;
+  /** Grouped bars made with the columns grouped by series (separated: each series has its own group of columns). */
+  separated?: boolean;
   /** Grouped bars made with the values of each subject joined across the series inside each category. */
   subjectLines?: boolean;
   /** An XY chart made with its points joined as this says (for example one line for each subject). */
   lineConnect?: Chart['lineConnect'];
+  /** Bubbles made as bubble charts usually are: a large largest bubble, a little see-through so that overlaps can be read. */
+  bubbles?: boolean;
+  /** Offset traces made as figures usually are: the Y axis hidden and a scale bar in its place. */
+  offsetTraces?: boolean;
   /** A dot plot made with its dots grouped by subject (nested dots). */
   bySubject?: boolean;
   /** Grouped bars made as dots only: the bars are off, the replicate values are dots and a line marks the mean of each cell. */
@@ -37,7 +43,10 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
   if (variant.dotsOnly && chart.type === 'groupedBar') next.layers = chart.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showBars: false, showSymbols: true, showMeanLine: true } } : l));
   if (variant.jitter !== undefined && chart.type === 'scatter') next.jitter = { ...chart.jitter, enabled: variant.jitter };
   if (variant.bySubject !== undefined && chart.type === 'scatter') next.jitter = { ...next.jitter, bySubject: variant.bySubject };
+  if (variant.separated && chart.type === 'groupedBar') next.groupedBy = 'series';
   if (variant.subjectLines !== undefined && chart.type === 'groupedBar') next.pairs = { ...next.pairs, bySubject: variant.subjectLines };
+  if (variant.bubbles && chart.type === 'xyBubble') next.defaults = { ...chart.defaults, symbolSizePt: 36, symbolFillOpacity: 0.6 };
+  if (variant.offsetTraces && chart.type === 'xyOffset') next.yAxis = { ...next.yAxis, visible: false, scaleBar: true };
   if (variant.lineConnect !== undefined && isXy(chart)) next.lineConnect = variant.lineConnect;
   if (variant.fit?.band && isXy(chart)) next.fit = { ...chart.fit, band: variant.fit.band };
   return next;

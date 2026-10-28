@@ -1,4 +1,4 @@
-import type { ChartType, Group } from '../types';
+import type { Chart, ChartType, Group } from '../types';
 
 /**
  * Factors: a second grouping level inside each category of a grouped table. A series can name its factor (`Group.factor`, set on
@@ -66,6 +66,8 @@ export function factorLayout(series: ReadonlyArray<SeriesLike>): FactorLayout | 
     at += members.length;
     return { factor, series: members, start };
   });
+  // When every cluster holds one series, the factor already tells the series apart: each keeps its own colour (its place in the table), not the one of its place in a cluster.
+  if (clusters.every((c) => c.series.length === 1)) series.forEach((_, i) => (position[i] = i));
   return { clusters, slot, position, units: series.length + FACTOR_GAP * (clusters.length - 1) };
 }
 
@@ -73,7 +75,8 @@ export function factorLayout(series: ReadonlyArray<SeriesLike>): FactorLayout | 
  * The palette slot of a series: its place inside its cluster when the chart clusters its series by factor (so a series keeps the colour
  * of its place in every cluster), else where it sat in its table. `firstColumns` are the first columns of the series, in order.
  */
-export function seriesPaletteIndex(type: ChartType, firstColumns: ReadonlyArray<Pick<Group, 'factor' | 'seriesSlot'>>, i: number): number {
-  const layout = usesFactors(type) ? factorLayout(firstColumns.map((c) => ({ columns: [c] }))) : null;
+export function seriesPaletteIndex(chart: Pick<Chart, 'type' | 'groupedBy'>, firstColumns: ReadonlyArray<Pick<Group, 'factor' | 'seriesSlot'>>, i: number): number {
+  // With the columns grouped by series every series is a group of its own: no factor clusters, and each keeps its own colour.
+  const layout = usesFactors(chart.type) && chart.groupedBy !== 'series' ? factorLayout(firstColumns.map((c) => ({ columns: [c] }))) : null;
   return layout ? layout.position[i] : (firstColumns[i]?.seriesSlot ?? i);
 }

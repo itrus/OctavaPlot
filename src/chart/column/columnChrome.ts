@@ -4,6 +4,7 @@ import type { ChromeScene } from '../shared/scene/scene';
 import { compileCategoryChrome, lineAndSymbolKeys } from '../shared/scene/categoryChrome';
 import { referenceLinesOf } from '../shared/scene/referenceLines';
 import { keyMarkElement } from '../shared/parts/fillElements';
+import { bracketElements } from '../shared/parts/brackets';
 import { el } from '../shared/scene/sceneElement';
 
 /** The chrome of a chart of columns (bar, scatter, mean, box, violin, floating, paired). */
@@ -20,6 +21,8 @@ export function compileColumnScene(chart: Chart, model: ColumnModel): ChromeScen
     yScale: model.yScale,
     y2,
     categories: model.groups.map((g) => ({ key: g.groupId, centerX: g.centerX, label: g.label })),
+    // The comparison brackets stand in front of the data; one whose layer is hidden is not drawn.
+    extraFront: bracketElements(model.brackets, model.orient, new Set(chart.hiddenLayerIds)),
     // A reference line that is hidden by its layer is not drawn.
     references: referenceLinesOf(chart, { family: 'column', model }).placed.filter((l) => !chart.hiddenLayerIds.includes(`${l.line.id}:referenceLine`)),
     keysOf: (it, w) => {

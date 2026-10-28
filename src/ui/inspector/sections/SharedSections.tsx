@@ -13,17 +13,20 @@ import type { Chart, Group, Id } from '../../../model/types';
 import { useApp } from '../../../state/AppContext';
 import {
   addAnnotation,
+  addBracket,
   addReferenceLine,
   applyPalette,
   composeCommands,
   patchAnnotation,
   patchAxis,
   patchBothAxes,
+  patchBracket,
   patchChart,
   patchLegend,
   patchLook,
   patchReferenceLine,
   removeAnnotation,
+  removeBracket,
   removeReferenceLine,
   setDisplayName,
   setGroupOnGraph,
@@ -39,6 +42,7 @@ import { BarLabelSection, hasBarLabels } from './LookControls';
 import { LegendOrder } from './LegendOrder';
 import { LEGEND_MAX_COLUMNS, LEGEND_MAX_OFFSET_PT, legendColumns, legendOffset } from '../../../model/graph/legendEntries';
 import { displayName } from '../../../chart/shared/parts/names';
+import { prepareChartInput } from '../../../model/table/preparedChart';
 
 /**
  * Inspector pieces that do not depend on the kind of chart: titles and fonts, size and shape, legend, annotations and
@@ -74,6 +78,9 @@ export function TextSections({ chart, groups, yName, dual, axes = true }: { char
         </Field>
           </>
         )}
+        <div className="muted small">
+          In any text of the graph (titles, names, labels, annotations): a subscript {'H_{2}O'}, a superscript {'m^{2}'} or {'x^{-1}'}; Greek letters and symbols by name {'\\mu \\alpha \\Delta \\pm \\times \\deg'}, with {'{}'} to end a name ({'\\mu{}m'}). Text without a backslash or a brace is written as typed.
+        </div>
       </Section>
       {axes && (
       <Section title="Axis titles">
@@ -292,6 +299,49 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
   );
 }
 
+/** Comparison brackets: a bar joining two data sets with the label the owner supplies. Nothing is calculated from it. */
+function BracketsSection({ chart }: { chart: Chart }) {
+  const { run, project } = useApp();
+  if (!capabilitiesOf(chart.type).brackets) return null;
+  const groups = prepareChartInput(project, chart)?.table.groups ?? [];
+  const options = groups.map((g) => ({ value: g.id, label: displayName(chart, g.id, g.name) }));
+  // A bracket that joins a data set that is no longer on the graph says so, and can be pointed at another.
+  const optionsFor = (id: Id) => (options.some((o) => o.value === id) ? options : [...options, { value: id, label: '(not on this graph)' }]);
+  const add = () => run('Add comparison bracket', addBracket(chart.id, { id: newId('brk'), from: groups[0].id, to: groups[1].id, label: '', color: '#000000', widthPt: 2, fontSizePt: 24 }));
+  return (
+    <Section title="Comparison brackets">
+      <div className="button-row">
+        <button onClick={add} disabled={groups.length < 2}>+ Bracket between two data sets</button>
+      </div>
+      {chart.brackets.length === 0 && <div className="muted small">A bracket joins two data sets and shows the label you give it (a p-value, stars, "ns"). Nothing is calculated: the result is yours, from your own test. The axis is extended to fit the brackets, and brackets that overlap stand one above the other.</div>}
+      {chart.brackets.map((b, i) => {
+        const set = (label: string, patch: Parameters<typeof patchBracket>[2], key?: string) => run(label, patchBracket(chart.id, b.id, patch), key === undefined ? undefined : `brk:${b.id}:${key}`);
+        return (
+          <div key={b.id} className="annotation-card selected">
+            <Field label={`From (bracket ${i + 1})`}>
+              <SelectInput<string> value={b.from} options={optionsFor(b.from)} onChange={(v) => set('Bracket start', { from: v })} />
+            </Field>
+            <Field label="To">
+              <SelectInput<string> value={b.to} options={optionsFor(b.to)} onChange={(v) => set('Bracket end', { to: v })} />
+            </Field>
+            <Field label="Label" hint="What you want written above the bracket: a p-value, stars, ns">
+              <TextInput value={b.label} onChange={(v) => set('Bracket label', { label: v }, 'label')} />
+            </Field>
+            <Field label="Colour">
+              <ColorInput value={b.color} onChange={(v) => set('Bracket colour', { color: v }, 'color')} />
+            </Field>
+            <NumField label="Thickness" unit="pt" value={b.widthPt} min={0.2} max={40} onCommit={(v) => set('Bracket thickness', { widthPt: v }, 'width')} />
+            <NumField label="Label size" unit="pt" value={b.fontSizePt} min={4} max={200} onCommit={(v) => set('Bracket label size', { fontSizePt: v }, 'font')} />
+            <div className="button-row">
+              <button onClick={() => run('Delete comparison bracket', removeBracket(chart.id, b.id))}>Delete bracket</button>
+            </div>
+          </div>
+        );
+      })}
+    </Section>
+  );
+}
+
 /**
  * The annotations of a graph. `placer` (from the model of the graph) says where each one is drawn; with it a text can be anchored to
  * values on the axes instead of a place on the page. Without it (a graph with no model here) every text is placed on the page.
@@ -302,6 +352,7 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
     <div className="tab-body">
       {hasBarLabels(chart.type) && <BarLabelSection chart={chart} />}
       <ReferenceLinesSection chart={chart} />
+      <BracketsSection chart={chart} />
       <div className="button-row">
         <button
           onClick={() => {

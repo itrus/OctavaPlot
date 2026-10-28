@@ -16,12 +16,13 @@ export function compileGroupedScene(chart: Chart, model: GroupedModel): ChromeSc
     y: model.y,
     yScale: model.yScale,
     y2: null,
-    categories: model.categories.map((cat) => ({ key: cat.row, centerX: cat.centerX, label: cat.label })),
+    // Grouped by series: one tick and name for each column of each group; otherwise one for each category.
+    categories: model.axisColumns ?? model.categories.map((cat) => ({ key: cat.row, centerX: cat.centerX, label: cat.label })),
     // A reference line that is hidden by its layer is not drawn.
     // The names of the factors: a rule under each cluster of bars, and its name centred below it.
     extraFront: model.factorLabels.flatMap((f) => [
       el('path', [['d', `M${n2(f.x1 + 1)},${n2(f.y + 1)}H${n2(f.x2 - 1)}`], ['fill', 'none'], ['stroke', chart.axisColor], ['stroke-width', 1], ['stroke-opacity', chart.axisOpacity < 1 ? chart.axisOpacity : undefined]]),
-      el('text', [['x', n2((f.x1 + f.x2) / 2)], ['y', n2(f.y + 2 + chart.xAxis.tickFontSizePt * 0.9)], ['text-anchor', 'middle'], ['font-size', chart.xAxis.tickFontSizePt], ['font-weight', chart.xAxis.tickBold ? 'bold' : undefined], ['fill', chart.textColor]], { text: f.text }),
+      el('text', [['x', n2((f.x1 + f.x2) / 2)], ['y', n2(f.y + 2 + chart.xAxis.tickFontSizePt * 0.9)], ['text-anchor', 'middle'], ['font-size', n2(f.fontPt)], ['font-weight', chart.xAxis.tickBold ? 'bold' : undefined], ['fill', chart.textColor]], { text: f.text }),
     ]),
     references: referenceLinesOf(chart, { family: 'grouped', model }).placed.filter((l) => !chart.hiddenLayerIds.includes(`${l.line.id}:referenceLine`)),
     keysOf: (it, w) => {

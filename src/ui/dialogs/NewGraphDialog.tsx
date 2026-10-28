@@ -3,7 +3,7 @@ import { useRoving } from '../inspector/common/roving';
 import { buildAnyModel, ChartCanvas } from '../../chart/anyModel';
 
 import { applyVariant, previewFit, type ChartVariant } from '../../model/graph/chartVariant';
-import { GALLERY, availableItems, galleryCounts, visibleTabs, type GalleryItem } from '../../model/graph/chartGallery';
+import { GALLERY, availableItems, type GalleryItem } from '../../model/graph/chartGallery';
 import { inheritChart } from '../../model/graph/chartFormat';
 import { chartTypeInfo, tableTypeInfo } from '../../model/graph/chartTypes';
 import { createChart } from '../../model/defaults';
@@ -59,9 +59,8 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
   const [tableId, setTableId] = useState<Id>(firstTable.id);
   const table = tables.find((t) => t.id === tableId) ?? firstTable;
   const family = table.kind;
-  const [showPlanned, setShowPlanned] = useState(false);
-  const counts = galleryCounts();
-  const tabs = visibleTabs(family, showPlanned);
+  // Every graph is shown; the ones that cannot be made yet are locked.
+  const tabs = GALLERY[family];
   const [tabId, setTabId] = useState<string>(tabs[0].id);
   const tab = tabs.find((t) => t.id === tabId) ?? tabs[0];
   const [chosen, setChosen] = useState<string | null>(null);
@@ -191,13 +190,7 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
         </div>
       )}
 
-      <label className="choice-label">
-        <input type="checkbox" checked={showPlanned} onChange={(e) => setShowPlanned(e.target.checked)} />
-        <span>Show planned graphs ({counts.available} available, {counts.planned} planned)</span>
-      </label>
-
       <div className="gallery" role="radiogroup" aria-label="Graph" {...rovingItems.groupProps}>
-        {tab.items.length === 0 && <p className="muted">No graph of this kind can be created yet. Tick “Show planned graphs” to see what is planned.</p>}
         {tab.items.map((it, n) => {
           const locked = it.type === null;
           return (

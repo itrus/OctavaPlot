@@ -113,7 +113,7 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   const cellValue = (s: (typeof defs)[number], r: number): number | null => {
     const values = s.columns.map((c) => c.observations[r]?.value ?? null);
     let result: CellResult;
-    if (layoutKind.kind === 'single') {
+    if (layoutKind.kind === 'single' || layoutKind.kind === 'sized' || layoutKind.kind === 'vector') {
       const v = values[0] !== null && Number.isFinite(values[0]) ? values[0] : null;
       result = centreOnly || v === null ? { value: v, unavailable: null } : cellStatistic(values, o.summary as StatisticOnly);
     } else if (layoutKind.kind === 'replicates') {

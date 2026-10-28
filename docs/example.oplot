@@ -494,6 +494,8 @@
         "orientation": "vertical",
         "lineOrder": "auto",
         "lineConnect": "table",
+        "traceOffset": null,
+        "groupedBy": "category",
         "origin": {
           "x": null,
           "y": null
@@ -756,6 +758,7 @@
         ],
         "annotations": [],
         "referenceLines": [],
+        "brackets": [],
         "hiddenLayerIds": [],
         "rangeExcludedLayerIds": [],
         "layerOrder": [],

@@ -157,7 +157,7 @@ function FormatSketch({ id, layout }: { id: FormatId; layout: ReplicateLayout })
   }
 }
 
-type XyMode = 'single' | 'replicates' | 'summary';
+type XyMode = 'single' | 'replicates' | 'summary' | 'sized' | 'vector';
 
 /**
  * New data table. The format is chosen in the menu along the top (Column, Grouped, XY, Contingency and
@@ -172,7 +172,7 @@ export function NewTableDialog({ defaultSample, onCreate, onClose }: { defaultSa
   const current = FORMATS.find((f) => f.id === formatId) ?? FORMATS[0];
   // XY and grouped tables let you choose how each series is entered; the others have one way.
   const hasLayoutOptions = formatId === 'xy' || formatId === 'grouped';
-  const layout: ReplicateLayout = !hasLayoutOptions || mode === 'single' ? { kind: 'single' } : mode === 'replicates' ? { kind: 'replicates', n } : { kind: 'summary', format };
+  const layout: ReplicateLayout = !hasLayoutOptions || mode === 'single' ? { kind: 'single' } : mode === 'replicates' ? { kind: 'replicates', n } : mode === 'sized' ? { kind: 'sized' } : mode === 'vector' ? { kind: 'vector' } : { kind: 'summary', format };
   const create = () => {
     if (current.kind) onCreate(current.kind, { sample, layout });
   };
@@ -231,6 +231,16 @@ export function NewTableDialog({ defaultSample, onCreate, onClose }: { defaultSa
               />
               replicate values in side-by-side subcolumns
             </label>
+            {formatId === 'xy' && (
+              <label className="dlg-radio">
+                <input type="radio" name="mode" checked={mode === 'sized'} onChange={() => setMode('sized')} /> Enter a Y and a size for each point (bubbles)
+              </label>
+            )}
+            {formatId === 'xy' && (
+              <label className="dlg-radio">
+                <input type="radio" name="mode" checked={mode === 'vector'} onChange={() => setMode('vector')} /> Enter a Y, dX and dY for each point (vectors: arrows from X, Y to X + dX, Y + dY)
+              </label>
+            )}
             <label className="dlg-radio">
               <input type="radio" name="mode" checked={mode === 'summary'} onChange={() => setMode('summary')} /> Enter and plot error values already calculated elsewhere
             </label>

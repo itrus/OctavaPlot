@@ -17,6 +17,11 @@ export const ANALYSIS_TYPES: readonly AnalysisTypeInfo[] = [
     description: 'Number of values, quartiles and percentiles, mean, SD, SEM, coefficient of variation, geometric mean, skewness, kurtosis and confidence intervals, for each column of the table.',
   },
   {
+    kind: 'survival',
+    label: 'Survival summary',
+    description: 'For each group of a survival table: the number of subjects, events and censored, and the median survival time from the Kaplan-Meier estimate (or "Not reached").',
+  },
+  {
     kind: 'curvefit',
     label: 'Curve fit',
     description: 'Fits a line, a polynomial, an exponential, a peak or a dose-response (logistic) curve to each Y series of an XY table, with the parameters, their errors and confidence intervals, and the goodness of fit. A graph of the table can draw the curve and its band.',
@@ -28,8 +33,8 @@ export const analysisTypeInfo = (kind: AnalysisKind): AnalysisTypeInfo => ANALYS
 /** Table types a column analysis applies to: those whose columns hold measured values. Counts and 1/0 flags are not. */
 export const analysisApplies = (kind: TableKind): boolean => kind === 'column' || kind === 'xy' || kind === 'grouped';
 
-/** Whether an analysis of this kind can be made of a table of this type: a curve fit needs the X and Y of an XY table. */
-export const analysisKindApplies = (analysis: AnalysisKind, table: TableKind): boolean => (analysis === 'curvefit' ? table === 'xy' : analysisApplies(table));
+/** Whether an analysis of this kind can be made of a table of this type: a curve fit needs the X and Y of an XY table, a survival summary a survival table. */
+export const analysisKindApplies = (analysis: AnalysisKind, table: TableKind): boolean => (analysis === 'curvefit' ? table === 'xy' : analysis === 'survival' ? table === 'survival' : analysisApplies(table));
 
 export const analysesOf = (p: Pick<Project, 'analyses'>): Analysis[] => p.analyses ?? [];
 

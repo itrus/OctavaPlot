@@ -10,7 +10,8 @@ import { hasFactors, seriesPaletteIndex, usesFactors } from '../../model/table/f
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/graph/summary';
 import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from '../../stats/describe';
 import { tooltipFmt } from '../../chart/tooltip';
-import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection } from './sections/LookControls';
+import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, OffsetSection } from './sections/LookControls';
+import { autoOffsetStep } from '../../model/table/offset';
 import { DataSetOrder } from './sections/DataSetOrder';
 import { AxisStyleControls } from './sections/AxisStyleControls';
 import { IntervalFields, LineAtField } from './sections/SummaryControls';
@@ -124,10 +125,10 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const st: ChartStyle = useMemo(() => {
     if (!sample) return chart.defaults;
     const l = scope === 'all' ? { ...layer, groupOverrides: {}, objectOverrides: {} } : layer;
-    return resolveStyle(chart, l, { id: sample.id, paletteIndex: seriesPaletteIndex(chart.type, series, sampleIndex) });
+    return resolveStyle(chart, l, { id: sample.id, paletteIndex: seriesPaletteIndex(chart, series, sampleIndex) });
   }, [chart, layer, sample, sampleIndex, scope]);
   // The series the edits reach (hidden ones are not drawn, so they do not count as differing).
-  const inScope = series.map((g, i) => ({ id: g.id, paletteIndex: seriesPaletteIndex(chart.type, series, i) })).filter((g) => scopeIds.includes(g.id) && !chart.hiddenGroupIds.includes(g.id));
+  const inScope = series.map((g, i) => ({ id: g.id, paletteIndex: seriesPaletteIndex(chart, series, i) })).filter((g) => scopeIds.includes(g.id) && !chart.hiddenGroupIds.includes(g.id));
   const inScopeKey = inScope.map((g) => g.id).join();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const mixedStyle = useMemo(() => mixedStyleKeys(chart, layer, inScope), [chart, layer, inScopeKey]);
@@ -241,6 +242,11 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
               )}
 
               {usesFactors(chart.type) && (
+                <Field label="Group the columns by" hint="Category: the series stand side by side inside each category (the usual layout). Series: each series has its own group of columns, one column for each category, and its name is written under the group.">
+                  <SelectInput<'category' | 'series'> value={chart.groupedBy} options={[{ value: 'category', label: 'Category' }, { value: 'series', label: 'Series (separated)' }]} onChange={(v) => run('Group the columns by', patchLook(chart.id, { groupedBy: v }))} />
+                </Field>
+              )}
+              {usesFactors(chart.type) && chart.groupedBy === 'category' && (
                 <div className="muted small">
                   {hasFactors(series.map((g) => ({ columns: [g] })))
                     ? 'The series that share a factor are drawn together; each series keeps the colour of its place in the cluster. Change factors with Factor… in the data table.'
@@ -272,7 +278,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 <Field label="Shape" overridden={ov('symbolShape')}>
                   <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...SYMBOL_SHAPE_OPTIONS]} onChange={(v) => setStyle({ symbolShape: v })} />
                 </Field>
-                <NumField label="Size" unit="pt" value={st.symbolSizePt} min={2} max={80} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
+                <NumField label={chart.type === 'xyBubble' ? 'Largest bubble' : 'Size'} unit="pt" value={st.symbolSizePt} min={2} max={80} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} {...(chart.type === 'xyBubble' ? { hint: 'The diameter of the largest bubble of the chart; the area of the others follows their size.' } : {})} onCommit={(v) => setStyle({ symbolSizePt: v })} />
                 <NumField label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
                 <Field label="Border color" overridden={ov('symbolBorderColor')}>
                   <ColorInput value={st.symbolBorderColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolBorderColor: v })} />
@@ -405,6 +411,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
               <DimensionsSection chart={chart} />
               {(chart.type === 'groupedBar' || chart.type === 'groupedFloating' || chart.type === 'contingencyBars') && <ColumnLayoutSection chart={chart} spacing={false} baseline />}
               {chart.type === 'xyBars' && <ColumnLayoutSection chart={chart} spacing baseline numericX />}
+              {chart.type === 'xyOffset' && <OffsetSection chart={chart} autoStep={autoOffsetStep(table)} />}
             </div>
           )}
           {section === 'legend' && <LegendSection chart={chart} groups={series} />}

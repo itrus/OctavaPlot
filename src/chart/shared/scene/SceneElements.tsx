@@ -2,6 +2,8 @@ import { createElement, type ReactNode } from 'react';
 import { hitAttrs } from './hitTest';
 import { prefixed, scopeRefs, useSvgIdPrefix } from './idPrefix';
 import type { SceneElement } from './sceneElement';
+import { richPieces } from './richSvg';
+import { hasMarkup } from '../../../util/richText';
 
 /** `stroke-width` -> `strokeWidth`: React's name for the attribute; data- and aria- attributes are written as they are. */
 const reactName = (name: string): string => (name === 'class' ? 'className' : name.startsWith('data-') || name.startsWith('aria-') ? name : name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()));
@@ -18,6 +20,11 @@ function render(node: SceneElement, key: number, editor: boolean, selectedGroups
   if (editor && node.hit) Object.assign(props, hitAttrs(node.hit.kind, node.hit.groupId, node.hit.objectId, node.hit.annotationId));
   if (node.id !== undefined) props.id = prefixed(prefix, node.id);
   const children = node.children?.map((c, i) => render(c, i, editor, selectedGroups, selectedAnnotation, prefix));
+  // A text with markup (subscripts, superscripts, Greek names) is written as pieces; text without it is written exactly as it was.
+  if ((node.tag === 'text' || node.tag === 'tspan') && node.text !== undefined && hasMarkup(node.text)) {
+    const pieces = richPieces(node.text).map((p, i): ReactNode => (p.fontSize === undefined && p.dy === undefined ? p.text : createElement('tspan', { key: `r${i}`, ...(p.fontSize !== undefined ? { fontSize: p.fontSize } : {}), ...(p.dy !== undefined ? { dy: p.dy } : {}) }, p.text)));
+    return createElement(node.tag, props, ...pieces);
+  }
   return createElement(node.tag, props, ...(node.text !== undefined ? [node.text] : children ?? []));
 }
 

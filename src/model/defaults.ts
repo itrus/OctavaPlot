@@ -53,6 +53,9 @@ function axisTitlesFor(type: ChartType): { x: string; y: string } {
     case 'xySpikes':
     case 'xyArea':
     case 'xyBars':
+    case 'xyBubble':
+    case 'xyVector':
+    case 'xyOffset':
       return { x: 'X', y: 'Y' };
     case 'contingencyBars':
     case 'contingencyStacked':
@@ -200,6 +203,12 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
   xyArea: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   // Bars at numeric X: the bars layer draws them; there is no line or symbol unless asked for.
   xyBars: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
+  // Bubbles: the symbols, sized by the second column of each series.
+  xyBubble: { showBars: false, showSymbols: true, showLines: false, showMeanLine: false },
+  // Vectors: the line layer draws the arrows (shaft and head); the symbols at their starts are off until asked for.
+  xyVector: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
+  // Offset traces: lines, one above the other; the symbols are off until asked for.
+  xyOffset: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   groupedBar: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedStacked: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   groupedFloating: { showBars: true, showSymbols: false, showLines: false, showMeanLine: true },
@@ -288,6 +297,8 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     orientation: 'vertical',
     lineOrder: 'auto',
     lineConnect: 'table',
+    traceOffset: null,
+    groupedBy: 'category',
     origin: { x: null, y: null },
     bars: { ...DEFAULT_BARS },
     barLabels: { ...DEFAULT_BAR_LABELS },
@@ -309,6 +320,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     layers: [layer],
     annotations: [],
     referenceLines: [],
+    brackets: [],
     hiddenLayerIds: [],
     rangeExcludedLayerIds: [],
     layerOrder: [],
@@ -368,6 +380,10 @@ const XY_EXAMPLE_Y: Array<[string, number[]]> = [
  */
 function sampleSeriesColumns(layout: ReplicateLayout, base: number[]): number[][] {
   if (layout.kind === 'single') return [base];
+  // A sized table: the sizes of the bubbles, positive and varied, so the sample shows what the chart does.
+  if (layout.kind === 'sized') return [base, base.map((_, i) => 4 + ((i * 7) % 11))];
+  // A vector table: a step for each point, of different length and direction, so the sample shows the arrows.
+  if (layout.kind === 'vector') return [base, base.map((_, i) => Number((0.4 + (i % 3) * 0.3).toFixed(3))), base.map((v, i) => Number((((i % 2 === 0 ? 1 : -1) * Math.abs(v)) * 0.15).toFixed(3)))];
   if (layout.kind === 'replicates') {
     const offsets = [-0.12, 0.08, 0.15, -0.06, 0.1, -0.14, 0.04, 0.12, -0.09, 0.02];
     return Array.from({ length: layout.n }, (_, k) => base.map((v, i) => Number((v * (1 + offsets[(k * 3 + i) % offsets.length])).toFixed(3))));

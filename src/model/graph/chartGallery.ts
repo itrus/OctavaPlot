@@ -38,12 +38,11 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('xy.bars', 'Bars at numeric X', 'Bars placed at X values, with a baseline.', 'xyBars', 'xy.bars'),
         item('xy.area', 'Area under the curve', 'A filled area below, above or between curves.', 'xyArea', 'xy.area'),
         item('xy.spikes', 'Spikes', 'Thin lines from the baseline up to each point.', 'xySpikes', 'xy.spikes'),
-        item('xy.vector', 'Vectors', 'Arrows from the origin or between two points.', null, 'xy.vector'),
-        item('xy.bubble', 'Bubbles', 'Symbols sized or coloured by another column.', null, 'xy.bubble'),
+        item('xy.vector', 'Vectors', 'Arrows from (X, Y) to (X + dX, Y + dY): make the table with "Y, dX and dY"; from the origin is X = 0, Y = 0.', 'xyVector', 'xy.vector'),
+        item('xy.bubble', 'Bubbles', 'Symbols whose area follows a second column: make the table with "Y and size".', 'xyBubble', 'xy.bubble', { bubbles: true }),
         item('xy.trajectory', 'Repeated measures', 'One line per subject, for example before and after: name the subjects in the table (Subject…).', 'xyLineSymbols', 'xy.trajectory', { lineConnect: 'subject' }),
-        item('xy.offset', 'Offset traces', 'Several series stacked with a fixed offset and a scale bar.', null, 'xy.offset_traces'),
+        item('xy.offset', 'Offset traces', 'Several series stacked with a fixed offset and a scale bar.', 'xyOffset', 'xy.offset_traces', { offsetTraces: true }),
         item('curve.fit', 'Points with a fitted curve', 'A fitted line with its confidence band; choose another model in the panel.', 'xyScatter', 'curve.fit', { fit: { model: 'linear', band: 'confidence' } }),
-        item('curve.smooth', 'Smooth curve', 'A spline or LOWESS curve through the points.', null, 'curve.smooth'),
       ],
     },
   ],
@@ -93,7 +92,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       label: 'Individual values',
       items: [
         item('grp.scatterI', 'Interleaved scatter', 'Dots of every series side by side within each category.', 'groupedBar', 'category.grouped', { dotsOnly: true }),
-        item('grp.scatterS', 'Separated scatter', 'Dots of each series in its own group of columns.', null, 'category.grouped'),
+        item('grp.scatterS', 'Separated scatter', 'Dots of each series in its own group of columns, one column for each category.', 'groupedBar', 'category.grouped', { dotsOnly: true, separated: true }),
         item('grp.paired', 'Before and after, grouped', 'Subject lines inside each category: enter the values as replicates and name the subjects in the table (Subject…).', 'groupedBar', 'category.paired', { dotsOnly: true, subjectLines: true }),
       ],
     },
@@ -171,17 +170,3 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
 export const galleryItems = (kind: TableKind): GalleryItem[] => GALLERY[kind].flatMap((t) => t.items);
 export const availableItems = (kind: TableKind): GalleryItem[] => galleryItems(kind).filter((i) => i.type !== null);
 
-const KINDS = Object.keys(GALLERY) as TableKind[];
-
-/** How many graphs the gallery holds over all table types: those that can be made and those still planned. */
-export function galleryCounts(): { available: number; planned: number; total: number } {
-  const all = KINDS.flatMap(galleryItems);
-  const available = all.filter((i) => i.type !== null).length;
-  return { available, planned: all.length - available, total: all.length };
-}
-
-/** The tabs of a table type with only the graphs to show: the creatable ones, plus the planned ones when asked. Every tab is kept. */
-export const visibleTabs = (kind: TableKind, showPlanned: boolean): GalleryTab[] =>
-  GALLERY[kind].map((t) => ({ ...t, items: showPlanned ? t.items : t.items.filter((i) => i.type !== null) }));
-
-export const visibleItems = (kind: TableKind, showPlanned: boolean): GalleryItem[] => visibleTabs(kind, showPlanned).flatMap((t) => t.items);

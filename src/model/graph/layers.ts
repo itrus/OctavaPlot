@@ -11,7 +11,7 @@ import type { Chart, ChartStyle, ChartType, DataTable, Id, LayerStyle, LineStyle
  * decides about them (hidden, kept out of the axis range, their own look, their order) is kept on the chart by layer ID. Every family is
  * drawn from them. Which parts take a look (lookKeysOf) or a place in the axis range (rangeKindsOf) depends on the chart type.
  */
-export type LayerKind = 'atRisk' | 'band' | 'area' | 'bars' | 'distribution' | 'meanLine' | 'pairLines' | 'labels' | 'titles' | 'colourBar' | 'rawPoints' | 'points' | 'line' | 'errorBars' | 'fitCurve' | 'fitBand' | 'referenceLine' | 'annotation';
+export type LayerKind = 'atRisk' | 'band' | 'area' | 'bars' | 'distribution' | 'meanLine' | 'pairLines' | 'labels' | 'titles' | 'colourBar' | 'rawPoints' | 'points' | 'line' | 'errorBars' | 'fitCurve' | 'fitBand' | 'referenceLine' | 'bracket' | 'annotation';
 
 /** What a layer's numbers come from; a calculation is keyed by what it is computed from, never by how the layer is styled. */
 type CalcRef = { kind: 'summary'; seriesId: Id } | { kind: 'survival'; seriesId: Id } | { kind: 'curvefit'; analysisId: Id };
@@ -53,7 +53,8 @@ export function layersOf(chart: Chart, table: DataTable): LayerSpec[] {
   if (chartFamily(chart.type) === 'heatmap') return finishLayers(chart, heatLayers(chart, table));
   const out: Array<Omit<LayerSpec, 'z'>> = [];
   const bound = (seriesId: Id) => ({ tableId: table.id, seriesId });
-  const calc = layoutOf(table).kind !== 'single';
+  // Replicates and entered summaries have a calculation behind each point; a single value, or a value with a size, has none.
+  const calc = layoutOf(table).kind === 'replicates' || layoutOf(table).kind === 'summary';
   const analysisId = chart.fit.analysisId;
 
   for (const r of chart.referenceLines) {
@@ -180,7 +181,7 @@ function groupedLayers(chart: Chart, table: DataTable): Array<Omit<LayerSpec, 'z
   const type = chart.type;
   const layer = dataLayer(chart);
   const defs = xySeries(table);
-  const series = defs.map((s, i) => ({ s, style: resolveStyle(chart, layer, { id: s.id, paletteIndex: seriesPaletteIndex(type, defs.map((d) => d.columns[0]), i) }) }));
+  const series = defs.map((s, i) => ({ s, style: resolveStyle(chart, layer, { id: s.id, paletteIndex: seriesPaletteIndex(chart, defs.map((d) => d.columns[0]), i) }) }));
   // Error bars and individual values are part of the axis range only while they are on.
   const perSeries = (kind: LayerKind, on: boolean, visible: (st: ChartStyle) => boolean, calc = false, range: (st: ChartStyle) => boolean = () => true) =>
     on ? series.map(({ s, style }) => ({ id: `${s.id}:${kind}`, kind, binding: { tableId: table.id, seriesId: s.id }, calc: calc ? ({ kind: 'summary', seriesId: s.id } as CalcRef) : null, enabled: true, visible: visible(style), rangeContribution: range(style) })) : [];
@@ -241,6 +242,8 @@ function columnLayers(chart: Chart, table: DataTable): Array<Omit<LayerSpec, 'z'
     ...chart.referenceLines.map((r) => ({ id: `${r.id}:referenceLine`, kind: 'referenceLine' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: false })),
     ...parts,
     ...labels,
+    // The brackets are drawn above the data and their room is part of the axis range (hiding one moves nothing).
+    ...chart.brackets.map((b) => ({ id: `${b.id}:bracket`, kind: 'bracket' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: true })),
     ...chart.annotations.map((a) => ({ id: `${a.id}:annotation`, kind: 'annotation' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: false })),
   ];
 }
@@ -296,6 +299,7 @@ const LAYER_NAMES: Record<LayerKind, string> = {
   fitCurve: 'Fit curve',
   fitBand: 'Fit band',
   referenceLine: 'Reference line',
+  bracket: 'Comparison bracket',
   annotation: 'Annotation',
 };
 
@@ -313,6 +317,9 @@ export function rangeKindsOf(type: ChartType): ReadonlyArray<LayerKind> {
     case 'xySpikes':
     case 'xyArea':
     case 'xyBars':
+    case 'xyBubble':
+    case 'xyVector':
+    case 'xyOffset':
       return ['points', 'rawPoints', 'errorBars', 'fitCurve'];
     case 'bar':
     case 'scatter':
@@ -434,10 +441,13 @@ export function layerRows(chart: Chart, table: DataTable, seriesName: (id: Id, f
   const family = chartFamily(chart.type);
   const lineOf = new Map(chart.referenceLines.map((r) => [`${r.id}:referenceLine`, r]));
   const noteOf = new Map(chart.annotations.map((a) => [`${a.id}:annotation`, a]));
+  const bracketOf = new Map(chart.brackets.map((b) => [`${b.id}:bracket`, b]));
   const labelOf = (layer: LayerSpec): string => {
     const r = lineOf.get(layer.id);
     if (r) return `${LAYER_NAMES.referenceLine}: ${r.axis.toUpperCase()} = ${r.value}`;
     const a = noteOf.get(layer.id);
+    const br = bracketOf.get(layer.id);
+    if (br) return `${LAYER_NAMES.bracket}: ${br.label.trim() !== '' ? br.label.trim() : 'no label'}`;
     if (a) {
       const text = a.text.replace(/\s+/g, ' ').trim();
       return `${LAYER_NAMES.annotation}: ${text.length > 24 ? `${text.slice(0, 24)}…` : text || '(empty)'}`;
@@ -574,7 +584,7 @@ export function layerBaseStyle(chart: Chart, table: DataTable, layer: Pick<Layer
   }
   const series = xySeries(table);
   const at = series.findIndex((s) => s.id === id);
-  return at < 0 ? null : resolveStyle(chart, dataLayer(chart), { id, paletteIndex: seriesPaletteIndex(chart.type, series.map((d) => d.columns[0]), at) });
+  return at < 0 ? null : resolveStyle(chart, dataLayer(chart), { id, paletteIndex: seriesPaletteIndex(chart, series.map((d) => d.columns[0]), at) });
 }
 
 /** The look the Layers section shows for a layer that takes one: its own settings, else those of its series. */

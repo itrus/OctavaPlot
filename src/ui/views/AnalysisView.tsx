@@ -12,6 +12,7 @@ import { copyText, downloadBlob, exportFileName } from '../../util/download';
 import { NumField } from '../inspector/common/controls';
 import { ExportIcon } from '../components/icons';
 import { SheetTable, sheetText, useSheetSelection } from './ResultsSheet';
+import { survivalSheet } from './survivalSheet';
 
 const LEVELS = [0.9, 0.95, 0.99] as const;
 
@@ -46,7 +47,7 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
   const table = analysis ? project.dataTables.find((t) => t.id === analysis.dataTableId) : undefined;
   const sheet = useMemo<Sheet | null>(() => {
     if (!analysis || !table || !analysisKindApplies(analysis.kind, table.kind)) return null;
-    return analysis.kind === 'curvefit' ? curveFitSheet(table, analysis) : descriptiveSheet(analysis, table);
+    return analysis.kind === 'curvefit' ? curveFitSheet(table, analysis) : analysis.kind === 'survival' ? survivalSheet(table) : descriptiveSheet(analysis, table);
   }, [analysis, table]);
   const selection = useSheetSelection(sheet ?? { corner: '', columns: [], rows: [] }, setStatus);
 
@@ -55,6 +56,7 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
     return <div className="empty">The table of this analysis is gone, or is of a kind this analysis does not apply to.</div>;
   }
   const curveFit = analysis.kind === 'curvefit';
+  const survival = analysis.kind === 'survival';
   const model = fitModelById(analysis.model ?? 'linear');
 
   const exportCsv = () => {
@@ -96,6 +98,7 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
             )}
           </>
         )}
+        {!survival && (
         <label className="inline-label">
           Confidence level
           <select value={analysis.level} onChange={(e) => run('Change confidence level', patchAnalysis(analysis.id, { level: Number(e.target.value) }))} aria-label="Confidence level">
@@ -104,6 +107,7 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
             ))}
           </select>
         </label>
+        )}
         <span className="sep" />
         <button className="icon-text" onClick={exportCsv} title="Download these results as a .csv file">
           <ExportIcon /> Export CSV
@@ -123,12 +127,14 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
       </div>
       <div className="results-scroller" tabIndex={0} onKeyDown={selection.onKeyDown} onCopy={selection.onCopy} onMouseUp={selection.release} onMouseLeave={selection.release} aria-label="Results: select cells and press Ctrl+C to copy">
         {sheet.columns.length === 0 ? (
-          <div className="empty">{curveFit ? 'The table has no Y series to fit.' : 'The table has no columns to analyse.'}</div>
+          <div className="empty">{curveFit ? 'The table has no Y series to fit.' : survival ? 'The table has no groups.' : 'The table has no columns to analyse.'}</div>
         ) : (
           <SheetTable sheet={sheet} selection={selection} />
         )}
         <p className="muted small results-note">
-          {curveFit
+          {survival
+            ? 'The median is the first time at which the Kaplan-Meier estimate is 0.5 or below, the estimate the survival chart draws; "Not reached" means the curve never gets there (too few events, or most subjects censored). A subject censored at a tied time is still at risk at that time. Entries that are neither 1 (event) nor 0 (censored), and subjects with no valid time (a number, 0 or more), are left out and counted in the last row. No interval is given for the median.'
+            : curveFit
             ? 'Every replicate is a point of the fit; a series entered as means is fitted to the means. Rows with a missing X or Y are left out. The error and the intervals come from the covariance of the parameters (a linear approximation for the curved models), with t-based intervals; they are empty when the points leave no degrees of freedom. A fit that does not settle says so under Notes.'
             : 'Missing cells are left out, not counted as zero. A statistic that cannot be calculated from the values (too few values, or a geometric mean of values that are not all positive) is left empty. Percentiles are the (n + 1) p kind; the median interval is the exact order-statistic one and shows the coverage it actually reaches.'}
         </p>

@@ -39,7 +39,7 @@ export function fitObservations(source: DataTable): Array<{ id: Id; label: strin
       const x = xs[row];
       if (x === null || x === undefined || !Number.isFinite(x)) continue;
       const values = s.columns.map((c) => c.observations[row]?.value ?? null);
-      if (layout.kind === 'single') {
+      if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'vector') {
         if (values[0] !== null && Number.isFinite(values[0])) obs.push({ x, y: values[0] });
       } else if (layout.kind === 'replicates') {
         for (const v of values) if (v !== null && Number.isFinite(v)) obs.push({ x, y: v });

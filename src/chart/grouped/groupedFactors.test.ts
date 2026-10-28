@@ -57,8 +57,38 @@ describe('factor clusters: the layout', () => {
   });
   it('a series keeps the colour of its place in its cluster; chart types that do not cluster keep the plain colours', () => {
     const cols = fac('WT', 'WT', 'KO', 'KO').map((c) => c.columns[0]);
-    expect([0, 1, 2, 3].map((i) => seriesPaletteIndex('groupedBar', cols, i))).toEqual([0, 1, 0, 1]);
-    expect([0, 1, 2, 3].map((i) => seriesPaletteIndex('groupedStacked', cols, i))).toEqual([0, 1, 2, 3]);
+    expect([0, 1, 2, 3].map((i) => seriesPaletteIndex({ type: 'groupedBar', groupedBy: 'category' }, cols, i))).toEqual([0, 1, 0, 1]);
+    expect([0, 1, 2, 3].map((i) => seriesPaletteIndex({ type: 'groupedStacked', groupedBy: 'category' }, cols, i))).toEqual([0, 1, 2, 3]);
+    // Grouped by series every series is a group of its own and keeps its own colour.
+    expect([0, 1, 2, 3].map((i) => seriesPaletteIndex({ type: 'groupedBar', groupedBy: 'series' }, cols, i))).toEqual([0, 1, 2, 3]);
+  });
+});
+
+describe('factors that name one series each', () => {
+  it('leave each series its own colour, since the factor already tells them apart', () => {
+    const l = factorLayout(fac('WT', 'KO'))!;
+    expect(l.position).toEqual([0, 1]);
+    const cols = fac('WT', 'KO', 'HET').map((c) => c.columns[0]);
+    expect([0, 1, 2].map((i) => seriesPaletteIndex({ type: 'groupedBar', groupedBy: 'category' }, cols, i))).toEqual([0, 1, 2]);
+    // With two series in a cluster the colour is the place in the cluster again.
+    expect(factorLayout(fac('WT', 'WT', 'KO'))!.position).toEqual([0, 1, 0]);
+  });
+});
+
+describe('the names of the factors fit their clusters', () => {
+  it('are written at the tick size when they fit, and smaller (not below 60%) when they are wider than their cluster', () => {
+    const p = setup();
+    const tick = chartOf(p).xAxis.tickFontSizePt;
+    const wide = Math.max(...model(p).factorLabels.map((f) => f.fontPt));
+    expect(wide).toBeLessThanOrEqual(tick);
+    const series = xySeries(tableOf(p));
+    const long = setFactor('t', series.slice(0, 2).map((s) => s.id), 'A factor with a very long name indeed')(p);
+    const sizes = model(long).factorLabels.filter((f) => f.text.startsWith('A factor')).map((f) => f.fontPt);
+    expect(sizes.length).toBeGreaterThan(0);
+    for (const size of sizes) {
+      expect(size).toBeLessThan(tick);
+      expect(size).toBeGreaterThanOrEqual(tick * 0.6 - 1e-9);
+    }
   });
 });
 

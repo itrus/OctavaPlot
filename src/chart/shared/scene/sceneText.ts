@@ -1,9 +1,10 @@
+import { plainText } from '../../../util/richText';
 import { annotationElements } from './annotations';
 import type { ChartDrawing } from './SceneChart';
 import type { SceneElement } from './sceneElement';
 
 const textsOf = (nodes: ReadonlyArray<SceneElement>): string[] =>
-  nodes.flatMap((n) => [...(n.tag === 'text' || n.tag === 'tspan' ? (n.text !== undefined ? [n.text] : []) : []), ...textsOf(n.children ?? [])]);
+  nodes.flatMap((n) => [...(n.tag === 'text' || n.tag === 'tspan' ? (n.text !== undefined ? [plainText(n.text)] : []) : []), ...textsOf(n.children ?? [])]);
 
 /**
  * Every text a drawing writes (titles, tick labels, legend entries, labels, annotations, ...), one string for each text element

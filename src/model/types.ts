@@ -67,7 +67,11 @@ export type ReplicateLayout =
   /** `n` replicate values in side-by-side sub-columns; the chart shows their centre and spread. */
   | { kind: 'replicates'; n: number }
   /** Centre and error already calculated elsewhere (spec 2.3, supplied summary). */
-  | { kind: 'summary'; format: SummaryFormat };
+  | { kind: 'summary'; format: SummaryFormat }
+  /** XY tables: a Y and a size for each point, in two columns (the size of a bubble); one value for each point, no replicates. */
+  | { kind: 'sized' }
+  /** XY tables: a Y and a step (dX, dY) for each point, in three columns: an arrow from (X, Y) to (X + dX, Y + dY). */
+  | { kind: 'vector' };
 
 export interface DataTable {
   id: Id;
@@ -97,6 +101,9 @@ export type ChartType =
   | 'xyLineSymbols'
   | 'xySpikes'
   | 'xyBars'
+  | 'xyBubble'
+  | 'xyVector'
+  | 'xyOffset'
   | 'xyArea'
   | 'groupedBar'
   | 'groupedLine'
@@ -421,6 +428,9 @@ export interface InsideBarLabel {
 export type LineOrder = 'auto' | 'onTop' | 'underneath';
 /** The order an XY line joins its points in: the rows of the table, or ascending X. */
 /** How the points of an XY series are joined: as the rows run, from the lowest X to the highest, or one line for each subject (in ascending X). */
+/** Grouped bars, boxes and violins: the columns of a category stand together (by category), or the columns of a series do, one for each category (by series). */
+export type GroupedBy = 'category' | 'series';
+
 export type LineConnect = 'table' | 'x' | 'subject';
 export type LineStyle = 'solid' | 'longDash' | 'dashed' | 'dotted' | 'dashDot' | 'dashDotDot';
 /** The frame round the plotting region: none, or a box (spec 6.2 frame.mode). */
@@ -551,6 +561,22 @@ export interface ReferenceLine {
   showLabel: boolean;
 }
 
+/**
+ * A comparison bracket: a bar joining two data sets of a chart over columns, with the label the owner of the figure supplies (a p-value,
+ * stars, "ns"). Nothing is calculated from it. `from` and `to` are the IDs of the two data sets, so the bracket stays on them when
+ * they are reordered or renamed.
+ */
+export interface Bracket {
+  id: Id;
+  from: Id;
+  to: Id;
+  label: string;
+  color: string;
+  widthPt: number;
+  /** Size of the label, pt. */
+  fontSizePt: number;
+}
+
 export interface Annotation {
   id: Id;
   text: string;
@@ -641,6 +667,10 @@ export interface Chart {
   lineOrder: LineOrder;
   /** XY lines and areas: join the points in table order (a missing value breaks the line) or in ascending X (a missing Y still breaks it). */
   lineConnect: LineConnect;
+  /** Offset traces (chart type `xyOffset`): trace i is lifted by i times this, in Y units; null = automatic (see model/table/offset.ts). */
+  traceOffset: number | null;
+  /** Grouped bars of side-by-side series: the columns grouped by category (the usual layout) or by series (separated: each series has its own group of columns). */
+  groupedBy: GroupedBy;
   /** Where the axis lines cross, as values on the other axis (null = the low edge): the Y axis at this X, the X axis at this Y. */
   origin: { x: number | null; y: number | null };
   bars: BarLayout;
@@ -665,6 +695,8 @@ export interface Chart {
   annotations: Annotation[];
   /** Lines at chosen values of the axes. */
   referenceLines: ReferenceLine[];
+  /** Comparison brackets between two data sets (charts over columns). */
+  brackets: Bracket[];
   /** IDs of layers (see model/graph/layers.ts) that are not drawn. Hiding changes nothing that is calculated. */
   hiddenLayerIds: Id[];
   /** Layers whose values the axis range is not fitted to (the layer is still drawn); see rangeContribution in model/graph/layers.ts. */
@@ -691,7 +723,7 @@ export interface LayerStyle {
 }
 
 /** The analyses of the Results section: descriptive statistics of each column, and curve fits of an XY table. */
-export type AnalysisKind = 'descriptive' | 'curvefit';
+export type AnalysisKind = 'descriptive' | 'curvefit' | 'survival';
 
 /** An analysis of one data table. Its results are never stored: they are recalculated from the table each time. */
 export interface Analysis {

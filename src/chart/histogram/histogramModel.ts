@@ -6,7 +6,7 @@ import type { Chart, DataTable } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { autoBinWidth, binEdges, binHeights, countBins, ecdfSteps } from '../../stats/histogram';
 import { sortedFinite } from '../../stats/distribution';
-import { axisMapper, resolveAxis } from '../shared/axes/axisScale';
+import { axisMapper, resolveAxis, stepPathThroughBreaks } from '../shared/axes/axisScale';
 import { computeLayout } from '../shared/parts/layout';
 import type { XyModel, XyPoint, XySeries } from '../xy/xyModel';
 import { displayName } from '../shared/parts/names';
@@ -125,6 +125,12 @@ export function buildHistogramModel(chart: Chart, table: DataTable): XyModel {
       }
       path += `H${n2(xScale(right))}`;
       void after;
+      // On a broken axis a step whose X lies in an omitted range is not drawn at the edge of the gap: the line is cut there instead.
+      const corners: Array<{ x: number; y: number }> = [{ x: left, y: before }];
+      let held = before;
+      for (const p of points) corners.push({ x: p.x, y: held }, { x: p.x, y: (held = p.y) });
+      corners.push({ x: right, y: held });
+      path = stepPathThroughBreaks(corners, xAxis, yAxis, xScale, yScale, n2) ?? path;
     }
     return { ...base, points, linePath: path };
   });

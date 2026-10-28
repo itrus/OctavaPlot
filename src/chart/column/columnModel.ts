@@ -10,7 +10,9 @@ import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { statsFor, summarize, type GroupStats, type GroupSummary, type Notice } from '../../stats/summary';
-import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, populateAxes, type RangeRow } from '../shared/axes/axes';
+import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, groupRangeContribution, populateAxes, type RangeRow } from '../shared/axes/axes';
+import type { BracketGeom } from '../shared/parts/brackets';
+import { placeBrackets } from './bracketPlacement';
 import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, errorEndValues, type ErrorBarGeom } from '../shared/parts/errorGeometry';
 import { countMarks, patternMarks, type Point, type Rect } from '../shared/parts/hatch';
 import { computeLayout, type Layout } from '../shared/parts/layout';
@@ -126,6 +128,8 @@ export interface ColumnModel {
   groups: GroupGeom[];
   /** Paired plots: the line of each subject across the data sets, in the virtual drawing like every other shape. */
   pairLines: PairLine[];
+  /** Comparison brackets between data sets, in the vertical drawing (see model/types.ts Bracket). */
+  brackets: BracketGeom[];
   /** Index into `groups` of each legend entry, in legend order. */
   legendGroups: number[];
   /** Point labels; always present, empty while none is requested. They never affect ranges, summaries or layout. */
@@ -244,6 +248,24 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     };
   });
   const pools = populateAxes(rangeRows, chart.type);
+  // Comparison brackets: each stands above the data sets it joins (and above the brackets it overlaps), and the axis is extended to show it
+  // and its label. A bracket that is hidden still takes its room, so hiding one moves nothing.
+  const placement = placeBrackets({
+    brackets: chart.brackets,
+    order: rows.map((r) => r.group.id),
+    tops: rangeRows.map((r) => {
+      const v = groupRangeContribution(r, chart.type).values;
+      return v.length > 0 ? Math.max(...v) : null;
+    }),
+    primary: rows.map((r) => r.binding === 'primary'),
+    log: axisConfigFor(chart, 'primary').scale !== 'linear',
+    values: pools.primary.values,
+    includeZero: pools.primary.hasBars && axisConfigFor(chart, 'primary').scale === 'linear',
+    // The value axis is the length of the chart (its width for a horizontal chart) less the margins, the title and the labels: about 60%.
+    plotLengthPt: (horizontal ? widthPt : heightPt) * 0.6,
+  });
+  for (const s of placement.skipped) warnings.push(`Bracket "${s.bracket.label.trim() || 'no label'}" is not drawn: ${s.reason}.`);
+  for (const p of placement.placed) pools.primary.values.push(p.top);
   const dual = pools.secondaryInUse;
   const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? widthPt / 120 : heightPt / 100)));
   const axisScaleFor = (binding: AxisBinding): YAxisScale => {
@@ -753,7 +775,14 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     );
   }
 
-  const model: ColumnModel = { widthPt, heightPt, layout, orient, y, yScale, y2, y2Scale, clipped, groups, pairLines, legendGroups, labels, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
+  // The brackets as geometry: the two data sets' places across, and the height of the bar on the left axis (not inside an omitted range).
+  const brackets: BracketGeom[] = placement.placed.flatMap((p) => {
+    const { scale, toY } = axisOf('primary');
+    const at = toY(p.value);
+    if (!Number.isFinite(at) || inBreak(scale, p.value)) return [];
+    return [{ id: p.bracket.id, label: p.bracket.label, x1: groups[p.i].centerX, x2: groups[p.j].centerX, y: at, tick: Math.max(6, p.bracket.fontSizePt * 0.6), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
+  });
+  const model: ColumnModel = { widthPt, heightPt, layout, orient, y, yScale, y2, y2Scale, clipped, groups, pairLines, brackets, legendGroups, labels, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileColumnScene(chart, model);
   // The marks are compiled when a drawing, an export or a hit test first asks for them, so a model that is only measured does not pay for them.
   let marks: SceneElement[] | undefined;

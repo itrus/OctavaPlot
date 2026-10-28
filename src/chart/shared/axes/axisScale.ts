@@ -344,6 +344,27 @@ export function polylinesThroughBreaks(seq: ReadonlyArray<DataPoint | null>, xAx
 }
 
 /** Path data for lines cut by polylinesThroughBreaks: one stroke for each run of two points or more, Y mapped from data to the page. */
+/**
+ * The path of a step function through the breaks of its axes. `vertices` are the corners of the steps in data units, in order (level, then
+ * drop). On a broken axis the line is cut in data space where it meets a gap, so a drop whose time lies in an omitted range is not drawn
+ * at the edge of the gap as if it happened there: the level before it ends at one edge, the new level begins at the other.
+ * Returns null when no axis is broken, so the caller keeps the plain path (and the same output as before).
+ */
+export function stepPathThroughBreaks(
+  vertices: ReadonlyArray<DataPoint>,
+  xAxis: Pick<YAxisScale, 'segments' | 'log' | 'reverse'>,
+  yAxis: Pick<YAxisScale, 'segments' | 'log' | 'reverse'>,
+  toX: (v: number) => number,
+  toY: (v: number) => number,
+  fmt: (v: number) => number | string = (v) => v,
+): string | null {
+  if (dataGaps(xAxis).length === 0 && dataGaps(yAxis).length === 0) return null;
+  return polylinesThroughBreaks(vertices, xAxis, yAxis)
+    .filter((run) => run.length >= 2)
+    .map((run) => run.map((p, i) => `${i === 0 ? 'M' : 'L'}${fmt(toX(p.x))},${fmt(toY(p.y))}`).join(''))
+    .join('');
+}
+
 export function pathOfRuns(runs: ReadonlyArray<ReadonlyArray<DataPoint>>, toY: (v: number) => number, fmt: (v: number) => number | string = (v) => v): string {
   return runs
     .filter((run) => run.length >= 2)

@@ -77,7 +77,7 @@ function pathsOf(chart: Chart, s: XySeries, layerId: Id, kind: LayerKind): Scene
       if (!st.showSymbols) return [];
       return s.points.map((p) => ({
         id: svgId(base, p.id),
-        d: symbolPath(st.symbolShape, p.px, p.py, st.symbolSizePt),
+        d: symbolPath(st.symbolShape, p.px, p.py, p.diameterPt ?? st.symbolSizePt),
         fill: st.symbolColor,
         fillOpacity: st.symbolFillOpacity < 1 ? st.symbolFillOpacity : undefined,
         stroke: st.symbolBorderColor,
@@ -120,6 +120,8 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
     ...numericAxisElements({ ...axis, cfg: ya, scale: y, along: 'y', crossing: yCross, pieces: yPieces, gaps: axisGaps(y, bottom, -plot.height), map: yScale }),
     ...numericAxisElements({ ...axis, cfg: xa, scale: x, along: 'x', crossing: xCross, pieces: xPieces, gaps: axisGaps(x, plot.x, plot.width), map: xScale }),
     ...[frameElement(chart, plot, ya.lineWidthPt), scaleBarElement(chart, xa, 'x', x, xScale, plot), scaleBarElement(chart, ya, 'y', y, yScale, plot)].flatMap((e) => (e ? [e] : [])),
+    // Offset traces: the sentence that tells the offset stands in the row the layout reserved under the X axis title, centred under the plot.
+    ...(model.offsetNote && layout.extraBottom ? [el('text', [['x', n2(plot.x + plot.width / 2)], ['y', n2(layout.extraBottom.y + ya.tickFontSizePt * 1.2)], ['text-anchor', 'middle'], ['font-size', ya.tickFontSizePt], ['fill', chart.textColor]], { text: model.offsetNote })] : []),
     ...titleElements(chart, layout, xa, ya),
     ...(model.atRisk && !hidden.has(`${chart.id}:atRisk`) ? atRiskElements(chart, model.atRisk, plot.x, plot.x - labelOffset(ya) - Y_TICK_LABEL_GAP) : []),
     ...legendElements(chart, layout, (it, w) => {

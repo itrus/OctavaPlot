@@ -36,6 +36,8 @@ export const layoutOf = (table: Pick<DataTable, 'layout'>): ReplicateLayout => t
 export function seriesWidth(layout: ReplicateLayout): number {
   if (layout.kind === 'replicates') return layout.n;
   if (layout.kind === 'summary') return summaryFormatInfo(layout.format).columns.length;
+  if (layout.kind === 'sized') return 2;
+  if (layout.kind === 'vector') return 3;
   return 1;
 }
 
@@ -43,6 +45,8 @@ export function seriesWidth(layout: ReplicateLayout): number {
 export function subLabels(layout: ReplicateLayout): string[] {
   if (layout.kind === 'replicates') return Array.from({ length: layout.n }, (_, i) => `Y${i + 1}`);
   if (layout.kind === 'summary') return summaryFormatInfo(layout.format).columns;
+  if (layout.kind === 'sized') return ['Y', 'Size'];
+  if (layout.kind === 'vector') return ['Y', 'dX', 'dY'];
   return ['Y'];
 }
 

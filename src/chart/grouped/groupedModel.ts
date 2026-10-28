@@ -5,7 +5,8 @@ import { legendEntries } from '../../model/graph/legendEntries';
 import { resolveSummary } from '../../model/graph/summary';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
 import { hasSubjects } from '../../model/table/subjects';
-import { factorLayout, seriesPaletteIndex, usesFactors } from '../../model/table/factors';
+import { measureText } from '../shared/parts/text';
+import { FACTOR_GAP, factorLayout, hasFactors, seriesPaletteIndex, usesFactors } from '../../model/table/factors';
 import type { Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
 import { resolveBarFill } from '../../model/graph/fill';
 import { chartPx2Pt, extent, n2 } from '../../model/units';
@@ -111,6 +112,8 @@ interface GroupedFactorLabel {
   x1: number;
   x2: number;
   y: number;
+  /** The size the name is written at: the tick size, smaller (to 60%) when the name is wider than its cluster. */
+  fontPt: number;
 }
 
 export interface GroupedModel {
@@ -129,6 +132,8 @@ export interface GroupedModel {
   pairLines: GroupedPairLine[];
   /** The names of the factors under their clusters (see model/table/factors.ts); none when no series names a factor. */
   factorLabels: GroupedFactorLabel[];
+  /** Grouped by series: where each column stands along the axis (one for each series and category) and its category name; absent when grouped by category. */
+  axisColumns?: Array<{ key: string; centerX: number; label: string }>;
   /** Index into `series` of each legend entry. */
   legendSeries: number[];
   warnings: string[];
@@ -162,7 +167,9 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const warnings: string[] = [];
   const seriesDefs = xySeries(table);
   // Series that name the same factor are drawn together: the clusters (null when none does, or the chart has no side-by-side bars).
-  const clusters = usesFactors(chart.type) && !contingency ? factorLayout(seriesDefs) : null;
+  // Separated: the columns of a series stand together, one for each category, and the series follow each other (instead of the series standing side by side inside each category).
+  const separated = usesFactors(chart.type) && !contingency && chart.groupedBy === 'series';
+  const clusters = usesFactors(chart.type) && !contingency && !separated ? factorLayout(seriesDefs) : null;
   const labelOfRow = (r: number) => rowTitleAt(table, r).trim() || `row ${r + 1}`;
 
   // 1. Categories: rows with a title or any value.
@@ -177,7 +184,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   let negative = 0;
   const noError: string[] = [];
   const raw = seriesDefs.map((s, si) => {
-    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: seriesPaletteIndex(chart.type, seriesDefs.map((d) => d.columns[0]), si) });
+    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: seriesPaletteIndex(chart, seriesDefs.map((d) => d.columns[0]), si) });
     const spec = resolveSummary(layer, s.id);
     let meaning: string | null = null;
     const cells = categoryRows.map((r, ci) => {
@@ -189,7 +196,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         if (v !== null && v < 0) negative++;
         value = v === null || v < 0 ? null : v;
         if (value !== null && arrangement === 'percent') value = rowTotals[ci] > 0 ? (value / rowTotals[ci]) * 100 : null;
-      } else if (layout.kind === 'single') value = values[0];
+      } else if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'vector') value = values[0];
       else if (layout.kind === 'replicates') {
         stats = summaryOf(values, spec);
         value = stats.centre;
@@ -276,6 +283,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   // 4. Layout with the category labels along the X axis.
   const legendSeries = legendEntries(chart.legend, raw.map((r) => r.s.id));
   const labels = categoryRows.map((r) => rowTitleAt(table, r).trim() || `Row ${r + 1}`);
+  // Separated: the labels along the axis are those of every column, so the layout can tell when they have to turn.
+  const axisLabels = separated ? raw.flatMap(() => labels) : labels;
   const lay = computeLayout({
     fontFamily: chart.fontFamily,
     titleOffsetPt: chart.titleOffsetPt,
@@ -287,9 +296,9 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     yAxis: horizontal ? chart.xAxis : chart.yAxis,
     legend: chart.legend,
     legendLabels: legendSeries.map((i) => raw[i].label),
-    categoryLabels: horizontal ? [] : labels,
+    categoryLabels: horizontal ? [] : axisLabels,
     yTickLabels: horizontal ? labels : yAxis.ticks.map(yAxis.tickLabel),
-    categoryRowPt: clusters && !horizontal ? chart.xAxis.tickFontSizePt * 1.6 : 0,
+    categoryRowPt: (clusters || separated) && !horizontal ? chart.xAxis.tickFontSizePt * 1.6 : 0,
   });
   warnings.push(...lay.warnings);
   // The geometry below is made in the virtual region (the real one when vertical).
@@ -307,6 +316,10 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   // 5. Geometry.
   const nSeries = Math.max(1, raw.length);
   const cluster = slot * CLUSTER_FRACTION;
+  // Separated: one column for each series and category, in groups with the same gap as factor clusters; a column takes the share of a slot a bar of a cluster does.
+  const sepUnits = nSeries * Math.max(1, categoryRows.length) + FACTOR_GAP * (nSeries - 1);
+  const sepUnit = plot.width / sepUnits;
+  const sepCentre = (si: number, ci: number): number => plot.x + sepUnit * (si * categoryRows.length + FACTOR_GAP * si + ci + 0.5);
   const baseline = Math.min(Math.max(yAxis.log ? 0 : (chart.bars.baseline ?? 0), y0), y1);
   const violinWidths = chart.type === 'groupedViolin' ? normaliseProfiles(raw.flatMap((r) => r.cells.map((c) => c.dist?.profile ?? null)), opts.normalisation) : [];
   let cellIndex = -1;
@@ -368,8 +381,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         continue;
       }
       const stacked = arrangement !== 'side';
-      const bw = stacked ? cluster * 0.75 : cluster / (clusters?.units ?? nSeries);
-      const x = stacked ? cat.centerX - bw / 2 : cat.centerX - cluster / 2 + (clusters ? clusters.slot[si] : si) * bw;
+      const bw = stacked ? cluster * 0.75 : separated ? sepUnit * CLUSTER_FRACTION : cluster / (clusters?.units ?? nSeries);
+      const x = stacked ? cat.centerX - bw / 2 : separated ? sepCentre(si, cell.ci) - bw / 2 : cat.centerX - cluster / 2 + (clusters ? clusters.slot[si] : si) * bw;
       // Box plots and violins of a cell with no replicate values have nothing to draw.
       if (isDist && !cell.dist) continue;
       // A bar whose value is inside an omitted range would be drawn as if it ended at the edge of the gap.
@@ -503,7 +516,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   // Subject lines: inside each category, the mean of a subject's replicates in each series, joined from the first series to the last. A series
   // without a value for the subject breaks the line unless the chart bridges it (the values either side are joined; none is made up). A line needs two values.
   const pairLines: GroupedPairLine[] = [];
-  if (chart.type === 'groupedBar' && chart.pairs.bySubject) {
+  if (chart.type === 'groupedBar' && chart.pairs.bySubject && separated) warnings.push('Lines joining the subjects are drawn inside each category; with the columns grouped by series there is none.');
+  if (chart.type === 'groupedBar' && chart.pairs.bySubject && !separated) {
     if (layout.kind !== 'replicates') warnings.push('Lines joining the subjects need the replicate values: enter the data as replicates.');
     else if (!hasSubjects(table)) warnings.push('Lines are drawn for each subject, but no value has a subject: name the subjects in the data table (Subject…).');
     else {
@@ -540,7 +554,20 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
 
   // The names of the factors, one row under the category labels. A horizontal chart has no such row.
   const factorLabels: GroupedFactorLabel[] = [];
-  if (clusters) {
+  // A name is written at the tick size, or smaller (down to 60%) so that it fits the width of its cluster with a little room either side.
+  const fitName = (text: string, width: number): number => {
+    const size = chart.xAxis.tickFontSizePt;
+    const wide = measureText(text, size, chart.xAxis.tickBold, false, chart.fontFamily);
+    return wide > 0 ? Math.max(size * 0.6, Math.min(size, (size * Math.max(0, width - 6)) / wide)) : size;
+  };
+  if (separated && hasFactors(seriesDefs)) warnings.push('The factors of the series are not used while the columns are grouped by series.');
+  if (separated) {
+    // The name of each series under its group of columns.
+    if (horizontal) warnings.push('The names of the series are not written under their groups on a horizontal chart.');
+    else if (lay.categoryRow) {
+      raw.forEach((r, si) => factorLabels.push({ id: `series:${r.s.id}`, text: r.label, x1: sepCentre(si, 0) - sepUnit / 2, x2: sepCentre(si, Math.max(0, categoryRows.length - 1)) + sepUnit / 2, fontPt: fitName(r.label, sepCentre(si, Math.max(0, categoryRows.length - 1)) - sepCentre(si, 0) + sepUnit), y: lay.categoryRow!.y }));
+    }
+  } else if (clusters) {
     if (horizontal) warnings.push('The names of the factors are not written on a horizontal chart.');
     else if (lay.categoryRow) {
       const unit = cluster / clusters.units;
@@ -548,13 +575,13 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         for (const c of clusters.clusters) {
           if (c.factor === '') continue;
           const x1 = cat.centerX - cluster / 2 + c.start * unit;
-          factorLabels.push({ id: `factor:${cat.row}:${c.factor}`, text: c.factor, x1, x2: x1 + c.series.length * unit, y: lay.categoryRow.y });
+          factorLabels.push({ id: `factor:${cat.row}:${c.factor}`, text: c.factor, x1, x2: x1 + c.series.length * unit, fontPt: fitName(c.factor, c.series.length * unit), y: lay.categoryRow.y });
         }
       }
     }
   }
 
-  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, pairLines, factorLabels, legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
+  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, pairLines, factorLabels, ...(separated ? { axisColumns: raw.flatMap((r, si) => categories.map((cat, ci) => ({ key: `${r.s.id}:${cat.row}`, centerX: sepCentre(si, ci), label: cat.label }))) } : {}), legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileGroupedScene(chart, model);
   // The marks are compiled when a drawing, an export or a hit test first asks for them.
   let marks: SceneElement[] | undefined;

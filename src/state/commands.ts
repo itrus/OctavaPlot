@@ -50,6 +50,7 @@ import type {
   FolderKey,
   Project,
   ReferenceLine,
+  Bracket,
   ReplicateLayout,
   SummarySpec,
   SurvivalOptions,
@@ -521,6 +522,7 @@ export const resetAllDataSets = (chartId: Id): Command => (p) =>
       displayNames: c.displayNames,
       annotations: c.annotations,
       referenceLines: c.referenceLines,
+      brackets: c.brackets,
       fit: { ...fresh.fit, analysisId: c.fit.analysisId },
       xAxis: axis('xAxis'),
       yAxis: axis('yAxis'),
@@ -590,6 +592,14 @@ export const patchReferenceLine = (chartId: Id, lineId: Id, patch: Partial<Omit<
 export const removeReferenceLine = (chartId: Id, lineId: Id): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, referenceLines: c.referenceLines.filter((l) => l.id !== lineId) }));
 
+/** Comparison brackets between two data sets: added, changed and removed one at a time. */
+export const addBracket = (chartId: Id, bracket: Bracket): Command => (p) => mapChart(p, chartId, (c) => ({ ...c, brackets: [...c.brackets, bracket] }));
+
+export const patchBracket = (chartId: Id, bracketId: Id, patch: Partial<Omit<Bracket, 'id'>>): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, brackets: c.brackets.map((b) => (b.id === bracketId ? { ...b, ...patch } : b)) }));
+
+export const removeBracket = (chartId: Id, bracketId: Id): Command => (p) => mapChart(p, chartId, (c) => ({ ...c, brackets: c.brackets.filter((b) => b.id !== bracketId) }));
+
 // ---------------------------------------------------------------- project items
 
 /** "Data 1", "Data 2", ... (or "XY 1", ...): the lowest number not yet used with this prefix. */
@@ -627,7 +637,7 @@ export const addDataTable = (id: Id, kind: TableKind = 'column', options: NewTab
  * Replace a table's rows and group values (CSV import) as one command. Groups keep their IDs, and so their chart
  * styling, by position; extra groups are added and missing ones dropped. Row titles are kept when the file has none.
  */
-export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>>; excluded?: Array<Array<{ reason: string } | null>> }): Command => (p) =>
+export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>>; excluded?: Array<Array<{ reason: string } | null>>; subjects?: string[][]; factors?: string[] }): Command => (p) =>
   mapTable(p, tableId, (t) => {
     const rowCount = Math.max(1, data.values.length);
     const width = usesSeriesBlocks(t.kind) ? tableSeriesWidth(t) : 1;
@@ -645,9 +655,12 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
         name: sub ? (old?.name ?? subs[k]) : name,
         title: sub ? (old?.title ?? (k === 0 ? defaultSeriesName((i - lead) / width, t.kind) : '')) : (old?.title ?? ''),
         paletteIndex: old?.paletteIndex ?? i,
+        // The factor of a series: the file's when it has factor columns, else the one the table had at that place.
+        ...((data.factors ? (data.factors[i] ?? '') : (old?.factor ?? '')) !== '' ? { factor: data.factors ? (data.factors[i] ?? '') : old!.factor } : {}),
         observations: fresh.observations.map((o, r) => {
           const ex = data.excluded?.[r]?.[i];
-          return { ...o, value: data.values[r]?.[i] ?? null, ...(ex ? { excluded: true as const, ...(ex.reason !== '' ? { excludedReason: ex.reason } : {}) } : {}) };
+          const subject = data.subjects?.[r]?.[i] ?? '';
+          return { ...o, value: data.values[r]?.[i] ?? null, ...(subject !== '' ? { subject } : {}), ...(ex ? { excluded: true as const, ...(ex.reason !== '' ? { excludedReason: ex.reason } : {}) } : {}) };
         }),
       };
     });
@@ -709,7 +722,7 @@ export const addChartLike = (chartId: Id, tableId: Id, sourceChartId: Id, linked
 export const unlinkChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId && c.linkedTo !== undefined) ? mapChart(p, chartId, ({ linkedTo: _gone, ...c }) => c) : p);
 
 /** Colours, frame and gridline style of the chart (see model/graph/axis.ts: sanitizeLook). */
-export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'lineConnect' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle>; pairs?: Partial<Chart['pairs']> }): Command => (p) =>
+export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'origin' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'groupedBy' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle>; pairs?: Partial<Chart['pairs']> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
     const { grid, ...rest } = patch;
     return { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };

@@ -67,11 +67,13 @@ function parseLayout(raw: unknown, path: string): ReplicateLayout | undefined {
     if (typeof raw.n === 'number' && Number.isInteger(raw.n) && raw.n >= MIN_REPLICATES && raw.n <= MAX_REPLICATES) return { kind: 'replicates', n: raw.n };
     fail(`${path}.n`, `must be a whole number from ${MIN_REPLICATES} to ${MAX_REPLICATES}`);
   }
+  if (raw.kind === 'sized') return { kind: 'sized' };
+  if (raw.kind === 'vector') return { kind: 'vector' };
   if (raw.kind === 'summary') {
     if (SUMMARY_FORMATS.some((f) => f.id === raw.format)) return { kind: 'summary', format: raw.format as SummaryFormat };
     fail(`${path}.format`, `must be one of ${SUMMARY_FORMATS.map((f) => f.id).join(', ')}`);
   }
-  fail(`${path}.kind`, 'must be single, replicates or summary');
+  fail(`${path}.kind`, 'must be single, replicates, summary, sized or vector');
 }
 
 /** Stored survival options merged over the defaults; a level outside 0 to 1 or an unknown method falls back. */
@@ -365,6 +367,36 @@ function cleanReferenceLines(raw: unknown, path: string, notes: string[]): Chart
   return out;
 }
 
+/** Comparison brackets: every field checked; an entry that cannot be read (or repeats an ID) is dropped and noted. */
+function cleanBrackets(raw: unknown, path: string, notes: string[]): Chart['brackets'] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    notes.push(`${path} was not a list and was reset.`);
+    return [];
+  }
+  const out: Chart['brackets'] = [];
+  const seen = new Set<string>();
+  raw.forEach((b, i) => {
+    if (!isObj(b) || typeof b.id !== 'string' || b.id === '' || seen.has(b.id) || typeof b.from !== 'string' || b.from === '' || typeof b.to !== 'string' || b.to === '') {
+      notes.push(`${path}[${i}] could not be read and was dropped.`);
+      return;
+    }
+    seen.add(b.id);
+    const width = finiteOr(b.widthPt, 2);
+    const font = finiteOr(b.fontSizePt, 24);
+    out.push({
+      id: b.id,
+      from: b.from,
+      to: b.to,
+      label: typeof b.label === 'string' ? b.label : '',
+      color: typeof b.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(b.color) ? b.color : '#000000',
+      widthPt: width > 0 && width <= 40 ? width : 2,
+      fontSizePt: font >= 4 && font <= 200 ? font : 24,
+    });
+  });
+  return out;
+}
+
 /**
  * Data sets taken from other tables. An entry that cannot be read, or a data set listed twice, refuses the file (which
  * of two copies is meant would be a guess). An entry whose table or data set no longer exists is dropped, with a note: the
@@ -436,6 +468,7 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
     displayNames: cleanDisplayNames(c.displayNames, `${path}.displayNames`, notes),
     annotations: cleanAnnotations(c.annotations, `${path}.annotations`, notes),
     referenceLines: cleanReferenceLines(c.referenceLines, `${path}.referenceLines`, notes),
+    brackets: cleanBrackets(c.brackets, `${path}.brackets`, notes),
     layerStyles: (() => {
       const r = sanitizeLayerStyles(c.layerStyles);
       if (r.dropped > 0) notes.push(`${path}.layerStyles: ${r.dropped} setting${r.dropped === 1 ? '' : 's'} could not be read and ${r.dropped === 1 ? 'was' : 'were'} dropped.`);
@@ -480,7 +513,7 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
     if (id === '') fail(`${ap}.id`, 'must not be empty');
     if (analysisIds.has(id)) fail(`${ap}.id`, 'is duplicated');
     analysisIds.add(id);
-    if (o.kind !== 'descriptive' && o.kind !== 'curvefit') fail(`${ap}.kind`, 'must be descriptive or curvefit');
+    if (o.kind !== 'descriptive' && o.kind !== 'curvefit' && o.kind !== 'survival') fail(`${ap}.kind`, 'must be descriptive, curvefit or survival');
     const kind = o.kind;
     const dataTableId = str(o.dataTableId, `${ap}.dataTableId`);
     const table = dataTables.find((t) => t.id === dataTableId);
@@ -494,7 +527,7 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
       else notes.push(`${ap}.level had an invalid value and was reset to 0.95.`);
     }
     const name = typeof o.name === 'string' && o.name !== '' ? o.name : analysisTypeInfo(kind).label;
-    if (kind === 'descriptive') {
+    if (kind === 'descriptive' || kind === 'survival') {
       analyses.push({ id, name, kind, dataTableId, level });
       return;
     }

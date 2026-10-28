@@ -224,3 +224,14 @@ export function LineOrderSection({ chart }: { chart: Chart }) {
     </Section>
   );
 }
+
+/** The offset between the traces of an offset-traces chart: blank is the automatic step, shown as a hint. */
+export function OffsetSection({ chart, autoStep }: { chart: Chart; autoStep: number }) {
+  const { run } = useApp();
+  return (
+    <Section title="Offset traces">
+      <OptionalNumField label="Offset between traces" hint="In Y units; trace 1 stays where it is, trace 2 is lifted by one step, trace 3 by two. Auto: a little more than the largest range of a trace, so they do not overlap. Below 0 stacks them downward." value={chart.traceOffset} autoValue={autoStep} onCommit={(v) => run('Offset between traces', patchLook(chart.id, { traceOffset: v }), 'offset:step')} />
+      <div className="muted small">The offset is written on the figure. Hide the Y axis and turn on its scale bar (Axes) to read the size of the traces.</div>
+    </Section>
+  );
+}

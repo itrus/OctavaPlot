@@ -8,7 +8,7 @@ import type { Chart, DataTable, SurvivalBandMethod } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { normalQuantile } from '../../stats/special';
 import { computeLayout } from '../shared/parts/layout';
-import { axisMapper, placeable, resolveAxis } from '../shared/axes/axisScale';
+import { axisMapper, placeable, resolveAxis, stepPathThroughBreaks } from '../shared/axes/axisScale';
 import type { AtRiskTable, XyModel, XyPoint, XySeries } from '../xy/xyModel';
 import { displayName } from '../shared/parts/names';
 import { attachLazyScene } from '../xy/xyScene';
@@ -126,6 +126,34 @@ export const BAND_OPACITY = DEFAULT_BAND_OPACITY;
  * line, the censor marks are its points, and the optional confidence band is its band. The time axis starts at 0; the
  * fraction axis is 0 to 1 unless set by hand. An at-risk table can be reserved under the plot.
  */
+/**
+ * The subjects of each group of a survival table: the time is the first column, the status of a subject the entry of its row in the
+ * group's column (1 = event, 0 = censored). An entry that is neither, or a row with no valid time (a number, 0 or more), is left out
+ * and counted. Pure; the survival chart and the Results read the table through this, so they cannot disagree.
+ */
+export function readSurvivalSubjects(table: DataTable): Array<{ series: ReturnType<typeof xySeries>[number]; subjects: Array<{ time: number; event: boolean; row: number }>; invalidStatus: number; noTime: number }> {
+  const times = table.groups[0]?.observations.map((o) => o.value) ?? [];
+  return xySeries(table).map((series) => {
+    const subjects: Array<{ time: number; event: boolean; row: number }> = [];
+    let invalidStatus = 0;
+    let noTime = 0;
+    series.columns[0].observations.forEach((o, row) => {
+      if (o.value === null) return;
+      const t = times[row];
+      if (o.value !== 0 && o.value !== 1) {
+        invalidStatus++;
+        return;
+      }
+      if (t === null || t === undefined || !Number.isFinite(t) || t < 0) {
+        noTime++;
+        return;
+      }
+      subjects.push({ time: t, event: o.value === 1, row });
+    });
+    return { series, subjects, invalidStatus, noTime };
+  });
+}
+
 export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   if (!isSurvivalChartType(chart.type) || table.groups.length === 0) throw new Error('buildSurvivalModel needs a survival chart on a survival table');
   const cumulative = chart.type === 'cumulativeEvent';
@@ -133,29 +161,17 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   const layer = dataLayer(chart);
   const opts = chart.survival;
   const warnings: string[] = [];
-  const times = table.groups[0].observations.map((o) => o.value);
   const level = (v: number) => (cumulative ? 1 - v : v);
 
   // 1. One Kaplan-Meier estimate per group column.
   let invalidStatus = 0;
   let noTime = 0;
-  const raw = xySeries(table).map((s, i) => {
+  const raw = readSurvivalSubjects(table).map((g, i) => {
+    const s = g.series;
     const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? i });
-    const subjects: Array<{ time: number; event: boolean; row: number }> = [];
-    s.columns[0].observations.forEach((o, row) => {
-      if (o.value === null) return;
-      const t = times[row];
-      if (o.value !== 0 && o.value !== 1) {
-        invalidStatus++;
-        return;
-      }
-      if (t === null || !Number.isFinite(t) || t < 0) {
-        noTime++;
-        return;
-      }
-      subjects.push({ time: t, event: o.value === 1, row });
-    });
-    return { s, style, km: kaplanMeier(subjects), label: displayName(chart, s.id, s.name) };
+    invalidStatus += g.invalidStatus;
+    noTime += g.noTime;
+    return { s, style, km: kaplanMeier(g.subjects), label: displayName(chart, s.id, s.name) };
   });
   if (invalidStatus > 0) warnings.push(`${invalidStatus} entr${invalidStatus === 1 ? 'y is' : 'ies are'} neither 1 (event) nor 0 (censored) and ignored.`);
   if (noTime > 0) warnings.push(`${noTime} subject${noTime === 1 ? ' has' : 's have'} no valid time (it must be a number, 0 or more) and ${noTime === 1 ? 'is' : 'are'} ignored.`);
@@ -202,6 +218,12 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
     // Hold the last estimate to the last observed time (an event or a censoring), not across the whole axis.
     const lastTime = Math.max(0, ...r.km.steps.map((x) => x.time), ...r.km.marks.map((m) => m.time));
     d += `H${n2(xScale(lastTime))}`;
+    // On a broken axis a drop whose time lies in an omitted range is not drawn at the edge of the gap: the line is cut there instead.
+    const corners: Array<{ x: number; y: number }> = [{ x: Math.max(0, x0), y: level(1) }];
+    let held = level(1);
+    for (const st of r.km.steps) corners.push({ x: st.time, y: held }, { x: st.time, y: (held = level(st.survival)) });
+    corners.push({ x: lastTime, y: held });
+    d = stepPathThroughBreaks(corners, xAxis, yAxis, xScale, yScale, n2) ?? d;
     const col = r.s.columns[0];
     const points: XyPoint[] = r.km.marks.filter((m) => placeable(xAxis, m.time) && placeable(yAxis, level(m.survival)) ? true : (inGap++, false)).map((m) => ({ id: col.observations[m.row].id, row: m.row, x: m.time, y: level(m.survival), px: xScale(m.time), py: yScale(level(m.survival)), stats: null }));
     // Symbols at the events too, when asked: the estimate just after each drop, tied to the first subject with the event.

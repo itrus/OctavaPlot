@@ -94,6 +94,8 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
     orientation: source.orientation,
     lineOrder: source.lineOrder,
     lineConnect: source.lineConnect,
+    traceOffset: source.traceOffset,
+    groupedBy: source.groupedBy,
     bars: { ...source.bars },
     barLabels: { ...source.barLabels, ...(source.barLabels.inside ? { inside: { ...source.barLabels.inside } } : {}) },
     distribution: { ...source.distribution },

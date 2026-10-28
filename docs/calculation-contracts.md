@@ -26,7 +26,7 @@ Labels: **D** = documented by a public source (GraphPad Prism user guide, ggpris
 |---|---|
 | Numeric XY | `xy.scatter`, `xy.line`, `xy.line_symbols`, `xy.area`, `xy.bars`, `xy.spikes`, `xy.vector`, `xy.bubble`, `xy.trajectory`, `xy.offset_traces` |
 | Category and distribution | `category.strip`, `category.aligned`, `category.paired`, `category.bar`, `category.summary`, `category.range`, `distribution.box`, `distribution.violin`, `category.grouped`, `category.stacked`, `category.normalised_stack`, `category.nested`, `category.counts` |
-| Calculated curves and diagnostics | `distribution.histogram`, `distribution.frequency_polygon`, `distribution.ecdf`, `curve.survival`, `curve.cumulative_event`, `curve.roc`, `curve.fit`, `curve.smooth`, `curve.function`, `diagnostic.qq`, `diagnostic.bland_altman`, `diagnostic.residual` |
+| Calculated curves and diagnostics | `distribution.histogram`, `distribution.frequency_polygon`, `distribution.ecdf`, `curve.survival`, `curve.cumulative_event`, `curve.roc`, `curve.fit`, `curve.function`, `diagnostic.qq`, `diagnostic.bland_altman`, `diagnostic.residual` |
 | Matrix, composition, specialised | `matrix.heatmap`, `whole.pie`, `whole.doughnut`, `whole.bar`, `whole.dot_grid`, `special.forest`, `special.volcano`, `special.population_pyramid` |
 
 Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, not the calculation. A band is an ordered lower/upper layer, not a shaded rectangle; it can stay visible when its centre path is hidden. A categorical axis never gets measurement uncertainty by rotation.
@@ -56,7 +56,6 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 - Boundary rule `[left, right)`, final edge inclusive (P). Out-of-range values are omitted and counted, never folded into edge bins. Density is `count/(n·width)`; unequal widths must integrate to the included proportion. Cumulative density integrates. The denominator choice is shown when tails are omitted.
 - Automatic bins (P): start at `max(1, ceil(log2(n)+1))` bins, derive a width from the range, round up to a `1, 2, 2.5, 5, 10` decimal multiple, anchor the first edge at a width multiple not above the minimum, extend to include the maximum, record resolved edges. Constant input: one bin with an explicit unit-scale width. Never a zero-width bin or a NaN density.
 - ECDF: `F(x) = count(yᵢ ≤ x)/n`; ties are one jump. Descending is `1 − F(x)` (strictly above). Straight display is an approximation, not a different calculation.
-- Smoothing: cubic, Akima, cubic smoothing spline, LOWESS. Duplicate X are averaged with disclosure. No extrapolation by default. No confidence band unless supplied bounds or a separate uncertainty method exists. LOWESS (P): k nearest X, distance divided by the furthest selected, weight `(1+|u|³)^(−3)` (tricube `(1−|u|³)³` optional), weighted local linear fit; neighbour fraction coarse/medium/fine = 0.75/0.50/0.25; at least `4n` segments (150 otherwise).
 
 ## 6. Variable-driven symbols
 
@@ -180,4 +179,4 @@ Interaction and applicability tests:
 
 ## 16. Open fidelity items (U)
 
-Exact palette arrays; symbol outlines and font metrics; automatic ranges, ticks and label collision; strip-plot packing (`standard`, `classic`, `expanded` must be deterministic, seeded and versioned, with no value-axis jitter); violin kernel behind the named levels; LOWESS and spline endpoint details; default bar widths and legend spacing; solver and band details for every model; full domain-specific equation libraries (out of scope); advanced post-hoc or multi-factor p values (render supplied results only). Before calling a feature matched, record a fixture with data, settings, size in pt, font identity and expected result.
+Exact palette arrays; symbol outlines and font metrics; automatic ranges, ticks and label collision; strip-plot packing (`standard`, `classic`, `expanded` must be deterministic, seeded and versioned, with no value-axis jitter); violin kernel behind the named levels; default bar widths and legend spacing; solver and band details for every model; full domain-specific equation libraries (out of scope); advanced post-hoc or multi-factor p values (render supplied results only). Before calling a feature matched, record a fixture with data, settings, size in pt, font identity and expected result.
