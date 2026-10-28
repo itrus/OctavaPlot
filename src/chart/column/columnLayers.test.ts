@@ -137,12 +137,13 @@ describe('the layer rows of a column chart', () => {
     expect(off.filter((r) => r.layer.kind === 'errorBars').every((r) => !r.canToggle && r.reason !== null)).toBe(true);
   });
 
-  it('offer hiding and moving but no look of their own and no say in the axis range', () => {
+  it('offer hiding and moving; looks and the axis range only for the parts that have them (see columnPartLooks.test.ts)', () => {
     const rows = layerRows(chartOf('bar'), table);
-    expect(rows.every((r) => r.takes === null && r.inRange === null)).toBe(true);
+    expect(rows.filter((r) => r.layer.kind === 'bars').every((r) => r.takes === null && r.inRange === null)).toBe(true);
+    expect(rows.filter((r) => r.layer.kind === 'points').every((r) => r.takes !== null && r.inRange === true)).toBe(true);
     expect(rows.some((r) => r.canMoveUp || r.canMoveDown)).toBe(true);
     const chart = chartOf('bar');
-    const id = idOf(chart, 'points');
-    expect(patchLayerStyle(chart.id, id, { color: '#ff0000' })(project(chart)).charts[0].layerStyles).toEqual({});
+    // A body is styled with the fill of its data set, so a look given to it is not stored.
+    expect(patchLayerStyle(chart.id, idOf(chart, 'bars'), { color: '#ff0000' })(project(chart)).charts[0].layerStyles).toEqual({});
   });
 });

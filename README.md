@@ -116,36 +116,36 @@ XY charts follow spec §3.1 and §7: symbols and a path layer per series (the li
 The table below is generated from the capability registry (`src/model/graph/capabilities.ts`) and checked against it by a test, so it cannot drift from the code: a control that a drawing does not honour is not offered.
 
 <!-- capabilities:start -->
-| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options |
-|---|---|---|---|---|---|---|
-| Bar chart | yes | Y | yes | – | – | – |
-| Scatter dot plot | yes | Y | yes | – | – | – |
-| Mean with error bars | yes | Y | yes | – | – | – |
-| Box and whiskers | yes | Y | – | – | – | – |
-| Floating bars (min to max) | yes | Y | – | – | – | – |
-| Before and after | yes | Y | – | – | – | – |
-| Histogram | – | X and Y | – | – | – | – |
-| Cumulative distribution | – | X and Y | – | – | – | – |
-| Violin plot | yes | Y | – | – | – | – |
-| XY scatter | – | X and Y | – | yes | yes | – |
-| Line | – | X and Y | – | yes | yes | – |
-| Line with symbols | – | X and Y | – | yes | yes | – |
-| Spikes | – | X and Y | – | yes | – | – |
-| Area under the curve | – | X and Y | – | yes | yes | – |
-| Grouped bars | yes | Y | – | – | – | – |
-| Stacked bars | yes | Y | – | – | – | – |
-| Floating bars (min to max) | yes | Y | – | – | – | – |
-| Grouped box and whiskers | yes | Y | – | – | – | – |
-| Grouped violin | yes | Y | – | – | – | – |
-| Heat map | – | – | – | – | – | – |
-| Lines over categories | – | Y | – | – | – | – |
-| Pie charts | – | – | – | – | – | – |
-| Doughnut charts | – | – | – | – | – | – |
-| Side-by-side bars | yes | Y | – | – | – | – |
-| Stacked bars | yes | Y | – | – | – | – |
-| 100% stacked bars | yes | Y | – | – | – | – |
-| Survival curve | – | X and Y | – | – | – | yes |
-| Cumulative events | – | X and Y | – | – | – | yes |
+| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options | Look per part | Keep out of range |
+|---|---|---|---|---|---|---|---|---|
+| Bar chart | yes | Y | yes | – | – | – | yes | yes |
+| Scatter dot plot | yes | Y | yes | – | – | – | yes | yes |
+| Mean with error bars | yes | Y | yes | – | – | – | yes | yes |
+| Box and whiskers | yes | Y | – | – | – | – | yes | yes |
+| Floating bars (min to max) | yes | Y | – | – | – | – | yes | yes |
+| Before and after | yes | Y | – | – | – | – | yes | yes |
+| Histogram | – | X and Y | – | – | – | – | – | yes |
+| Cumulative distribution | – | X and Y | – | – | – | – | yes | yes |
+| Violin plot | yes | Y | – | – | – | – | yes | yes |
+| XY scatter | – | X and Y | – | yes | yes | – | yes | yes |
+| Line | – | X and Y | – | yes | yes | – | yes | yes |
+| Line with symbols | – | X and Y | – | yes | yes | – | yes | yes |
+| Spikes | – | X and Y | – | yes | – | – | yes | yes |
+| Area under the curve | – | X and Y | – | yes | yes | – | yes | yes |
+| Grouped bars | yes | Y | – | – | – | – | yes | yes |
+| Stacked bars | yes | Y | – | – | – | – | – | – |
+| Floating bars (min to max) | yes | Y | – | – | – | – | yes | yes |
+| Grouped box and whiskers | yes | Y | – | – | – | – | yes | yes |
+| Grouped violin | yes | Y | – | – | – | – | yes | yes |
+| Heat map | – | – | – | – | – | – | – | – |
+| Lines over categories | – | Y | – | – | – | – | yes | yes |
+| Pie charts | – | – | – | – | – | – | – | – |
+| Doughnut charts | – | – | – | – | – | – | – | – |
+| Side-by-side bars | yes | Y | – | – | – | – | – | – |
+| Stacked bars | yes | Y | – | – | – | – | – | – |
+| 100% stacked bars | yes | Y | – | – | – | – | – | – |
+| Survival curve | – | X and Y | – | – | – | yes | yes | – |
+| Cumulative events | – | X and Y | – | – | – | yes | yes | – |
 <!-- capabilities:end -->
 
 ## Box plots, violins, columns and axes
@@ -217,7 +217,7 @@ The legend has its own order of entries (Legend: Top, Up, Down, Bottom, Reverse,
 
 ## Limitations
 
-Reference lines are drawn on XY, survival, histogram, column and grouped charts (not on pie or heat maps) and cm units are not built; a graph has one data layer (a file with more is read with a note and only the first is kept); every chart is drawn from layers, which can be hidden and reordered one by one (own looks and the axis range switch are for XY and survival charts only); observations have no subject or exclusion roles yet; the default colours are those of the Science (AAAS) palette; values display as stored (typed `1.10` shows `1.1`).
+Reference lines are drawn on XY, survival, histogram, column and grouped charts (not on pie or heat maps) and cm units are not built; a graph has one data layer (a file with more is read with a note and only the first is kept); every chart is drawn from layers, which can be hidden and reordered one by one (a look of their own per part, and a switch to keep a part out of the axis range, are given where the table above says so: not for pie charts and heat maps, whose parts have no such thing to set, and not for stacked bars, which are ranged by their totals; the survival axes are fixed, so a survival chart has own looks but no range switch); observations have no subject or exclusion roles yet; the default colours are those of the Science (AAAS) palette; values display as stored (typed `1.10` shows `1.1`).
 
 ## Evidence labels
 

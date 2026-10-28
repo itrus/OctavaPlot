@@ -133,9 +133,10 @@ describe('the layer rows of a grouped chart', () => {
     expect(rows('groupedLine')).toEqual(expect.arrayContaining(['Line', 'Means', 'Error bars']));
   });
 
-  it('offer hiding and moving but no look of their own and no say in the axis range', () => {
+  it('offer hiding and moving; looks and the axis range only for the parts that have them (see groupedPartLooks.test.ts)', () => {
     const rows = layerRows(chartOf('groupedBar'), replicates);
-    expect(rows.every((r) => r.takes === null && r.inRange === null)).toBe(true);
+    expect(rows.filter((r) => r.layer.kind === 'bars').every((r) => r.takes === null && r.inRange === null)).toBe(true);
+    expect(rows.filter((r) => r.layer.kind === 'errorBars').every((r) => r.takes !== null && r.inRange !== null)).toBe(true);
     expect(rows.some((r) => r.canMoveUp && r.canMoveDown)).toBe(true);
   });
 });

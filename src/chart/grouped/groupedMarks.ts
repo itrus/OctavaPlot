@@ -1,4 +1,4 @@
-import type { LayerKind, LayerSpec } from '../../model/graph/layers';
+import { partStyle, type LayerKind, type LayerSpec } from '../../model/graph/layers';
 import { linePattern } from '../../model/graph/look';
 import type { Chart, ChartStyle } from '../../model/types';
 import { n2 } from '../../model/units';
@@ -39,7 +39,8 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
     const s = layer.binding ? seriesOf.get(layer.binding.seriesId) : undefined;
     if (!s) return [];
     const named = (e: SceneElement, ...part: Array<string | number>): SceneElement => ({ ...e, id: svgId(layer.id, ...part) });
-    const st = s.style;
+    // The look of the data set, with what this part was given of its own over it (the same object when it was given none).
+    const st = partStyle(chart, layer.id, s.style);
     switch (layer.kind) {
       case 'bars':
         return s.bars.map((b): SceneElement => {

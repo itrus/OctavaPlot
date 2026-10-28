@@ -22,7 +22,7 @@ import { paletteColor, type Palette } from '../model/graph/palettes';
 import { createRows, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { clearGroupSummary, clearGroupSummaryKeys, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/graph/summary';
 import { folderItems, nudge, reorder, sortedByName } from '../model/project/folderItems';
-import { clearPartStyles, layersOf, layerStylesAvailable, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
+import { clearPartStyles, layerKindOf, layersOf, layerStylesAvailable, lookKeysOf, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
 import type { StyleScope } from '../model/graph/selection/scope';
 import { LABEL_STYLE_KEYS, clearGroupKeys, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
 import type {
@@ -992,9 +992,12 @@ export const patchLayerStyle = (chartId: Id, layerId: Id, patch: { [K in keyof L
     // Only the families that draw their parts in a look of their own take one.
     if (!layerStylesAvailable(c)) return c;
     const merged: Record<string, unknown> = { ...(c.layerStyles[layerId] ?? {}) };
+    const kind = layerKindOf(layerId);
+    const takes = kind ? lookKeysOf(c.type, kind) ?? [] : [];
     for (const [k, v] of Object.entries(patch)) {
       if (v === null) delete merged[k];
-      else if (v !== undefined) merged[k] = v;
+      // A setting the drawing of this chart type does not honour is not stored.
+      else if (v !== undefined && takes.includes(k as keyof LayerStyle)) merged[k] = v;
     }
     const { styles } = sanitizeLayerStyles({ [layerId]: merged });
     const next = { ...c.layerStyles };

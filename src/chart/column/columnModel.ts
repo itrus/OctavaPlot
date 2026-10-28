@@ -23,7 +23,7 @@ import { boxNeeds, floatingNeeds, unplacedMarkNote } from '../shared/parts/distr
 import { columnLayout } from './columnLayout';
 import { axisMapper, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
-import { layersOf, type LayerSpec } from '../../model/graph/layers';
+import { layersOf, partStyle, type LayerKind, type LayerSpec } from '../../model/graph/layers';
 import { compileColumnMarks } from './columnMarks';
 import type { ChromeScene } from '../shared/scene/scene';
 import type { SceneElement } from '../shared/scene/sceneElement';
@@ -158,6 +158,12 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   // Horizontal columns: the right-hand axis does not exist there, and the data sets all sit on the one value axis.
   const horizontal = chart.orientation === 'horizontal' && supportsHorizontal(chart.type);
 
+  // The parts of the chart: whether each one's values are part of the axis range (see rangeContribution in model/graph/layers.ts), and the look it was given.
+  const layerList = layersOf(chart, table);
+  const inRange = (kind: LayerKind, groupId: Id): boolean => layerList.find((l) => l.id === `${groupId}:${kind}`)?.rangeContribution ?? true;
+  /** The look of a data set with what one of its parts was given of its own over it (the same object when it was given none). */
+  const partOf = (kind: LayerKind, groupId: Id, style: ChartStyle): ChartStyle => partStyle(chart, `${groupId}:${kind}`, style);
+
   // 1. Statistical summaries + resolved styles (independent of presentation settings).
   const rows = table.groups.map((group) => {
     const summary = summarize(group.observations.map((o) => o.value));
@@ -196,27 +202,40 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
       sorted: sortedFinite(values),
     }));
     const { summary, profile, sorted } = calc;
-    const show: number[] = [];
-    if (summary && chart.type === 'floating') show.push(summary.min, summary.max);
-    else if (summary) show.push(summary.whiskerLow, summary.whiskerHigh, summary.q1, summary.q3, ...(r.style.showSymbols ? (opts.points === 'all' ? [summary.min, summary.max] : opts.points === 'outside' ? summary.outliers : []) : []));
-    if (chart.type === 'violin') {
-      if (profile) show.push(profile.v[0], profile.v[profile.v.length - 1]);
-      else show.push(...sorted);
-      if (opts.points === 'all' && r.style.showSymbols && sorted.length) show.push(sorted[0], sorted[sorted.length - 1]);
+    // What the body (box and whiskers, violin, floating bar) and what the dots on it ask the axis to show; the dots are a layer of their own.
+    const body: number[] = [];
+    const dots: number[] = [];
+    if (summary && chart.type === 'floating') body.push(summary.min, summary.max);
+    else if (summary) {
+      body.push(summary.whiskerLow, summary.whiskerHigh, summary.q1, summary.q3);
+      dots.push(...(r.style.showSymbols ? (opts.points === 'all' ? [summary.min, summary.max] : opts.points === 'outside' ? summary.outliers : []) : []));
     }
-    return { values, summary, profile, sorted, show };
+    if (chart.type === 'violin') {
+      if (profile) body.push(profile.v[0], profile.v[profile.v.length - 1]);
+      else body.push(...sorted);
+      if (opts.points === 'all' && r.style.showSymbols && sorted.length) dots.push(sorted[0], sorted[sorted.length - 1]);
+    }
+    return { values, summary, profile, sorted, body, dots };
   });
   const violinWidths = isDist && chart.type === 'violin' ? normaliseProfiles(distPre.map((d) => d?.profile ?? null), opts.normalisation) : [];
 
   // 2. One value axis per binding, each ranged from its own data sets only. The right axis exists only
   // while a data set is bound to it (spec 6.2 L363); with none it is the old single pool.
-  const rangeRows: RangeRow[] = rows.map((r, i) => ({
-    binding: r.binding,
-    stats: r.stats,
-    style: r.style,
-    values: r.group.observations.map((o) => o.value),
-    ...(distPre[i] ? { override: distPre[i]!.show } : {}),
-  }));
+  // A part kept out of the range (see rangeContribution) adds nothing around the centre; the centre itself is the chart's data and always counts.
+  const bodyKind: LayerKind = chart.type === 'floating' ? 'bars' : 'distribution';
+  const rangeRows: RangeRow[] = rows.map((r, i) => {
+    const id = r.group.id;
+    const errorsOut = r.style.showErrorBars && !inRange('errorBars', id);
+    const dotsOut = r.style.showSymbols && !inRange('points', id);
+    const d = distPre[i];
+    return {
+      binding: r.binding,
+      stats: r.stats,
+      style: errorsOut || dotsOut ? { ...r.style, ...(errorsOut ? { showErrorBars: false } : {}), ...(dotsOut ? { showSymbols: false } : {}) } : r.style,
+      values: r.group.observations.map((o) => o.value),
+      ...(d ? { override: [...(inRange(bodyKind, id) ? d.body : []), ...(inRange('points', id) ? d.dots : [])] } : {}),
+    };
+  });
   const pools = populateAxes(rangeRows, chart.type);
   const dual = pools.secondaryInUse;
   const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? widthPt / 120 : heightPt / 100)));
@@ -329,6 +348,9 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     const centerX = x0 + bw / 2;
     const slotX = x0 - (slotStep - bw) / 2;
     const centre = stats.centre;
+    // The look of the dots and of the mean line: the data set's, with what the part was given of its own over it.
+    const pst = partOf('points', group.id, style);
+    const mst = partOf('meanLine', group.id, style);
     // The centre has a place only where the axis can show it (not 0 or less on a log axis, not inside an omitted range).
     const yCentre = centre === null || !placeable(scale, centre) ? null : toY(centre);
     // Marks of the distribution are made from whole-sample statistics; a value with no place gives no coordinate, so the mark is not drawn.
@@ -380,7 +402,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     // An end inside an omitted range would be drawn at the edge of the gap, as if that were its value: the bar is not drawn then.
     const endInGap = !isDist && errorEndValues(stats, style.showErrorBars, style.errorDirection).some((v) => inBreak(scale, v));
     if (endInGap) gapErrorBars++;
-    const errorBar = isDist || endInGap || (centre !== null && inBreak(scale, centre)) ? null : buildErrorBar({ groupId: group.id, centerX, stats, style, yScale: toY, domain: scale.domain, log: !!scale.log });
+    const errorBar = isDist || endInGap || (centre !== null && inBreak(scale, centre)) ? null : buildErrorBar({ groupId: group.id, centerX, stats, style: partOf('errorBars', group.id, style), yScale: toY, domain: scale.domain, log: !!scale.log });
 
     // Symbols: raw observations (bar overlay / scatter) or the mean marker (mean chart).
     const points: PointGeom[] = [];
@@ -395,13 +417,13 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
             value: centre,
             cx: centerX,
             cy: yCentre,
-            shape: style.symbolShape,
-            size: style.symbolSizePt,
-            color: style.symbolColor,
-            fillOpacity: style.symbolFillOpacity,
-            borderColor: style.symbolBorderColor,
-            borderWidth: style.symbolBorderWidthPt,
-            borderOpacity: style.symbolBorderOpacity,
+            shape: pst.symbolShape,
+            size: pst.symbolSizePt,
+            color: pst.symbolColor,
+            fillOpacity: pst.symbolFillOpacity,
+            borderColor: pst.symbolBorderColor,
+            borderWidth: pst.symbolBorderWidthPt,
+            borderOpacity: pst.symbolBorderOpacity,
           });
         }
       } else {
@@ -419,7 +441,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
             inGap++;
             return;
           }
-          const ps = resolveStyle(chart, layer, group, o.id);
+          const ps = { ...pst, ...layer.objectOverrides[o.id] };
           points.push({
             id: o.id,
             groupId: group.id,
@@ -487,13 +509,13 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
           inGap++;
           return;
         }
-        const ps = resolveStyle(chart, layer, group, o.id);
+        const ps = { ...pst, ...layer.objectOverrides[o.id] };
         const offset = chart.jitter.enabled ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * dotWidth : 0;
         points.push({ id: o.id, groupId: group.id, observationId: o.id, row, value: o.value, cx: centerX + offset, cy: toY(o.value), shape: ps.symbolShape, size: ps.symbolSizePt, color: ps.symbolColor, fillOpacity: ps.symbolFillOpacity, borderColor: ps.symbolBorderColor, borderWidth: ps.symbolBorderWidthPt, borderOpacity: ps.symbolBorderOpacity });
       });
       if (opts.showMean && pre.summary) {
         const my = toYDraw(pre.summary.mean);
-        if (Number.isFinite(my)) points.push({ id: `${group.id}:mean`, groupId: group.id, observationId: null, row: -1, value: pre.summary.mean, cx: centerX, cy: my, shape: 'plus', size: style.symbolSizePt, color: style.symbolColor, fillOpacity: style.symbolFillOpacity, borderColor: style.symbolBorderColor, borderWidth: Math.max(style.symbolBorderWidthPt, 2), borderOpacity: style.symbolBorderOpacity });
+        if (Number.isFinite(my)) points.push({ id: `${group.id}:mean`, groupId: group.id, observationId: null, row: -1, value: pre.summary.mean, cx: centerX, cy: my, shape: 'plus', size: pst.symbolSizePt, color: pst.symbolColor, fillOpacity: pst.symbolFillOpacity, borderColor: pst.symbolBorderColor, borderWidth: Math.max(pst.symbolBorderWidthPt, 2), borderOpacity: pst.symbolBorderOpacity });
       }
       if (dist?.note) warnings.push(`${name}: ${dist.note}.`);
     }
@@ -505,9 +527,9 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
         id: `${group.id}:meanline`,
         groupId: group.id,
         d: `M${centerX - half},${yCentre}H${centerX + half}`,
-        color: style.lineColor,
-        strokeWidth: style.lineWidthPt,
-        opacity: style.lineOpacity,
+        color: mst.lineColor,
+        strokeWidth: mst.lineWidthPt,
+        opacity: mst.lineOpacity,
       };
     }
 
@@ -541,7 +563,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   if (chart.type === 'paired' && groups[0]?.style.showLines) {
     const rowsSeen = new Set<number>();
     for (const values of pairValues) for (const row of values.keys()) rowsSeen.add(row);
-    const first = groups[0]?.style;
+    const first = groups[0] ? partStyle(chart, `${chart.id}:pairLines`, groups[0].style) : undefined;
     const sharedAxis = groups.every((g) => g.axis === groups[0].axis);
     for (const row of [...rowsSeen].sort((x, y) => x - y)) {
       // The subject's values in data units, cut where the line crosses an omitted range (never drawn through it). With
@@ -576,6 +598,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
         continue;
       }
       const { toY, scale } = axisOf(a.axis);
+      const joined = partOf('line', a.groupId, a.style);
       // Cut in data units where it crosses an omitted range; the X "data" is the page position, which has none.
       const d = pathOfRuns(polylinesThroughBreaks([{ x: a.centerX, y: a.centreValue }, { x: b.centerX, y: b.centreValue }], { log: null, reverse: false }, scale), toY);
       if (d === '') continue;
@@ -583,9 +606,9 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
         id: `${a.groupId}:line`,
         groupId: a.groupId,
         d,
-        color: a.style.lineColor,
-        strokeWidth: a.style.lineWidthPt,
-        opacity: a.style.lineOpacity,
+        color: joined.lineColor,
+        strokeWidth: joined.lineWidthPt,
+        opacity: joined.lineOpacity,
       };
     }
   }

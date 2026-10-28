@@ -1,9 +1,7 @@
 import { Fragment } from 'react';
-import { layerEditLook, layerRows } from '../../../model/graph/layers';
+import { layerBaseStyle, layerEditLook, layerRows } from '../../../model/graph/layers';
 import { SYMBOL_SHAPE_OPTIONS } from '../../../chart/shared/parts/symbols';
 import { LINE_STYLES } from '../../../model/graph/look';
-import { resolveStyle, dataLayer } from '../../../model/graph/style';
-import { xySeries } from '../../../model/table/tableLayout';
 import type { Chart, DataTable, LayerStyle, LineStyle } from '../../../model/types';
 import { useApp } from '../../../state/AppContext';
 import { moveLayer, patchLayerStyle, resetLayerOrder, setLayerHidden, setLayerRange } from '../../../state/commands';
@@ -11,19 +9,18 @@ import { Check, ColorInput, Field, NumField, Section, SelectInput } from '../com
 import { displayName } from '../../../chart/shared/parts/names';
 
 /**
- * The parts an XY chart is drawn from (data, reference lines and annotations), topmost first: each can be hidden without
- * changing anything that is calculated, and the fit curve and the fit band can be given a look of their own.
+ * The parts a chart is drawn from (data, reference lines and annotations), topmost first: each can be hidden without changing anything that is
+ * calculated. Where the chart type has them (the registry says, see model/graph/capabilities.ts) a part can also be given a look of its own
+ * and be kept out of the axis range; which ones, and what they are called, is decided in model/graph/layers.ts, not here.
  */
 export function LayersSection({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run } = useApp();
   const rows = layerRows(chart, table, (id, fallback) => displayName(chart, id, fallback));
-  const series = xySeries(table);
   return (
     <Section title="Layers" defaultOpen={false}>
       {rows.map((r) => {
         const takes = r.takes;
-        const owner = series.findIndex((s) => s.id === r.layer.binding?.seriesId);
-        const base = takes && owner >= 0 ? resolveStyle(chart, dataLayer(chart), { id: series[owner].id, paletteIndex: series[owner].columns[0].seriesSlot ?? owner }) : null;
+        const base = takes ? layerBaseStyle(chart, table, r.layer) : null;
         const look = base ? layerEditLook(chart, r.layer.id, base) : null;
         const points = r.layer.kind === 'points' || r.layer.kind === 'rawPoints';
         const own = chart.layerStyles[r.layer.id] ?? {};
