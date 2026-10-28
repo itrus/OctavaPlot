@@ -55,7 +55,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('scatter', 'Scatter dot plot', 'Every value as a dot, grouped by column, with an optional line at the mean.', 'scatter'),
         item('cat.aligned', 'Aligned dots', 'Dots in a column without spreading them sideways.', 'scatter', 'category.aligned', { jitter: false }),
         item('paired', 'Before and after', 'The values of each subject joined by a line.', 'paired', 'category.paired'),
-        item('cat.nested', 'Nested dots', 'Technical repeats inside each independent unit.', null, 'category.nested'),
+        item('cat.nested', 'Nested dots', 'Technical repeats inside each independent unit: name the subjects in the table (Subject…); the mean and error bar are of the subjects.', 'scatter', 'category.nested', { bySubject: true }),
       ],
     },
     {

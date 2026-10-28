@@ -387,6 +387,11 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
                   <Check checked={chart.jitter.enabled} disabled={!st.showSymbols} onChange={(v) => run('Jitter', patchJitter(chart.id, { enabled: v }))} />
                 </Field>
                 <NumField label="Jitter width" value={chart.jitter.widthFraction} min={0} max={1} disabled={!st.showSymbols || !chart.jitter.enabled} hint="Fraction of the group slot; deterministic, never moves values vertically" onCommit={(v) => run('Jitter width', patchJitter(chart.id, { widthFraction: v }), 'jitter:w')} />
+                {chart.type === 'scatter' && (
+                  <Field label="Group dots by subject" note="The dots of each subject sit together with a marker at their mean; the mean line and error bar are of the subjects. Name subjects in the data table (Subject…).">
+                    <Check checked={chart.jitter.bySubject === true} disabled={!st.showSymbols} onChange={(v) => run('Group dots by subject', patchJitter(chart.id, { bySubject: v }))} />
+                  </Field>
+                )}
               </>
             )}
           </GroupBox>

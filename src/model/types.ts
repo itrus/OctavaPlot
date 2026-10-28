@@ -518,6 +518,12 @@ export interface JitterConfig {
   enabled: boolean;
   /** Fraction of the category slot width, 0..1. */
   widthFraction: number;
+  /**
+   * Dot plots only: the dots of each subject (see `Observation.subject`) sit side by side in a cluster of their own, each subject
+   * has a marker at its mean, and the mean line and the error bar are calculated from those unit means (n = the subjects).
+   * Values with no subject are drawn in the middle and left out of the calculation, and a warning counts them.
+   */
+  bySubject: boolean;
 }
 
 /** A line across the plotting region at a value of an axis (a threshold, a target, a control level). */

@@ -679,7 +679,8 @@
         "displayNames": {},
         "jitter": {
           "enabled": true,
-          "widthFraction": 0.4
+          "widthFraction": 0.4,
+          "bySubject": false
         },
         "defaults": {
           "showBars": true,

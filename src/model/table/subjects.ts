@@ -1,4 +1,5 @@
-import type { DataTable, Group } from '../types';
+import { memoFor } from '../../stats/memo';
+import type { DataTable, Group, Observation } from '../types';
 import { withoutExcluded } from './exclusion';
 
 /**
@@ -66,4 +67,9 @@ export function subjectTrajectories(table: DataTable): Array<{ subject: string; 
   return order
     .map((subject) => ({ subject, values: perColumn.map((m) => m.get(subject) ?? null) }))
     .filter((t) => t.values.filter((v) => v !== null).length >= 2);
+}
+
+/** Unit means as observations (what a calculation of the units takes in place of the values). Kept per observations array, so a style edit reuses it. */
+export function unitObservations(group: Group): Observation[] {
+  return memoFor(group.observations, 'unitObservations', () => unitMeans(group).map((m) => ({ id: `unit:${m.subject}`, value: m.mean })));
 }

@@ -4,6 +4,7 @@ import { paletteById } from '../../model/graph/palettes';
 import { legendEntries } from '../../model/graph/legendEntries';
 import { isPatternInvisible, resolveBarFill } from '../../model/graph/fill';
 import { groupRowTitle } from '../../model/table/rows';
+import { hasSubjects, subjectUnits, unitObservations } from '../../model/table/subjects';
 import { resolveSummary } from '../../model/graph/summary';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
@@ -165,13 +166,19 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   const partOf = (kind: LayerKind, groupId: Id, style: ChartStyle): ChartStyle => partStyle(chart, `${groupId}:${kind}`, style);
 
   // 1. Statistical summaries + resolved styles (independent of presentation settings).
+  // Nested dots: the dots of a subject are repeats of one unit, so the mean and the error bar are calculated from the unit means.
+  const nestedOn = chart.type === 'scatter' && chart.jitter.bySubject === true;
+  if (nestedOn && !hasSubjects(table)) warnings.push('Dots are grouped by subject, but no value has a subject: name the subjects in the data table (Subject…).');
   const rows = table.groups.map((group) => {
     const summary = summarize(group.observations.map((o) => o.value));
+    const units = nestedOn ? subjectUnits(group) : null;
+    const nested = units !== null && units.units.length > 0 ? units : null;
     // The observations array itself is the cache key, so style-only edits reuse the GroupStats.
-    const stats = statsFor(group.observations, resolveSummary(layer, group.id));
+    const stats = statsFor(nested ? unitObservations(group) : group.observations, resolveSummary(layer, group.id));
     const style = resolveStyle(chart, layer, group);
     const name = displayName(chart, group.id, group.name);
-    return { group, summary, stats, style, name, binding: horizontal ? ('primary' as AxisBinding) : bindingOf(style) };
+    if (nested && nested.unassigned > 0) warnings.push(`${name}: ${nested.unassigned} value${nested.unassigned === 1 ? ' has' : 's have'} no subject, and ${nested.unassigned === 1 ? 'is' : 'are'} left out of the mean and the error bar.`);
+    return { group, summary, stats, style, name, nested, binding: horizontal ? ('primary' as AxisBinding) : bindingOf(style) };
   });
 
   // Calculation notices. Visual warning (spec 21.5 L1462) for unavailable statistics, blocking (L1460)
@@ -342,7 +349,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   // 5. Geometry. Values with no position on a log axis (0 or less) are left out and counted.
   // For paired plots: the value of each subject (table row) in each data set, with its place across, whether or not its dot can be drawn.
   const pairValues = rows.map(() => new Map<number, { x: number; y: number }>());
-  const groups: GroupGeom[] = rows.map(({ group, summary, stats, style, name, binding }, gi) => {
+  const groups: GroupGeom[] = rows.map(({ group, summary, stats, style, name, nested, binding }, gi) => {
     const { scale, toY, baseline } = axisOf(binding);
     const x0 = cols.x(group.id) ?? plot.x;
     const centerX = x0 + bw / 2;
@@ -434,7 +441,13 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
             return;
           }
           // The dots of a paired plot stay on the line of their column: a subject's line would not meet them otherwise.
-          const offset = chart.jitter.enabled && chart.type !== 'paired' ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * bw : 0;
+          let offset = chart.jitter.enabled && chart.type !== 'paired' ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * bw : 0;
+          if (nested) {
+            // Each subject has a cluster of its own across the slot; a value with no subject stays in the middle.
+            const k = nested.units.findIndex((u) => u.subject === (o.subject ?? ''));
+            const clusterWidth = (bw * 0.8) / nested.units.length;
+            offset = k < 0 ? 0 : -bw * 0.4 + clusterWidth * (k + 0.5) + (chart.jitter.enabled ? (hash01(o.id) - 0.5) * clusterWidth * 0.6 : 0);
+          }
           // A value inside an omitted range has no dot, but its subject's line still runs to the edge of the gap.
           if (chart.type === 'paired') pairValues[gi].set(row, { x: centerX + offset, y: o.value });
           if (inBreak(scale, o.value)) {
@@ -460,6 +473,32 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
           });
         });
       }
+    }
+
+    // Nested dots: a larger marker at the mean of each subject, in the middle of its cluster.
+    if (nested && !isDist && style.showSymbols) {
+      const unitSize = pst.symbolSizePt * 1.9;
+      const clusterWidth = (bw * 0.8) / nested.units.length;
+      nested.units.forEach((u, k) => {
+        const mean = u.values.reduce((a, b) => a + b, 0) / u.values.length;
+        if (!placeable(scale, mean)) return;
+        points.push({
+          id: `${group.id}:unit:${k}`,
+          groupId: group.id,
+          observationId: null,
+          row: -1,
+          value: mean,
+          cx: centerX - bw * 0.4 + clusterWidth * (k + 0.5),
+          cy: toY(mean),
+          shape: pst.symbolShape,
+          size: unitSize,
+          color: pst.symbolColor,
+          fillOpacity: 1,
+          borderColor: chart.textColor ?? '#000000',
+          borderWidth: Math.max(pst.symbolBorderWidthPt, 1),
+          borderOpacity: 1,
+        });
+      });
     }
 
     // Box plot or violin: the body and lines from the raw values, the dots by the distribution options.

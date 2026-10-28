@@ -14,6 +14,8 @@ export interface ChartVariant {
   survival?: Partial<SurvivalOptions>;
   /** A dot plot made with (true) or without (false) sideways spreading of the dots. */
   jitter?: boolean;
+  /** A dot plot made with its dots grouped by subject (nested dots). */
+  bySubject?: boolean;
   /** Grouped bars made as dots only: the bars are off, the replicate values are dots and a line marks the mean of each cell. */
   dotsOnly?: boolean;
   fit?: { model: FitModelId; degree?: number; band?: ChartFit['band'] };
@@ -30,6 +32,7 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
   if (variant.survival && (chart.type === 'survival' || chart.type === 'cumulativeEvent')) next.survival = { ...chart.survival, ...variant.survival };
   if (variant.dotsOnly && chart.type === 'groupedBar') next.layers = chart.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showBars: false, showSymbols: true, showMeanLine: true } } : l));
   if (variant.jitter !== undefined && chart.type === 'scatter') next.jitter = { ...chart.jitter, enabled: variant.jitter };
+  if (variant.bySubject !== undefined && chart.type === 'scatter') next.jitter = { ...next.jitter, bySubject: variant.bySubject };
   if (variant.fit?.band && isXy(chart)) next.fit = { ...chart.fit, band: variant.fit.band };
   return next;
 }

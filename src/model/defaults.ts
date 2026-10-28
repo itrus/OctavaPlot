@@ -79,7 +79,7 @@ const defaultSummaryFor = (type: ChartType): SummarySpec =>
 
 export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, method: 'loglog', atRisk: false, eventSymbols: false, errorBars: false };
 
-const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4 };
+const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4, bySubject: false };
 
 /** Line weight shared by the axes, bar borders, error bars and connecting lines, so they read as one family. */
 const AXIS_LINE_PT = 4;

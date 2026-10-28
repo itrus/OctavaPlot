@@ -103,7 +103,7 @@ A style is the keys of `ChartStyle`: bars, symbols, error bars, lines, point lab
 
 - **Lengths** whose key ends in `Pt` are in typographic points (72 pt = 1 inch, so 1 pt = 4/3 px): font sizes, line widths, symbol sizes, offsets. They are true points: a chart of the stated pixel size, exported, has text of that size.
 - **Sizes of the chart** are in pixels (`widthPx`, `heightPx`).
-- **Fractions** (`xFrac`, `yFrac` of an annotation, `widthFraction` of the jitter) are of the chart's width or height, or of a column's slot.
+- **Fractions** (`xFrac`, `yFrac` of an annotation, `widthFraction` of the jitter; `jitter.bySubject`, true or false, groups the dots of a dot plot by subject) are of the chart's width or height, or of a column's slot.
 - **Colours** are `#rrggbb` (six hex digits). A colour that is `null` where the type allows it means "none" (a transparent background) or "automatic".
 - **Percentages** have `Pct` in the key.
 
