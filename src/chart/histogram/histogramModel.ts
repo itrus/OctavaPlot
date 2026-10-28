@@ -1,4 +1,4 @@
-import { layersOf } from '../../model/graph/layers';
+import { layersOf, type LayerKind } from '../../model/graph/layers';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { legendEntries } from '../../model/graph/legendEntries';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
@@ -46,9 +46,15 @@ export function buildHistogramModel(chart: Chart, table: DataTable): XyModel {
   // The level before the first value: 0 for "at or below", the whole (1, 100 or n) for "above". It is part of the path.
   const startLevel = (n: number) => (opts.ecdfDirection === 'atOrBelow' ? 0 : scaleOf(n));
 
-  // 2. The axes: the value axis over the edges (or the values), the other from zero to the largest height.
-  const allX = histogram ? edges : pooled;
-  const allY = histogram ? bins.flatMap((b) => b?.heights ?? []) : ecdf.flatMap((e) => (e && e.steps.length ? [startLevel(e.n), ...e.steps.map((s) => s.f * scaleOf(e.n))] : []));
+  // 2. The axes: the value axis over the edges (or the values), the other from zero to the largest height. The bins come from all the values;
+  // a data set whose bars (or steps) are kept out of the range (see rangeContribution in model/graph/layers.ts) only adds nothing to the heights.
+  const layerList = layersOf(chart, table);
+  const inRange = (kind: LayerKind, id: string): boolean => layerList.find((l) => l.id === `${id}:${kind}`)?.rangeContribution ?? true;
+  const stepsIn = data.map((d) => inRange('line', d.g.id));
+  const allX = histogram ? edges : stepsIn.every(Boolean) ? pooled : data.flatMap((d, i) => (stepsIn[i] ? d.values : [])).sort((a, b) => a - b);
+  const allY = histogram
+    ? bins.flatMap((b, i) => (inRange('bars', data[i].g.id) ? b?.heights ?? [] : []))
+    : ecdf.flatMap((e, i) => (e && e.steps.length && stepsIn[i] ? [startLevel(e.n), ...e.steps.map((s) => s.f * scaleOf(e.n))] : []));
   const linear = { scale: 'linear' as const, reverse: false };
   const xAxis = resolveAxis(
     { values: allX, includeZero: false, min: chart.xAxis.min ?? (histogram && edges.length > 1 ? edges[0] : null), max: chart.xAxis.max ?? (histogram && edges.length > 1 ? edges[edges.length - 1] : null), majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) },
@@ -129,7 +135,7 @@ export function buildHistogramModel(chart: Chart, table: DataTable): XyModel {
   if (histogram && opts.cumulative !== 'off' && opts.frequency === 'density') warnings.push('A cumulative histogram of a density shows the cumulative fraction.');
   if (histogram && edges.length > 400) warnings.push('There are very many bins; set a larger bin width.');
 
-  const model: XyModel = { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit: NO_FIT_SETTINGS, layers: layersOf(chart, table) };
+  const model: XyModel = { widthPt: W, heightPt: H, layout, x: xAxis, y: yAxis, xScale, yScale, series, legendSeries, warnings: [...new Set(warnings)], fit: NO_FIT_SETTINGS, layers: layerList };
   attachLazyScene(chart, model);
   return model;
 }

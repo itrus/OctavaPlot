@@ -24,6 +24,8 @@ Also on 27 October 2026 (after roadmap steps 1 to 3): the glyph checks of P2 (se
 
 Not done from the lists: OP-032 (in full), and the P8 items not named above.
 
+Looks per part and the axis-range switch beyond XY and survival (roadmap P1, 28 October 2026): **done and tested** for column (dots, error bars, mean lines, joins, paired-plot lines; range: error bars, dots, the body of a box, violin or floating bar), grouped (error bars, individual values, centre lines, the line and means of lines over categories; range: error bars, dots, box, violin and floating bodies) and histogram (steps and symbols of a cumulative distribution; range: the bars of a histogram, the steps of a cumulative one). Before the change the drawing of 100 setups was recorded (`src/chart/export/__snapshots__/family-baseline.json`, one hash per SVG) and it is unchanged. **Not done, on purpose:** pie and heat map (no part has a look to set, and neither has an axis); a look for bars, boxes and violins (they keep the fill settings of the data set); dashed joins in column and grouped charts (they are drawn solid, so no pattern is offered); the X range of a histogram (it is the bin grid, a calculation, and stays). Stacked bars and contingency charts are ranged by their totals and get no switch. **Not tried in a browser:** the Layers section of the column, grouped and histogram inspectors with the new controls (it is the XY section reused; only the code and the layer rows are tested).
+
 ---
 
 ## 1. Defects (roadmap P0 Correctness)

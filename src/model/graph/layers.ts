@@ -3,12 +3,12 @@ import { centreLower } from '../../stats/summary';
 import { resolveStyle, dataLayer } from './style';
 import { resolveSummary } from './summary';
 import { layoutOf, xySeries } from '../table/tableLayout';
-import type { Chart, ChartStyle, DataTable, Id, LayerStyle, LineStyle, SymbolShape } from '../types';
+import type { Chart, ChartStyle, ChartType, DataTable, Id, LayerStyle, LineStyle, SymbolShape } from '../types';
 
 /**
  * The graphical layers of a chart (roadmap P1). The layers are derived from the chart and its table, not stored; what the user
- * decides about them (hidden, kept out of the axis range, their own look, their order) is kept on the chart by layer ID. XY,
- * survival, column and grouped charts are drawn from them; histogram, pie and heat map follow.
+ * decides about them (hidden, kept out of the axis range, their own look, their order) is kept on the chart by layer ID. Every family is
+ * drawn from them. Which parts take a look (lookKeysOf) or a place in the axis range (rangeKindsOf) depends on the chart type.
  */
 export type LayerKind = 'atRisk' | 'band' | 'area' | 'bars' | 'distribution' | 'meanLine' | 'pairLines' | 'labels' | 'titles' | 'colourBar' | 'rawPoints' | 'points' | 'line' | 'errorBars' | 'fitCurve' | 'fitBand' | 'referenceLine' | 'annotation';
 
@@ -26,14 +26,17 @@ export interface LayerSpec {
   enabled: boolean;
   /** Hidden, the layer is not drawn but everything it calculates stays as it was. */
   visible: boolean;
-  /** Whether the layer's values are part of what the axis range is fitted to (XY charts read it for the points, the individual values, the error bars and the fit curve). */
+  /** Whether the layer's values are part of what the axis range is fitted to (see rangeKindsOf for the parts each chart type reads it for). */
   rangeContribution: boolean;
   /** Drawing order, lowest first. */
   z: number;
 }
 
-/** Whether a layer can be given a look of its own (XY and survival charts; the others draw in the look of the data set). */
-export const layerStylesAvailable = (chart: Chart): boolean => ['xy', 'survival'].includes(chartFamily(chart.type));
+/**
+ * Whether the parts of a chart can be given a look of their own: XY, survival, column, grouped and histogram charts. A pie draws its
+ * slices in the colours of its parts and a heat map its cells in its colour scale, so neither has parts that take a look.
+ */
+export const layerStylesAvailable = (chart: Chart): boolean => ['xy', 'survival', 'column', 'grouped', 'histogram'].includes(chartFamily(chart.type));
 
 /**
  * The layers of an XY or survival chart, lowest first: reference lines, then kind by kind over all series the line, the fit band, the fit
@@ -174,15 +177,16 @@ function groupedLayers(chart: Chart, table: DataTable): Array<Omit<LayerSpec, 'z
   const type = chart.type;
   const layer = dataLayer(chart);
   const series = xySeries(table).map((s, i) => ({ s, style: resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? i }) }));
-  const perSeries = (kind: LayerKind, on: boolean, visible: (st: ChartStyle) => boolean, calc = false) =>
-    on ? series.map(({ s, style }) => ({ id: `${s.id}:${kind}`, kind, binding: { tableId: table.id, seriesId: s.id }, calc: calc ? ({ kind: 'summary', seriesId: s.id } as CalcRef) : null, enabled: true, visible: visible(style), rangeContribution: true })) : [];
+  // Error bars and individual values are part of the axis range only while they are on.
+  const perSeries = (kind: LayerKind, on: boolean, visible: (st: ChartStyle) => boolean, calc = false, range: (st: ChartStyle) => boolean = () => true) =>
+    on ? series.map(({ s, style }) => ({ id: `${s.id}:${kind}`, kind, binding: { tableId: table.id, seriesId: s.id }, calc: calc ? ({ kind: 'summary', seriesId: s.id } as CalcRef) : null, enabled: true, visible: visible(style), rangeContribution: range(style) })) : [];
   const dist = type === 'groupedBox' || type === 'groupedViolin';
   const bars = perSeries('bars', type !== 'groupedLine', (st) => st.showBars, true);
   const centres = perSeries('meanLine', type === 'groupedBar' || type === 'groupedFloating', (st) => st.showMeanLine, true);
   const line = perSeries('line', type === 'groupedLine', (st) => st.showLines, true);
-  const errors = perSeries('errorBars', type === 'groupedBar' || type === 'groupedLine', (st) => st.showErrorBars, true);
+  const errors = perSeries('errorBars', type === 'groupedBar' || type === 'groupedLine', (st) => st.showErrorBars, true, (st) => st.showErrorBars);
   const means = perSeries('points', type === 'groupedLine', (st) => st.showSymbols);
-  const values = perSeries('rawPoints', type === 'groupedBar' || type === 'groupedFloating' || dist, (st) => st.showSymbols);
+  const values = perSeries('rawPoints', type === 'groupedBar' || type === 'groupedFloating' || dist, (st) => st.showSymbols, false, (st) => st.showSymbols);
   const body = [...bars, ...centres];
   const lines = [...line, ...errors];
   const symbols = [...means, ...values];
@@ -208,9 +212,10 @@ function columnLayers(chart: Chart, table: DataTable): Array<Omit<LayerSpec, 'z'
   const dist = type === 'box' || type === 'violin' || type === 'floating';
   const style = dataLayer(chart);
   const groups = table.groups.map((group) => ({ group, style: resolveStyle(chart, style, group) }));
-  const perGroup = (kind: LayerKind, on: boolean, visible: (st: ChartStyle) => boolean, calc = false, ends = 0) =>
+  // Error bars and individual values are part of the axis range only while they are on; the rest is as the chart type gives it.
+  const perGroup = (kind: LayerKind, on: boolean, visible: (st: ChartStyle) => boolean, calc = false, ends = 0, range: (st: ChartStyle) => boolean = () => true) =>
     on
-      ? groups.slice(0, groups.length - ends).map(({ group, style: st }) => ({ id: `${group.id}:${kind}`, kind, binding: { tableId: table.id, seriesId: group.id }, calc: calc ? ({ kind: 'summary', seriesId: group.id } as CalcRef) : null, enabled: true, visible: visible(st), rangeContribution: true }))
+      ? groups.slice(0, groups.length - ends).map(({ group, style: st }) => ({ id: `${group.id}:${kind}`, kind, binding: { tableId: table.id, seriesId: group.id }, calc: calc ? ({ kind: 'summary', seriesId: group.id } as CalcRef) : null, enabled: true, visible: visible(st), rangeContribution: range(st) }))
       : [];
   const bars = perGroup('bars', type !== 'violin', (st) => st.showBars, true);
   const body = perGroup('distribution', dist, () => true, true);
@@ -219,9 +224,9 @@ function columnLayers(chart: Chart, table: DataTable): Array<Omit<LayerSpec, 'z'
       ? [{ id: `${chart.id}:pairLines`, kind: 'pairLines' as LayerKind, binding: null, calc: null, enabled: true, visible: groups[0].style.showLines, rangeContribution: true }]
       : [];
   const joins = perGroup('line', type === 'mean', (st) => st.showLines, true, 1);
-  const errors = perGroup('errorBars', !dist, (st) => st.showErrorBars, true);
+  const errors = perGroup('errorBars', !dist, (st) => st.showErrorBars, true, 0, (st) => st.showErrorBars);
   const means = perGroup('meanLine', type === 'scatter' || type === 'paired', (st) => st.showMeanLine, true);
-  const points = perGroup('points', true, (st) => st.showSymbols);
+  const points = perGroup('points', true, (st) => st.showSymbols, false, 0, (st) => st.showSymbols);
   const lines = [...pairLines, ...joins, ...errors, ...means];
   // The labels of the bars: above everything else the chart draws from its data sets.
   const labels = hasBarLabels(chart) ? groups.map(({ group }) => ({ id: `${group.id}:labels`, kind: 'labels' as LayerKind, binding: { tableId: table.id, seriesId: group.id }, calc: null, enabled: true, visible: true, rangeContribution: false })) : [];
@@ -288,8 +293,48 @@ const LAYER_NAMES: Record<LayerKind, string> = {
   annotation: 'Annotation',
 };
 
-/** The kinds of layer whose values the axis range reads, and so can be left out of it. */
-const RANGE_KINDS: ReadonlyArray<LayerKind> = ['points', 'rawPoints', 'errorBars', 'fitCurve'];
+/**
+ * The kinds of layer whose values the axis range reads, and so can be left out of it, by chart type. A centre (the top of a bar, a mean)
+ * is the chart's data and always counts, so what can be left out is what is added around it: error bars, the individual values, the body of
+ * a box plot, violin or floating bar, the bars of a histogram, the steps of a cumulative distribution. Survival axes are fixed, a pie and a
+ * heat map have no axis, and stacked bars are ranged by their totals.
+ */
+export function rangeKindsOf(type: ChartType): ReadonlyArray<LayerKind> {
+  switch (type) {
+    case 'xyScatter':
+    case 'xyLine':
+    case 'xyLineSymbols':
+    case 'xySpikes':
+    case 'xyArea':
+      return ['points', 'rawPoints', 'errorBars', 'fitCurve'];
+    case 'bar':
+    case 'scatter':
+    case 'paired':
+      return ['errorBars', 'points'];
+    case 'mean':
+      return ['errorBars'];
+    case 'box':
+    case 'violin':
+      return ['distribution', 'points'];
+    case 'floating':
+      return ['bars'];
+    case 'groupedBar':
+      return ['errorBars', 'rawPoints'];
+    case 'groupedLine':
+      return ['errorBars'];
+    case 'groupedFloating':
+      return ['bars'];
+    case 'groupedBox':
+    case 'groupedViolin':
+      return ['bars', 'rawPoints'];
+    case 'histogram':
+      return ['bars'];
+    case 'ecdf':
+      return ['line'];
+    default:
+      return [];
+  }
+}
 
 export interface LayerRow {
   layer: LayerSpec;
@@ -408,10 +453,10 @@ export function layerRows(chart: Chart, table: DataTable, seriesName: (id: Id, f
       const rangeByStyle = byRange.get(layer.id) ?? false;
       return {
         layer,
-        inRange: family === 'xy' && RANGE_KINDS.includes(layer.kind) && rangeByStyle ? layer.rangeContribution : null,
+        inRange: rangeKindsOf(chart.type).includes(layer.kind) && rangeByStyle ? layer.rangeContribution : null,
         label: labelOf(layer),
         shown: layer.visible,
-        takes: layerStylesAvailable(chart) ? STYLABLE_LAYERS[layer.kind] ?? null : null,
+        takes: layerStylesAvailable(chart) ? lookKeysOf(chart.type, layer.kind) : null,
         canMoveUp: at >= 0 && at < orderable.length - 1,
         canMoveDown: at > 0,
         canToggle: styleOn,
@@ -428,9 +473,47 @@ const STYLABLE_LAYERS: Partial<Record<LayerKind, ReadonlyArray<keyof LayerStyle>
   errorBars: ['color', 'widthPt', 'opacity'],
   points: ['color', 'widthPt', 'opacity', 'shape'],
   rawPoints: ['color', 'widthPt', 'opacity', 'shape'],
+  meanLine: ['color', 'widthPt', 'opacity'],
+  pairLines: ['color', 'widthPt', 'opacity'],
   fitCurve: ['color', 'widthPt', 'lineStyle', 'opacity'],
   fitBand: ['color', 'opacity'],
 };
+
+/**
+ * The settings a kind of layer takes in a chart of this type: those of STYLABLE_LAYERS that the drawing of the type honours, so that
+ * no setting is offered that changes nothing, and none for a part the type does not have. A column chart does not draw its joining lines dashed, the dots
+ * of a box plot or a violin have a shape of their own, and the bodies (bars, boxes, violins, slices, cells) are styled with the data set's fill, not here.
+ */
+export function lookKeysOf(type: ChartType, kind: LayerKind): ReadonlyArray<keyof LayerStyle> | null {
+  const keys = STYLABLE_LAYERS[kind];
+  if (!keys) return null;
+  const family = chartFamily(type);
+  if (family === 'xy' || family === 'survival') return keys;
+  const without = (...drop: Array<keyof LayerStyle>) => keys.filter((k) => !drop.includes(k));
+  /** The kinds each chart type draws that take a look: the others have no such part, so there is nothing to give a look to. */
+  const draws = (types: ReadonlyArray<ChartType>) => types.includes(type);
+  switch (family) {
+    case 'column':
+      if (kind === 'errorBars') return draws(['bar', 'scatter', 'mean', 'paired']) ? keys : null;
+      if (kind === 'points') return keys;
+      if (kind === 'meanLine') return draws(['scatter', 'paired']) ? keys : null;
+      if (kind === 'pairLines') return draws(['paired']) ? keys : null;
+      if (kind === 'line') return draws(['mean']) ? without('lineStyle') : null;
+      return null;
+    case 'grouped':
+      if (kind === 'errorBars') return draws(['groupedBar', 'groupedLine']) ? keys : null;
+      if (kind === 'points') return draws(['groupedLine']) ? keys : null;
+      if (kind === 'line') return draws(['groupedLine']) ? keys : null;
+      if (kind === 'meanLine') return draws(['groupedBar', 'groupedFloating']) ? keys : null;
+      // The dots of a box plot or a violin have a fixed shape.
+      if (kind === 'rawPoints') return draws(['groupedBox', 'groupedViolin']) ? without('shape') : draws(['groupedBar', 'groupedFloating']) ? keys : null;
+      return null;
+    case 'histogram':
+      return type === 'ecdf' && (kind === 'line' || kind === 'points') ? keys : null;
+    default:
+      return null;
+  }
+}
 
 /**
  * The settings of a series that a setting of its layer stands for. A layer's own setting wins over the series' (the most specific
@@ -441,6 +524,8 @@ const PART_KEYS: Partial<Record<LayerKind, Partial<Record<keyof LayerStyle, Read
   errorBars: { color: ['errorColor'], widthPt: ['errorLineWidthPt'], opacity: ['errorOpacity'] },
   points: { color: ['symbolColor', 'symbolBorderColor'], widthPt: ['symbolBorderWidthPt'], opacity: ['symbolFillOpacity'], shape: ['symbolShape'] },
   rawPoints: { color: ['symbolColor', 'symbolBorderColor'], widthPt: ['symbolBorderWidthPt'], opacity: ['symbolFillOpacity'], shape: ['symbolShape'] },
+  meanLine: { color: ['lineColor'], widthPt: ['lineWidthPt'], opacity: ['lineOpacity'] },
+  pairLines: { color: ['lineColor'], widthPt: ['lineWidthPt'], opacity: ['lineOpacity'] },
   fitCurve: { color: ['lineColor'], widthPt: ['lineWidthPt'], lineStyle: ['lineStyle'] },
   fitBand: { color: ['lineColor'] },
   band: { color: ['lineColor'] },
@@ -448,7 +533,7 @@ const PART_KEYS: Partial<Record<LayerKind, Partial<Record<keyof LayerStyle, Read
 };
 
 /** The layers drawn in the look of their series with the layer's own settings over it (the others have a look of their own, see layerLook). */
-const SERIES_LOOK_KINDS: ReadonlyArray<LayerKind> = ['line', 'errorBars', 'points', 'rawPoints'];
+const SERIES_LOOK_KINDS: ReadonlyArray<LayerKind> = ['line', 'errorBars', 'points', 'rawPoints', 'meanLine', 'pairLines'];
 
 const SYMBOL_SHAPES: ReadonlyArray<SymbolShape> = ['circle', 'square', 'triangle', 'triangleDown', 'diamond', 'hexagon', 'star', 'target', 'plus', 'cross', 'asterisk'];
 
@@ -461,6 +546,27 @@ export function partStyle(chart: Chart, layerId: Id, style: ChartStyle): ChartSt
   const out: Record<string, unknown> = { ...style };
   for (const [setting, value] of Object.entries(own)) for (const key of keys[setting as keyof LayerStyle] ?? []) out[key] = value;
   return out as unknown as ChartStyle;
+}
+
+/**
+ * The look of the data set a layer belongs to, before the layer's own settings: what the inspector shows for a setting the layer has not
+ * been given. A layer of the chart as a whole (the lines joining the rows of a paired plot) takes the first data set's.
+ */
+export function layerBaseStyle(chart: Chart, table: DataTable, layer: Pick<LayerSpec, 'binding' | 'kind'>): ChartStyle | null {
+  const id = layer.binding?.seriesId ?? (layer.kind === 'pairLines' ? table.groups[0]?.id : undefined);
+  if (id === undefined) return null;
+  const family = chartFamily(chart.type);
+  if (family === 'column') {
+    const group = table.groups.find((g) => g.id === id);
+    return group ? resolveStyle(chart, dataLayer(chart), group) : null;
+  }
+  if (family === 'histogram') {
+    const at = table.groups.findIndex((g) => g.id === id);
+    return at < 0 ? null : resolveStyle(chart, dataLayer(chart), { id, paletteIndex: table.groups[at].paletteIndex ?? at });
+  }
+  const series = xySeries(table);
+  const at = series.findIndex((s) => s.id === id);
+  return at < 0 ? null : resolveStyle(chart, dataLayer(chart), { id, paletteIndex: series[at].columns[0].seriesSlot ?? at });
 }
 
 /** The look the Layers section shows for a layer that takes one: its own settings, else those of its series. */
@@ -503,7 +609,10 @@ export const DEFAULT_BAND_OPACITY = 0.2;
 const LINE_STYLE_VALUES: readonly LineStyle[] = ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'];
 
 /** The layer kind of a layer ID (`${object id}:${kind}`), or null. */
-const layerKindOf = (layerId: Id): LayerKind | null => {
+/** Whether some part of a chart of this type takes a look of its own. */
+export const hasPartLooks = (type: ChartType): boolean => (Object.keys(STYLABLE_LAYERS) as LayerKind[]).some((kind) => lookKeysOf(type, kind) !== null);
+
+export const layerKindOf = (layerId: Id): LayerKind | null => {
   const kind = layerId.slice(layerId.lastIndexOf(':') + 1);
   return kind in LAYER_NAMES ? (kind as LayerKind) : null;
 };

@@ -37,11 +37,14 @@ describe('the layers of a histogram and a cumulative distribution', () => {
     expect(z(chartOf('ecdf', { lineOrder: 'onTop' }), 'points')).toBeLessThan(z(chartOf('ecdf', { lineOrder: 'onTop' }), 'line'));
   });
 
-  it('say what is switched off in Style, and take no look of their own', () => {
+  it('say what is switched off in Style; the bars take no look of their own and the steps and symbols do', () => {
     const rows = layerRows(chartOf('ecdf'), table);
     expect(rows.filter((r) => r.layer.kind === 'points').every((r) => !r.canToggle && r.reason !== null)).toBe(true);
     expect(rows.filter((r) => r.layer.kind === 'line').every((r) => r.canToggle)).toBe(true);
-    expect(rows.every((r) => r.takes === null && r.inRange === null)).toBe(true);
+    expect(rows.filter((r) => r.layer.kind === 'line' || r.layer.kind === 'points').every((r) => r.takes !== null)).toBe(true);
+    expect(rows.filter((r) => r.layer.kind === 'line').every((r) => r.inRange === true)).toBe(true);
+    expect(rows.filter((r) => r.layer.kind === 'points').every((r) => r.inRange === null)).toBe(true);
+    expect(layerRows(chartOf('histogram'), table).every((r) => r.takes === null && r.inRange === true)).toBe(true);
     expect(layerRows(chartOf('histogram'), table).map((r) => r.label.split(':')[0])).toEqual(table.groups.map(() => 'Bars'));
     expect(rows.map((r) => r.label.split(':')[0])).toEqual(expect.arrayContaining(['Steps', 'Symbols']));
   });

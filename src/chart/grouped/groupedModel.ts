@@ -16,7 +16,7 @@ import { computeLayout, type Layout } from '../shared/parts/layout';
 import { barLabelText, insideLabelText, placeBarLabel, placeInsideBarLabel, type BarLabelGeom, type InsideLabelGeom } from '../shared/parts/barLabels';
 import { axisMapper, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
-import { layersOf, type LayerSpec } from '../../model/graph/layers';
+import { layersOf, type LayerKind, type LayerSpec } from '../../model/graph/layers';
 import { compileGroupedMarks } from './groupedMarks';
 import type { ChromeScene } from '../shared/scene/scene';
 import type { SceneElement } from '../shared/scene/sceneElement';
@@ -205,24 +205,31 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   // Individual values are shown over bars of replicates, not over lines or counts.
   if (isDist && layout.kind !== 'replicates') warnings.push('Box plots and violins need the replicate values: enter the data as replicates.');
   const showDots = (style: ChartStyle) => (chart.type === 'groupedBar' || floating) && layout.kind === 'replicates' && style.showSymbols;
-  /** What a cell of a box plot or violin occupies on the value axis. */
-  const distShow = (c: (typeof raw)[number]['cells'][number], style: ChartStyle): number[] => {
+  // A part kept out of the range (see rangeContribution in model/graph/layers.ts) adds nothing to it; the centre of a bar is the data and always counts.
+  const layerList = layersOf(chart, table);
+  const inRange = (kind: LayerKind, seriesId: Id): boolean => layerList.find((l) => l.id === `${seriesId}:${kind}`)?.rangeContribution ?? true;
+  /** What a cell of a box plot or violin occupies on the value axis: the body, then the dots on it (a layer of their own). */
+  const distShow = (c: (typeof raw)[number]['cells'][number], style: ChartStyle, seriesId: Id): number[] => {
     const d = c.dist;
     if (!d) return [];
-    const out: number[] = [];
-    if (d.summary) out.push(d.summary.whiskerLow, d.summary.whiskerHigh, d.summary.q1, d.summary.q3, ...(style.showSymbols ? (opts.points === 'all' ? [d.summary.min, d.summary.max] : opts.points === 'outside' ? d.summary.outliers : []) : []));
-    if (chart.type === 'groupedViolin') {
-      if (d.profile) out.push(d.profile.v[0], d.profile.v[d.profile.v.length - 1]);
-      else out.push(...d.sorted);
-      if (opts.points === 'all' && style.showSymbols && d.sorted.length) out.push(d.sorted[0], d.sorted[d.sorted.length - 1]);
+    const body: number[] = [];
+    const dots: number[] = [];
+    if (d.summary) {
+      body.push(d.summary.whiskerLow, d.summary.whiskerHigh, d.summary.q1, d.summary.q3);
+      dots.push(...(style.showSymbols ? (opts.points === 'all' ? [d.summary.min, d.summary.max] : opts.points === 'outside' ? d.summary.outliers : []) : []));
     }
-    return out;
+    if (chart.type === 'groupedViolin') {
+      if (d.profile) body.push(d.profile.v[0], d.profile.v[d.profile.v.length - 1]);
+      else body.push(...d.sorted);
+      if (opts.points === 'all' && style.showSymbols && d.sorted.length) dots.push(d.sorted[0], d.sorted[d.sorted.length - 1]);
+    }
+    return [...(inRange('bars', seriesId) ? body : []), ...(inRange('rawPoints', seriesId) ? dots : [])];
   };
   const allY =
     isDist
-      ? raw.flatMap((r) => r.cells.flatMap((c) => distShow(c, r.style)))
+      ? raw.flatMap((r) => r.cells.flatMap((c) => distShow(c, r.style, r.s.id)))
       : arrangement === 'side'
-      ? raw.flatMap((r) => r.cells.flatMap((c) => (c.value === null ? [] : floating ? (c.span ? [...c.span, c.value] : []) : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars, r.style.errorDirection) : [c.value]), ...(showDots(r.style) ? c.reps.map((x) => x.value) : [])])))
+      ? raw.flatMap((r) => r.cells.flatMap((c) => (c.value === null ? [] : floating ? (c.span && inRange('bars', r.s.id) ? [...c.span, c.value] : []) : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars && inRange('errorBars', r.s.id), r.style.errorDirection) : [c.value]), ...(showDots(r.style) && inRange('rawPoints', r.s.id) ? c.reps.map((x) => x.value) : [])])))
       : stackedTotals;
   const horizontal = chart.orientation === 'horizontal' && supportsHorizontal(chart.type);
   const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? W / 120 : H / 100)));

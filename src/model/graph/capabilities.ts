@@ -1,4 +1,5 @@
 import { CHART_TYPES, chartFamily, isSeriesColourType, supportsHorizontal } from './chartTypes';
+import { hasPartLooks, rangeKindsOf } from './layers';
 import type { ChartType } from '../types';
 
 /**
@@ -23,6 +24,10 @@ export interface Capabilities {
   seriesColour: boolean;
   /** Survival options: confidence band, at-risk table, event symbols. */
   survivalOptions: boolean;
+  /** Some part (the error bars, the dots, a line, the fit curve ...) can be given a look of its own, over that of its data set. */
+  partLooks: boolean;
+  /** Some part can be kept out of what the axis range is fitted to, without being hidden. */
+  rangeSwitch: boolean;
   /** The chart has numeric axes that can be broken, reversed or put on a log scale. */
   numericAxes: boolean;
 }
@@ -56,6 +61,8 @@ export function capabilitiesOf(type: ChartType): Capabilities {
     seriesColour: isSeriesColourType(type),
     survivalOptions: family === 'survival',
     numericAxes: family !== 'pie' && family !== 'heatmap',
+    partLooks: hasPartLooks(type),
+    rangeSwitch: rangeKindsOf(type).length > 0,
   };
 }
 
@@ -72,7 +79,7 @@ export function capabilityTable(): string {
   const rows = CHART_TYPES.map((c) => {
     const k = capabilitiesOf(c.type);
     const lines = k.referenceLines === 'xy' ? 'X and Y' : k.referenceLines === 'y' ? 'Y' : '–';
-    return `| ${c.label} | ${yes(k.horizontal)} | ${lines} | ${yes(k.secondaryAxis)} | ${yes(k.curveFit)} | ${yes(k.lineConnect)} | ${yes(k.survivalOptions)} |`;
+    return `| ${c.label} | ${yes(k.horizontal)} | ${lines} | ${yes(k.secondaryAxis)} | ${yes(k.curveFit)} | ${yes(k.lineConnect)} | ${yes(k.survivalOptions)} | ${yes(k.partLooks)} | ${yes(k.rangeSwitch)} |`;
   });
-  return ['| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options |', '|---|---|---|---|---|---|---|', ...rows].join('\n');
+  return ['| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options | Look per part | Keep out of range |', '|---|---|---|---|---|---|---|---|---|', ...rows].join('\n');
 }
