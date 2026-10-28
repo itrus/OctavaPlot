@@ -16,6 +16,7 @@ import { axisMapper, inBreak, onAxis, polylinesThroughBreaks, resolveAxis } from
 import type { YAxisScale } from '../shared/axes/scales';
 import { displayName } from '../shared/parts/names';
 import { suppliedStats } from '../../model/table/suppliedStats';
+import { hasSubjects } from '../../model/table/subjects';
 import { attachLazyScene } from './xyScene';
 
 /** One plotted point of an XY series: a single Y value, or the centre of replicate / supplied-summary values. */
@@ -259,6 +260,7 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
   const yScale = axisMapper(yAxis, plot.y + plot.height, -plot.height);
 
   // 4. Geometry.
+  if (chart.lineConnect === 'subject' && !hasSubjects(table)) warnings.push('Lines are drawn for each subject, but no value has a subject: name the subjects in the data table (Subject…).');
   let clipped = 0;
   let offAxis = 0;
   // Values inside an omitted range of a broken axis, and error bars with an end inside one: not drawn, and counted.
@@ -277,7 +279,22 @@ export function buildXyModel(chart: Chart, table: DataTable, fit: FitSettings = 
     // A run ends where a row between two drawn points is missing (Y or X), so a gap is a gap in the line.
     // Joined in ascending X instead, a row with an X but no drawable Y (empty, or off a log axis) cuts the line at its sorted place; a row with no X is not there at all.
     const seq: Array<{ x: number; y: number } | null> = [];
-    if (chart.lineConnect === 'x') {
+    if (chart.lineConnect === 'subject') {
+      // One run for each subject, in order of first appearance, joined from the lowest X to the highest. A point with no subject is not joined to anything.
+      const column = r.s.columns[0].observations;
+      const bySubject = new Map<string, typeof drawn>();
+      let loose = 0;
+      for (const p of drawn) {
+        const subject = column[p.row]?.subject ?? '';
+        if (subject === '') loose++;
+        else bySubject.set(subject, [...(bySubject.get(subject) ?? []), p]);
+      }
+      for (const list of bySubject.values()) {
+        seq.push(null);
+        for (const p of [...list].sort((a, b) => a.x - b.x || a.row - b.row)) seq.push({ x: p.x, y: p.y });
+      }
+      if (loose > 0 && bySubject.size > 0) warnings.push(`${r.label}: ${loose} point${loose === 1 ? ' has' : 's have'} no subject and ${loose === 1 ? 'is' : 'are'} not joined by a line.`);
+    } else if (chart.lineConnect === 'x') {
       const drawnRows = new Set(drawn.map((p) => p.row));
       const visits = [...drawn.map((p) => ({ row: p.row, x: p.x, at: { x: p.x, y: p.y } as { x: number; y: number } | null })), ...r.gapXs.map((g) => ({ ...g, at: null })), ...r.pts.filter((p) => !drawnRows.has(p.row)).map((p) => ({ row: p.row, x: p.x, at: null }))];
       visits.sort((a, b) => a.x - b.x || a.row - b.row);

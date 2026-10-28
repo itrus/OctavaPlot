@@ -309,8 +309,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <SelectInput<LineStyle> value={st.lineStyle} disabled={!st.showLines} options={LINE_STYLES.map((l) => ({ value: l.value, label: l.label }))} onChange={(v) => setStyle({ lineStyle: v })} />
                 </Field>
                 {family === 'xy' && capabilitiesOf(chart.type).lineConnect && (
-                  <Field label="Connect points in" hint="Table order joins the points as the rows run. Ascending X joins them from the lowest X to the highest; the table, the symbols and the fit do not change.">
-                    <SelectInput<LineConnect> value={chart.lineConnect} options={[{ value: 'table', label: 'Table order' }, { value: 'x', label: 'Ascending X' }]} onChange={(v) => run('Connect points in', patchLook(chart.id, { lineConnect: v }))} />
+                  <Field label="Connect points in" hint="Table order joins the points as the rows run. Ascending X joins them from the lowest X to the highest. One line for each subject joins the points of each subject (see Subject… in the data table) from the lowest X to the highest; points with no subject are not joined. The table, the symbols and the fit do not change.">
+                    <SelectInput<LineConnect> value={chart.lineConnect} options={[{ value: 'table', label: 'Table order' }, { value: 'x', label: 'Ascending X' }, { value: 'subject', label: 'One line for each subject' }]} onChange={(v) => run('Connect points in', patchLook(chart.id, { lineConnect: v }))} />
                   </Field>
                 )}
                 <div className="muted small">{family === 'survival' ? 'The Kaplan-Meier estimate, a step at each event time.' : family === 'grouped' ? 'The means of each series are joined across the categories.' : 'Points are joined in the order of the table rows; a missing Y value breaks the line.'}</div>

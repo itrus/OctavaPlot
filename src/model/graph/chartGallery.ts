@@ -40,7 +40,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('xy.spikes', 'Spikes', 'Thin lines from the baseline up to each point.', 'xySpikes', 'xy.spikes'),
         item('xy.vector', 'Vectors', 'Arrows from the origin or between two points.', null, 'xy.vector'),
         item('xy.bubble', 'Bubbles', 'Symbols sized or coloured by another column.', null, 'xy.bubble'),
-        item('xy.trajectory', 'Repeated measures', 'One line per subject, for example before and after.', null, 'xy.trajectory'),
+        item('xy.trajectory', 'Repeated measures', 'One line per subject, for example before and after: name the subjects in the table (Subject…).', 'xyLineSymbols', 'xy.trajectory', { lineConnect: 'subject' }),
         item('xy.offset', 'Offset traces', 'Several series stacked with a fixed offset and a scale bar.', null, 'xy.offset_traces'),
         item('curve.fit', 'Points with a fitted curve', 'A fitted line with its confidence band; choose another model in the panel.', 'xyScatter', 'curve.fit', { fit: { model: 'linear', band: 'confidence' } }),
         item('curve.smooth', 'Smooth curve', 'A spline or LOWESS curve through the points.', null, 'curve.smooth'),

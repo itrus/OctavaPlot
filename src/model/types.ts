@@ -412,7 +412,8 @@ export interface InsideBarLabel {
 /** Pattern of a line: solid, dashed or dotted. */
 export type LineOrder = 'auto' | 'onTop' | 'underneath';
 /** The order an XY line joins its points in: the rows of the table, or ascending X. */
-export type LineConnect = 'table' | 'x';
+/** How the points of an XY series are joined: as the rows run, from the lowest X to the highest, or one line for each subject (in ascending X). */
+export type LineConnect = 'table' | 'x' | 'subject';
 export type LineStyle = 'solid' | 'longDash' | 'dashed' | 'dotted' | 'dashDot' | 'dashDotDot';
 /** The frame round the plotting region: none, or a box (spec 6.2 frame.mode). */
 export type FrameStyle = 'none' | 'box';
