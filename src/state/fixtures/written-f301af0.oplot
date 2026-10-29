@@ -1,0 +1,1652 @@
+{
+  "format": "octavaplot-project",
+  "version": 1,
+  "project": {
+    "id": "project_csrotdti2y",
+    "name": "Old file f301af0",
+    "dataTables": [
+      {
+        "id": "table_kk25bxs81",
+        "name": "Data 1",
+        "kind": "column",
+        "rowCount": 12,
+        "rows": [
+          {
+            "id": "row_ay0v7mmv2",
+            "title": ""
+          },
+          {
+            "id": "row_no7oh8in3",
+            "title": ""
+          },
+          {
+            "id": "row_h1e51lbx4",
+            "title": ""
+          },
+          {
+            "id": "row_ai1mw81x5",
+            "title": ""
+          },
+          {
+            "id": "row_85uuyzj16",
+            "title": ""
+          },
+          {
+            "id": "row_r1duzi7c7",
+            "title": ""
+          },
+          {
+            "id": "row_ycqy3qw58",
+            "title": ""
+          },
+          {
+            "id": "row_8wuwf1gx9",
+            "title": ""
+          },
+          {
+            "id": "row_f9qvgfa8a",
+            "title": ""
+          },
+          {
+            "id": "row_e6bsqppkb",
+            "title": ""
+          },
+          {
+            "id": "row_9xsbp713c",
+            "title": ""
+          },
+          {
+            "id": "row_sbq6s0r2d",
+            "title": ""
+          }
+        ],
+        "groups": [
+          {
+            "id": "grp_z5veht7fm",
+            "name": "Group A",
+            "title": "",
+            "paletteIndex": 0,
+            "observations": [
+              {
+                "id": "obs_9iwmfb8sn",
+                "value": 1.1
+              },
+              {
+                "id": "obs_fekppti3o",
+                "value": 1.2
+              },
+              {
+                "id": "obs_0zo97tacp",
+                "value": 1.3
+              },
+              {
+                "id": "obs_twoajxmzq",
+                "value": 1.2
+              },
+              {
+                "id": "obs_xvarwpvzr",
+                "value": 1.4
+              },
+              {
+                "id": "obs_lqbu1wzfs",
+                "value": null
+              },
+              {
+                "id": "obs_sfsdq2umt",
+                "value": null
+              },
+              {
+                "id": "obs_dx90qacyu",
+                "value": null
+              },
+              {
+                "id": "obs_hb12vkiav",
+                "value": null
+              },
+              {
+                "id": "obs_x27jttf8w",
+                "value": null
+              },
+              {
+                "id": "obs_38hq0ls9x",
+                "value": null
+              },
+              {
+                "id": "obs_sdeghgwhy",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "grp_gdmyk84k17",
+            "name": "Group B",
+            "title": "",
+            "paletteIndex": 1,
+            "observations": [
+              {
+                "id": "obs_sddfecwt18",
+                "value": 1.4
+              },
+              {
+                "id": "obs_r6hrgws919",
+                "value": 1.7
+              },
+              {
+                "id": "obs_0a3kuvcp1a",
+                "value": 1.6
+              },
+              {
+                "id": "obs_17lvl4261b",
+                "value": 1.8
+              },
+              {
+                "id": "obs_zab9mxxs1c",
+                "value": 1.5
+              },
+              {
+                "id": "obs_snhv6pyr1d",
+                "value": null
+              },
+              {
+                "id": "obs_ulsvsjlj1e",
+                "value": null
+              },
+              {
+                "id": "obs_2oqgsqry1f",
+                "value": null
+              },
+              {
+                "id": "obs_1lrksnj11g",
+                "value": null
+              },
+              {
+                "id": "obs_mpovap2u1h",
+                "value": null
+              },
+              {
+                "id": "obs_gyx4rwh01i",
+                "value": null
+              },
+              {
+                "id": "obs_qw64twp71j",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "grp_1zunpqx41s",
+            "name": "Group C",
+            "title": "",
+            "paletteIndex": 2,
+            "observations": [
+              {
+                "id": "obs_lymtul441t",
+                "value": 1.8
+              },
+              {
+                "id": "obs_1y7jizfr1u",
+                "value": 2
+              },
+              {
+                "id": "obs_486c69y11v",
+                "value": 1.9
+              },
+              {
+                "id": "obs_r1y57knx1w",
+                "value": 2.1
+              },
+              {
+                "id": "obs_kkgjk9re1x",
+                "value": 2.2
+              },
+              {
+                "id": "obs_h8j8omxa1y",
+                "value": null
+              },
+              {
+                "id": "obs_je1r0r9j1z",
+                "value": null
+              },
+              {
+                "id": "obs_rvqat63520",
+                "value": null
+              },
+              {
+                "id": "obs_2p4bs3a921",
+                "value": null
+              },
+              {
+                "id": "obs_gomyswnl22",
+                "value": null
+              },
+              {
+                "id": "obs_2qn8ge3a23",
+                "value": null
+              },
+              {
+                "id": "obs_3v230dav24",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "grp_5jvnvna82d",
+            "name": "Group D",
+            "title": "",
+            "paletteIndex": 3,
+            "observations": [
+              {
+                "id": "obs_uc56t4sv2e",
+                "value": 2.1
+              },
+              {
+                "id": "obs_d0jor4qu2f",
+                "value": 2.4
+              },
+              {
+                "id": "obs_zseezzvo2g",
+                "value": 2.3
+              },
+              {
+                "id": "obs_bbc72woy2h",
+                "value": 2.5
+              },
+              {
+                "id": "obs_q6qeqeol2i",
+                "value": 2.2
+              },
+              {
+                "id": "obs_qjx1ygyp2j",
+                "value": null
+              },
+              {
+                "id": "obs_j967bmp22k",
+                "value": null
+              },
+              {
+                "id": "obs_96yhun6u2l",
+                "value": null
+              },
+              {
+                "id": "obs_q7at84172m",
+                "value": null
+              },
+              {
+                "id": "obs_6b3pwzp52n",
+                "value": null
+              },
+              {
+                "id": "obs_bh5axnc42o",
+                "value": null
+              },
+              {
+                "id": "obs_5nn63dp42p",
+                "value": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "table_qbcc42d74s",
+        "name": "Dose response",
+        "kind": "xy",
+        "rowCount": 12,
+        "rows": [
+          {
+            "id": "row_g4ff48pl4t",
+            "title": ""
+          },
+          {
+            "id": "row_cy4eo6wi4u",
+            "title": ""
+          },
+          {
+            "id": "row_iolhbqdu4v",
+            "title": ""
+          },
+          {
+            "id": "row_kf6jykix4w",
+            "title": ""
+          },
+          {
+            "id": "row_vupejf034x",
+            "title": ""
+          },
+          {
+            "id": "row_t3j0i3jp4y",
+            "title": ""
+          },
+          {
+            "id": "row_eulebz7z4z",
+            "title": ""
+          },
+          {
+            "id": "row_630rv28350",
+            "title": ""
+          },
+          {
+            "id": "row_7crv7g8l51",
+            "title": ""
+          },
+          {
+            "id": "row_azrkgkwu52",
+            "title": ""
+          },
+          {
+            "id": "row_vgk1fssd53",
+            "title": ""
+          },
+          {
+            "id": "row_bs9vmed854",
+            "title": ""
+          }
+        ],
+        "groups": [
+          {
+            "id": "grp_rummf6wv31",
+            "name": "X",
+            "title": "",
+            "paletteIndex": 0,
+            "observations": [
+              {
+                "id": "obs_kf7sw17032",
+                "value": 1
+              },
+              {
+                "id": "obs_3m8jae9p33",
+                "value": 2
+              },
+              {
+                "id": "obs_0a23kmvk34",
+                "value": 3
+              },
+              {
+                "id": "obs_h3dolw5o35",
+                "value": 4
+              },
+              {
+                "id": "obs_a6q3471536",
+                "value": 5
+              },
+              {
+                "id": "obs_nvnpxmb437",
+                "value": 6
+              },
+              {
+                "id": "obs_ed453dvl38",
+                "value": 7
+              },
+              {
+                "id": "obs_l5s644do39",
+                "value": 8
+              },
+              {
+                "id": "obs_gnwruyn23a",
+                "value": null
+              },
+              {
+                "id": "obs_50vl59jc3b",
+                "value": null
+              },
+              {
+                "id": "obs_53sk63a73c",
+                "value": null
+              },
+              {
+                "id": "obs_v5z5smb33d",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "grp_fm5t6ctc3m",
+            "name": "Series A",
+            "title": "",
+            "paletteIndex": 1,
+            "observations": [
+              {
+                "id": "obs_8j9sf5h63n",
+                "value": 1.1
+              },
+              {
+                "id": "obs_lbtrwan53o",
+                "value": 2.3
+              },
+              {
+                "id": "obs_e0wtsrx83p",
+                "value": 2.9
+              },
+              {
+                "id": "obs_9f4soeef3q",
+                "value": 4.2
+              },
+              {
+                "id": "obs_g5rt31353r",
+                "value": 5.1
+              },
+              {
+                "id": "obs_e0iqb94w3s",
+                "value": 5.8
+              },
+              {
+                "id": "obs_95mz2uqq3t",
+                "value": 7.2
+              },
+              {
+                "id": "obs_pymdhn5i3u",
+                "value": 8.1
+              },
+              {
+                "id": "obs_flsczzn13v",
+                "value": null
+              },
+              {
+                "id": "obs_109q6pyi3w",
+                "value": null
+              },
+              {
+                "id": "obs_xife848i3x",
+                "value": null
+              },
+              {
+                "id": "obs_yxhzqgms3y",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "grp_0ocl3fqv47",
+            "name": "Series B",
+            "title": "",
+            "paletteIndex": 2,
+            "observations": [
+              {
+                "id": "obs_t7q21rja48",
+                "value": 0.5
+              },
+              {
+                "id": "obs_a2viq71x49",
+                "value": 1.2
+              },
+              {
+                "id": "obs_mhy6s6fp4a",
+                "value": 2.2
+              },
+              {
+                "id": "obs_iylpzsqt4b",
+                "value": 3.9
+              },
+              {
+                "id": "obs_2anirvcg4c",
+                "value": 6.1
+              },
+              {
+                "id": "obs_umsoyadr4d",
+                "value": 8.8
+              },
+              {
+                "id": "obs_b9mgf0mk4e",
+                "value": 12
+              },
+              {
+                "id": "obs_0o58yhy04f",
+                "value": 15.9
+              },
+              {
+                "id": "obs_e3bvfvyl4g",
+                "value": null
+              },
+              {
+                "id": "obs_49jrlgr34h",
+                "value": null
+              },
+              {
+                "id": "obs_l1qnadix4i",
+                "value": null
+              },
+              {
+                "id": "obs_j4dn8kuz4j",
+                "value": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "table_ty0xlkk374",
+        "name": "Survival",
+        "kind": "survival",
+        "rowCount": 12,
+        "rows": [
+          {
+            "id": "row_dw3ll0nz75",
+            "title": ""
+          },
+          {
+            "id": "row_enpucwxe76",
+            "title": ""
+          },
+          {
+            "id": "row_hedvp8ke77",
+            "title": ""
+          },
+          {
+            "id": "row_h8y9sebb78",
+            "title": ""
+          },
+          {
+            "id": "row_jxln0vro79",
+            "title": ""
+          },
+          {
+            "id": "row_d0zln4sk7a",
+            "title": ""
+          },
+          {
+            "id": "row_gerjv8wg7b",
+            "title": ""
+          },
+          {
+            "id": "row_hopt8iy37c",
+            "title": ""
+          },
+          {
+            "id": "row_r3nzehsm7d",
+            "title": ""
+          },
+          {
+            "id": "row_2qv91zqn7e",
+            "title": ""
+          },
+          {
+            "id": "row_bhqhld697f",
+            "title": ""
+          },
+          {
+            "id": "row_ar47oeh57g",
+            "title": ""
+          }
+        ],
+        "groups": [
+          {
+            "id": "grp_rraebv7p5d",
+            "name": "Time",
+            "title": "",
+            "paletteIndex": 0,
+            "observations": [
+              {
+                "id": "obs_3wd58p875e",
+                "value": 3
+              },
+              {
+                "id": "obs_bktg9s6f5f",
+                "value": 5
+              },
+              {
+                "id": "obs_0o5vxjcw5g",
+                "value": 6
+              },
+              {
+                "id": "obs_ucgc1pc35h",
+                "value": 8
+              },
+              {
+                "id": "obs_lmpa3vyz5i",
+                "value": 9
+              },
+              {
+                "id": "obs_hd7nflsn5j",
+                "value": 11
+              },
+              {
+                "id": "obs_h026qgrk5k",
+                "value": 14
+              },
+              {
+                "id": "obs_8gyv4t8u5l",
+                "value": 16
+              },
+              {
+                "id": "obs_kidbn4b45m",
+                "value": 20
+              },
+              {
+                "id": "obs_gsr5cu1y5n",
+                "value": 24
+              },
+              {
+                "id": "obs_3d3ryjsx5o",
+                "value": 6
+              },
+              {
+                "id": "obs_74nvei515p",
+                "value": 9
+              }
+            ]
+          },
+          {
+            "id": "grp_1qfsvwkm5y",
+            "name": "Group A",
+            "title": "",
+            "paletteIndex": 1,
+            "observations": [
+              {
+                "id": "obs_xz4dfkmu5z",
+                "value": 1
+              },
+              {
+                "id": "obs_79mazc0p60",
+                "value": 1
+              },
+              {
+                "id": "obs_sqa55b0u61",
+                "value": 1
+              },
+              {
+                "id": "obs_5tuouz1w62",
+                "value": 0
+              },
+              {
+                "id": "obs_ee89puia63",
+                "value": 1
+              },
+              {
+                "id": "obs_t0votjh064",
+                "value": 1
+              },
+              {
+                "id": "obs_pikl502j65",
+                "value": 1
+              },
+              {
+                "id": "obs_brrki3j366",
+                "value": 0
+              },
+              {
+                "id": "obs_ib7t0v7n67",
+                "value": 1
+              },
+              {
+                "id": "obs_j3x8w1bl68",
+                "value": 1
+              },
+              {
+                "id": "obs_gahe61q469",
+                "value": null
+              },
+              {
+                "id": "obs_k1o1rf4j6a",
+                "value": null
+              }
+            ]
+          },
+          {
+            "id": "grp_b478kq416j",
+            "name": "Group B",
+            "title": "",
+            "paletteIndex": 2,
+            "observations": [
+              {
+                "id": "obs_c8lt29zw6k",
+                "value": null
+              },
+              {
+                "id": "obs_4tjjaiyj6l",
+                "value": null
+              },
+              {
+                "id": "obs_c4qsp29y6m",
+                "value": null
+              },
+              {
+                "id": "obs_lkfmr0ng6n",
+                "value": null
+              },
+              {
+                "id": "obs_p5uwgewe6o",
+                "value": null
+              },
+              {
+                "id": "obs_53omwjer6p",
+                "value": null
+              },
+              {
+                "id": "obs_0a4ehday6q",
+                "value": null
+              },
+              {
+                "id": "obs_42gatkx56r",
+                "value": null
+              },
+              {
+                "id": "obs_o46b690v6s",
+                "value": null
+              },
+              {
+                "id": "obs_49put1rj6t",
+                "value": null
+              },
+              {
+                "id": "obs_dertp5r66u",
+                "value": 1
+              },
+              {
+                "id": "obs_u56aysvz6v",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "chart_82pg9bhx30",
+        "name": "Graph 1",
+        "dataTableId": "table_kk25bxs81",
+        "type": "bar",
+        "widthPx": 1024,
+        "heightPx": 768,
+        "hiddenGroupIds": [],
+        "groupOrder": [],
+        "groupGaps": {
+          "grp_gdmyk84k17": 150,
+          "grp_1zunpqx41s": 150,
+          "grp_5jvnvna82d": 150
+        },
+        "extraGroups": [],
+        "survival": {
+          "band": false,
+          "level": 0.95,
+          "method": "loglog",
+          "atRisk": false,
+          "eventSymbols": false,
+          "errorBars": false
+        },
+        "aspect": "free",
+        "paletteId": "aaas",
+        "title": "Graph 1",
+        "showTitle": true,
+        "titleFontSizePt": 33.6,
+        "fontFamily": "Arial, Helvetica, sans-serif",
+        "textColor": "#000000",
+        "titleBold": true,
+        "titleOffsetPt": 0,
+        "axisColor": "#000000",
+        "plotColor": "#ffffff",
+        "pageColor": "#ffffff",
+        "frame": "none",
+        "grid": {
+          "color": "#d0d0d0",
+          "widthPt": 1,
+          "style": "solid",
+          "minorColor": "#e6e6e6",
+          "minorWidthPt": 0.5,
+          "minorStyle": "solid"
+        },
+        "orientation": "vertical",
+        "lineOrder": "auto",
+        "origin": {
+          "x": null,
+          "y": null
+        },
+        "bars": {
+          "gapPct": null,
+          "beforePct": null,
+          "afterPct": null,
+          "baseline": null
+        },
+        "barLabels": {
+          "show": "none",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": "",
+          "sizePt": 22.4,
+          "color": null
+        },
+        "distribution": {
+          "whisker": "minmax",
+          "tukeyK": 1.5,
+          "boxWidth": 0.65,
+          "violinWidth": 0.8,
+          "showMedian": true,
+          "showMean": false,
+          "points": "none",
+          "smoothing": "medium",
+          "bandwidth": null,
+          "trim": "sample",
+          "normalisation": "width",
+          "showQuartiles": true
+        },
+        "pairs": {
+          "bridge": false
+        },
+        "heatmap": {
+          "palette": "viridis",
+          "reverse": false,
+          "min": null,
+          "max": null,
+          "centre": null,
+          "normalise": "none",
+          "method": "zscore",
+          "summary": "mean",
+          "showValues": false,
+          "decimals": null,
+          "cellGapPt": 0,
+          "transpose": false,
+          "colourbar": true,
+          "missingColour": "#d9d9d9"
+        },
+        "histogram": {
+          "binning": "auto",
+          "binWidth": null,
+          "firstEdge": null,
+          "frequency": "count",
+          "cumulative": "off",
+          "arrangement": "overlay",
+          "gapPct": 0,
+          "ecdfDirection": "atOrBelow",
+          "ecdfUnits": "fraction",
+          "ecdfSymbols": false,
+          "ecdfExtend": true
+        },
+        "fit": {
+          "analysisId": null,
+          "band": "none",
+          "extend": false,
+          "showParameters": false
+        },
+        "pie": {
+          "startAngle": 0,
+          "direction": "clockwise",
+          "hole": 0.5,
+          "labels": "percent",
+          "percentDigits": 1,
+          "showTotal": false,
+          "totalPrefix": "Total = "
+        },
+        "xAxis": {
+          "title": "",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "yAxis": {
+          "title": "Value",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "y2Axis": {
+          "title": "",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "legend": {
+          "visible": true,
+          "keyShape": "rectangle",
+          "position": "right",
+          "fontSizePt": 22.4,
+          "hiddenGroupIds": []
+        },
+        "displayNames": {},
+        "jitter": {
+          "enabled": true,
+          "widthFraction": 0.4
+        },
+        "defaults": {
+          "showBars": true,
+          "barFill": "#d9d9d9",
+          "barOpacity": 1,
+          "barBorderColor": "#000000",
+          "barBorderWidthPt": 0,
+          "barFillMode": "solid",
+          "barPattern": "horizontal",
+          "barPatternSpacingPt": 8,
+          "barPatternWidthPt": 2,
+          "barPatternColor": null,
+          "barPatternBackground": "#ffffff",
+          "showSymbols": false,
+          "symbolColor": "#000000",
+          "symbolShape": "circle",
+          "symbolSizePt": 12,
+          "symbolFillOpacity": 1,
+          "symbolBorderColor": "#000000",
+          "symbolBorderWidthPt": 3,
+          "showErrorBars": true,
+          "errorDirection": "both",
+          "errorCap": "bar",
+          "errorCapWidthPt": 10,
+          "errorLineWidthPt": 5.2,
+          "errorColor": "#000000",
+          "showLines": false,
+          "showMeanLine": false,
+          "lineColor": "#000000",
+          "lineWidthPt": 5.2,
+          "lineStyle": "solid",
+          "axisBinding": "primary",
+          "showPointLabels": false,
+          "pointLabelSource": "rowTitle",
+          "pointLabelPlacement": "above-right",
+          "pointLabelOffsetXPt": 6,
+          "pointLabelOffsetYPt": 6,
+          "pointLabelCollision": "keep",
+          "pointLabelLeader": false,
+          "pointLabelFontSizePt": 22.4,
+          "pointLabelBold": false,
+          "pointLabelItalic": false,
+          "pointLabelColor": null,
+          "pointLabelDecimals": null
+        },
+        "layers": [
+          {
+            "id": "layer_oxzqshly2z",
+            "name": "Data",
+            "style": {
+              "showBars": true,
+              "showSymbols": true,
+              "showLines": false,
+              "showMeanLine": false
+            },
+            "groupOverrides": {},
+            "objectOverrides": {},
+            "summary": {
+              "centre": "mean",
+              "spread": "none",
+              "confidenceLevel": 0.95,
+              "smallSamplePolicy": "drawCentre",
+              "invalidPolicy": "omit"
+            },
+            "groupSummary": {}
+          },
+          {
+            "id": "layer-extra",
+            "name": "Second layer",
+            "style": {
+              "showBars": true,
+              "showSymbols": true,
+              "showLines": false,
+              "showMeanLine": false
+            },
+            "groupOverrides": {},
+            "objectOverrides": {},
+            "summary": {
+              "centre": "mean",
+              "spread": "none",
+              "confidenceLevel": 0.95,
+              "smallSamplePolicy": "drawCentre",
+              "invalidPolicy": "omit"
+            },
+            "groupSummary": {}
+          }
+        ],
+        "annotations": [],
+        "referenceLines": []
+      },
+      {
+        "id": "chart_fphu2sju7q",
+        "name": "Graph 1",
+        "dataTableId": "table_qbcc42d74s",
+        "type": "xyLine",
+        "widthPx": 1024,
+        "heightPx": 768,
+        "hiddenGroupIds": [],
+        "groupOrder": [],
+        "groupGaps": {},
+        "extraGroups": [],
+        "survival": {
+          "band": false,
+          "level": 0.95,
+          "method": "loglog",
+          "atRisk": false,
+          "eventSymbols": false,
+          "errorBars": false
+        },
+        "aspect": "free",
+        "paletteId": "aaas",
+        "title": "Graph 1",
+        "showTitle": true,
+        "titleFontSizePt": 33.6,
+        "fontFamily": "Arial, Helvetica, sans-serif",
+        "textColor": "#000000",
+        "titleBold": true,
+        "titleOffsetPt": 0,
+        "axisColor": "#000000",
+        "plotColor": "#ffffff",
+        "pageColor": "#ffffff",
+        "frame": "none",
+        "grid": {
+          "color": "#d0d0d0",
+          "widthPt": 1,
+          "style": "solid",
+          "minorColor": "#e6e6e6",
+          "minorWidthPt": 0.5,
+          "minorStyle": "solid"
+        },
+        "orientation": "vertical",
+        "lineOrder": "auto",
+        "origin": {
+          "x": null,
+          "y": null
+        },
+        "bars": {
+          "gapPct": null,
+          "beforePct": null,
+          "afterPct": null,
+          "baseline": null
+        },
+        "barLabels": {
+          "show": "none",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": "",
+          "sizePt": 22.4,
+          "color": null
+        },
+        "distribution": {
+          "whisker": "minmax",
+          "tukeyK": 1.5,
+          "boxWidth": 0.65,
+          "violinWidth": 0.8,
+          "showMedian": true,
+          "showMean": false,
+          "points": "none",
+          "smoothing": "medium",
+          "bandwidth": null,
+          "trim": "sample",
+          "normalisation": "width",
+          "showQuartiles": true
+        },
+        "pairs": {
+          "bridge": false
+        },
+        "heatmap": {
+          "palette": "viridis",
+          "reverse": false,
+          "min": null,
+          "max": null,
+          "centre": null,
+          "normalise": "none",
+          "method": "zscore",
+          "summary": "mean",
+          "showValues": false,
+          "decimals": null,
+          "cellGapPt": 0,
+          "transpose": false,
+          "colourbar": true,
+          "missingColour": "#d9d9d9"
+        },
+        "histogram": {
+          "binning": "auto",
+          "binWidth": null,
+          "firstEdge": null,
+          "frequency": "count",
+          "cumulative": "off",
+          "arrangement": "overlay",
+          "gapPct": 0,
+          "ecdfDirection": "atOrBelow",
+          "ecdfUnits": "fraction",
+          "ecdfSymbols": false,
+          "ecdfExtend": true
+        },
+        "fit": {
+          "analysisId": null,
+          "band": "none",
+          "extend": false,
+          "showParameters": false
+        },
+        "pie": {
+          "startAngle": 0,
+          "direction": "clockwise",
+          "hole": 0.5,
+          "labels": "percent",
+          "percentDigits": 1,
+          "showTotal": false,
+          "totalPrefix": "Total = "
+        },
+        "xAxis": {
+          "title": "X",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "yAxis": {
+          "title": "Y",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "y2Axis": {
+          "title": "",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "legend": {
+          "visible": true,
+          "keyShape": "rectangle",
+          "position": "right",
+          "fontSizePt": 22.4,
+          "hiddenGroupIds": []
+        },
+        "displayNames": {},
+        "jitter": {
+          "enabled": true,
+          "widthFraction": 0.4
+        },
+        "defaults": {
+          "showBars": true,
+          "barFill": "#d9d9d9",
+          "barOpacity": 1,
+          "barBorderColor": "#000000",
+          "barBorderWidthPt": 0,
+          "barFillMode": "solid",
+          "barPattern": "horizontal",
+          "barPatternSpacingPt": 8,
+          "barPatternWidthPt": 2,
+          "barPatternColor": null,
+          "barPatternBackground": "#ffffff",
+          "showSymbols": false,
+          "symbolColor": "#000000",
+          "symbolShape": "circle",
+          "symbolSizePt": 12,
+          "symbolFillOpacity": 1,
+          "symbolBorderColor": "#000000",
+          "symbolBorderWidthPt": 3,
+          "showErrorBars": true,
+          "errorDirection": "both",
+          "errorCap": "bar",
+          "errorCapWidthPt": 10,
+          "errorLineWidthPt": 5.2,
+          "errorColor": "#000000",
+          "showLines": false,
+          "showMeanLine": false,
+          "lineColor": "#000000",
+          "lineWidthPt": 5.2,
+          "lineStyle": "solid",
+          "axisBinding": "primary",
+          "showPointLabels": false,
+          "pointLabelSource": "rowTitle",
+          "pointLabelPlacement": "above-right",
+          "pointLabelOffsetXPt": 6,
+          "pointLabelOffsetYPt": 6,
+          "pointLabelCollision": "keep",
+          "pointLabelLeader": false,
+          "pointLabelFontSizePt": 22.4,
+          "pointLabelBold": false,
+          "pointLabelItalic": false,
+          "pointLabelColor": null,
+          "pointLabelDecimals": null
+        },
+        "layers": [
+          {
+            "id": "layer_otcgrx3g7p",
+            "name": "Data",
+            "style": {
+              "showBars": false,
+              "showSymbols": false,
+              "showLines": true,
+              "showMeanLine": false
+            },
+            "groupOverrides": {},
+            "objectOverrides": {},
+            "summary": {
+              "centre": "mean",
+              "spread": "sd",
+              "confidenceLevel": 0.95,
+              "smallSamplePolicy": "drawCentre",
+              "invalidPolicy": "omit"
+            },
+            "groupSummary": {}
+          }
+        ],
+        "annotations": [],
+        "referenceLines": []
+      },
+      {
+        "id": "chart_93eso1uo7s",
+        "name": "Graph 1",
+        "dataTableId": "table_ty0xlkk374",
+        "type": "survival",
+        "widthPx": 1024,
+        "heightPx": 768,
+        "hiddenGroupIds": [],
+        "groupOrder": [],
+        "groupGaps": {},
+        "extraGroups": [],
+        "survival": {
+          "band": false,
+          "level": 0.95,
+          "method": "loglog",
+          "atRisk": false,
+          "eventSymbols": false,
+          "errorBars": false
+        },
+        "aspect": "free",
+        "paletteId": "aaas",
+        "title": "Graph 1",
+        "showTitle": true,
+        "titleFontSizePt": 33.6,
+        "fontFamily": "Arial, Helvetica, sans-serif",
+        "textColor": "#000000",
+        "titleBold": true,
+        "titleOffsetPt": 0,
+        "axisColor": "#000000",
+        "plotColor": "#ffffff",
+        "pageColor": "#ffffff",
+        "frame": "none",
+        "grid": {
+          "color": "#d0d0d0",
+          "widthPt": 1,
+          "style": "solid",
+          "minorColor": "#e6e6e6",
+          "minorWidthPt": 0.5,
+          "minorStyle": "solid"
+        },
+        "orientation": "vertical",
+        "lineOrder": "auto",
+        "origin": {
+          "x": null,
+          "y": null
+        },
+        "bars": {
+          "gapPct": null,
+          "beforePct": null,
+          "afterPct": null,
+          "baseline": null
+        },
+        "barLabels": {
+          "show": "none",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": "",
+          "sizePt": 22.4,
+          "color": null
+        },
+        "distribution": {
+          "whisker": "minmax",
+          "tukeyK": 1.5,
+          "boxWidth": 0.65,
+          "violinWidth": 0.8,
+          "showMedian": true,
+          "showMean": false,
+          "points": "none",
+          "smoothing": "medium",
+          "bandwidth": null,
+          "trim": "sample",
+          "normalisation": "width",
+          "showQuartiles": true
+        },
+        "pairs": {
+          "bridge": false
+        },
+        "heatmap": {
+          "palette": "viridis",
+          "reverse": false,
+          "min": null,
+          "max": null,
+          "centre": null,
+          "normalise": "none",
+          "method": "zscore",
+          "summary": "mean",
+          "showValues": false,
+          "decimals": null,
+          "cellGapPt": 0,
+          "transpose": false,
+          "colourbar": true,
+          "missingColour": "#d9d9d9"
+        },
+        "histogram": {
+          "binning": "auto",
+          "binWidth": null,
+          "firstEdge": null,
+          "frequency": "count",
+          "cumulative": "off",
+          "arrangement": "overlay",
+          "gapPct": 0,
+          "ecdfDirection": "atOrBelow",
+          "ecdfUnits": "fraction",
+          "ecdfSymbols": false,
+          "ecdfExtend": true
+        },
+        "fit": {
+          "analysisId": null,
+          "band": "none",
+          "extend": false,
+          "showParameters": false
+        },
+        "pie": {
+          "startAngle": 0,
+          "direction": "clockwise",
+          "hole": 0.5,
+          "labels": "percent",
+          "percentDigits": 1,
+          "showTotal": false,
+          "totalPrefix": "Total = "
+        },
+        "xAxis": {
+          "title": "Time",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "yAxis": {
+          "title": "Fraction surviving",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "y2Axis": {
+          "title": "",
+          "titleVisible": true,
+          "titleBold": true,
+          "tickBold": true,
+          "titleOffsetPt": 0,
+          "tickLabelOffsetPt": 0,
+          "visible": true,
+          "lineWidthPt": 5.2,
+          "tickFontSizePt": 26.6,
+          "titleFontSizePt": 28,
+          "min": null,
+          "max": null,
+          "majorInterval": null,
+          "showGrid": false,
+          "showMinorGrid": false,
+          "breaks": [],
+          "breakMark": "doubleSlash",
+          "scaleBar": false,
+          "scale": "linear",
+          "reverse": false,
+          "minorTicks": 0,
+          "tickDirection": "out",
+          "tickLengthPt": 11.2,
+          "numberFormat": "auto",
+          "decimals": null,
+          "thousands": false,
+          "prefix": "",
+          "suffix": ""
+        },
+        "legend": {
+          "visible": true,
+          "keyShape": "rectangle",
+          "position": "right",
+          "fontSizePt": 22.4,
+          "hiddenGroupIds": []
+        },
+        "displayNames": {},
+        "jitter": {
+          "enabled": true,
+          "widthFraction": 0.4
+        },
+        "defaults": {
+          "showBars": true,
+          "barFill": "#d9d9d9",
+          "barOpacity": 1,
+          "barBorderColor": "#000000",
+          "barBorderWidthPt": 0,
+          "barFillMode": "solid",
+          "barPattern": "horizontal",
+          "barPatternSpacingPt": 8,
+          "barPatternWidthPt": 2,
+          "barPatternColor": null,
+          "barPatternBackground": "#ffffff",
+          "showSymbols": false,
+          "symbolColor": "#000000",
+          "symbolShape": "circle",
+          "symbolSizePt": 12,
+          "symbolFillOpacity": 1,
+          "symbolBorderColor": "#000000",
+          "symbolBorderWidthPt": 3,
+          "showErrorBars": true,
+          "errorDirection": "both",
+          "errorCap": "bar",
+          "errorCapWidthPt": 10,
+          "errorLineWidthPt": 5.2,
+          "errorColor": "#000000",
+          "showLines": false,
+          "showMeanLine": false,
+          "lineColor": "#000000",
+          "lineWidthPt": 5.2,
+          "lineStyle": "solid",
+          "axisBinding": "primary",
+          "showPointLabels": false,
+          "pointLabelSource": "rowTitle",
+          "pointLabelPlacement": "above-right",
+          "pointLabelOffsetXPt": 6,
+          "pointLabelOffsetYPt": 6,
+          "pointLabelCollision": "keep",
+          "pointLabelLeader": false,
+          "pointLabelFontSizePt": 22.4,
+          "pointLabelBold": false,
+          "pointLabelItalic": false,
+          "pointLabelColor": null,
+          "pointLabelDecimals": null
+        },
+        "layers": [
+          {
+            "id": "layer_3q6ft6jt7r",
+            "name": "Data",
+            "style": {
+              "showBars": false,
+              "showSymbols": true,
+              "showLines": true,
+              "showMeanLine": false,
+              "symbolShape": "plus",
+              "symbolSizePt": 18,
+              "symbolBorderWidthPt": 4
+            },
+            "groupOverrides": {},
+            "objectOverrides": {},
+            "summary": {
+              "centre": "mean",
+              "spread": "none",
+              "confidenceLevel": 0.95,
+              "smallSamplePolicy": "drawCentre",
+              "invalidPolicy": "omit"
+            },
+            "groupSummary": {}
+          }
+        ],
+        "annotations": [],
+        "referenceLines": []
+      }
+    ]
+  }
+}

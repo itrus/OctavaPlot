@@ -1,3 +1,5 @@
+import { crc32 } from '../../util/zip';
+
 /** The pixels of a chart exported at a resolution: 96 dpi is the chart's own size in CSS pixels (1 px = 0.75 pt). */
 export const exportPixels = (chart: { widthPx: number; heightPx: number }, dpi: number): { width: number; height: number } => ({
   width: Math.max(1, Math.round((chart.widthPx * dpi) / 96)),
@@ -6,22 +8,6 @@ export const exportPixels = (chart: { widthPx: number; heightPx: number }, dpi: 
 
 /** Browsers limit the size of a canvas; a size above these limits fails or comes out blank. */
 export const fitsCanvas = (width: number, height: number): boolean => Math.max(width, height) <= 16000 && width * height <= 200_000_000;
-
-const CRC_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    t[n] = c >>> 0;
-  }
-  return t;
-})();
-
-function crc32(bytes: Uint8Array): number {
-  let c = 0xffffffff;
-  for (const b of bytes) c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 

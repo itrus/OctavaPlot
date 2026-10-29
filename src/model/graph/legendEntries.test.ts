@@ -8,7 +8,7 @@ import { buildXyModel } from '../../chart/xy/xyModel';
 import { chartToSvgString } from '../../chart/export/export';
 import { inheritChart } from './chartFormat';
 import { syncLinks } from './chartLink';
-import { legendColumns, legendEntries, sanitizeLegendLayout } from './legendEntries';
+import { legendColumns, legendEntries, sanitizeLegendLayout, withoutRepeats } from './legendEntries';
 
 const base = { hiddenGroupIds: [] as string[] };
 
@@ -126,5 +126,15 @@ describe('legend order on a graph', () => {
     const { table, chart, p, a, b } = setup();
     const svg = chartToSvgString(chartOf(setLegendOrder(chart.id, [b, a])(p)), table);
     expect(svg.indexOf('Series B')).toBeLessThan(svg.indexOf('Series A'));
+  });
+});
+
+describe('withoutRepeats', () => {
+  it('keeps the first entry of each key, in the order given', () => {
+    expect(withoutRepeats([0, 1, 2, 3, 4], (i) => ['a', 'b', 'a', 'c', 'b'][i])).toEqual([0, 1, 3]);
+  });
+  it('keeps everything when no key repeats, and nothing from nothing', () => {
+    expect(withoutRepeats([2, 0, 1], (i) => String(i))).toEqual([2, 0, 1]);
+    expect(withoutRepeats([], () => 'x')).toEqual([]);
   });
 });

@@ -14,9 +14,10 @@ import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, 
 import { autoOffsetStep } from '../../model/table/offset';
 import { DataSetOrder } from './sections/DataSetOrder';
 import { AxisStyleControls } from './sections/AxisStyleControls';
+import { bindingOf, bindingSelectState } from '../../chart/shared/axes/axes';
 import { IntervalFields, LineAtField } from './sections/SummaryControls';
 import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
-import type { AxisConfig, Chart, ChartStyle, ChartType, DataTable, LineConnect, LineStyle, SummarySpec } from '../../model/types';
+import type { AxisBinding, AxisConfig, Chart, ChartStyle, ChartType, DataTable, ExtraTick, LineConnect, LineStyle, SummarySpec } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { clearGroupStyleSettings, clearGroupSummarySettings, composeCommands, patchAxis, patchChart, patchLook, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
 import { LINE_STYLES } from '../../model/graph/look';
@@ -28,8 +29,11 @@ import { LayersSection } from './sections/LayersSection';
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { DataSetPicker } from './sections/DataSetPicker';
 import { DataSetReset } from './sections/DataSetReset';
-import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
-import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './common/controls';
+import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
+import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar, TextInput } from './common/controls';
+import { MAX_EXTRA_TICKS } from '../../model/graph/axis';
+import { TimeField, timeLimitChecks } from './common/TimeField';
+import type { TimeColumn } from '../../util/timeColumn';
 import { SECTIONS, TABS } from './common/nav';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
 import { displayName } from '../../chart/shared/parts/names';
@@ -38,8 +42,41 @@ import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
 const axisCtx = (axis: AxisConfig, scale: YAxisScale): AxisEditContext => ({ min: axis.min, max: axis.max, majorInterval: axis.majorInterval, domain: scale.domain, log: scale.log });
 const stepOf = majorStepOf;
 
+/** Ticks added by hand among the automatic ones (XY charts): a value and, when wanted, the text written instead of its number. */
+function ExtraTicksControls({ chart, which, scale, name, time }: { chart: Chart; which: 'xAxis' | 'yAxis'; scale: YAxisScale; name: string; time?: TimeColumn }) {
+  const { run } = useApp();
+  const ticks = chart[which].extraTicks ?? [];
+  const tag = which === 'xAxis' ? 'x' : which === 'yAxis' ? 'y' : 'y2';
+  const set = (label: string, next: ExtraTick[], key?: string) => run(label, patchAxis(chart.id, which, { extraTicks: next }), key);
+  const edit = (i: number, patch: Partial<ExtraTick>) => ticks.map((t, j) => (j === i ? { ...t, ...patch } : t));
+  // A new tick starts in the middle of the axis, or at the first value that no tick has yet.
+  const start = [(scale.domain[0] + scale.domain[1]) / 2, ...scale.domain].find((v) => !ticks.some((t) => t.value === v)) ?? scale.domain[0];
+  return (
+    <>
+      {ticks.map((t, i) => (
+        <div key={i} className="annotation-card selected">
+          {time ? (
+            <TimeField label={`${name} extra tick ${i + 1}`} time={time} value={t.value} onCommit={(v) => v !== null && set('Extra tick value', edit(i, { value: v }), `axis:${tag}tick${i}`)} hint="A value outside the axis range or in an omitted range is not drawn, and a notice says so" />
+          ) : (
+            <NumField label={`${name} extra tick ${i + 1}`} value={t.value} onCommit={(v) => set('Extra tick value', edit(i, { value: v }), `axis:${tag}tick${i}`)} hint="A value outside the axis range, in an omitted range, or at or below 0 on a log axis is not drawn, and a notice says so" />
+          )}
+          <Field label="Text" hint="Written instead of the number; empty keeps the number">
+            <TextInput value={t.label} onChange={(v) => set('Extra tick text', edit(i, { label: v }), `axis:${tag}tick${i}text`)} />
+          </Field>
+          <div className="button-row">
+            <button onClick={() => set('Delete extra tick', ticks.filter((_, j) => j !== i))}>Delete tick</button>
+          </div>
+        </div>
+      ))}
+      <div className="button-row">
+        <button disabled={ticks.length >= MAX_EXTRA_TICKS} onClick={() => set('Add extra tick', [...ticks, { value: time ? (time.kind === 'duration' ? start : Math.round(start)) : Number(start.toPrecision(6)), label: '' }])}>+ Tick at a value</button>
+      </div>
+    </>
+  );
+}
+
 /** Range, limits and ticks of one numeric axis: Auto fits the data, Manual uses the limits. */
-export function AxisLimits({ chart, which, scale, name, canScale = true, canReverse = true }: { chart: Chart; which: 'xAxis' | 'yAxis'; scale: YAxisScale; name: string; canScale?: boolean; canReverse?: boolean }) {
+export function AxisLimits({ chart, which, scale, name, canScale = true, canReverse = true, time }: { chart: Chart; which: 'xAxis' | 'yAxis' | 'y2Axis'; scale: YAxisScale; name: string; canScale?: boolean; canReverse?: boolean; time?: TimeColumn }) {
   const { run } = useApp();
   const axis = chart[which];
   const ctx = axisCtx(axis, scale);
@@ -56,13 +93,28 @@ export function AxisLimits({ chart, which, scale, name, canScale = true, canReve
           onChange={(v) => run(`${name} range`, patchAxis(chart.id, which, v === 'auto' ? { min: null, max: null } : { min: axis.min ?? scale.domain[0], max: axis.max ?? scale.domain[1] }))}
         />
       </Field>
-      <OptionalNumField label={`${name} minimum`} value={axis.min} autoValue={scale.domain[0]} validate={(v) => validateAxisMin(v, ctx)} onCommit={(v) => run(`${name} minimum`, patchAxis(chart.id, which, { min: v }), `axis:${tag}min`)} />
-      <OptionalNumField label={`${name} maximum`} value={axis.max} autoValue={scale.domain[1]} validate={(v) => validateAxisMax(v, ctx)} onCommit={(v) => run(`${name} maximum`, patchAxis(chart.id, which, { max: v }), `axis:${tag}max`)} />
-      <OptionalNumField label="Major tick interval" value={axis.majorInterval} autoValue={stepOf(scale)} validate={(v) => validateAxisInterval(v, ctx)} onCommit={(v) => run(`${name} tick interval`, patchAxis(chart.id, which, { majorInterval: v }), `axis:${tag}int`)} />
+      {time ? (
+        <>
+          <TimeField optional label={`${name} minimum`} time={time} value={axis.min} autoValue={scale.domain[0]} validate={timeLimitChecks(time, axis.min, axis.max, scale.domain).min} onCommit={(v) => run(`${name} minimum`, patchAxis(chart.id, which, { min: v }), `axis:${tag}min`)} />
+          <TimeField optional label={`${name} maximum`} time={time} value={axis.max} autoValue={scale.domain[1]} validate={timeLimitChecks(time, axis.min, axis.max, scale.domain).max} onCommit={(v) => run(`${name} maximum`, patchAxis(chart.id, which, { max: v }), `axis:${tag}max`)} />
+        </>
+      ) : (
+        <>
+          <OptionalNumField label={`${name} minimum`} value={axis.min} autoValue={scale.domain[0]} validate={(v) => validateAxisMin(v, ctx)} onCommit={(v) => run(`${name} minimum`, patchAxis(chart.id, which, { min: v }), `axis:${tag}min`)} />
+          <OptionalNumField label={`${name} maximum`} value={axis.max} autoValue={scale.domain[1]} validate={(v) => validateAxisMax(v, ctx)} onCommit={(v) => run(`${name} maximum`, patchAxis(chart.id, which, { max: v }), `axis:${tag}max`)} />
+          <OptionalNumField label="Major tick interval" value={axis.majorInterval} autoValue={stepOf(scale)} validate={(v) => validateAxisInterval(v, ctx)} onCommit={(v) => run(`${name} tick interval`, patchAxis(chart.id, which, { majorInterval: v }), `axis:${tag}int`)} />
+        </>
+      )}
       <Field label="Major gridlines">
         <Check checked={axis.showGrid} onChange={(v) => run(`${name} gridlines`, patchAxis(chart.id, which, { showGrid: v }))} />
       </Field>
-      <AxisStyleControls chart={chart} which={which} scale={scale} name={name} canScale={canScale} canReverse={canReverse} />
+      {capabilitiesOf(chart.type).guides && which !== 'y2Axis' && <ExtraTicksControls chart={chart} which={which} scale={scale} name={name} time={time} />}
+      {capabilitiesOf(chart.type).guides && which === 'xAxis' && (
+        <Field label="Equal units" hint="One unit of X is as long as one unit of Y, so that the identity line runs at 45 degrees. The axis with more room is widened; it needs linear axes with no omitted range">
+          <Check checked={chart.equalUnits === true} onChange={(v) => run('Equal units', patchChart(chart.id, { equalUnits: v ? true : undefined }))} />
+        </Field>
+      )}
+      <AxisStyleControls chart={chart} which={which} scale={scale} name={name} canScale={canScale} canReverse={canReverse} time={time} />
     </>
   );
 }
@@ -95,8 +147,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const selected = series.find((g) => g.id === selectedId);
   // Several series selected together are edited together, and where they differ a field says so ("Mixed").
   const seriesIds = useMemo(() => series.map((g) => g.id), [series]);
-  const several = selection.kind === 'groups' ? scopeGroupIds(selection.groupIds, seriesIds) : [];
-  const scope: StyleScope = several.length > 1 ? several : selected ? selected.id : 'all';
+  const several = selection.kind === 'groups' || selection.kind === 'points' ? scopeGroupIds(selectedGroupIds(selection), seriesIds) : [];
+  const scope: StyleScope = several.length > 1 ? several : selected ? selected.id : several.length === 1 ? several[0] : 'all';
   const scopeIds = scopeGroupIds(scope, seriesIds);
   // A series of the selection that is gone (deleted) leaves the selection.
   useEffect(() => {
@@ -114,6 +166,9 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const yScale = any.family === 'column' || any.family === 'pie' || any.family === 'heatmap' ? null : any.model.y;
   const seriesView = any.family === 'column' || any.family === 'pie' || any.family === 'heatmap' ? [] : any.model.series.map((x) => ({ groupId: x.groupId, label: x.label, style: x.style, count: 'points' in x ? x.points.length : 0, bars: 'bars' in x && x.bars ? x.bars.length : 0 }));
   const family = chartFamily(chart.type);
+  // Two value axes exist only while a series is bound to the right one.
+  const y2Scale = xyModel?.y2 ?? null;
+  const dual = y2Scale !== null;
   // Survival curves and stacked or percentage bars keep a plain linear axis (see the models).
   const yAxisCanChange = family !== 'survival' && chart.type !== 'groupedStacked' && chart.type !== 'contingencyStacked' && chart.type !== 'contingencyPercent';
   const noun = table.kind === 'survival' ? 'Group' : table.kind === 'contingency' ? 'Outcome' : table.kind === 'grouped' ? 'Group' : 'Series';
@@ -127,6 +182,9 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
     const l = scope === 'all' ? { ...layer, groupOverrides: {}, objectOverrides: {} } : layer;
     return resolveStyle(chart, l, { id: sample.id, paletteIndex: seriesPaletteIndex(chart, series, sampleIndex) });
   }, [chart, layer, sample, sampleIndex, scope]);
+  const bindingUi = bindingSelectState(chart.type, st);
+  const inScopeBindings = (xyModel?.series ?? []).filter((x) => scopeIds.includes(x.groupId)).map((x) => bindingOf(x.style));
+  const mixedBinding = inScopeBindings.some((b) => b !== inScopeBindings[0]);
   // The series the edits reach (hidden ones are not drawn, so they do not count as differing).
   const inScope = series.map((g, i) => ({ id: g.id, paletteIndex: seriesPaletteIndex(chart, series, i) })).filter((g) => scopeIds.includes(g.id) && !chart.hiddenGroupIds.includes(g.id));
   const inScopeKey = inScope.map((g) => g.id).join();
@@ -200,6 +258,16 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <SelectInput<ChartType> value={chart.type} options={chartTypesFor(table.kind).map((c) => ({ value: c.type, label: c.label }))} onChange={(t) => run('Change graph type', setChartType(chart.id, t))} />
                 </Field>
                 <PaletteField chart={chart} hint="Gives the series coordinated colours in order. Per-series colours below still apply on top." />
+                {family === 'xy' && bindingUi.offered && (
+                  <Field label="Plot data on" hint="Which Y axis this series is drawn against" overridden={ov('axisBinding')} note={mixedBinding ? 'The series use different axes. Choose Left or Right to set all of them.' : null}>
+                    <select value={mixedBinding ? 'mixed' : bindingUi.value} disabled={series.length === 0} aria-label="Plot data on" onChange={(e) => run(e.target.value === 'secondary' ? 'Plot data on right Y axis' : 'Plot data on left Y axis', patchStyle(chart.id, scope, { axisBinding: e.target.value as AxisBinding }))}>
+                      {mixedBinding && <option value="mixed" disabled>Mixed</option>}
+                      {bindingUi.options.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
               </GroupBox>
 
               {layout.kind === 'replicates' && (
@@ -393,19 +461,31 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 <Field label="Show X axis">
                   <Check checked={chart.xAxis.visible} onChange={(v) => run('Show X axis', patchAxis(chart.id, 'xAxis', { visible: v }))} />
                 </Field>
-                {xyModel ? <AxisLimits chart={chart} which="xAxis" scale={xyModel.x} name={family === 'survival' ? 'Time' : 'X'} canScale={family !== 'survival'} canReverse={family !== 'survival'} /> : <div className="muted small">The categories are the rows of the table, so there are no numeric limits to set.</div>}
+                {xyModel ? <AxisLimits chart={chart} which="xAxis" scale={xyModel.x} name={family === 'survival' ? 'Time' : 'X'} canScale={family !== 'survival'} canReverse={family !== 'survival'} time={family === 'xy' ? table.groups[0]?.time : undefined} /> : <div className="muted small">The categories are the rows of the table, so there are no numeric limits to set.</div>}
               </Section>
-              <Section title="Y axis">
-                <Field label="Show Y axis">
+              <Section title={dual ? 'Left Y axis' : 'Y axis'}>
+                <Field label={dual ? 'Show left Y axis' : 'Show Y axis'}>
                   <Check checked={chart.yAxis.visible} onChange={(v) => run('Show Y axis', patchAxis(chart.id, 'yAxis', { visible: v }))} />
                 </Field>
-                {yScale && <AxisLimits chart={chart} which="yAxis" scale={yScale} name="Y" canScale={yAxisCanChange} canReverse={yAxisCanChange} />}
+                {yScale && <AxisLimits chart={chart} which="yAxis" scale={yScale} name={dual ? 'Left Y' : 'Y'} canScale={yAxisCanChange} canReverse={yAxisCanChange} />}
               </Section>
+              {y2Scale && (
+                <Section title="Right Y axis">
+                  <Field label="Right Y axis title">
+                    <TextInput value={chart.y2Axis.title} onChange={(v) => run('Right Y axis title', patchAxis(chart.id, 'y2Axis', { title: v }), 'axis:y2t')} />
+                  </Field>
+                  <Field label="Show right Y axis">
+                    <Check checked={chart.y2Axis.visible} onChange={(v) => run('Show right Y axis', patchAxis(chart.id, 'y2Axis', { visible: v }))} />
+                  </Field>
+                  <AxisLimits chart={chart} which="y2Axis" scale={y2Scale} name="Right Y" />
+                  <div className="muted small">Reference lines, shaded regions, extra ticks and annotations placed at values are on the left Y axis.</div>
+                </Section>
+              )}
             </div>
           )}
 
-          {section === 'text' && <TextSections chart={chart} groups={series} yName="Y" dual={false} />}
-          {section === 'frame' && <FrameSection chart={chart} dual={false} origin={family === 'grouped' ? 'y' : 'xy'} />}
+          {section === 'text' && <TextSections chart={chart} groups={series} yName={dual ? 'Left Y' : 'Y'} dual={dual} />}
+          {section === 'frame' && <FrameSection chart={chart} dual={dual} origin={family === 'grouped' ? 'y' : 'xy'} />}
           {section === 'layout' && (
             <div>
               <DimensionsSection chart={chart} />

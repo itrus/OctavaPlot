@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { chartTypesFor } from '../../model/graph/chartTypes';
 import { editScale, paletteColour, seedCustom } from '../../chart/heatmap/heatColours';
-import { HEAT_LIMITS, HEAT_PALETTE_GROUPS, HEAT_STATISTICS, isDiverging } from '../../model/options/heatmapOptions';
+import { HEAT_LIMITS, HEAT_MARKS, HEAT_PALETTE_GROUPS, HEAT_STATISTICS, isDiverging } from '../../model/options/heatmapOptions';
 import { GroupedSelectField } from './GroupedSelect';
 import type { Chart, ChartType, DataTable, HeatmapOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { patchAxis, patchLook, setChartType } from '../../state/commands';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SectionBar, SelectInput, TabBar } from './common/controls';
+import { Check, ColorInput, Field, FieldInput, GroupBox, NumField, OptionalNumField, SectionBar, SelectInput, TabBar, TextInput } from './common/controls';
 import { SECTIONS as ALL_SECTIONS, TABS } from './common/nav';
 import { LayersSection } from './sections/LayersSection';
 import { AnnotationsTab, DimensionsSection, TextSections } from './sections/SharedSections';
@@ -14,6 +14,55 @@ import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
 
 /** The colours of the scale at 16 even positions, as the stops of a CSS gradient (the scale as the cells show it, reversed or not). */
 const previewColours = (o: HeatmapOptions): string => Array.from({ length: 16 }, (_, i) => paletteColour(o.palette, i / 15, o.reverse, o.customColours)).join(', ');
+
+const wholeIn = (lim: { min: number; max: number }) => (v: number) => (Number.isInteger(v) && v >= lim.min && v <= lim.max ? null : `A whole number from ${lim.min} to ${lim.max}.`);
+const sizeIn = (v: number) => (v >= HEAT_LIMITS.cellPt.min && v <= HEAT_LIMITS.cellPt.max ? null : `From ${HEAT_LIMITS.cellPt.min} to ${HEAT_LIMITS.cellPt.max} pt.`);
+
+/** The edges of the colour intervals as a list of numbers, typed with commas and set when the box is left; a text that is not numbers is refused. */
+function EdgesField({ value, onCommit }: { value: number[]; onCommit: (v: number[]) => void }) {
+  const shown = value.join(', ');
+  const [text, setText] = useState(shown);
+  const [error, setError] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) {
+      setText(shown);
+      setError(null);
+    }
+  }, [shown, focused]);
+  const commit = () => {
+    const numbers = text.split(/[;,\s]+/).filter((x) => x !== '').map(Number);
+    if (numbers.some((n) => !Number.isFinite(n))) return setError('Enter numbers separated by commas.');
+    if (numbers.length > HEAT_LIMITS.steps.max - 1) return setError(`At most ${HEAT_LIMITS.steps.max - 1} edges.`);
+    setError(null);
+    onCommit([...new Set(numbers)].sort((a, b) => a - b));
+  };
+  return (
+    <Field label="Interval edges" hint="Colour intervals with edges you choose, for example 2, 5, 10; they replace the equal steps" error={error}>
+      <FieldInput
+        ariaLabel="Interval edges"
+        className={error ? 'invalid' : ''}
+        placeholder="None"
+        value={text}
+        onFocus={() => setFocused(true)}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => {
+          setFocused(false);
+          commit();
+        }}
+        onKeyDown={(e) => e.key === 'Enter' && commit()}
+      />
+    </Field>
+  );
+}
+
+function MarkField({ label, value, onChange }: { label: string; value: HeatmapOptions['missingMark']; onChange: (v: HeatmapOptions['missingMark']) => void }) {
+  return (
+    <Field label={label} hint="Drawn over cells of this kind, in the colour of the text on them">
+      <SelectInput<HeatmapOptions['missingMark']> value={value} options={HEAT_MARKS.map(({ value: v, label: l }) => ({ value: v, label: l }))} onChange={onChange} />
+    </Field>
+  );
+}
 
 /** A heat map has no axes of numbers, no frame and no legend: its panel has the style, text and layout sections. */
 const SECTIONS = ALL_SECTIONS.filter((s) => s.id === 'style' || s.id === 'text' || s.id === 'layout');
@@ -88,12 +137,51 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
                 <OptionalNumField label="Lowest value" hint="Auto: the smallest value" value={o.min} autoValue={0} validate={(v) => (o.max !== null && v >= o.max ? 'Must be below the highest value.' : null)} onCommit={(v) => set('Lowest colour value', { min: v }, 'heat:min')} />
                 <OptionalNumField label="Highest value" hint="Auto: the largest value" value={o.max} autoValue={1} validate={(v) => (o.min !== null && v <= o.min ? 'Must be above the lowest value.' : null)} onCommit={(v) => set('Highest colour value', { max: v }, 'heat:max')} />
                 {diverging && <OptionalNumField label="Middle colour at" hint="Auto: the middle of the range, or 0 for z-scores and centred values" value={o.centre} autoValue={0} onCommit={(v) => set('Middle colour value', { centre: v }, 'heat:centre')} />}
+                <OptionalNumField label="Colour steps" hint="Auto: a continuous scale; or this many equal intervals, each one colour" value={o.steps} autoValue={5} validate={wholeIn(HEAT_LIMITS.steps)} onCommit={(v) => set('Colour steps', { steps: v }, 'heat:steps')} />
+                <EdgesField value={o.breaks} onCommit={(v) => set('Interval edges', { breaks: v })} />
                 <Field label="Missing cells">
                   <ColorInput value={o.missingColour} ariaLabel="Colour of missing cells" onChange={(v) => set('Missing cell colour', { missingColour: v })} />
                 </Field>
+                <MarkField label="Missing cells mark" value={o.missingMark} onChange={(v) => set('Missing cell mark', { missingMark: v })} />
+                <Field label="Excluded cells own colour" hint="Cells whose values are all excluded; off: the colour of missing cells">
+                  <Check checked={o.excludedColour !== null} onChange={(on) => set('Excluded cell colour', { excludedColour: on ? o.missingColour : null })} />
+                </Field>
+                {o.excludedColour !== null && (
+                  <Field label="Excluded cells">
+                    <ColorInput value={o.excludedColour} ariaLabel="Colour of excluded cells" onChange={(v) => set('Excluded cell colour', { excludedColour: v })} />
+                  </Field>
+                )}
+                <MarkField label="Excluded cells mark" value={o.excludedMark} onChange={(v) => set('Excluded cell mark', { excludedMark: v })} />
+                <Field label="Out-of-range own colour" hint="Cells beyond the lowest or highest value; off: the end colour of the scale">
+                  <Check checked={o.outsideColour !== null} onChange={(on) => set('Out-of-range colour', { outsideColour: on ? drawn(1) : null })} />
+                </Field>
+                {o.outsideColour !== null && (
+                  <Field label="Out-of-range cells">
+                    <ColorInput value={o.outsideColour} ariaLabel="Colour of cells outside the range" onChange={(v) => set('Out-of-range colour', { outsideColour: v })} />
+                  </Field>
+                )}
+                <MarkField label="Out-of-range mark" value={o.outsideMark} onChange={(v) => set('Out-of-range mark', { outsideMark: v })} />
+              </GroupBox>
+
+              <GroupBox title="Colour bar">
                 <Field label="Colour bar">
                   <Check checked={o.colourbar} onChange={(v) => set('Colour bar', { colourbar: v })} />
                 </Field>
+                {o.colourbar && (
+                  <>
+                    <NumField label="Width" unit="pt" value={o.barWidthPt} min={HEAT_LIMITS.barWidthPt.min} max={HEAT_LIMITS.barWidthPt.max} onCommit={(v) => set('Colour bar width', { barWidthPt: v }, 'heat:barWidth')} />
+                    <NumField label="Length" unit="%" hint="Of the height of the cells" value={o.barLengthPct} min={HEAT_LIMITS.barLengthPct.min} max={HEAT_LIMITS.barLengthPct.max} onCommit={(v) => set('Colour bar length', { barLengthPct: v }, 'heat:barLength')} />
+                    <NumField label="Ticks" hint="About this many numbers; a scale in intervals has one at each edge" value={o.barTicks} min={HEAT_LIMITS.barTicks.min} max={HEAT_LIMITS.barTicks.max} slider={false} validate={wholeIn(HEAT_LIMITS.barTicks)} onCommit={(v) => set('Colour bar ticks', { barTicks: v }, 'heat:barTicks')} />
+                    <Field label="Title">
+                      <Check checked={o.barTitle !== ''} onChange={(on) => set('Colour bar title', { barTitle: on ? null : '' })} />
+                    </Field>
+                    {o.barTitle !== '' && (
+                      <Field label="Title text" hint="Empty: named by what the colours show">
+                        <TextInput value={o.barTitle ?? ''} placeholder="Automatic" ariaLabel="Colour bar title" onChange={(v) => set('Colour bar title', { barTitle: v === '' ? null : v }, 'heat:barTitle')} />
+                      </Field>
+                    )}
+                  </>
+                )}
               </GroupBox>
 
               <GroupBox title="Values">
@@ -136,6 +224,11 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
 
               <GroupBox title="Cells">
                 <NumField label="Space between cells" unit="pt" value={o.cellGapPt} min={HEAT_LIMITS.cellGapPt.min} max={HEAT_LIMITS.cellGapPt.max} onCommit={(v) => set('Space between cells', { cellGapPt: v }, 'heat:gap')} />
+                <OptionalNumField label="Cell width" hint="Auto: the cells fill the width; a size too large for it is held at the width" value={o.cellWidthPt} autoValue={40} validate={sizeIn} onCommit={(v) => set('Cell width', { cellWidthPt: v }, 'heat:cellW')} />
+                <OptionalNumField label="Cell height" hint="Auto: the cells fill the height" value={o.cellHeightPt} autoValue={20} validate={sizeIn} onCommit={(v) => set('Cell height', { cellHeightPt: v }, 'heat:cellH')} />
+                <OptionalNumField label="Rows in a group" hint="Auto: no groups; else extra space after this many rows" value={o.rowGroupSize} autoValue={5} validate={wholeIn(HEAT_LIMITS.groupSize)} onCommit={(v) => set('Row groups', { rowGroupSize: v }, 'heat:rowGroup')} />
+                <OptionalNumField label="Columns in a group" hint="Auto: no groups; else extra space after this many columns" value={o.colGroupSize} autoValue={5} validate={wholeIn(HEAT_LIMITS.groupSize)} onCommit={(v) => set('Column groups', { colGroupSize: v }, 'heat:colGroup')} />
+                <NumField label="Space between groups" unit="pt" value={o.groupGapPt} min={HEAT_LIMITS.groupGapPt.min} max={HEAT_LIMITS.groupGapPt.max} disabled={o.rowGroupSize === null && o.colGroupSize === null} onCommit={(v) => set('Space between groups', { groupGapPt: v }, 'heat:groupGap')} />
                 <Field label="Numbers in the cells">
                   <Check checked={o.showValues} onChange={(v) => set('Numbers in the cells', { showValues: v })} />
                 </Field>
@@ -143,9 +236,11 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
                 <Field label="Row labels">
                   <Check checked={chart.yAxis.visible} onChange={(v) => run('Row labels', patchAxis(chart.id, 'yAxis', { visible: v }))} />
                 </Field>
+                <NumField label="Row label every" hint="Write every this many-th row label" value={o.rowLabelEvery} min={HEAT_LIMITS.labelEvery.min} max={HEAT_LIMITS.labelEvery.max} slider={false} validate={wholeIn(HEAT_LIMITS.labelEvery)} onCommit={(v) => set('Row label spacing', { rowLabelEvery: v }, 'heat:rowEvery')} />
                 <Field label="Column labels">
                   <Check checked={chart.xAxis.visible} onChange={(v) => run('Column labels', patchAxis(chart.id, 'xAxis', { visible: v }))} />
                 </Field>
+                <NumField label="Column label every" hint="Write every this many-th column label" value={o.colLabelEvery} min={HEAT_LIMITS.labelEvery.min} max={HEAT_LIMITS.labelEvery.max} slider={false} validate={wholeIn(HEAT_LIMITS.labelEvery)} onCommit={(v) => set('Column label spacing', { colLabelEvery: v }, 'heat:colEvery')} />
               </GroupBox>
             </div>
           )}

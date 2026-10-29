@@ -55,8 +55,8 @@ describe('capability registry', () => {
     }
     // X lines need a numeric X axis; a column chart has categories there.
     for (const c of CAPABILITIES) if (c.referenceLines === 'xy') expect(['xy', 'survival', 'histogram']).toContain(chartFamily(c.type));
-    // Only the three Cartesian column charts can be bound to the right axis.
-    expect(CAPABILITIES.filter((c) => c.secondaryAxis).map((c) => c.type)).toEqual(['bar', 'scatter', 'mean']);
+    // The three Cartesian column charts and the XY charts of points, lines, bars, spikes and areas can be bound to the right axis (offset traces and vectors share one scale).
+    expect(CAPABILITIES.filter((c) => c.secondaryAxis).map((c) => c.type)).toEqual(['bar', 'scatter', 'mean', 'xyScatter', 'xyLine', 'xyLineSymbols', 'xyBubble', 'xyBars', 'xySpikes', 'xyArea']);
     expect(capabilitiesOf('violin').curveFit).toBe(false);
   });
 
@@ -80,6 +80,20 @@ describe('capability registry', () => {
       const rows = layerRows(chart, table);
       expect({ type: c.type, looks: rows.some((r) => r.takes !== null) }).toEqual({ type: c.type, looks: c.partLooks });
       expect({ type: c.type, range: rows.some((r) => r.inRange !== null) }).toEqual({ type: c.type, range: c.rangeSwitch });
+    }
+  });
+
+  it('offers the guides (oblique lines, shaded regions, extra ticks, equal units) and the bars along X to XY charts only, with a look and a range switch for the bars', () => {
+    for (const c of CAPABILITIES) {
+      expect([c.type, c.guides, c.xErrorBars]).toEqual([c.type, chartFamily(c.type) === 'xy', chartFamily(c.type) === 'xy']);
+    }
+    // A table with an error of X gives every XY type a layer for them that takes a look and can be kept out of the range.
+    for (const c of CAPABILITIES.filter((k) => k.xErrorBars)) {
+      const table = createXyTable('XY', true, { kind: 'xerror' });
+      const base = createChart(table.id, undefined, c.type);
+      const chart = { ...base, layers: base.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showErrorBars: true } } : l)) };
+      const row = layerRows(chart, table).find((r) => r.layer.kind === 'xErrorBars');
+      expect([c.type, row?.takes, row?.inRange]).toEqual([c.type, ['color', 'widthPt', 'opacity'], true]);
     }
   });
 

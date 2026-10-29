@@ -139,6 +139,18 @@ export function chartFamily(type: ChartType): ChartFamily {
   }
 }
 
+/**
+ * Where a comparison bracket stands, by chart type: 'columns' joins two data sets of a chart over columns, 'grouped' two series of a
+ * category (or two categories) of side by side grouped bars, 'xy' two series at one X. Null: no meaningful place (stacked bars and lines
+ * share one place for all series; a survival chart is bounded at 100% with the curves at its top; a histogram has one data set to a bin).
+ */
+export function bracketKindOf(type: ChartType): 'columns' | 'grouped' | 'xy' | null {
+  const family = chartFamily(type);
+  if (family === 'column') return 'columns';
+  if (family === 'xy') return 'xy';
+  return type === 'groupedBar' || type === 'groupedFloating' || type === 'groupedBox' || type === 'groupedViolin' ? 'grouped' : null;
+}
+
 /** Whether a chart type is drawn on a numeric X axis from an XY table. */
 export const isXyChartType = (type: ChartType): boolean => chartFamily(type) === 'xy';
 /** Bars (or lines) over categories that are the rows of a grouped or contingency table. */

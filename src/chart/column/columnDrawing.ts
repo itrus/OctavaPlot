@@ -9,9 +9,9 @@ import type { ColumnModel } from './columnModel';
 /**
  * What a chart over columns is drawn from, in order: the chrome behind the data, the marks (clipped to the plotting region),
  * the labels of the bars, the chrome in front, the labels of single points (outside the clip), then the annotations. The
- * editor adds the selection marks.
+ * editor adds the selection marks. A `preview` (the screen, never an export) may simplify the dots of a graph of very many (see denseDots.ts).
  */
-export function columnDrawing(chart: Chart, model: ColumnModel): ChartDrawing {
+export function columnDrawing(chart: Chart, model: ColumnModel, preview = false): ChartDrawing {
   const scene = model.scene ?? compileColumnScene(chart, model);
   return {
     widthPt: model.widthPt,
@@ -19,12 +19,12 @@ export function columnDrawing(chart: Chart, model: ColumnModel): ChartDrawing {
     sections: [
       { nodes: scene.defs },
       { nodes: scene.back },
-      { nodes: scene.marks ?? compileColumnMarks(chart, model) },
+      { nodes: preview ? compileColumnMarks(chart, model, true) : scene.marks ?? compileColumnMarks(chart, model) },
       { nodes: compileColumnLabels(chart, model) },
       { nodes: scene.front },
       { nodes: compileColumnPointLabels(chart, model) },
       { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), place: annotationPlacer({ family: 'column', model }, model.widthPt, model.heightPt).place },
     ],
-    selection: (s) => compileColumnSelection(model, s.groupIds, s.pointId),
+    selection: (s) => compileColumnSelection(model, s.groupIds, s.pointIds),
   };
 }

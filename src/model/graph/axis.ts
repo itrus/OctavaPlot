@@ -1,5 +1,5 @@
 import { bool, clamp, oneOf, record, text, valuesOf } from '../sanitize';
-import type { AxisBreak, AxisConfig, AxisScaleKind, BreakMark, NumberFormatKind, TickDirection } from '../types';
+import type { AxisBreak, AxisConfig, AxisScaleKind, BreakMark, ExtraTick, NumberFormatKind, TickDirection } from '../types';
 
 /** Limits of the axis settings (P). */
 export const AXIS_LIMITS = {
@@ -57,6 +57,21 @@ export function sanitizeBreaks(raw: unknown, fallback: AxisBreak[]): AxisBreak[]
   return out;
 }
 
+/** Most ticks that can be added to an axis by hand. */
+export const MAX_EXTRA_TICKS = 12;
+
+/** Extra ticks as they can be used: a finite value and a label of at most the length of an affix; the same value once; at most MAX_EXTRA_TICKS. */
+function sanitizeExtraTicks(raw: unknown): ExtraTick[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ExtraTick[] = [];
+  for (const t of raw) {
+    const r = record(t);
+    if (typeof r.value !== 'number' || !Number.isFinite(r.value) || out.some((o) => o.value === r.value) || out.length >= MAX_EXTRA_TICKS) continue;
+    out.push({ value: r.value, label: text(r.label, AXIS_LIMITS.affixLength, '') });
+  }
+  return out;
+}
+
 /** The base of a log scale, or null for a linear one. */
 export const logBaseOf = (scale: AxisScaleKind): number | null => AXIS_SCALES.find((s) => s.value === scale)?.base ?? null;
 
@@ -64,7 +79,8 @@ export const logBaseOf = (scale: AxisScaleKind): number | null => AXIS_SCALES.fi
 export function sanitizeAxis(axis: AxisConfig, base: AxisConfig): AxisConfig {
   const a = record(axis);
   const { offsetPt, tickLengthPt, minorTicks, decimals } = AXIS_LIMITS;
-  return {
+  const extraTicks = sanitizeExtraTicks(a.extraTicks);
+  const out: AxisConfig = {
     ...axis,
     scale: oneOf(SCALES, a.scale, base.scale),
     reverse: bool(a.reverse, base.reverse),
@@ -85,7 +101,11 @@ export function sanitizeAxis(axis: AxisConfig, base: AxisConfig): AxisConfig {
     thousands: bool(a.thousands, base.thousands),
     prefix: text(a.prefix, AXIS_LIMITS.affixLength, base.prefix),
     suffix: text(a.suffix, AXIS_LIMITS.affixLength, base.suffix),
+    extraTicks,
   };
+  // No extra ticks is the absence of the setting, so a file without any is as it was.
+  if (extraTicks.length === 0) delete out.extraTicks;
+  return out;
 }
 
 /** Distance from the axis line to the start of the tick numbers: the part of the tick outside the axis line plus the extra distance set for them. */

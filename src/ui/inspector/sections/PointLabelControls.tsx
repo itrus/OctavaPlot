@@ -327,3 +327,67 @@ export function SelectedPointBox({
     </GroupBox>
   );
 }
+
+/**
+ * "Selected points": the label settings of several points edited together. Where the points differ a field says "Mixed"; choosing a value
+ * sets it for all of them, and the dot beside a setting clears it on every point that has its own value.
+ */
+export function SelectedPointsBox({
+  type,
+  count,
+  style,
+  labelMode,
+  mixed,
+  ownKeys,
+  onEdit,
+  onReset,
+}: {
+  type: ChartType;
+  count: number;
+  /** Inherit, Show or Hide when all the points have the same; the first of the points' when they differ (the field then says Mixed). */
+  labelMode: string;
+  /** Style resolved down to the first of the points; a field that is mixed shows no value. */
+  style: ChartStyle;
+  mixed: ReadonlySet<keyof ChartStyle>;
+  /** The settings that at least one of the points has its own value for. */
+  ownKeys: ReadonlySet<keyof ChartStyle>;
+  onEdit: (label: string, edit: PointEdit, coalesceKey?: string) => void;
+  onReset: () => void;
+}) {
+  const ui = describePointOverrideUi(style, { type, overrides: {}, rowTitle: '' });
+  const off = !ui.optionsEnabled && !mixed.has('showPointLabels');
+  const ov = (key: keyof ChartStyle): Overridden => {
+    const isMixed = mixed.has(key);
+    return ownKeys.has(key) || isMixed ? { reset: ownKeys.has(key) ? () => onEdit('Reset setting', { clear: [key] }) : undefined, mixed: isMixed } : false;
+  };
+  const set = (patch: Partial<ChartStyle>, label = 'Change point labels') => onEdit(label, { set: patch }, `points:${Object.keys(patch).join(',')}`);
+  return (
+    <GroupBox title={`Selected points (${count})`} overridden={POINT_LABEL_KEYS.some((k) => ownKeys.has(k))}>
+      <div className="muted small">These points are edited together. Ctrl or Shift on a point of the chart takes it in or out.</div>
+      <Field label="Label" overridden={ov('showPointLabels')} note={ui.reason}>
+        <SelectInput<string>
+          value={labelMode}
+          options={LABEL_MODE_OPTIONS}
+          disabled={type === 'mean'}
+          ariaLabel="Label for these points"
+          onChange={(v) => {
+            const action = labelModeAction(v);
+            if (action) onEdit('Change point labels', action);
+          }}
+        />
+      </Field>
+      <NumField label="Size" unit="pt" value={style.pointLabelFontSizePt} min={LABEL_FONT_LIMITS.min} max={LABEL_FONT_LIMITS.max} disabled={off} overridden={ov('pointLabelFontSizePt')} onCommit={(v) => set({ pointLabelFontSizePt: v })} />
+      <Field label="Bold" overridden={ov('pointLabelBold')}>
+        <Check checked={style.pointLabelBold} disabled={off} ariaLabel="Bold labels for these points" onChange={(v) => set({ pointLabelBold: v })} />
+      </Field>
+      <Field label="Italic" overridden={ov('pointLabelItalic')}>
+        <Check checked={style.pointLabelItalic} disabled={off} ariaLabel="Italic labels for these points" onChange={(v) => set({ pointLabelItalic: v })} />
+      </Field>
+      <NumField label="Offset X" unit="pt" value={style.pointLabelOffsetXPt} min={LABEL_OFFSET_LIMITS.min} max={LABEL_OFFSET_LIMITS.max} disabled={off} overridden={ov('pointLabelOffsetXPt')} hint="From each point, for labels placed as Custom (drag a label on the chart to set it)" onCommit={(v) => set({ pointLabelPlacement: 'custom', pointLabelOffsetXPt: v })} />
+      <NumField label="Offset Y" unit="pt" value={style.pointLabelOffsetYPt} min={LABEL_OFFSET_LIMITS.min} max={LABEL_OFFSET_LIMITS.max} disabled={off} overridden={ov('pointLabelOffsetYPt')} onCommit={(v) => set({ pointLabelPlacement: 'custom', pointLabelOffsetYPt: v })} />
+      <div className="button-row">
+        <button onClick={onReset} disabled={!POINT_LABEL_KEYS.some((k) => ownKeys.has(k))}>Reset point labels</button>
+      </div>
+    </GroupBox>
+  );
+}

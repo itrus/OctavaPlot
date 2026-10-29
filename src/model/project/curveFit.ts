@@ -31,6 +31,8 @@ export interface Sheet {
 export function fitObservations(source: DataTable): Array<{ id: Id; label: string; obs: Array<{ x: number; y: number }> }> {
   const table = withoutExcluded(source);
   if (table.kind !== 'xy' || table.groups.length === 0) return [];
+  // A date, time or duration X column is not a number to fit (the graph makes no fit there either).
+  if (table.groups[0].time) return [];
   const layout = layoutOf(table);
   const xs = table.groups[0].observations.map((o) => o.value);
   return xySeries(table).map((s) => {
@@ -39,7 +41,7 @@ export function fitObservations(source: DataTable): Array<{ id: Id; label: strin
       const x = xs[row];
       if (x === null || x === undefined || !Number.isFinite(x)) continue;
       const values = s.columns.map((c) => c.observations[row]?.value ?? null);
-      if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'vector') {
+      if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'vector' || layout.kind === 'xerror') {
         if (values[0] !== null && Number.isFinite(values[0])) obs.push({ x, y: values[0] });
       } else if (layout.kind === 'replicates') {
         for (const v of values) if (v !== null && Number.isFinite(v)) obs.push({ x, y: v });

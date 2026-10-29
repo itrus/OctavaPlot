@@ -3,7 +3,7 @@ import { n2 } from '../../../model/units';
 import type { AxisConfig, BreakMark, Chart, GridStyle } from '../../../model/types';
 import { dashOf } from '../../../model/graph/look';
 import { type YAxisScale, majorStepOf } from '../axes/scales';
-import type { PlacedReferenceLine } from './referenceLines';
+import type { PlacedReferenceLine, PlacedRegion } from './referenceLines';
 import { svgId } from './svgIds';
 import { labelOffset, tickPath, tickPaths } from '../axes/axisTicks';
 import { LEGEND_KEY, type Layout, type LegendItemLayout, type Rect, X_TICK_LABEL_GAP, Y_TICK_LABEL_GAP, keyWidthOf } from '../parts/layout';
@@ -158,6 +158,21 @@ export function referenceLineElements(lines: readonly PlacedReferenceLine[], fon
             ? [el('text', [['x', n2(l.labelX)], ['y', n2(l.labelY)], ['text-anchor', l.anchor], ['font-size', fontSizePt], ['fill', l.line.color], ['fill-opacity', l.line.opacity < 1 ? l.line.opacity : undefined], ['pointer-events', 'none']], { id: svgId('reference-line', l.id, 'label'), text: l.label })]
             : [],
         ),
+      ],
+    }),
+  ];
+}
+
+/** The shaded regions of a chart, behind the reference lines and the data and clipped to the plotting region; their labels stand inside the band. */
+export function regionElements(regions: readonly PlacedRegion[], fontSizePt: number): SceneElement[] {
+  if (regions.length === 0) return [];
+  return [
+    el('g', [['data-regions', '']], {
+      children: [
+        el('g', [['clip-path', 'url(#plot-clip)'], ['stroke', 'none']], {
+          children: regions.flatMap((r) => r.rects.map((q, i) => el('rect', [['x', n2(q.x)], ['y', n2(q.y)], ['width', n2(q.width)], ['height', n2(q.height)], ['fill', r.region.color], ['fill-opacity', r.region.opacity < 1 ? r.region.opacity : undefined]], { id: svgId('region', r.id, ...(i === 0 ? [] : [i])) }))),
+        }),
+        ...regions.flatMap((r) => (r.label ? [el('text', [['x', n2(r.labelX)], ['y', n2(r.labelY)], ['text-anchor', r.anchor], ['font-size', fontSizePt], ['fill', r.region.color], ['pointer-events', 'none']], { id: svgId('region', r.id, 'label'), text: r.label })] : [])),
       ],
     }),
   ];

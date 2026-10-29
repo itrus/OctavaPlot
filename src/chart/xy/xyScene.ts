@@ -10,20 +10,21 @@ import { linePattern } from '../../model/graph/look';
 import { symbolPath } from '../shared/parts/symbols';
 import { axisGaps, axisPieces } from '../shared/axes/axisScale';
 import { crossingPosition, labelOffset } from '../shared/axes/axisTicks';
-import { backgroundElements, frameElement, gridElements, legendElements, numericAxisElements, plotClipElement, referenceLineElements, scaleBarElement, titleElements } from '../shared/scene/chrome';
-import { referenceLinesOf } from '../shared/scene/referenceLines';
+import { backgroundElements, frameElement, gridElements, legendElements, numericAxisElements, plotClipElement, referenceLineElements, regionElements, scaleBarElement, secondaryAxisElements, titleElements } from '../shared/scene/chrome';
+import { referenceLinesOf, regionsOf } from '../shared/scene/referenceLines';
 import { atRiskElements, fitParameterElements } from './xyChrome';
-import { Y_TICK_LABEL_GAP } from '../shared/parts/layout';
+import { xyBracketElements } from './xyBrackets';
+import { LEGEND_KEY, Y_TICK_LABEL_GAP } from '../shared/parts/layout';
 
 /** The scene of an XY chart (and of a survival curve or a histogram, which have the shape of one): its data layers and its chrome. */
 /** Size of an individual value relative to the symbol of the mean. */
 export const RAW_POINT_SCALE = 0.6;
 
-const DATA_KINDS: ReadonlyArray<LayerKind> = ['bars', 'band', 'area', 'line', 'fitBand', 'fitCurve', 'errorBars', 'rawPoints', 'points'];
+const DATA_KINDS: ReadonlyArray<LayerKind> = ['bars', 'band', 'area', 'line', 'fitBand', 'fitCurve', 'errorBars', 'xErrorBars', 'rawPoints', 'points'];
 
 /** Layers in the order the families that are not drawn from layers draw their series. */
 function drawnLayers(chart: Chart, model: XyModel): Array<{ id: Id; kind: LayerKind; seriesId: Id }> {
-  const order: LayerKind[] = chart.lineOrder === 'onTop' ? ['points', 'band', 'area', 'line', 'fitBand', 'fitCurve', 'errorBars'] : ['band', 'area', 'line', 'fitBand', 'fitCurve', 'errorBars', 'points'];
+  const order: LayerKind[] = chart.lineOrder === 'onTop' ? ['points', 'band', 'area', 'line', 'fitBand', 'fitCurve', 'errorBars', 'xErrorBars'] : ['band', 'area', 'line', 'fitBand', 'fitCurve', 'errorBars', 'xErrorBars', 'points'];
   return order.flatMap((kind) => model.series.map((s) => ({ id: `${s.groupId}:${kind}`, kind, seriesId: s.groupId })));
 }
 
@@ -63,6 +64,9 @@ function pathsOf(chart: Chart, s: XySeries, layerId: Id, kind: LayerKind): Scene
     case 'errorBars':
       if (s.errorPath === '') return [];
       return [{ id: base, d: s.errorPath, fill: 'none', stroke: st.errorColor, strokeWidth: st.errorLineWidthPt, strokeOpacity: st.errorOpacity < 1 ? st.errorOpacity : undefined, lineCap: 'butt', hit: { kind: 'error', groupId: s.groupId } }];
+    case 'xErrorBars':
+      if (!s.xErrorPath) return [];
+      return [{ id: base, d: s.xErrorPath, fill: 'none', stroke: st.errorColor, strokeWidth: st.errorLineWidthPt, strokeOpacity: st.errorOpacity < 1 ? st.errorOpacity : undefined, lineCap: 'butt', hit: { kind: 'error', groupId: s.groupId } }];
     case 'rawPoints':
       return (s.rawPoints ?? []).map((p) => ({
         id: svgId(base, p.id),
@@ -99,6 +103,9 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
   const { plot } = layout;
   const xa = chart.xAxis;
   const ya = chart.yAxis;
+  const y2a = chart.y2Axis;
+  // model.y2 is null while no series is bound to the right axis (and absent for survival curves and histograms); a hidden right axis draws nothing.
+  const y2 = model.y2 && model.y2Scale && y2a.visible ? { scale: model.y2, map: model.y2Scale } : null;
   const bottom = plot.y + plot.height;
   const right = plot.x + plot.width;
   // Broken axes: the pieces of each that are drawn, and where its gaps are. The axis lines cross at the chosen values, or at the low edges.
@@ -112,17 +119,24 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
   const back = [
     ...backgroundElements(chart, W, H, plot),
     ...(ya.visible ? gridElements({ dir: 'h', grid: chart.grid, major: y.ticks, minor: y.minorTicks ?? [], showMajor: ya.showGrid, showMinor: ya.showMinorGrid, at: yScale, from: plot.x, to: right }) : []),
+    // Right gridlines: dashed when the left grid is also drawn, so the two sets stay distinguishable.
+    ...(y2 ? gridElements({ dir: 'h', grid: chart.grid, major: y2.scale.ticks, minor: y2.scale.minorTicks ?? [], showMajor: y2a.showGrid, showMinor: y2a.showMinorGrid, at: y2.map, from: plot.x, to: right, fallbackDash: ya.visible && ya.showGrid ? '3 3' : undefined }) : []),
     ...(xa.visible ? gridElements({ dir: 'v', grid: chart.grid, major: x.ticks, minor: x.minorTicks ?? [], showMajor: xa.showGrid, showMinor: xa.showMinorGrid, at: xScale, from: plot.y, to: bottom }) : []),
+    // The shaded regions are behind everything else that is drawn in the plot.
+    ...regionElements(regionsOf(chart, { family: 'xy', model }).placed.filter((r) => !hidden.has(`${r.region.id}:region`)), ya.tickFontSizePt),
     ...referenceLineElements(referenceLinesOf(chart, { family: 'xy', model }).placed.filter((l) => !hidden.has(`${l.line.id}:referenceLine`)), ya.tickFontSizePt),
   ];
   const front = [
+    // The comparison brackets stand in front of the data; one whose layer is hidden is not drawn.
+    ...xyBracketElements(model.brackets ?? [], hidden),
     ...(model.fit.showParameters ? fitParameterElements(series, plot.x + 16, plot.y + 8, ya.tickFontSizePt, model.fit.level) : []),
     ...numericAxisElements({ ...axis, cfg: ya, scale: y, along: 'y', crossing: yCross, pieces: yPieces, gaps: axisGaps(y, bottom, -plot.height), map: yScale }),
+    ...(y2 ? secondaryAxisElements({ chart, cfg: y2a, scale: y2.scale, map: y2.map, plot }) : []),
     ...numericAxisElements({ ...axis, cfg: xa, scale: x, along: 'x', crossing: xCross, pieces: xPieces, gaps: axisGaps(x, plot.x, plot.width), map: xScale }),
     ...[frameElement(chart, plot, ya.lineWidthPt), scaleBarElement(chart, xa, 'x', x, xScale, plot), scaleBarElement(chart, ya, 'y', y, yScale, plot)].flatMap((e) => (e ? [e] : [])),
     // Offset traces: the sentence that tells the offset stands in the row the layout reserved under the X axis title, centred under the plot.
     ...(model.offsetNote && layout.extraBottom ? [el('text', [['x', n2(plot.x + plot.width / 2)], ['y', n2(layout.extraBottom.y + ya.tickFontSizePt * 1.2)], ['text-anchor', 'middle'], ['font-size', ya.tickFontSizePt], ['fill', chart.textColor]], { text: model.offsetNote })] : []),
-    ...titleElements(chart, layout, xa, ya),
+    ...titleElements(chart, layout, xa, ya, y2 ? y2a : null),
     ...(model.atRisk && !hidden.has(`${chart.id}:atRisk`) ? atRiskElements(chart, model.atRisk, plot.x, plot.x - labelOffset(ya) - Y_TICK_LABEL_GAP) : []),
     ...legendElements(chart, layout, (it, w) => {
       const s = series[model.legendSeries[it.index]];
@@ -133,7 +147,7 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
         const pattern = linePattern(st);
         keys.push(el('path', [['d', `M${n2(it.x)},${n2(it.y)}H${n2(it.x + w)}`], ['stroke', st.lineColor], ['stroke-width', st.lineWidthPt], ['stroke-opacity', st.lineOpacity < 1 ? st.lineOpacity : undefined], ['stroke-dasharray', pattern.strokeDasharray], ['stroke-linecap', pattern.strokeLinecap], ['fill', 'none']]));
       }
-      if (st.showSymbols) keys.push(el('path', [['d', symbolPath(st.symbolShape, it.x + w / 2, it.y, st.symbolSizePt)], ['fill', st.symbolColor], ['fill-opacity', st.symbolFillOpacity < 1 ? st.symbolFillOpacity : undefined], ['stroke', st.symbolBorderColor], ['stroke-width', st.symbolBorderWidthPt], ['stroke-opacity', st.symbolBorderOpacity < 1 ? st.symbolBorderOpacity : undefined]]));
+      if (st.showSymbols) keys.push(el('path', [['d', symbolPath(st.symbolShape, it.x + w / 2, it.y, Math.min(st.symbolSizePt, LEGEND_KEY.height))], ['fill', st.symbolColor], ['fill-opacity', st.symbolFillOpacity < 1 ? st.symbolFillOpacity : undefined], ['stroke', st.symbolBorderColor], ['stroke-width', st.symbolBorderWidthPt], ['stroke-opacity', st.symbolBorderOpacity < 1 ? st.symbolBorderOpacity : undefined]]));
       return { groupId: s.groupId, keys };
     }),
   ];
@@ -168,10 +182,10 @@ export function attachLazyScene(chart: Chart, model: XyModel): void {
   Object.defineProperty(model, 'scene', { enumerable: true, configurable: true, get: () => (scene ??= compileXyScene(chart, model)) });
 }
 
-/** The editor's own mark of an XY chart: the ring round the selected point. Never in an export. */
-export function compileXySelection(model: XyModel, selectedPoint: string | null): SceneElement[] {
-  if (selectedPoint === null) return [];
+/** The editor's own mark of an XY chart: the ring round each selected point. Never in an export. */
+export function compileXySelection(model: XyModel, selectedPoints: readonly string[]): SceneElement[] {
+  if (selectedPoints.length === 0) return [];
   return model.series.flatMap((s) =>
-    s.points.filter((p) => p.id === selectedPoint).map((p) => el('circle', [['data-editor-only', 'true'], ['cx', n2(p.px)], ['cy', n2(p.py)], ['r', n2(s.style.symbolSizePt / 2 + 6)], ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2.4], ['pointer-events', 'none']], { editorOnly: true })),
+    s.points.filter((p) => selectedPoints.includes(p.id)).map((p) => el('circle', [['data-editor-only', 'true'], ['cx', n2(p.px)], ['cy', n2(p.py)], ['r', n2(s.style.symbolSizePt / 2 + 6)], ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2.4], ['pointer-events', 'none']], { editorOnly: true })),
   );
 }

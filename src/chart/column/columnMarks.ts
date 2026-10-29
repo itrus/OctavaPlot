@@ -4,10 +4,12 @@ import { n2 } from '../../model/units';
 import { SELECT_COLOR } from '../shared/scene/annotations';
 import { barLabelElement, insideBarLabelElement } from '../shared/parts/barLabelElements';
 import { barMarkElement } from '../shared/parts/fillElements';
-import type { ColumnModel, GroupGeom } from './columnModel';
+import type { ColumnModel, GroupGeom, PointGeom } from './columnModel';
+import { DENSE_CELL_PT, isDense } from '../shared/scene/denseDots';
 import { el, type SceneElement } from '../shared/scene/sceneElement';
 import { svgId } from '../shared/scene/svgIds';
 import { symbolPath } from '../shared/parts/symbols';
+import { cachedFor } from '../shared/parts/stable';
 
 /**
  * The data marks of a column chart (bars, boxes and violins, connectors, error bars, mean lines, points) as scene elements,
@@ -21,12 +23,24 @@ import { symbolPath } from '../shared/parts/symbols';
  * and the points. Layers that follow each other in the same pass share one matrix group on a horizontal chart; the points are
  * not turned.
  */
+/** Two dots drawn alike: what one shape can hold for a run of them. */
+const sameLook = (a: PointGeom, b: PointGeom): boolean => a.color === b.color && a.borderColor === b.borderColor && a.borderWidth === b.borderWidth && a.size === b.size && a.shape === b.shape;
+
 const PASS: Partial<Record<LayerKind, 'body' | 'lines' | 'points'>> = { bars: 'body', distribution: 'body', pairLines: 'lines', line: 'lines', errorBars: 'lines', meanLine: 'lines', points: 'points' };
 
-export function compileColumnMarks(chart: Chart, model: ColumnModel): SceneElement[] {
+/** How many dots the model draws: those of the data sets whose points layer is shown (a hidden layer draws nothing, so nothing is simplified). */
+export function drawnDotCount(chart: Chart, model: ColumnModel): number {
+  const hidden = new Set(chart.hiddenLayerIds);
+  const shown = new Set(model.layers.filter((l) => l.kind === 'points' && l.binding && !hidden.has(l.id)).map((l) => l.binding!.seriesId));
+  return model.groups.reduce((n, g) => (shown.has(g.groupId) ? n + g.points.length : n), 0);
+}
+
+export function compileColumnMarks(chart: Chart, model: ColumnModel, preview = false): SceneElement[] {
   const { groups, orient } = model;
   const hidden = new Set(chart.hiddenLayerIds);
   const groupOf = new Map(groups.map((g) => [g.groupId, g]));
+  // The preview of a graph of very many dots draws the dots of one look as one shape (see denseDots.ts); an export never does.
+  const dense = preview && isDense(drawnDotCount(chart, model));
   /** Shapes of the vertical drawing: under the matrix of a horizontal chart, as they are otherwise. */
   const turned = (children: SceneElement[]): SceneElement[] => (orient.matrix ? [el('g', [['transform', orient.matrix]], { children })] : children);
 
@@ -73,11 +87,54 @@ export function compileColumnMarks(chart: Chart, model: ColumnModel): SceneEleme
           : [];
       case 'meanLine':
         return g?.meanLine ? [named(el('path', [['d', g.meanLine.d], ['fill', 'none'], ['stroke', g.meanLine.color], ['stroke-width', g.meanLine.strokeWidth], ['stroke-opacity', g.meanLine.opacity < 1 ? g.meanLine.opacity : undefined], ['stroke-linecap', 'butt']], { hit: { kind: 'meanLine', groupId: g.groupId, objectId: g.meanLine.id } }))] : [];
-      case 'points':
-        return (g?.points ?? []).map((p) => {
+      case 'points': {
+        if (!g) return [];
+        // The shapes of one list of dots are made once: while the dots are the same (see stableList) they are the same objects, which React skips.
+        const key = `${layer.id}|${orient.horizontal}|${JSON.stringify(orient.real)}|${JSON.stringify(orient.virtual)}|${dense}`;
+        const dot = (p: PointGeom, d: string) => el('path', [['d', d], ['fill', p.color], ['fill-opacity', p.fillOpacity < 1 ? p.fillOpacity : undefined], ['stroke', p.borderColor], ['stroke-width', p.borderWidth], ['stroke-opacity', p.borderOpacity < 1 ? p.borderOpacity : undefined]], { hit: { kind: 'point', groupId: g.groupId, objectId: p.id } });
+        const shapeOf = (p: PointGeom): string => {
           const at = orient.toScreen(p.cx, p.cy);
-          return named(el('path', [['d', symbolPath(p.shape, at.x, at.y, p.size)], ['fill', p.color], ['fill-opacity', p.fillOpacity < 1 ? p.fillOpacity : undefined], ['stroke', p.borderColor], ['stroke-width', p.borderWidth], ['stroke-opacity', p.borderOpacity < 1 ? p.borderOpacity : undefined]], { hit: { kind: 'point', groupId: g!.groupId, objectId: p.id } }), p.id);
+          return symbolPath(p.shape, at.x, at.y, p.size);
+        };
+        return cachedFor(g.points, key, () => {
+          if (!dense) return g.points.map((p) => named(dot(p, shapeOf(p)), p.id));
+          // Dots that follow each other with the same opaque look are shapes of a few, one for each square of the page (a shape
+          // as large as the plot would be painted again whole whenever any part of it is, which takes seconds); the order of drawing
+          // between looks stays. A dot with transparency stays a shape of its own, because transparent dots add up where they overlap
+          // and one shape would not. Picking a dot is by position (nearestDot): a shape has the data set but no observation.
+          const out: SceneElement[] = [];
+          let run: { first: PointGeom; cells: Map<number, string> } | null = null;
+          const flush = () => {
+            if (run) {
+              let n = 0;
+              for (const d of run.cells.values()) out.push(named({ ...dot(run.first, d), hit: { kind: 'point', groupId: g.groupId } }, 'run', run.first.id, n++));
+            }
+            run = null;
+          };
+          const cellOf = (p: PointGeom): number => {
+            const at = orient.toScreen(p.cx, p.cy);
+            return Math.floor(at.x / DENSE_CELL_PT) * 100_003 + Math.floor(at.y / DENSE_CELL_PT);
+          };
+          const add = (r: NonNullable<typeof run>, p: PointGeom) => {
+            const c = cellOf(p);
+            r.cells.set(c, (r.cells.get(c) ?? '') + shapeOf(p));
+          };
+          for (const p of g.points) {
+            if (p.fillOpacity < 1 || p.borderOpacity < 1) {
+              flush();
+              out.push(named(dot(p, shapeOf(p)), p.id));
+            } else if (run && sameLook(run.first, p)) {
+              add(run, p);
+            } else {
+              flush();
+              run = { first: p, cells: new Map() };
+              add(run, p);
+            }
+          }
+          flush();
+          return out;
         });
+      }
       default:
         return [];
     }
@@ -150,15 +207,15 @@ export function compileColumnPointLabels(chart: Chart, model: ColumnModel): Scen
 }
 
 /** The editor's own marks of a column chart: the ring round the selected point, the frame of its label and the band of the selected data set. Never in an export. */
-export function compileColumnSelection(model: ColumnModel, selectedGroups: readonly string[], selectedPoint: string | null): SceneElement[] {
+export function compileColumnSelection(model: ColumnModel, selectedGroups: readonly string[], selectedPoints: readonly string[]): SceneElement[] {
   const { plot } = model.layout;
   const dashed = [['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '6 4'], ['pointer-events', 'none']] as const;
   return [
-    ...(selectedPoint === null
+    ...(selectedPoints.length === 0
       ? []
       : [
-          ...model.groups.flatMap((g) => g.points.filter((p) => p.id === selectedPoint)).map((p) => el('circle', [['data-editor-only', 'true'], ['cx', n2(p.cx)], ['cy', n2(p.cy)], ['r', n2(p.size / 2 + 6)], ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2.4], ['pointer-events', 'none']], { editorOnly: true })),
-          ...model.labels.items.filter((it) => it.id === selectedPoint).map((it) => el('rect', [['data-editor-only', 'true'], ['x', n2(it.box.x0 - 4)], ['y', n2(it.box.y0 - 4)], ['width', n2(it.box.x1 - it.box.x0 + 8)], ['height', n2(it.box.y1 - it.box.y0 + 8)], ...dashed], { editorOnly: true })),
+          ...model.groups.flatMap((g) => g.points.filter((p) => selectedPoints.includes(p.id))).map((p) => el('circle', [['data-editor-only', 'true'], ['cx', n2(p.cx)], ['cy', n2(p.cy)], ['r', n2(p.size / 2 + 6)], ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2.4], ['pointer-events', 'none']], { editorOnly: true })),
+          ...model.labels.items.filter((it) => selectedPoints.includes(it.id)).map((it) => el('rect', [['data-editor-only', 'true'], ['x', n2(it.box.x0 - 4)], ['y', n2(it.box.y0 - 4)], ['width', n2(it.box.x1 - it.box.x0 + 8)], ['height', n2(it.box.y1 - it.box.y0 + 8)], ...dashed], { editorOnly: true })),
         ]),
     ...(selectedGroups.length === 0
       ? []

@@ -1,7 +1,7 @@
 import type { Orientation } from '../parts/orientation';
 import type { YAxisScale } from '../axes/scales';
 import type { PlacedReferenceLine } from './referenceLines';
-import type { Layout, LegendItemLayout } from '../parts/layout';
+import { LEGEND_KEY, type Layout, type LegendItemLayout } from '../parts/layout';
 import { type SceneElement, el } from './sceneElement';
 import type { Chart, ChartStyle } from '../../../model/types';
 import type { ChromeScene } from './scene';
@@ -92,7 +92,7 @@ export function lineAndSymbolKeys(style: ChartStyle, x: number, y: number, w: nu
     out.push(el('path', [['d', `M${n2(x)},${n2(y)}H${n2(x + w)}`], ['stroke', style.lineColor], ['stroke-width', style.lineWidthPt], ['stroke-opacity', style.lineOpacity < 1 ? style.lineOpacity : undefined], ['stroke-dasharray', pattern.strokeDasharray], ['stroke-linecap', pattern.strokeLinecap], ['fill', 'none']]));
   }
   if (style.showSymbols) {
-    out.push(el('path', [['d', symbolPath(style.symbolShape, x + w / 2, y, style.symbolSizePt)], ['fill', style.symbolColor], ['fill-opacity', style.symbolFillOpacity < 1 ? style.symbolFillOpacity : undefined], ['stroke', style.symbolBorderColor], ['stroke-width', style.symbolBorderWidthPt], ['stroke-opacity', style.symbolBorderOpacity < 1 ? style.symbolBorderOpacity : undefined]]));
+    out.push(el('path', [['d', symbolPath(style.symbolShape, x + w / 2, y, Math.min(style.symbolSizePt, LEGEND_KEY.height))], ['fill', style.symbolColor], ['fill-opacity', style.symbolFillOpacity < 1 ? style.symbolFillOpacity : undefined], ['stroke', style.symbolBorderColor], ['stroke-width', style.symbolBorderWidthPt], ['stroke-opacity', style.symbolBorderOpacity < 1 ? style.symbolBorderOpacity : undefined]]));
   }
   return out;
 }

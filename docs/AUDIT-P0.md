@@ -24,7 +24,7 @@ Read-only audit, 27 October 2026. No source or test file was changed.
 | Save | `projectFile.test.ts`; `recovery.test.ts` (saved-as-file vs recovery vs memory, flush decision, status text); `recoveryStore.test.ts` (two-tab conflict, full store); `saveShortcut.test.ts` | The browser hook that calls the flush on page exit and the "unchanged after undo back to the saved point" case: not checked (no test seen) | missing test |
 | Undo | `state/history.test.ts` (2 cases: no merge across charts, merge on the same object); `commands.test.ts` l.94, 109, 165, 174 (one undo step, override restore, 800 ms window, style undo keeps title) | History depth limit, redo cleared by a new edit, undo across add/remove table, undo of a data edit leaving theme edits (contract section 15 states the reverse pair for theme): only the style/title pair is tested | missing test |
 | Stable series colours | `model/table/chartTable.test.ts` l.97 (added sets keep colour when an earlier one is removed), l.116 (old file with no slot); `chart/__tests__/drawOrder.test.ts` l.20 (colour follows its series when reordered) | Own series removed or hidden then re-added; colour after table duplicate: not checked | fine |
-| `exp_two_phase` identifiability | `fit.test.ts` l.134 (well-separated rates 2.5 and 0.15, converges), l.204 (non-converged: no SE). `fitScaling.test.ts` runs it in CASES for scaling and constant Y | No test for single-exponential data fitted by two phases, or for two nearly equal rates (ill-conditioned: expect no SE and not converged). `fit.ts` has no ordering constraint: parameter names say "k1 (fast rate)" and "k2 (slow rate)" but nothing enforces k1 > k2 (no sort or swap found in `fit.ts`). A fit can return the phases swapped, so the labels may be wrong. Start values are a fixed 10/span and 1/span | possible defect |
+| `exp_two_phase` identifiability | `fit.test.ts` l.134 (well-separated rates 2.5 and 0.15, converges), l.204 (non-converged: no SE). `fitScaling.test.ts` runs it in CASES for scaling and constant Y | No test for single-exponential data fitted by two phases, or for two nearly equal rates (ill-conditioned: expect no SE and not converged). `fit.ts` has no ordering constraint: parameter names say "k1 (fast rate)" and "k2 (slow rate)" but nothing enforces k1 > k2 (no sort or swap found in `fit.ts`). A fit can return the phases swapped, so the labels may be wrong. Start values are a fixed 10/span and 1/span | possible defect at the audit; **not reproduced** in the follow-up below (the rate order was always right) |
 | Confidence-level change recomputes intervals | `fitCurve.test.ts` l.156 (sheet and graph labels), l.198 and l.246 (cache); `curveFit.ts` `cachedFit` includes `level` in the key; `analysis.test.ts` l.67 (change level, repair a bad level) | Band width on the drawn graph after a level change: not checked (l.35 of `fitCurve.test.ts` tests band presence and PI > CI only). Non-fit intervals (mean CI, median CI, survival band) at a changed level: survival has `survivalBand.test.ts` l.49 (99%); mean CI at 99% in `descriptive.test.ts` l.73 | fine for the fit sheet; band: missing test |
 
 ## 2. Section 15 fixtures of `docs/calculation-contracts.md`
@@ -111,6 +111,24 @@ Section 1 lists OP-001..OP-025, OP-033. OP-026..OP-032, 034..036 are in other se
 | 8 | OP-022 and OP-012: a test that fails on `Math.max(...rows)` with a very large input, and a test that the layout PNG path (not only single graph) gets the dpi chunk | S |
 | 9 | Histogram: cap on bin count for a tiny width and a huge range; width of 0 or NaN | S |
 | 10 | Replace the `studentTQuantileUpper` call in `fit.test.ts` l.22 with a literal t value | S |
+
+## Current state of the section 15 fixtures, 29 October 2026
+
+The table in section 2 is the audit of 27 October 2026 and is kept as it was. The state now, from the tests in the working tree (full run 29 October 2026: 201 files, 4627 tests passed):
+
+| Fixture | Now |
+|---|---|
+| Arithmetic summary, mean 95% CI, type-6 quartiles, geometric, median CI n=5 and n=6, histogram edges, ECDF ties, exact line | pass (unchanged) |
+| Tukey whisker | pass: the fence 15 is pinned (`distribution.test.ts`) |
+| Bubble area | pass: `xyBubble.test.ts` (28 October 2026) |
+| Nested weighting | pass: `subjects.test.ts`, equal-unit mean 5 against pooled 2.5 (28 October 2026) |
+| Survival ties, no-event survival | pass: `seriesFamilies.test.ts` with `medianSurvival`; the Results sheet is tested in `survivalSheet.test.ts` |
+| Log endpoint | pass for geometry; the warning text is still not checked |
+| Composition zero total | pass; the contract was changed to say that the row is skipped with a warning (28 October 2026) |
+| Dates to days, offsets, zones, calendar ticks, duration | eight new rows of section 15 (29 October 2026); tests in `timeColumn.test.ts`, `timeAxis.test.ts`, `xyTime.test.ts`, `timeColumns.test.ts` |
+| **Dot apportionment, ROC perfect, ROC complete tie, exact binomial, Holm, BH** | **Not built and no test.** Postponed by decision (29 October 2026), not forgotten: the features do not exist, so these six rows stay open |
+
+The "possible defect" for `exp_two_phase` (item 1 of the top gaps) was not reproduced; see the follow-up. Gap 2 now reads: bubble area and nested weighting are done; dot apportionment, ROC, exact binomial, Holm and BH are unbuilt.
 
 ## Follow-up, 27 October 2026 (after the audit)
 

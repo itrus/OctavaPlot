@@ -10,16 +10,18 @@ import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLegendLayout, withoutLegendLayout } from '../model/graph/legendEntries';
 import { sanitizeLook, sanitizePrintWidthMm } from '../model/graph/look';
-import { applyOrder, sanitizeOrder } from '../model/table/groupOrder';
-import { foldGroupGaps } from '../model/options/columnOptions';
-import { createRows, MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
+import { sanitizeOrder } from '../model/table/groupOrder';
+import { MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
+import { RESULT_STATS } from '../model/graph/resultTokens';
 import { defaultLayout, sanitizeLayout } from '../model/project/layout';
-import type { Analysis, Chart, ChartLayer, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, SummarySpec } from '../model/types';
+import { timeColumnOf, type TimeColumn } from '../util/timeColumn';
+import { FILE_FORMAT, FILE_VERSION, migrateRead, migrateShape, upgradeToCurrent } from './migrate';
+import type { Analysis, Chart, ChartLayer, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, ResultStat, SummarySpec } from '../model/types';
 
-/** The envelope of a project file (.oplot): this format and its one version. */
-const FORMAT = 'octavaplot-project';
-const VERSION = 1;
+/** The envelope of a project file (.oplot): this format, and the version written (earlier ones are read: see migrate.ts). */
+const FORMAT = FILE_FORMAT;
+const VERSION = FILE_VERSION;
 /** Autosave in the browser's storage; the same text as a file. */
 export const AUTOSAVE_KEY = 'octavaplot:project:autosave';
 export const AUTOSAVE_BACKUP_KEY = 'octavaplot:project:autosave:backup';
@@ -39,9 +41,8 @@ const num = (v: unknown, path: string): number => (typeof v === 'number' && Numb
 const arr = (v: unknown, path: string): unknown[] => (Array.isArray(v) ? v : fail(path, 'must be an array'));
 const obj = (v: unknown, path: string): Obj => (isObj(v) ? v : fail(path, 'must be an object'));
 
-/** Rows align with observations: missing (older files) are regenerated, a wrong count or bad IDs fail. */
+/** Rows align with observations: a wrong count or bad IDs fail (a table without rows was given them by migrate.ts). */
 function parseRows(raw: unknown, path: string, rowCount: number): DataRow[] {
-  if (raw === undefined) return createRows(rowCount);
   const list = arr(raw, path);
   if (list.length !== rowCount) fail(path, `must have ${rowCount} entries`);
   const ids = new Set<string>();
@@ -69,11 +70,12 @@ function parseLayout(raw: unknown, path: string): ReplicateLayout | undefined {
   }
   if (raw.kind === 'sized') return { kind: 'sized' };
   if (raw.kind === 'vector') return { kind: 'vector' };
+  if (raw.kind === 'xerror') return { kind: 'xerror' };
   if (raw.kind === 'summary') {
     if (SUMMARY_FORMATS.some((f) => f.id === raw.format)) return { kind: 'summary', format: raw.format as SummaryFormat };
     fail(`${path}.format`, `must be one of ${SUMMARY_FORMATS.map((f) => f.id).join(', ')}`);
   }
-  fail(`${path}.kind`, 'must be single, replicates, summary, sized or vector');
+  fail(`${path}.kind`, 'must be single, replicates, summary, sized, vector or xerror');
 }
 
 /** Stored survival options merged over the defaults; a level outside 0 to 1 or an unknown method falls back. */
@@ -87,6 +89,13 @@ function parseSurvival(raw: unknown): SurvivalOptions {
     eventSymbols: typeof r.eventSymbols === 'boolean' ? r.eventSymbols : DEFAULT_SURVIVAL.eventSymbols,
     errorBars: typeof r.errorBars === 'boolean' ? r.errorBars : DEFAULT_SURVIVAL.errorBars,
   };
+}
+
+/** The type of a column, `{"kind":"date","unit":"d"}`; a kind or unit that is not one, or a unit that does not belong to the kind, refuses the file. */
+function parseTime(raw: unknown, path: string): TimeColumn {
+  const col = timeColumnOf(raw);
+  if (!col) fail(path, 'must be {"kind": date, "unit": d}, {"kind": datetime, "unit": s} or {"kind": duration, "unit": s, min, h or d}');
+  return col;
 }
 
 const TABLE_KINDS: readonly TableKind[] = ['column', 'xy', 'grouped', 'contingency', 'survival'];
@@ -124,12 +133,17 @@ function parseTable(raw: unknown, path: string): DataTable {
       title: typeof g.title === 'string' ? g.title : '',
       paletteIndex: typeof g.paletteIndex === 'number' ? g.paletteIndex : gi,
       ...(typeof g.factor === 'string' && g.factor.trim() !== '' ? { factor: g.factor.trim() } : {}),
+      ...(g.time !== undefined ? { time: parseTime(g.time, `${gp}.time`) } : {}),
       observations,
     };
   });
   const kind: TableKind = TABLE_KINDS.find((k) => k === t.kind) ?? 'column';
   const lead = leadingColumns(kind);
   if (groups.length < lead) fail(`${path}.groups`, `a ${kind} table needs its first column (${kind === 'survival' ? 'time' : 'X'})`);
+  // A column type is read for the X column of an XY table only: what a date or a duration means anywhere else is not built, and reading it as plain numbers would change its meaning.
+  groups.forEach((g, gi) => {
+    if (g.time && !(kind === 'xy' && gi === 0)) fail(`${path}.groups[${gi}].time`, 'is only read for the X column of an XY table');
+  });
   const layout = kind === 'xy' || kind === 'grouped' ? parseLayout(t.layout, `${path}.layout`) : undefined;
   if (layout && (groups.length - lead) % seriesWidth(layout) !== 0) fail(`${path}.groups`, `do not fit the table layout: the columns must come in blocks of ${seriesWidth(layout)}`);
   return { id: str(t.id, `${path}.id`), name: str(t.name, `${path}.name`), kind, ...(layout ? { layout } : {}), rowCount, rows: parseRows(t.rows, `${path}.rows`, rowCount), groups };
@@ -187,7 +201,7 @@ const isHexColour = (v: unknown): boolean => typeof v === 'string' && /^#[0-9a-f
 /**
  * Checks the keys of `raw` that `base` (the defaults) also has against the type of the default: a number must be
  * a finite number, text text, a flag true or false, a list a list, an object an object (checked in turn). A key whose
- * default is null holds a number or null; or, if its name ends in "colour" (or is "mid", the middle colour of a heat map scale), a #rrggbb colour or null; or, if it ends in "Id", an ID or null. A key that
+ * default is null holds a number or null; or, if its name ends in "colour" (or is "mid", the middle colour of a heat map scale), a #rrggbb colour or null; or, if it ends in "Id" or "Title", an ID or text, or null. A key that
  * fails is taken out, so the default applies, and noted. Keys `base` does not have, and the keys in `skip`, stay as they are.
  */
 function conform(raw: Obj, base: Obj, path: string, notes: string[], skip: ReadonlySet<string> = new Set()): Obj {
@@ -203,7 +217,7 @@ function conform(raw: Obj, base: Obj, path: string, notes: string[], skip: Reado
       ok = isObj(got);
       if (ok) out[key] = conform(got as Obj, want, `${path}.${key}`, notes);
     } else if (Array.isArray(want)) ok = Array.isArray(got);
-    else if (want === null) ok = /colou?r$|^mid$/i.test(key) ? isHexColour(got) : /Id$/.test(key) ? typeof got === 'string' : typeof got === 'number' && Number.isFinite(got);
+    else if (want === null) ok = /colou?r$|^mid$/i.test(key) ? isHexColour(got) : /Id$|Title$/.test(key) ? typeof got === 'string' : typeof got === 'number' && Number.isFinite(got);
     else if (typeof want === 'number') ok = typeof got === 'number' && Number.isFinite(got);
     else ok = typeof got === typeof want;
     if (!ok) {
@@ -352,16 +366,53 @@ function cleanReferenceLines(raw: unknown, path: string, notes: string[]): Chart
     }
     seen.add(l.id);
     const width = finiteOr(l.widthPt, 2);
+    // A binding to a result is read whole or not at all: the line then keeps its value.
+    const vf = l.valueFrom;
+    const from = isObj(vf) && RESULT_STATS.some((s) => s.id === vf.stat) && typeof vf.groupId === 'string' && vf.groupId !== '' ? { stat: vf.stat as ResultStat, groupId: vf.groupId } : undefined;
+    if (vf !== undefined && vf !== null && !from) notes.push(`${path}[${i}].valueFrom could not be read and was dropped.`);
+    // An oblique line needs both numbers; with one of them unreadable it is a line at its value, as before, and says so.
+    const oblique = typeof l.slope === 'number' && Number.isFinite(l.slope) && typeof l.intercept === 'number' && Number.isFinite(l.intercept);
+    if ((l.slope !== undefined || l.intercept !== undefined) && !oblique) notes.push(`${path}[${i}] had a slope or an intercept that could not be read; it is a line at its value.`);
     out.push({
       id: l.id,
       axis: l.axis,
       value: l.value,
+      ...(oblique ? { slope: l.slope as number, intercept: l.intercept as number } : from ? { valueFrom: from } : {}),
       color: typeof l.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(l.color) ? l.color : '#000000',
       widthPt: width > 0 && width <= 40 ? width : 2,
       style: LINE_STYLES.find((v) => v === l.style) ?? 'dashed',
       opacity: typeof l.opacity === 'number' && Number.isFinite(l.opacity) ? Math.min(1, Math.max(0, l.opacity)) : 1,
       label: typeof l.label === 'string' ? l.label : '',
       showLabel: l.showLabel === true,
+    });
+  });
+  return out;
+}
+
+/** Shaded regions: every field checked; an entry that cannot be read (or repeats an ID) is dropped and noted. */
+function cleanRegions(raw: unknown, path: string, notes: string[]): Chart['regions'] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    notes.push(`${path} was not a list and was reset.`);
+    return [];
+  }
+  const out: Chart['regions'] = [];
+  const seen = new Set<string>();
+  raw.forEach((r, i) => {
+    if (!isObj(r) || typeof r.id !== 'string' || r.id === '' || seen.has(r.id) || (r.axis !== 'x' && r.axis !== 'y') || typeof r.from !== 'number' || !Number.isFinite(r.from) || typeof r.to !== 'number' || !Number.isFinite(r.to)) {
+      notes.push(`${path}[${i}] could not be read and was dropped.`);
+      return;
+    }
+    seen.add(r.id);
+    out.push({
+      id: r.id,
+      axis: r.axis,
+      from: r.from,
+      to: r.to,
+      color: typeof r.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(r.color) ? r.color : '#4f81bd',
+      opacity: typeof r.opacity === 'number' && Number.isFinite(r.opacity) ? Math.min(1, Math.max(0, r.opacity)) : 0.25,
+      label: typeof r.label === 'string' ? r.label : '',
+      showLabel: r.showLabel === true,
     });
   });
   return out;
@@ -392,10 +443,15 @@ function cleanBrackets(raw: unknown, path: string, notes: string[]): Chart['brac
       color: typeof b.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(b.color) ? b.color : '#000000',
       widthPt: width > 0 && width <= 40 ? width : 2,
       fontSizePt: font >= 4 && font <= 200 ? font : 24,
+      ...(isRow(b.row) ? { row: b.row } : {}),
+      ...(isRow(b.toRow) ? { toRow: b.toRow } : {}),
+      ...(typeof b.at === 'number' && Number.isFinite(b.at) ? { at: b.at } : {}),
     });
   });
   return out;
 }
+
+const isRow = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
 
 /**
  * Data sets taken from other tables. An entry that cannot be read, or a data set listed twice, refuses the file (which
@@ -434,11 +490,10 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
   const c = conform(c0, base as unknown as Obj, path, notes, new Set(['defaults', 'layers']));
   // Merged over the defaults: a value that is missing or not valid takes the default.
   const defaults = cleanStyle(c.defaults, `${path}.defaults`, notes);
-  // A graph has one data layer (see dataLayer in model/graph/style.ts). A file with more says so; only the first is read.
+  // A graph has one data layer (see dataLayer in model/graph/style.ts); migrate.ts cut a file's others, with a note.
   const rawLayers = arr(c.layers, `${path}.layers`);
   if (rawLayers.length === 0) fail(`${path}.layers`, 'must contain at least one layer');
   const layers = [parseLayer(obj(rawLayers[0], `${path}.layers[0]`), `${path}.layers[0]`, notes)];
-  if (rawLayers.length > 1) notes.push(`${path}.layers: a graph has one layer in this version; the other ${rawLayers.length - 1} ${rawLayers.length === 2 ? 'was' : 'were'} not read.`);
   const legendIn = isObj(c.legend) ? c.legend : {};
   const chart: Chart = {
     ...base,
@@ -468,6 +523,8 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
     displayNames: cleanDisplayNames(c.displayNames, `${path}.displayNames`, notes),
     annotations: cleanAnnotations(c.annotations, `${path}.annotations`, notes),
     referenceLines: cleanReferenceLines(c.referenceLines, `${path}.referenceLines`, notes),
+    regions: cleanRegions(c.regions, `${path}.regions`, notes),
+    ...(c.equalUnits === true ? { equalUnits: true } : { equalUnits: undefined }),
     brackets: cleanBrackets(c.brackets, `${path}.brackets`, notes),
     layerStyles: (() => {
       const r = sanitizeLayerStyles(c.layerStyles);
@@ -494,8 +551,8 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
   }
   const env = obj(json, 'file');
   if (env.format !== FORMAT) fail('format', `must be "${FORMAT}"`);
-  if (env.version !== VERSION) fail('version', `must be ${VERSION} (this app reads version ${VERSION} only)`);
-  const p = obj(env.project, 'project');
+  const p = upgradeToCurrent(env, notes);
+  migrateShape(p, notes);
   const dataTables = arr(p.dataTables, 'project.dataTables').map((t, i) => parseTable(t, `project.dataTables[${i}]`));
   const tableIds = new Set(dataTables.map((t) => t.id));
   if (tableIds.size !== dataTables.length) fail('project.dataTables', 'has two tables with the same ID');
@@ -536,16 +593,8 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
     if (!model) fail(`${ap}.model`, `must be one of ${FIT_MODEL_IDS.join(', ')}`);
     if (table.kind !== 'xy') fail(`${ap}.dataTableId`, 'must be an XY table for a curve fit');
     analyses.push({ id, name, kind, dataTableId, level, model, degree: sanitizeDegree(o.degree, 2) });
-  });  // Older files held a space before each data set: it is now part of Space between columns (and never kept as it was).
-  for (const [ci, c] of charts.entries()) {
-    const legacy = (c as unknown as Record<string, unknown>).groupGaps;
-    delete (c as unknown as Record<string, unknown>).groupGaps;
-    const table = dataTables.find((t) => t.id === c.dataTableId);
-    if (!table || legacy === undefined) continue;
-    const folded = foldGroupGaps(legacy, applyOrder(table.groups, c.groupOrder).map((g) => g.id), c.bars);
-    c.bars = folded.bars;
-    if (folded.note) notes.push(`project.charts[${ci}] ("${c.name}"): ${folded.note}`);
-  }
+  });
+  migrateRead({ dataTables, charts }, notes);
   // A link refers to another graph: one to a graph that is missing, to itself, or round in a circle is dropped.
   const linkOf = new Map(charts.map((c) => [c.id, typeof c.linkedTo === 'string' ? c.linkedTo : undefined]));
   for (const [ci, c] of charts.entries()) {

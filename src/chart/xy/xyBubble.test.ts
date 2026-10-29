@@ -5,7 +5,7 @@ import { applyVariant } from '../../model/graph/chartVariant';
 import { chartTypesFor } from '../../model/graph/chartTypes';
 import { seriesWidth, subLabels, xySeries } from '../../model/table/tableLayout';
 import type { Project } from '../../model/types';
-import { addChart, addDataTable, replaceTableData } from '../../state/commands';
+import { addChart, addDataTable, patchStyle, replaceTableData } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { chartToSvgString } from '../export/export';
 import { buildXyModel } from './xyModel';
@@ -104,5 +104,22 @@ describe('bubbles: made from the gallery', () => {
     expect(made.defaults.symbolFillOpacity).toBe(0.6);
     // Other chart types keep the usual symbol.
     expect(applyVariant(chartOf(setup([[1, 5, 10]], 'xyScatter')), item?.variant).defaults.symbolSizePt).not.toBe(36);
+  });
+});
+
+describe('bubbles: the legend', () => {
+  /** The diameter of the first circle drawn in the legend of the drawing. */
+  const legendKey = (p: Project): number => {
+    const svg = chartToSvgString(chartOf(p), tableOf(p));
+    const legend = svg.slice(svg.indexOf('id="legend"'));
+    return 2 * Number(/a([\d.]+),/.exec(legend)![1]);
+  };
+  it('keeps the key of a series within its row, however large the largest bubble is', () => {
+    const p = patchStyle('c', 'all', { symbolSizePt: 70 })(setup([[1, 5, 10], [2, 6, 40]]));
+    expect(model(p).series[0].style.symbolSizePt).toBe(70);
+    expect(legendKey(p)).toBeLessThanOrEqual(20);
+  });
+  it('leaves a small symbol as it is', () => {
+    expect(legendKey(patchStyle('c', 'all', { symbolSizePt: 12 })(setup([[1, 5, 10]])))).toBe(12);
   });
 });

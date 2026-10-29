@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import type { Annotation, Chart, Selection } from '../../../model/types';
+import { selectedAnnotationIds, selectedPoints } from '../../../model/graph/selection/multi';
 import { n2 } from '../../../model/units';
 import { annotationElements } from './annotations';
 import { scopeRefs, useSvgIdPrefix } from './idPrefix';
@@ -30,7 +31,7 @@ export interface ChartDrawing {
   heightPt: number;
   sections: ReadonlyArray<ChartSection>;
   /** The editor's own marks for the selection, written last and only in the editor; never in an export. */
-  selection?: (selected: { groupIds: readonly string[]; pointId: string | null }) => SceneElement[];
+  selection?: (selected: { groupIds: readonly string[]; pointIds: readonly string[] }) => SceneElement[];
 }
 
 interface Props {
@@ -54,8 +55,8 @@ export const SceneChart = forwardRef<SVGSVGElement, Props>(function SceneChart({
   // The data sets that are selected (one, or several edited together); a selected point is not a selected data set.
   const groupIds = editor?.selection.kind === 'group' ? [editor.selection.groupId] : editor?.selection.kind === 'groups' ? editor.selection.groupIds : [];
   const selectedGroups: ReadonlySet<string> = new Set(groupIds);
-  const selectedPoint = editor?.selection.kind === 'point' ? editor.selection.pointId : null;
-  const selectedAnnotation = editor?.selection.kind === 'annotation' ? editor.selection.annotationId : null;
+  const pointIds = editor ? selectedPoints(editor.selection).map((p) => p.pointId) : [];
+  const selectedAnnotations: ReadonlySet<string> = new Set(editor ? selectedAnnotationIds(editor.selection) : []);
   return (
     <svg ref={ref} xmlns="http://www.w3.org/2000/svg" width={cssWidth} height={cssHeight} viewBox={`0 0 ${n2(W)} ${n2(H)}`} fontFamily={chart.fontFamily} style={{ background: chart.pageColor ?? 'transparent' }}>
       {drawing.sections.map((s, i) =>
@@ -66,10 +67,10 @@ export const SceneChart = forwardRef<SVGSVGElement, Props>(function SceneChart({
             <SceneSvg scene={s.xyData} editor={ed} selectedGroups={selectedGroups} />
           </g>
         ) : (
-          <SceneElements key={i} nodes={annotationElements(s.annotations, W, H, editor?.dragging, s.place)} editor={ed} selectedAnnotation={selectedAnnotation} />
+          <SceneElements key={i} nodes={annotationElements(s.annotations, W, H, editor?.dragging, s.place)} editor={ed} selectedAnnotations={selectedAnnotations} />
         ),
       )}
-      {ed && drawing.selection && <SceneElements nodes={drawing.selection({ groupIds, pointId: selectedPoint })} editor />}
+      {ed && drawing.selection && <SceneElements nodes={drawing.selection({ groupIds, pointIds })} editor />}
     </svg>
   );
 });

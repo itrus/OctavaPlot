@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { drawLayout, layoutPngSize, layoutToPdfBlob, layoutToPngBlob, layoutToSvgString } from '../../chart/export/layoutExport';
+import { drawLayout, layoutPngSize, layoutTextGroups, layoutToPdfBlob, layoutToPngBlob, layoutToSvgString } from '../../chart/export/layoutExport';
 import { FONT_FAMILY } from '../../model/defaults';
-import { clampFrame, FREE_MAX, GAP_MM_MAX, GRID_MAX, LABEL_PT_MAX, LABEL_PT_MIN, MARGIN_MM_MAX, pageMm, PERCENT_MAX, PERCENT_MIN, standardArrangements, sameArrangement } from '../../model/project/layout';
-import type { FrameMm, Layout, LayoutArrangement, LayoutScaling, PanelLabelStyle } from '../../model/types';
+import { clampFrame, FREE_MAX, GAP_MM_MAX, GRID_MAX, LABEL_PT_MAX, LEGEND_PT_MAX, LEGEND_PT_MIN, LABEL_PT_MIN, MARGIN_MM_MAX, pageMm, PERCENT_MAX, PERCENT_MIN, standardArrangements, sameArrangement } from '../../model/project/layout';
+import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, LayoutScaling, PanelLabelStyle } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { addFreePanel, freeLayout, patchLayout, removeFreePanel, removeLayout, setFrame, setLayoutPanel } from '../../state/commands';
 import { downloadBlob, exportFileName } from '../../util/download';
@@ -55,6 +55,9 @@ interface Drag {
 }
 
 const PT_TO_MM = 25.4 / 72;
+
+/** What switching on the master legend starts with. */
+const DEFAULT_PAGE_LEGEND: LayoutLegend = { position: 'bottom', fontSizePt: 9, hideGraphLegends: true };
 
 /** An A4 page of graphs, with the settings of the page, the arrangement, the scaling and the panel labels beside it. */
 export function LayoutView({ layoutId }: { layoutId: string }) {
@@ -147,6 +150,8 @@ function LayoutPage({ layout }: { layout: Layout }) {
   // One export at a time: while one runs the Export button is disabled, and a second start is ignored.
   const exportJob = useExportJob(setStatus);
   const [exportOpen, setExportOpen] = useState(false);
+  // The texts of the page, by font, for the check of characters: made only while the export dialog is open.
+  const textGroups = useMemo(() => (exportOpen ? layoutTextGroups(layout, project, FONT_FAMILY) : undefined), [exportOpen, layout, project]);
   const exportSvg = () =>
     exportJob.start({
       label: 'SVG',
@@ -226,6 +231,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
             heightPx: (drawing.heightPt * 96) / 72,
             // The page's own font (labels and title), then those of the graphs on it.
             fontFamilies: [FONT_FAMILY, ...layout.panels.flatMap((id) => project.charts.find((c) => c.id === id)?.fontFamily ?? [])],
+            textGroups,
             warnings: drawing.notices,
             printWidthMm: null,
             printWarnings: [],
@@ -369,6 +375,22 @@ function LayoutPage({ layout }: { layout: Layout }) {
               note={SCALING_NOTE[layout.scaling.mode] ?? null}
               onCommit={(v) => set('Scaling factor', { scaling: { mode: 'percent', percent: v } })}
             />
+          </Section>
+          <Section title="Legend of the page">
+            <Field label="Master legend" hint="One legend for the page, made from the legends of its graphs (the same name and look once). It takes its room from the panels; with free placement, keep the boxes clear of the band along the edge.">
+              <Check checked={layout.legend !== undefined} onChange={(v) => set('Page legend', { legend: v ? DEFAULT_PAGE_LEGEND : undefined })} ariaLabel="Master legend" />
+            </Field>
+            {layout.legend && (
+              <>
+                <Field label="Place">
+                  <SelectInput<LayoutLegend['position']> value={layout.legend.position} options={[{ value: 'bottom', label: 'Along the bottom' }, { value: 'right', label: 'Along the right edge' }]} onChange={(v) => set('Page legend place', { legend: { ...layout.legend!, position: v } })} />
+                </Field>
+                <NumField label="Text size" unit="pt" step={1} min={LEGEND_PT_MIN} max={LEGEND_PT_MAX} value={layout.legend.fontSizePt} onCommit={(v) => set('Page legend size', { legend: { ...layout.legend!, fontSizePt: v } })} />
+                <Field label="Graphs without their own legend" hint="On: the graphs on the page are drawn without a legend and their plot takes its room. Graphs whose legend is switched off give no entries.">
+                  <Check checked={layout.legend.hideGraphLegends} onChange={(v) => set('Page legend in graphs', { legend: { ...layout.legend!, hideGraphLegends: v } })} ariaLabel="Graphs without their own legend" />
+                </Field>
+              </>
+            )}
           </Section>
           <Section title="Panel labels">
             <Field label="Style">

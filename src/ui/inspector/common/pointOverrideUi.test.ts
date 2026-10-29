@@ -13,6 +13,8 @@ import {
   pointSelectionState,
   pointStatus,
   seedCustomOffsets,
+  dragLabelPatch,
+  multiPointState,
 } from './pointOverrideUi';
 
 const style = (patch: Partial<ChartStyle> = {}): ChartStyle => ({ ...DEFAULT_STYLE, showSymbols: true, showPointLabels: true, ...patch });
@@ -165,5 +167,48 @@ describe('pointSelectionState', () => {
   });
   it('a missing group on a group selection keeps the old behaviour', () => {
     expect(sel({ kind: 'group', groupId: 'gone' })).toMatchObject({ scope: 'all', fallback: null });
+  });
+});
+
+describe('moving a label by dragging it', () => {
+  const point = { cx: 100, cy: 50 };
+  const box = { x0: 103.04, y0: 33.26, x1: 120, y1: 45 };
+  it('stores the label as Custom, with the offsets of its corner from the point after the move', () => {
+    expect(dragLabelPatch(point, box, 10, -5.04)).toEqual({ pointLabelPlacement: 'custom', pointLabelOffsetXPt: 13, pointLabelOffsetYPt: -21.8 });
+  });
+  it('a drag that returns to the start stores the offsets of where the label is now, so it does not jump', () => {
+    expect(dragLabelPatch(point, box, 0, 0)).toEqual({ pointLabelPlacement: 'custom', pointLabelOffsetXPt: 3, pointLabelOffsetYPt: -16.7 });
+  });
+  it('keeps the offsets within the limits', () => {
+    expect(dragLabelPatch(point, box, 900, -900)).toEqual({ pointLabelPlacement: 'custom', pointLabelOffsetXPt: 400, pointLabelOffsetYPt: -400 });
+  });
+  it('is relative to the point: the same move of the point and the label gives the same offsets', () => {
+    const shifted = dragLabelPatch({ cx: 300, cy: 250 }, { x0: 303.04, y0: 233.26, x1: 320, y1: 245 }, 10, -5.04);
+    expect(shifted).toEqual(dragLabelPatch(point, box, 10, -5.04));
+  });
+});
+
+describe('several points selected together', () => {
+  const p = createExampleProject();
+  const table = p.dataTables[0];
+  const [g1, g2] = table.groups;
+  const ref = (g: typeof g1, i: number) => ({ groupId: g.id, pointId: g.observations[i].id });
+  it('lists the points that exist, with their rows, across data sets', () => {
+    const r = multiPointState(table, { kind: 'points', points: [ref(g1, 0), ref(g2, 2)] }, 'scatter');
+    expect(r.points.map((x) => [x.group.id, x.pointId, x.row])).toEqual([[g1.id, g1.observations[0].id, 0], [g2.id, g2.observations[2].id, 2]]);
+    expect(r.fallback).toBeNull();
+  });
+  it('is empty for any other selection', () => {
+    expect(multiPointState(table, { kind: 'point', ...ref(g1, 0) }, 'scatter')).toEqual({ points: [], fallback: null });
+    expect(multiPointState(table, { kind: 'chart' }, 'scatter')).toEqual({ points: [], fallback: null });
+  });
+  it('drops a point that is gone and falls back to the smaller selection; none left is the chart', () => {
+    const gone = { groupId: g1.id, pointId: 'gone' };
+    expect(multiPointState(table, { kind: 'points', points: [ref(g1, 0), gone, ref(g2, 1)] }, 'scatter').fallback).toEqual({ kind: 'points', points: [ref(g1, 0), ref(g2, 1)] });
+    expect(multiPointState(table, { kind: 'points', points: [ref(g1, 0), gone] }, 'scatter').fallback).toEqual({ kind: 'point', ...ref(g1, 0) });
+    expect(multiPointState(table, { kind: 'points', points: [gone, { groupId: 'x', pointId: 'y' }] }, 'scatter').fallback).toEqual({ kind: 'chart' });
+  });
+  it('a mean chart draws no observations, so the points fall back to the data sets they are in', () => {
+    expect(multiPointState(table, { kind: 'points', points: [ref(g1, 0), ref(g2, 0)] }, 'mean').fallback).toEqual({ kind: 'groups', groupIds: [g1.id, g2.id] });
   });
 });

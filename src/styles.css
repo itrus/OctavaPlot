@@ -4,8 +4,10 @@
   --border: #c9ced3;
   --border-soft: #dde1e5;
   --text: #1c2126;
-  --muted: #6a737d;
+  --muted: #5a636d;
   --accent: #2b7fff;
+  /* The accent as a fill behind white text (the primary button): 5.6 to 1 on white, where --accent gives 3.8 to 1. */
+  --accent-strong: #1a62d6;
   --accent-soft: #dbe9ff;
   --danger: #c62828;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
@@ -14,6 +16,8 @@
 }
 
 * { box-sizing: border-box; }
+/* One ring for the keyboard focus of every control that does not draw its own: 2 px of the accent, 3.3 to 1 or more against the page, the panels and white. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); }
 
@@ -35,7 +39,7 @@ input[type='text'], select, textarea {
   background: #fff;
   min-width: 0;
 }
-input.invalid { border-color: var(--danger); background: #fff5f5; outline: none; }
+input.invalid { border-color: var(--danger); background: #fff5f5; }
 input[type='color'] { width: 38px; height: 22px; padding: 0 1px; border: 1px solid var(--border); background: #fff; }
 .muted { color: var(--muted); }
 .small { font-size: 11.5px; }
@@ -138,9 +142,9 @@ button.icon-only { display: inline-flex; align-items: center; justify-content: c
 .modal.modal-wide { width: min(700px, 94vw); }
 .modal-pad { padding: 12px 16px; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
 button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
-button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0; }
+button.primary:hover:not(:disabled) { background: #144fb0; border-color: #144fb0; }
 .choice-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 8px; }
 .choice-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px; text-align: left; white-space: normal; border-radius: 6px; border: 2px solid var(--border); background: #fff; color: var(--text); }
 .choice-card svg { color: #39424b; margin-bottom: 4px; }
@@ -225,7 +229,7 @@ button.primary:hover:not(:disabled) { background: #1f6be0; border-color: #1f6be0
 .col-head-top { display: flex; align-items: center; gap: 2px; }
 .head-input { width: 100%; border: 1px solid transparent; background: transparent; padding: 1px 3px; font: inherit; border-radius: 2px; }
 .head-input:hover { border-color: var(--border); background: #fff; }
-.head-input:focus { border-color: var(--accent); background: #fff; outline: none; }
+.head-input:focus { border-color: var(--accent); background: #fff; }
 .head-name { font-weight: 600; }
 .icon-btn { border: 0; background: transparent; padding: 0 4px; color: var(--muted); line-height: 1; font-size: 15px; }
 .grid-row { display: flex; }
@@ -452,7 +456,8 @@ input[type='color'].mixed { opacity: 0.45; }
 
 /* The drag handles between the side panels and the workspace. */
 .splitter { position: absolute; top: 36px; bottom: 30px; width: 6px; z-index: 5; cursor: col-resize; touch-action: none; }
-.splitter:hover, .splitter:focus-visible { background: rgba(60, 120, 220, 0.35); outline: none; }
+.splitter:hover { background: rgba(60, 120, 220, 0.35); }
+.splitter:focus-visible { background: var(--accent); outline: none; }
 .topbar > * { flex: none; }
 
 .nav-actions { display: flex; gap: 6px; padding: 8px 6px 2px; border-top: 1px solid var(--border); margin-top: 8px; }

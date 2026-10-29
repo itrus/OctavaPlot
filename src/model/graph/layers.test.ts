@@ -103,6 +103,17 @@ describe('layer rows and hiding', () => {
     expect(rows.map((r) => r.layer.z)).toEqual([...rows.map((r) => r.layer.z)].sort((a, b) => b - a));
     expect(rows.filter((r) => r.layer.kind === 'fitBand').map((r) => r.label)).toEqual(['Fit band: Series B', 'Fit band: Series A']);
   });
+  it('list a shaded region, an oblique reference line and the bars along X by what they are', () => {
+    const region = { id: 'g1', axis: 'y' as const, from: 5, to: 2, color: '#4f81bd', opacity: 0.25, label: '', showLabel: false };
+    const p = addReferenceLine('c', { id: 'r1', axis: 'y', value: 0, slope: 1, intercept: 0, color: '#cc0000', widthPt: 2, style: 'dashed', label: '', showLabel: false, opacity: 1 })(withFitChart(projectWith()));
+    const q = { ...p, charts: p.charts.map((c) => (c.id === 'c' ? { ...c, regions: [region] } : c)) };
+    const rows = layerRows(chartOf(q), tableOf(q));
+    expect(rows.map((r) => r.label)).toEqual(expect.arrayContaining(['Shaded region: Y from 2 to 5', 'Reference line: identity (Y = X)']));
+    // The region is below the reference line in the drawing, and neither takes a look of its own through the layer or takes part in the range.
+    const [g, r] = [rows.find((x) => x.layer.kind === 'region')!, rows.find((x) => x.layer.kind === 'referenceLine')!];
+    expect(g.layer.z).toBeLessThan(r.layer.z);
+    expect([g.takes, g.inRange, r.takes, r.inRange]).toEqual([null, null, null, null]);
+  });
   it('collapse white space in an annotation label without touching the letter s', () => {
     const label = (text: string) => {
       const p = addAnnotation('c', { id: 'n1', text, xFrac: 0.1, yFrac: 0.1, fontSizePt: 20, color: '#000000', opacity: 1 })(projectWith());

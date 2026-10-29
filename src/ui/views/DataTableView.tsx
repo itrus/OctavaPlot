@@ -3,7 +3,7 @@ import type { DataTable, DecimalSeparator, TableKind } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import { newId } from '../../model/ids';
-import { addAnalysis, addGroup, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setExcluded, setFactor, setSubject, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
+import { addAnalysis, addGroup, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setColumnTime, setExcluded, setFactor, setSubject, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../../util/download';
 import { AddColumnIcon, AddManyRowsIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon } from '../components/icons';
 import { isCsvFile, tableToCsv, type CsvExportMode } from '../data/csv';
@@ -13,11 +13,13 @@ import { ImportCsvDialog, type CsvImportData } from '../dialogs/ImportCsvDialog'
 import { AppendRowsDialog } from '../dialogs/AppendRowsDialog';
 import { FillSeriesDialog, type SeriesDirection } from '../dialogs/FillSeriesDialog';
 import { SubjectDialog } from '../dialogs/SubjectDialog';
+import { TimeDialog } from '../dialogs/TimeDialog';
+import { offsetNote, type TimeColumn } from '../../util/timeColumn';
 import { FactorDialog } from '../dialogs/FactorDialog';
 import { RowsMenu } from './RowsMenu';
 import { leadingColumns, usesSeriesBlocks } from '../../model/graph/chartTypes';
 import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../../model/table/tableLayout';
-import { blockToText, formatCell, parseCell, planPaste, selectionStrings } from '../data/cellText';
+import { blockToText, formatCellFor, parseCellFor, planPaste, selectionStrings } from '../data/cellText';
 import { planFill, planSeries, suggestSeries } from '../data/fill';
 import { gridJump } from '../data/gridKeys';
 
@@ -44,7 +46,10 @@ interface Editing {
 
 /** Text shown when a cell opens for editing; col -1 is the Row title column. */
 const editText = (table: DataTable, row: number, col: number, separator: DecimalSeparator) =>
-  col < 0 ? rowTitleAt(table, row) : formatCell(table.groups[col]?.observations[row]?.value ?? null, separator);
+  col < 0 ? rowTitleAt(table, row) : formatCellFor(table.groups[col]?.observations[row]?.value ?? null, separator, table.groups[col]?.time);
+
+/** What a cell of a typed column wants written, for the message of a refused edit. */
+const valueWord = (time: TimeColumn | undefined): string => (!time ? 'a number' : time.kind === 'date' ? 'a date such as 2025-03-04' : time.kind === 'datetime' ? 'a date and time such as 2025-03-04T10:30:00' : 'a duration such as 1:30:00');
 
 const bounds = (s: Sel) => ({
   r0: Math.min(s.ar, s.fr),
@@ -145,7 +150,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const scrollerRef = useRef<HTMLDivElement>(null);
   const csvRef = useRef<HTMLInputElement>(null);
-  const [dialog, setDialog] = useState<'append' | 'exportCsv' | 'series' | 'subject' | 'factor' | null>(null);
+  const [dialog, setDialog] = useState<'append' | 'exportCsv' | 'series' | 'subject' | 'factor' | 'time' | null>(null);
   // A picked file waits here, read but not imported, while the preview dialog is open.
   const [pendingCsv, setPendingCsv] = useState<{ name: string; text: string } | null>(null);
   const dragging = useRef(false);
@@ -244,16 +249,16 @@ export function DataTableView({ table }: { table: DataTable }) {
         run('Edit row title', setRowTitles(table.id, [{ row: ed.row, title: ed.text }]));
       }
     } else {
-      const parsed = parseCell(ed.text, settings.decimalSeparator);
+      const parsed = parseCellFor(ed.text, settings.decimalSeparator, table.groups[ed.col]?.time);
       if (!parsed.ok) {
-        setMessage({ kind: 'error', text: `Row ${ed.row + 1}, ${table.groups[ed.col]?.name ?? 'column'}: ${parsed.message}. Enter a number or leave the cell empty.` });
+        setMessage({ kind: 'error', text: `Row ${ed.row + 1}, ${table.groups[ed.col]?.name ?? 'column'}: ${parsed.message}. Enter ${valueWord(table.groups[ed.col]?.time)} or leave the cell empty.` });
         if (mode === 'blur') {
           setEdit(null);
         }
         return; // keep editing so the user can correct the value
       }
       setEdit(null);
-      setMessage(null);
+      setMessage(parsed.offset ? { kind: 'info', text: `${offsetNote(1)}.` } : null);
       const group = table.groups[ed.col];
       if (group && group.observations[ed.row]?.value !== parsed.value) {
         run('Edit cell', setCells(table.id, [{ row: ed.row, col: ed.col, value: parsed.value }]));
@@ -297,7 +302,7 @@ export function DataTableView({ table }: { table: DataTable }) {
       if (e.button !== 0) return;
       if (editRef.current && editRef.current.col >= 0 && (editRef.current.row !== row || editRef.current.col !== col)) {
         // Clicking elsewhere commits (or rejects) the current edit first. Title edits have nothing to reject.
-        const parsed = parseCell(editRef.current.text, settings.decimalSeparator);
+        const parsed = parseCellFor(editRef.current.text, settings.decimalSeparator, tableRef.current.groups[editRef.current.col]?.time);
         if (!parsed.ok) {
           e.preventDefault();
           return;
@@ -339,7 +344,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   // ---- selection helpers
   const selectionText = () => {
     const { titles, matrix } = selectionStrings(table, bounds(sel));
-    return blockToText(titles, matrix, settings.decimalSeparator);
+    return blockToText(titles, matrix, settings.decimalSeparator, table.groups.slice(Math.max(0, bounds(sel).c0), bounds(sel).c1 + 1).map((g) => g.time));
   };
 
   // One history entry: the selected row titles are emptied and the selected values cleared.
@@ -411,9 +416,10 @@ export function DataTableView({ table }: { table: DataTable }) {
       : null;
   const importData = (data: CsvImportData, fileName: string) => {
     setPendingCsv(null);
-    run('Import CSV', replaceTableData(table.id, data));
+    // The dialog's choice for the X column of an XY table is the table's type afterwards, numbers included.
+    run('Import CSV', replaceTableData(table.id, table.kind === 'xy' ? { ...data, times: data.times ?? [] } : data));
     setSel({ ar: 0, ac: 0, fr: 0, fc: 0 });
-    setMessage({ kind: 'info', text: `Imported ${data.values.length} rows × ${data.names.length} groups from ${fileName}.` });
+    setMessage({ kind: 'info', text: `Imported ${data.values.length} rows × ${data.names.length} groups from ${fileName}.${(data.notes ?? []).map((n) => ` ${n}.`).join('')}` });
   };
 
   // ---- rows: each operation is one undo step; afterwards the selection sits on the new rows, or near the removed ones
@@ -510,7 +516,7 @@ export function DataTableView({ table }: { table: DataTable }) {
     clearSelection();
   };
   const pasteText = (text: string) => {
-    const plan = planPaste(text, bounds(sel), settings.decimalSeparator);
+    const plan = planPaste(text, bounds(sel), settings.decimalSeparator, table.groups.map((g) => g.time));
     if (!plan.ok) {
       setMessage({ kind: 'error', text: plan.message });
       return;
@@ -677,6 +683,11 @@ export function DataTableView({ table }: { table: DataTable }) {
         <button className="icon-text" onClick={() => setDialog('subject')} title="Subject: name the independent unit (a mouse, a plate) of the selected cells, so repeats of one unit are not taken for independent observations">
           Subject…
         </button>
+        {table.kind === 'xy' && (
+          <button className="icon-text" onClick={() => setDialog('time')} title="X type: say that the X column holds dates, times or durations (ISO 8601), so that the axis has ticks on calendar boundaries. No number is changed">
+            X type…
+          </button>
+        )}
         {table.kind === 'grouped' && (
           <button className="icon-text" onClick={() => setDialog('factor')} title="Factor: name the second grouping level of the selected series; series with the same factor are drawn together inside each category">
             Factor…
@@ -738,7 +749,7 @@ export function DataTableView({ table }: { table: DataTable }) {
         />
         <div className="grid-inner" style={{ width: STICKY_W + nCols * COL_W, height: HEADER_H + nRows * ROW_H }}>
           <div className="grid-header" style={{ height: HEADER_H }} role="row" aria-rowindex={1}>
-            <div className="corner" style={{ width: ROWNUM_W }} onClick={() => setSel({ ar: 0, ac: 0, fr: nRows - 1, fc: nCols - 1 })} title="Select all" />
+            <div className="corner" aria-hidden="true" style={{ width: ROWNUM_W }} onClick={() => setSel({ ar: 0, ac: 0, fr: nRows - 1, fc: nCols - 1 })} title="Select all" />
             <div
               className="title-head"
               role="columnheader"
@@ -848,7 +859,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                     row={r}
                     col={c}
                     width={COL_W}
-                    text={formatCell(g.observations[r].value, settings.decimalSeparator)}
+                    text={formatCellFor(g.observations[r].value, settings.decimalSeparator, g.time)}
                     inRange={r >= r0 && r <= r1 && c >= c0 && c <= c1}
                     active={r === sel.fr && c === sel.fc}
                     editing={isEditing}
@@ -880,6 +891,17 @@ export function DataTableView({ table }: { table: DataTable }) {
         const subjects = new Set(cells.map((c) => table.groups[c.col]?.observations[c.row]?.subject ?? ''));
         return <SubjectDialog cells={cells.length} current={subjects.size === 1 ? [...subjects][0] : ''} onSet={setSelectionSubject} onClose={() => setDialog(null)} />;
       })()}
+      {dialog === 'time' && (
+        <TimeDialog
+          current={table.groups[0]?.time}
+          onSet={(time) => {
+            setDialog(null);
+            run(time ? 'Set X type' : 'Clear X type', setColumnTime(table.id, time));
+            setMessage({ kind: 'info', text: time ? `The X column is read as ${time.kind === 'date' ? 'dates' : time.kind === 'datetime' ? 'dates and times' : `durations in ${time.unit}`}. No number was changed.` : 'The X column is read as plain numbers again. No number was changed.' });
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog === 'factor' && (() => {
         const ids = selectedSeriesIds();
         const factors = new Set(xySeries(table).filter((s) => ids.includes(s.id)).map((s) => s.columns[0].factor ?? ''));
@@ -892,6 +914,7 @@ export function DataTableView({ table }: { table: DataTable }) {
           fileName={pendingCsv.name}
           text={pendingCsv.text}
           defaultSeparator={settings.decimalSeparator}
+          xType={table.kind === 'xy' ? { current: table.groups[0]?.time } : null}
           check={checkCsvShape}
           onImport={(data) => importData(data, pendingCsv.name)}
           onClose={() => setPendingCsv(null)}

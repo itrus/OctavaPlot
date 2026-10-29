@@ -103,7 +103,7 @@ const DEFAULT_DISTRIBUTION: DistributionOptions = {
   showQuartiles: true,
 };
 /** Heat maps (spec 13.1): a single gradient, the range of the values, nothing normalised, no numbers in the cells. */
-const DEFAULT_HEATMAP: HeatmapOptions = { palette: 'bs-blue', reverse: false, min: null, max: null, centre: null, normalise: 'none', method: 'zscore', summary: 'mean', showValues: false, decimals: null, cellGapPt: 0, transpose: false, colourbar: true, missingColour: '#d9d9d9', customColours: DEFAULT_CUSTOM_COLOURS };
+const DEFAULT_HEATMAP: HeatmapOptions = { palette: 'bs-blue', reverse: false, min: null, max: null, centre: null, normalise: 'none', method: 'zscore', summary: 'mean', showValues: false, decimals: null, cellGapPt: 0, transpose: false, colourbar: true, missingColour: '#d9d9d9', steps: null, breaks: [], missingMark: 'none', excludedColour: null, excludedMark: 'none', outsideColour: null, outsideMark: 'none', cellWidthPt: null, cellHeightPt: null, rowGroupSize: null, colGroupSize: null, groupGapPt: 6, rowLabelEvery: 1, colLabelEvery: 1, barWidthPt: 24, barLengthPct: 100, barTicks: 5, barTitle: null, customColours: DEFAULT_CUSTOM_COLOURS };
 /** No fitted curve until a curve fit of the Results is chosen; a band, when asked for, uses that fit's confidence level. */
 const DEFAULT_FIT: ChartFit = { analysisId: null, band: 'none', extend: false, showParameters: false };
 
@@ -305,7 +305,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     // A violin shows its values from the start: the Points box then switches them off.
     distribution: { ...DEFAULT_DISTRIBUTION, ...(type === 'violin' || type === 'groupedViolin' ? { points: 'all' as const } : {}) },
     pairs: { bridge: false, bySubject: false },
-    heatmap: { ...DEFAULT_HEATMAP, customColours: { ...DEFAULT_CUSTOM_COLOURS } },
+    heatmap: { ...DEFAULT_HEATMAP, breaks: [], customColours: { ...DEFAULT_CUSTOM_COLOURS } },
     histogram: { ...DEFAULT_HISTOGRAM },
     fit: { ...DEFAULT_FIT },
     pie: { ...DEFAULT_PIE },
@@ -320,6 +320,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     layers: [layer],
     annotations: [],
     referenceLines: [],
+    regions: [],
     brackets: [],
     hiddenLayerIds: [],
     rangeExcludedLayerIds: [],
@@ -384,6 +385,8 @@ function sampleSeriesColumns(layout: ReplicateLayout, base: number[]): number[][
   if (layout.kind === 'sized') return [base, base.map((_, i) => 4 + ((i * 7) % 11))];
   // A vector table: a step for each point, of different length and direction, so the sample shows the arrows.
   if (layout.kind === 'vector') return [base, base.map((_, i) => Number((0.4 + (i % 3) * 0.3).toFixed(3))), base.map((v, i) => Number((((i % 2 === 0 ? 1 : -1) * Math.abs(v)) * 0.15).toFixed(3)))];
+  // An error table: a +/- error of Y and of X for each point, of different size, so the sample shows both bars.
+  if (layout.kind === 'xerror') return [base, base.map((v, i) => Number((Math.abs(v) * 0.08 + 0.05 * (i % 3)).toFixed(3))), base.map((_, i) => Number((0.15 + 0.1 * (i % 4)).toFixed(3)))];
   if (layout.kind === 'replicates') {
     const offsets = [-0.12, 0.08, 0.15, -0.06, 0.1, -0.14, 0.04, 0.12, -0.09, 0.02];
     return Array.from({ length: layout.n }, (_, k) => base.map((v, i) => Number((v * (1 + offsets[(k * 3 + i) % offsets.length])).toFixed(3))));

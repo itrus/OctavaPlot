@@ -20,6 +20,21 @@ export function legendEntries(legend: Pick<LegendConfig, 'hiddenGroupIds' | 'ord
   return applyOrder(shown, legend.order ?? []).map((e) => e.index);
 }
 
+/**
+ * The entries of a legend with the repeats left out: of the entries that have the same key, only the first (in legend order) is kept.
+ * Series of two factor clusters that stand in the same place of their cluster have the same colour and often the same name, so the
+ * legend would list one colour twice; `keyOf` says what makes two entries the same thing (its name and its look).
+ */
+export function withoutRepeats(entries: readonly number[], keyOf: (index: number) => string): number[] {
+  const seen = new Set<string>();
+  return entries.filter((i) => {
+    const k = keyOf(i);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 /** The furthest the legend can be moved from its place, pt. */
 export const LEGEND_MAX_OFFSET_PT = 1000;
 

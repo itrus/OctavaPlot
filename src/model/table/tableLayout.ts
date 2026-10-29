@@ -37,7 +37,7 @@ export function seriesWidth(layout: ReplicateLayout): number {
   if (layout.kind === 'replicates') return layout.n;
   if (layout.kind === 'summary') return summaryFormatInfo(layout.format).columns.length;
   if (layout.kind === 'sized') return 2;
-  if (layout.kind === 'vector') return 3;
+  if (layout.kind === 'vector' || layout.kind === 'xerror') return 3;
   return 1;
 }
 
@@ -47,6 +47,7 @@ export function subLabels(layout: ReplicateLayout): string[] {
   if (layout.kind === 'summary') return summaryFormatInfo(layout.format).columns;
   if (layout.kind === 'sized') return ['Y', 'Size'];
   if (layout.kind === 'vector') return ['Y', 'dX', 'dY'];
+  if (layout.kind === 'xerror') return ['Y', 'Y +/- error', 'X +/- error'];
   return ['Y'];
 }
 

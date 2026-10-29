@@ -67,7 +67,7 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 
 - Replicate reduction, then normalisation, then colour scaling. Geometric mean rejects non-positive values. Percent CV at zero mean is undefined. Zero denominator gives missing with a notice. Auto min/max ignores missing and excluded cells. Interval colours use `[b(i), b(i+1))` with an inclusive final maximum. Reversing colours does not reverse row order. Labels name which value they show. Gaps are layout objects.
 - Weights must be finite, nonnegative, with a positive included total. Hiding a part keeps it in the denominator; excluding removes it. Zero parts keep their ID, with no fabricated slice. A supplied denominator above the included sum shows the remainder or is rejected. Slice angle `2π·w/total`.
-- Dot grid: `q = N·w/total`, floor, then the remaining dots by descending fractional remainder, ties by part order. Weights 1, 1, 1 with N = 100 give 34, 33, 33. Percent labels use the original weights.
+- Dot grid (**not built**, postponed by decision on 29 October 2026; no code and no fixture test): `q = N·w/total`, floor, then the remaining dots by descending fractional remainder, ties by part order. Weights 1, 1, 1 with N = 100 give 34, 33, 33. Percent labels use the original weights.
 - Stacks: an additive component's height is its own value; positive and negative accumulate separately. Normalised stacks reject negatives; an all-zero denominator is undefined. Component errors are not the total's uncertainty.
 - Nested data: group uncertainty comes from unit summaries, with equal weight per independent unit. n counts units.
 - Counts: nonnegative integers; cross-tabulate after exclusions; no chi-square or effect-size report.
@@ -80,6 +80,8 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 - Unknown status codes are invalid, not censored. Event at time 0 is allowed with explicit pre and post states.
 
 ## 9. ROC
+
+*Status, 29 October 2026: not built (postponed by decision). No code and no fixture test.*
 
 - Pooled distinct thresholds plus all-negative and all-positive outer points. Equal scores advance together. Sensitivity `TP/P`, FPR `FP/N`. Direction is explicit; never pick the better-looking one.
 - AUC is the trapezoidal area, equal to the fraction of correctly ordered positive-negative pairs plus half the tied fraction. Do not replace AUC < 0.5 by its complement without changing the direction. Both classes must be present.
@@ -109,7 +111,7 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 - One X scale and at most two value scales. Linear, log10, log2, ln, normal-probability (`Φ⁻¹(p)`, `0 < p < 1`). Log axes need positive coordinates; omit invalid marks with a warning, never substitute a small number. Log changes visual coordinates only.
 - Auto range includes error endpoints, whiskers, baselines and curve bounds. A clipped point is not excluded. Percent formatting must not multiply by 100 twice.
 - Minor ticks: log10 uses mantissas 2-9; log2 and ln need their own subdivisions. Category axes have no numeric controls.
-- Dates, instants and durations are distinct types.
+- Dates, instants and durations are distinct types (built for the X axis of XY charts, section 17).
 - A reference identity line is `Y = X`, not a screen diagonal. Reference regions are axis-aware bands, not uncertainty. The editor's alignment grid is never exported.
 - Broken axes: up to two breaks, continuous axes only; split and clamp every primitive at each segment boundary, never bridge. Reversed plus segmented is rejected. Scale bars on nonlinear axes need an explicit endpoint pair or ratio label.
 
@@ -118,6 +120,7 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 - Sources: manual text, supplied p, or calculated p. Supplied results are labelled as not recomputed.
 - Methods: one-sample t, Welch, equal-variance t (explicit), paired t (on differences), Mann-Whitney, signed-rank, two-curve logrank, supplied. Welch uses Satterthwaite df. Rank methods use average ranks; signed-rank drops exact zero differences and reports the count; exact distribution when feasible, else a tie-corrected normal approximation with a continuity-correction setting; the method that ran is stored.
 - Logrank: sum `d₁ⱼ − n₁ⱼ·dⱼ/nⱼ` with variance `n₁ⱼ n₀ⱼ dⱼ (nⱼ−dⱼ)/(nⱼ²(nⱼ−1))`, squared standardised total against χ² with 1 df. Zero variance means unavailable.
+- *Status, 29 October 2026: no test is calculated and no p-value is adjusted. Brackets carry the label the owner types or a result token (section 18); the methods and adjustments below are not built (Holm, BH and the exact binomial interval are postponed by decision).*
 - Adjustment over m p-values: Bonferroni `min(1, m·p)`; Holm cumulative maxima of `(m−i+1)·p(i)`; BH reverse cumulative minima of `m·p(i)/i`; BY multiplies BH by `Σ1/j`. Restore the original order. Labels say adjusted or unadjusted. Hiding a bracket never changes its correction family. No automatic test choice after a normality screen.
 - Stars default: ≤0.05 `*`, ≤0.01 `**`, ≤0.001 `***`, ≤0.0001 `****`; otherwise "ns". Brackets stay attached to stable group IDs. Lane gaps are physical (pt).
 
@@ -167,7 +170,21 @@ Exact and rational values keep exact tolerance; ordinary finite summaries target
 | Holm | p = 0.01, 0.03, 0.04 | 0.03, 0.06, 0.06 |
 | BH | same | 0.03, 0.04, 0.04 |
 | Log endpoint | centre 2, interval [−1, 5] on log Y | keep centre; clip or suppress the endpoint; warning |
+| Date to days | 2025-03-04; 2000-02-29; 1900-02-29 | 20151 days from 1970-01-01; 11016; refused (1900 is not a leap year) |
+| Time with an offset | 2025-03-04T12:30:00+02:00 and 2025-03-04T10:30:00Z | both 1741084200 s; both counted in the note "converted to UTC" |
+| Time without a zone | 2025-03-04T10:30:00 | 1741084200 s, no note; the same on every machine time zone |
+| Zones mixed | 2025-03-04T10:30:00, then 2025-03-04T10:30:00Z | the second is refused |
+| Calendar ticks, a year | dates 2024-01-01 to 2025-01-01 | ticks on 1 Oct 2023, then every third month, to 1 Apr 2025 |
+| Calendar ticks, a month | dates 2025-03-03 to 2025-03-31 | ticks on Mondays, 24 Feb to 7 Apr |
+| Calendar ticks, years | dates 2015-06-15 to 2024-06-15 | ticks on 1 January of 2014, 2016 ... 2026 |
+| Duration | 1:30:00 in a column of hours, minutes, seconds | 1.5, 90, 5400 |
 | Composition zero total | weights 0, 0 | that row is not drawn (no angle, percent or fabricated slice) and a warning names it; other rows still draw |
+
+Status of the fixtures above, 29 October 2026 (a row is "tested" when a unit test holds the stated values, written from outside the code under test; see [AUDIT-P0.md](AUDIT-P0.md)):
+
+| Tested | Not built, no test (postponed by decision) |
+|---|---|
+| Arithmetic summary, mean CI, type-6 quartiles, Tukey whisker (fence 15 pinned), geometric summary, median CI n=5 and n=6, histogram edges, ECDF ties, bubble area, nested weighting, survival ties, no-event survival, exact line, log endpoint (geometry; the warning text was not checked), composition zero total, the eight date, time, zone, tick and duration rows | Dot apportionment, ROC perfect, ROC complete tie, exact binomial, Holm, BH |
 
 Interaction and applicability tests:
 
@@ -180,3 +197,68 @@ Interaction and applicability tests:
 ## 16. Open fidelity items (U)
 
 Exact palette arrays; symbol outlines and font metrics; automatic ranges, ticks and label collision; strip-plot packing (`standard`, `classic`, `expanded` must be deterministic, seeded and versioned, with no value-axis jitter); violin kernel behind the named levels; default bar widths and legend spacing; solver and band details for every model; full domain-specific equation libraries (out of scope); advanced post-hoc or multi-factor p values (render supplied results only). Before calling a feature matched, record a fixture with data, settings, size in pt, font identity and expected result.
+
+## 17. Dates, times and durations
+
+Built for the X column of an XY table (29 October 2026). Y columns, survival, histogram and category axes are not.
+
+**What is stored.** A column holds numbers, as every column does. The type of the X column (`Group.time`, `{kind, unit}`) says what they mean; setting it never changes a number.
+
+| Type | Stored as | Written as |
+|---|---|---|
+| `date` | whole days since 1970-01-01 (proleptic Gregorian, years 0001 to 9999) | `2025-03-04` |
+| `datetime` | seconds since 1970-01-01T00:00:00, a fraction to a microsecond | `2025-03-04T10:30:00` (a space is read too) |
+| `duration` | a length in the unit of the column (days, hours, minutes or seconds) | `1:30:00` (hours may pass 24) |
+
+Dates are counted with integer calendar arithmetic. `Date` and the machine's time zone are never used for values, so a file reads the same everywhere.
+
+**Reading (ISO 8601 first).**
+- A date column takes `YYYY-MM-DD` only; a datetime column takes a date, `T` or a space, and `hh:mm` or `hh:mm:ss[.ffffff]`. A date in a datetime column, or a time of day in a date column, is refused, not completed or cut. Nothing else is guessed (`03/04/2025`, `4 March 2025`, `2025-3-4`, `2025-03`, `20250304` are refused with the form to use). A month or day that does not exist, a leap second (:60), 24:00 and more than six fraction digits are refused.
+- A duration is `H:MM[:SS[.f]]`, an ISO 8601 duration (`PT1H30M`, `P1DT2H`, `P2W`; years and months are refused, since they have no fixed length), or a number with an optional unit (`90 min`, `1.5h`, `2d`). A bare number is in the unit of the column.
+- Empty is missing, never zero.
+
+**Time zones (decided 29 October 2026).**
+1. A time written **without** a zone is a wall-clock reading. It is stored as it is, as if it were UTC, and shown again as it is. It is not read as the machine's local time.
+2. A time written **with** an offset (`Z`, `+02:00`, `+0200`, `+02`) is an instant. It is converted to UTC when it is read, and the paste, import or edit says how many were converted ("2 times had a UTC offset and were converted to UTC (times are stored and shown in UTC)"). Nothing is converted silently.
+3. A column is all one or all the other. In a paste or an import, the cells that differ from the first filled cell are refused, since they would put readings of different clocks on one axis.
+4. Times are always shown and written in UTC, with no zone designator, so a file that was written reads back to the same numbers (an offset that was converted is not restored). The axis is in UTC and has no daylight saving: every day is 24 hours.
+5. A date has no zone and no conversion.
+
+**Writing.** A value that cannot be written in its form is written as the next form that can, never rounded: a date column with a fraction of a day shows a date and time, a number outside the years 0001 to 9999 shows as the number. Durations are shown to a microsecond with trailing zeros dropped.
+
+**Axis.**
+- Dates and times: ticks fall on calendar boundaries in UTC, never at an even number of days from the first value. The steps are 1, 2, 5, 10, 15, 30 seconds; 1, 2, 5, 10, 15, 30 minutes; 1, 2, 3, 6, 12 hours; 1 day; 1 week (Monday); 1, 3, 6 months (on January, April, July, October for 3); 1, 2, 5, 10, 20, 50 ... years (on years divisible by the step). A date axis starts at 1 day. The step is the one nearest the wanted spacing (about 120 pt) whose labels still fit between ticks.
+- Labels name the boundary and always carry the year: `2025`, `2025-03`, `2025-03-04`, `2025-03-04 10:30`, `2025-03-04 10:30:15`. A value that is not a boundary (the end value of a short stretch of a broken axis, an extra tick) is written in full.
+- Durations are not a calendar: ticks are multiples of 1, 2, 5, 10, 15, 30 seconds, minutes or hours (2, 3, 6, 12 hours), then 1, 2, 5 times a power of ten days, counted from zero. Labels are `h:mm`, `h:mm:ss` below a minute, and `N d` for whole-day steps. Minor ticks are evenly spaced.
+- The range is the data and 5% each side, then out to the ticks, as for a numeric axis. A single value gets a day (date), an hour (time) or one unit (duration) on each side. Zero is never added to the range. Limits set by hand are in the unit of the column and are typed as dates in the inspector; a pair that cannot be one is ignored with a warning.
+- **Log:** a time axis is linear. A log scale set on it is not applied and a notice says so.
+- **Breaks and reversal:** as on a numeric axis (a broken axis is not reversed). Ticks are only where there is axis; a stretch with no boundary gets its end values.
+- **Not used, and said so:** a major tick interval (the ticks follow the calendar), minor ticks on a date or time axis.
+- **Curve fits** are not made on a time X axis (a fit needs numbers; the X values are 1.7 billion seconds from an arbitrary origin). Equal units are not applied.
+- The tooltip of a point writes its X as a date, time or duration.
+
+**File.** `time` on the first column of an XY table: `{"kind":"date","unit":"d"}`, `{"kind":"datetime","unit":"s"}`, `{"kind":"duration","unit":"s"|"min"|"h"|"d"}`. Optional, so a file without it opens as before and no migration step is needed; no version change. A `time` that is not one of these, or on any other column, refuses the file. An older program ignores it and reads the numbers as plain ones.
+
+**Not built (29 October 2026):** a type on Y columns, survival times, histogram values and the other tables; a date as the axis of a category chart; a major tick interval in calendar units (every 2 weeks); minor ticks on dates; local time zones and daylight saving; locale date forms; week numbers; Fill series, annotations, brackets and vector steps in dates (they take numbers in the stored unit); the Results sheet and a fit on dates.
+
+Fixtures: section 15 (dates to days, offsets, zones, ticks). The tests are `src/util/timeColumn.test.ts`, `src/chart/shared/axes/timeAxis.test.ts`, `src/chart/xy/xyTime.test.ts` and `src/ui/data/timeColumns.test.ts`; the reference values are Unix times and day numbers known from outside the code.
+
+## 18. Guides and results in text (XY and others)
+
+Built 29 October 2026, tested on the model and in the SVG export (the reference values are worked by hand or are geometric properties). Controls not tried in a browser.
+
+**Results in text.** A text of a figure (an annotation, a reference line label, a bracket label) may hold `{{stat Name}}` or `{{stat Name|d}}`: `stat` is n, sum, mean, sd, sem, median, min or max, `Name` a data set (its table name or the name shown on the chart, case ignored; a table with one data set needs none) and `d` the decimals. The value is the descriptive statistic of the values of that data set with excluded values left out, as in every calculation (SD and SEM need two values). It is filled each time the graph is drawn, so it follows the data. A token that cannot be filled (no such data set, no values) stays as typed and the chart warns. Fixture: values 2, 4, 4, 4, 5, 5, 7, 9 give mean 5, SD √(32/7), SEM SD/√8, median 4.5. A reference line bound to a result (`valueFrom`) is drawn at it; when it is unavailable the line is not drawn and a notice says so.
+
+**X error bars** (XY table layout `xerror`: Y, Y error, X error; plus or minus). The bar runs from X − e to X + e (one side only, when the error direction setting says so). A negative error draws no bar and is counted in a notice; an empty one is no bar and no notice. On a log axis an end at or below 0 is drawn at the low end and counted as clipped; on a broken axis a bar with an end in the omitted range is not drawn and is counted. They enter the axis range unless kept out. The OP-008 check (centre inside its limits) does not apply, since the error is given as plus or minus.
+
+**Oblique reference lines.** `y = intercept + slope · x` (the identity line is slope 1, intercept 0), drawn from where it enters the plot to where it leaves, sampled on a log axis, cut at the omitted range of a broken axis. A line that misses the plot is skipped with a notice. **Equal units** widens the axis with more room until one unit has the same length on both (pt per unit equal; the identity line then runs at 45 degrees). A limit set by hand is kept; with both limits of that axis fixed, or on a log, broken or time axis, it is not applied and a notice says so.
+
+**Extra ticks and regions.** An extra tick (value, optional text, at most 12) is merged among the automatic ticks, replaces a minor tick it lands on and carries a gridline when the grid is on; a value outside the range, in an omitted range or at or below 0 on a log axis is skipped with a notice. A region is a band between two values of an axis, cut to the axis range and pieced around gaps; one with nothing left is skipped with a notice; on a log axis a limit at or below 0 reaches to the edge. Regions do not enter the axis range.
+
+**Right Y axis on XY charts.** A series bound to the right axis is scaled on it (points, lines, bars, spikes, areas, error bars, the fit curve). The right axis has its own range, log scale, reversal and limits, and no breaks. Reference lines, regions, extra ticks and annotations in data units use the left axis. A bracket joining two series on the right axis uses its scale; one joining series on different axes is skipped with a notice.
+
+**Comparison brackets on grouped and XY charts.** Placement is the rule of section 13 and of the column charts: a bracket stands above the highest value either end draws, overlapping brackets are stacked (the shorter lower), a hidden bracket keeps its room, and the axis grows to hold the stack and its label unless the bracket layer is kept out of the range. Grouped bars: the ends are two series in one category, or one series in two categories; an end with no value skips the bracket with a warning. XY: a vertical bar to the right of the two points at one X, with lanes where brackets overlap; a bracket with no point at its X is skipped with a warning. The placement uses loops, not spreads into `Math.min`/`Math.max`, so a very large number of values is safe.
+
+**Heat map intervals.** `steps` (2 to 12) cuts the scale into equal intervals and `breaks` (up to 11 edges) into the intervals you give, which win; an interval takes the scale colour at its middle; intervals are `[b(i), b(i+1))` with an inclusive final maximum (section 7). Missing, excluded and out-of-range cells each have a mark and, for the last two, a colour of their own; a cell is excluded only when it has no value left after exclusion.
+
+**Large graphs (preview only).** Above 100 000 dots the screen preview of a column-family graph merges consecutive opaque dots of one look into paths per 12 pt square (dots with transparency are not merged); every dot keeps its position. The export, thumbnails and layouts draw every dot, and a note says the preview is simplified. Dots are counted only on points layers that are shown.

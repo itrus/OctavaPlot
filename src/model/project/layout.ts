@@ -1,4 +1,4 @@
-import type { FrameMm, Layout, LayoutArrangement, PageOrientation, PanelLabelStyle } from '../types';
+import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, PageOrientation, PanelLabelStyle } from '../types';
 
 /** A4 in mm; the renderer's unit is the point (1 in = 72 pt). */
 const A4_MM = { width: 210, height: 297 } as const;
@@ -11,6 +11,8 @@ export const LABEL_PT_MIN = 6;
 export const LABEL_PT_MAX = 48;
 export const MARGIN_MM_MAX = 50;
 export const GAP_MM_MAX = 30;
+export const LEGEND_PT_MIN = 6;
+export const LEGEND_PT_MAX = 24;
 /** Most rows or columns of an array. */
 export const GRID_MAX = 6;
 /** Most panels of a free layout, and the smallest box (mm). */
@@ -90,25 +92,43 @@ export interface PageFrame {
   /** The area inside the margins that the panels share (below the title when there is one). */
   content: Rect;
   title: Rect | null;
+  /** The band of the master legend (inside the margins, outside `content`); null when the page has none. */
+  legend: Rect | null;
 }
 
 type FrameFields = Pick<Layout, 'orientation' | 'marginMm' | 'showTitle'>;
 
-export function pageFrame(layout: FrameFields): PageFrame {
+/** The room a master legend needs along an edge of the page, pt (its width for 'right', its height for 'bottom'); the gap to the panels is added here. */
+export interface LegendBand {
+  position: LayoutLegend['position'];
+  sizePt: number;
+}
+
+export function pageFrame(layout: FrameFields & { gapMm?: number }, band: LegendBand | null = null): PageFrame {
   const mm = pageMm(layout.orientation);
   const [W, H, m] = [mmToPt(mm.width), mmToPt(mm.height), mmToPt(layout.marginMm)];
   const titleH = layout.showTitle ? mmToPt(TITLE_HEIGHT_MM) : 0;
-  return {
-    widthPt: W,
-    heightPt: H,
-    title: layout.showTitle ? { x: m, y: m, w: W - 2 * m, h: titleH } : null,
-    content: { x: m, y: m + titleH, w: Math.max(1, W - 2 * m), h: Math.max(1, H - 2 * m - titleH) },
-  };
+  const content: Rect = { x: m, y: m + titleH, w: Math.max(1, W - 2 * m), h: Math.max(1, H - 2 * m - titleH) };
+  let legend: Rect | null = null;
+  if (band) {
+    // The band takes its room from the panels' area, with the gap between panels in between; the panels keep at least 1 pt.
+    const take = band.sizePt + mmToPt(layout.gapMm ?? 0);
+    if (band.position === 'bottom') {
+      const h = Math.min(band.sizePt, Math.max(0, content.h - 1));
+      content.h = Math.max(1, content.h - take);
+      legend = { x: m, y: content.y + content.h + (take - band.sizePt), w: content.w, h };
+    } else {
+      const w = Math.min(band.sizePt, Math.max(0, content.w - 1));
+      content.w = Math.max(1, content.w - take);
+      legend = { x: content.x + content.w + (take - band.sizePt), y: content.y, w, h: content.h };
+    }
+  }
+  return { widthPt: W, heightPt: H, title: layout.showTitle ? { x: m, y: m, w: W - 2 * m, h: titleH } : null, content, legend };
 }
 
 /** The rectangle of every slot, in pt on the page. */
-export function slotRects(layout: FrameFields & Pick<Layout, 'arrangement' | 'gapMm'>): Rect[] {
-  const { content } = pageFrame(layout);
+export function slotRects(layout: FrameFields & Pick<Layout, 'arrangement' | 'gapMm'>, band: LegendBand | null = null): Rect[] {
+  const { content } = pageFrame(layout, band);
   const a = layout.arrangement;
   if (a.kind === 'free') return a.frames.map((f) => ({ x: mmToPt(f.x), y: mmToPt(f.y), w: mmToPt(f.w), h: mmToPt(f.h) }));
   if (a.kind === 'inset') {
@@ -168,9 +188,9 @@ export interface Arranged {
 const fitFactor = (r: Rect, s: { widthPt: number; heightPt: number }): number => Math.min(r.w / s.widthPt, r.h / s.heightPt);
 
 /** Where each graph goes on the page and at what scale; `sizes[i]` is the natural size of the graph in slot i. */
-export function arrangeLayout(layout: Layout, sizes: readonly NaturalSize[]): Arranged {
-  const frame = pageFrame(layout);
-  const rects = slotRects(layout);
+export function arrangeLayout(layout: Layout, sizes: readonly NaturalSize[], band: LegendBand | null = null): Arranged {
+  const frame = pageFrame(layout, band);
+  const rects = slotRects(layout, band);
   const fits = rects.map((r, i) => {
     const s = sizes[i];
     return s ? fitFactor(r, s) : null;
@@ -215,6 +235,18 @@ function sanitizeArrangement(v: unknown, fallback: LayoutArrangement, orientatio
   return { kind: 'grid', cols: dim(a.cols, fc), rows: dim(a.rows, fr) };
 }
 
+/** The master legend from a loosely typed value: absent for null, a wrong type or a missing value; the fields of an object are checked and clamped. */
+function sanitizeLegend(v: unknown, fallback: LayoutLegend | undefined): LayoutLegend | undefined {
+  if (v === null || v === undefined) return undefined;
+  if (typeof v !== 'object') return fallback;
+  const o = v as Record<string, unknown>;
+  return {
+    position: o.position === 'right' || o.position === 'bottom' ? o.position : (fallback?.position ?? 'bottom'),
+    fontSizePt: clampNum(o.fontSizePt, LEGEND_PT_MIN, LEGEND_PT_MAX, fallback?.fontSizePt ?? 9),
+    hideGraphLegends: typeof o.hideGraphLegends === 'boolean' ? o.hideGraphLegends : (fallback?.hideGraphLegends ?? true),
+  };
+}
+
 function sanitizeScaling(v: unknown, fallback: Layout['scaling']): Layout['scaling'] {
   if (typeof v !== 'object' || v === null) return fallback;
   const s = v as Record<string, unknown>;
@@ -233,6 +265,7 @@ function sanitizeScaling(v: unknown, fallback: Layout['scaling']): Layout['scali
 export function sanitizeLayout(raw: Partial<Record<keyof Layout, unknown>>, base: Layout): Layout {
   const orientation = raw.orientation === 'portrait' || raw.orientation === 'landscape' ? raw.orientation : base.orientation;
   const arrangement = 'arrangement' in raw ? sanitizeArrangement(raw.arrangement, base.arrangement, orientation) : base.arrangement;
+  const legend = 'legend' in raw ? sanitizeLegend(raw.legend, base.legend) : base.legend;
   return {
     id: base.id,
     name: typeof raw.name === 'string' && raw.name.trim() !== '' ? raw.name.trim() : base.name,
@@ -247,6 +280,7 @@ export function sanitizeLayout(raw: Partial<Record<keyof Layout, unknown>>, base
     title: typeof raw.title === 'string' ? raw.title.slice(0, 200) : base.title,
     marginMm: clampNum(raw.marginMm, 0, MARGIN_MM_MAX, base.marginMm),
     gapMm: clampNum(raw.gapMm, 0, GAP_MM_MAX, base.gapMm),
+    ...(legend ? { legend } : {}),
   };
 }
 

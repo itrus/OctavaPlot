@@ -3,7 +3,7 @@ import { createExampleProject } from '../../model/defaults';
 import { layerRows } from '../../model/graph/layers';
 import { capabilitiesOf } from '../../model/graph/capabilities';
 import type { Project } from '../../model/types';
-import { addBracket, addChart, addDataTable, patchAxis, patchChart, patchLook, patchBracket, removeBracket, setLayerHidden } from '../../state/commands';
+import { addBracket, addChart, addDataTable, patchAxis, patchChart, patchLook, patchBracket, removeBracket, setLayerHidden, setLayerRange } from '../../state/commands';
 import { parseProject, parseProjectWithNotes, stringifyProject } from '../../state/serialize';
 import { chartToSvgString } from '../export/export';
 import { buildColumnModel } from './columnModel';
@@ -93,9 +93,25 @@ describe('comparison brackets on a chart over columns', () => {
     expect(out).not.toContain('NaN');
     expect(out).toContain('transform="matrix');
   });
-  it('is offered for charts over columns, not for the others', () => {
-    for (const type of ['bar', 'scatter', 'mean', 'box', 'violin', 'floating', 'paired'] as const) expect(capabilitiesOf(type).brackets).toBe(true);
-    for (const type of ['histogram', 'ecdf', 'xyScatter', 'groupedBar', 'pie', 'survival', 'heatmap'] as const) expect(capabilitiesOf(type).brackets).toBe(false);
+  it('is offered for charts over columns, side by side grouped bars and XY charts, not for the others', () => {
+    for (const type of ['bar', 'scatter', 'mean', 'box', 'violin', 'floating', 'paired', 'groupedBar', 'groupedFloating', 'groupedBox', 'groupedViolin', 'xyScatter', 'xyLineSymbols', 'xyBubble'] as const) expect(capabilitiesOf(type).brackets).toBe(true);
+    // Stacked bars and lines have one place for all their series; a survival chart is bounded at 100%; a histogram has one data set to a bin.
+    for (const type of ['histogram', 'ecdf', 'groupedStacked', 'groupedLine', 'contingencyBars', 'pie', 'survival', 'cumulativeEvent', 'heatmap'] as const) expect(capabilitiesOf(type).brackets).toBe(false);
+  });
+  it('can be kept out of the axis range: the axis does not grow, the bracket is still placed and drawn, clipped by the plot', () => {
+    const p0 = base();
+    const [a, , , d] = ids(p0);
+    const plain = model(p0);
+    const p = withBrackets(p0, bracket('b1', a, d));
+    const kept = model(setLayerRange('c', 'b1:bracket', false)(p));
+    expect(kept.y.domain).toEqual(plain.y.domain);
+    expect(model(p).y.domain[1]).toBeGreaterThan(plain.y.domain[1]);
+    // Still above the highest thing drawn (a smaller page y); the plot clips what lies beyond its edge.
+    expect(kept.brackets).toHaveLength(1);
+    expect(kept.brackets[0].y).toBeLessThan(Math.min(...kept.groups.map((g) => (g.errorBar ? g.errorBar.top : kept.yScale(g.centreValue ?? 0)))));
+    expect(layerRows(chartOf(p), tableOf(p)).find((r) => r.layer.kind === 'bracket')?.inRange).toBe(true);
+    const q = setLayerRange('c', 'b1:bracket', false)(p);
+    expect(layerRows(chartOf(q), tableOf(q)).find((r) => r.layer.kind === 'bracket')?.inRange).toBe(false);
   });
 });
 

@@ -1,6 +1,8 @@
-import type { ChartStyle, ChartType, DataTable, Id, PointLabelPlacement, Selection } from '../../../model/types';
+import type { ChartStyle, ChartType, DataTable, Group, Id, PointLabelPlacement, Selection } from '../../../model/types';
 import { LABEL_OFFSET_LIMITS, type Box, type PlacementCode, type PointLabelModel } from '../../../chart/shared/parts/labels';
 import { LABEL_STYLE_KEYS } from '../../../model/graph/style';
+import { selectedGroupIds, selectionOfGroups } from '../../../model/graph/selection/scope';
+import { selectionOfPoints } from '../../../model/graph/selection/multi';
 import { groupRowTitle } from '../../../model/table/rows';
 import { describePointLabelUi, placementPatch, type PointLabelUi } from './pointLabelUi';
 
@@ -178,4 +180,33 @@ export function pointStatus(ui: Pick<PointOverrideUi, 'available' | 'reason' | '
   if (!ui.labelled) return { text: 'No label for this point.', canKeep: false };
   if (ui.noTitle) return { text: NO_TITLE_NOTE, canKeep: false };
   return { text: 'Label not drawn: the point lies outside the plot or the label limit was reached.', canKeep: false };
+}
+
+/** What the Inspector edits when several points are selected together: the ones that still exist, and the selection to fall back to when some do not. */
+interface MultiPointState {
+  points: Array<{ group: Group; pointId: Id; row: number }>;
+  fallback: Selection | null;
+}
+
+/**
+ * The points of a 'points' selection that exist (their data set and row are there, and the chart type draws observations). When some are
+ * gone the selection shrinks to the rest; a mean chart draws no observations, so the points step back to their data sets.
+ */
+export function multiPointState(table: DataTable, selection: Selection, type: ChartType): MultiPointState {
+  if (selection.kind !== 'points') return { points: [], fallback: null };
+  if (type === 'mean') return { points: [], fallback: selectionOfGroups(selectedGroupIds(selection).filter((id) => table.groups.some((g) => g.id === id))) };
+  const points = selection.points.flatMap((r) => {
+    const group = table.groups.find((g) => g.id === r.groupId);
+    const row = group ? group.observations.findIndex((o) => o.id === r.pointId) : -1;
+    return group && row >= 0 ? [{ group, pointId: r.pointId, row }] : [];
+  });
+  return { points, fallback: points.length === selection.points.length ? null : selectionOfPoints(points.map((p) => ({ groupId: p.group.id, pointId: p.pointId }))) };
+}
+
+/**
+ * Dragging a label stores it as Custom with the offsets of its top-left corner from its point, as seedCustomOffsets does for the drawn label,
+ * moved by (dx, dy) pt. The offsets are relative to the point, so the label stays with it when the axes or the data change.
+ */
+export function dragLabelPatch(point: { cx: number; cy: number }, box: Box, dx: number, dy: number): Partial<ChartStyle> {
+  return { pointLabelPlacement: 'custom', pointLabelOffsetXPt: clampOffset(box.x0 + dx - point.cx), pointLabelOffsetYPt: clampOffset(box.y0 + dy - point.cy) };
 }

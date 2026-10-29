@@ -1,6 +1,7 @@
 import type { DataTable } from '../../model/types';
 import { MAX_TABLE_ROWS, sanitizeRowTitle } from '../../model/table/rows';
-import { formatCell, parseCell } from './cellText';
+import { formatCellFor, parseCellFor } from './cellText';
+import { detectTimeColumn, parseTimeBatch, type TimeColumn } from '../../util/timeColumn';
 import type { DecimalSeparator } from '../../model/types';
 
 /** First header cell that marks the row title column in an exported file. */
@@ -49,7 +50,7 @@ export function tableToCsv(table: DataTable, separator: DecimalSeparator = 'auto
     const cells = [quote(table.rows[r]?.title ?? '')];
     table.groups.forEach((g, c) => {
       const o = g.observations[r];
-      cells.push(formatCell(mode === 'analysis' && o?.excluded ? null : (o?.value ?? null), separator));
+      cells.push(formatCellFor(mode === 'analysis' && o?.excluded ? null : (o?.value ?? null), separator, g.time));
       if (marked[c]) cells.push(o?.excluded ? '1' : '', quote(o?.excluded ? (o.excludedReason ?? '') : ''));
       if (withSubject[c]) cells.push(quote(o?.subject ?? ''));
       if (withFactor[c]) cells.push(quote(g.factor ?? ''));
@@ -135,6 +136,10 @@ interface ImportedTable {
   subjects?: string[][];
   /** Per column: the factor the file names ('' for none). Only present when the file has factor columns. */
   factors?: string[];
+  /** Per column: the type the values were read as (a date, a time, a duration; undefined = a number). Only present when a column has one. */
+  times?: Array<TimeColumn | undefined>;
+  /** What reading did that the file did not ask for: times with a UTC offset converted to UTC. */
+  notes?: string[];
 }
 
 type CsvImport = { ok: true; data: ImportedTable } | { ok: false; message: string };
@@ -178,6 +183,8 @@ interface CsvRead {
   excluded?: Array<Array<{ reason: string } | null>>;
   subjects?: string[][];
   factors?: string[];
+  /** What reading the time columns did that the file did not ask for. */
+  notes: string[];
   /** Position of each data column in a line of the file. */
   positions: number[];
   problems: CsvProblem[];
@@ -211,7 +218,7 @@ function dataColumns(header: string[], offset: number): CsvColumn[] {
 export type FirstColumn = 'auto' | 'titles' | 'values';
 
 /** Read every cell of a file. A fault of the file as a whole is an `error`; bad cells are collected, not fatal. */
-function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimiter, firstColumn: FirstColumn, inDialog: boolean): { error: string } | { read: CsvRead } {
+function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimiter, firstColumn: FirstColumn, inDialog: boolean, times: ReadonlyArray<TimeColumn | undefined> = []): { error: string } | { read: CsvRead } {
   let records: string[][];
   try {
     records = parseCsv(text, delimiter);
@@ -256,7 +263,8 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
     for (let c = 0; c < width; c++) {
       const at = cols[c].at;
       const cell = body[r][at] ?? '';
-      const parsed = parseCell(cell, separator);
+      // A column with a time type is read together after the lines (a column is all wall-clock times or all with an offset).
+      const parsed = times[c] ? ({ ok: true, value: null } as const) : parseCellFor(cell, separator);
       cells.push(cell);
       if (parsed.ok) row.push(parsed.value);
       else {
@@ -269,7 +277,7 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
         problems.push({ line: r + 2, column: flag + 1, label: colLabel(header[flag], c), text: flagText, message: `"${flagText}" must be 1 or empty` });
       }
       // An excluded value is one that exists: a flag on an empty cell marks nothing.
-      marked.push(flagText === '1' && row[c] !== null ? { reason: reason === undefined ? '' : (body[r][reason] ?? '').trim() } : null);
+      marked.push(flagText === '1' && (times[c] ? cell.trim() !== '' : row[c] !== null) ? { reason: reason === undefined ? '' : (body[r][reason] ?? '').trim() } : null);
       const subjectAt = cols[c].subject;
       named.push(subjectAt === undefined ? '' : (body[r][subjectAt] ?? '').trim());
     }
@@ -278,20 +286,45 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
     excluded.push(marked);
     subjects.push(named);
   }
-  return { read: { hasTitles, names, titles: hasTitles ? body.map((rec) => sanitizeRowTitle(rec[0] ?? '')) : null, values, texts, positions: cols.map((c) => c.at), ...(marks ? { excluded } : {}), ...(hasSubjects ? { subjects } : {}), ...(hasFactors ? { factors } : {}), problems } };
+  const notes: string[] = [];
+  for (let c = 0; c < width; c++) {
+    const time = times[c];
+    if (!time) continue;
+    const batch = parseTimeBatch(texts.map((r) => r[c]), time, (t) => parseCellFor(t, separator, time));
+    batch.values.forEach((v, r) => (values[r][c] = v));
+    for (const q of batch.problems) problems.push({ line: q.index + 2, column: cols[c].at + 1, label: colLabel(header[cols[c].at], c), text: texts[q.index][c], message: q.message });
+    notes.push(...batch.notes);
+  }
+  problems.sort((x, y) => x.line - y.line || x.column - y.column);
+  return { read: { hasTitles, names, titles: hasTitles ? body.map((rec) => sanitizeRowTitle(rec[0] ?? '')) : null, values, texts, positions: cols.map((c) => c.at), ...(marks ? { excluded } : {}), ...(hasSubjects ? { subjects } : {}), ...(hasFactors ? { factors } : {}), notes, problems } };
 }
 
 /**
  * Interpret CSV text as table data. The first line holds the group names; a first column headed "Row title" holds row titles.
  * Fields are separated as `csvDelimiter` says unless a delimiter is given.
  */
-export function importCsv(text: string, separator: DecimalSeparator = 'auto', delimiter: CsvDelimiter = csvDelimiter(separator), firstColumn: FirstColumn = 'auto'): CsvImport {
-  const result = readCsv(text, separator, delimiter, firstColumn, false);
+export function importCsv(text: string, separator: DecimalSeparator = 'auto', delimiter: CsvDelimiter = csvDelimiter(separator), firstColumn: FirstColumn = 'auto', times: ReadonlyArray<TimeColumn | undefined> = []): CsvImport {
+  const result = readCsv(text, separator, delimiter, firstColumn, false, times);
   if ('error' in result) return { ok: false, message: result.error };
   const { read } = result;
   const bad = read.problems[0];
   if (bad) return { ok: false, message: `Line ${bad.line}, ${bad.label}: ${bad.message}. Use numbers or leave the cell empty.` };
-  return { ok: true, data: { names: read.names, titles: read.titles, values: read.values, ...(read.excluded ? { excluded: read.excluded } : {}), ...(read.subjects ? { subjects: read.subjects } : {}), ...(read.factors ? { factors: read.factors } : {}) } };
+  return { ok: true, data: importedOf(read, times) };
+}
+
+/** What a read file becomes as table data. */
+function importedOf(read: CsvRead, times: ReadonlyArray<TimeColumn | undefined>): ImportedTable {
+  const typed = read.names.map((_, c) => times[c]);
+  return {
+    names: read.names,
+    titles: read.titles,
+    values: read.values,
+    ...(read.excluded ? { excluded: read.excluded } : {}),
+    ...(read.subjects ? { subjects: read.subjects } : {}),
+    ...(read.factors ? { factors: read.factors } : {}),
+    ...(typed.some((t) => t) ? { times: typed } : {}),
+    ...(read.notes.length > 0 ? { notes: read.notes } : {}),
+  };
 }
 
 /** Rows and columns of a file shown before it is imported. */
@@ -318,6 +351,8 @@ interface CsvPreviewOptions {
   delimiter: CsvDelimiter;
   separator: DecimalSeparator;
   firstColumn: FirstColumn;
+  /** The type to read each data column as (a date, a time, a duration); absent or undefined = numbers. */
+  times?: ReadonlyArray<TimeColumn | undefined>;
 }
 
 type CsvPreview =
@@ -337,11 +372,16 @@ type CsvPreview =
       problems: CsvProblem[];
       /** What Import puts in the table; null while there are problems. */
       data: ImportedTable | null;
+      /** The type the cells of the first data column say they are (all dates, all times, all clock durations), when it was read as numbers; only a suggestion. */
+      suggestedTime: TimeColumn | null;
+      /** What reading the time columns did that the file did not ask for. */
+      notes: string[];
     };
 
 /** What a file becomes under these choices, without changing anything. Pure. */
 export function previewCsv(text: string, options: CsvPreviewOptions): CsvPreview {
-  const result = readCsv(text, options.separator, options.delimiter, options.firstColumn, true);
+  const times = options.times ?? [];
+  const result = readCsv(text, options.separator, options.delimiter, options.firstColumn, true, times);
   if ('error' in result) return { ok: false, message: result.error };
   const { read } = result;
   const shown = Math.min(PREVIEW_COLUMNS, read.names.length);
@@ -360,7 +400,9 @@ export function previewCsv(text: string, options: CsvPreviewOptions): CsvPreview
     rows,
     hiddenColumns: read.names.length - shown,
     problems: read.problems,
-    data: read.problems.length === 0 ? { names: read.names, titles: read.titles, values: read.values, ...(read.excluded ? { excluded: read.excluded } : {}), ...(read.subjects ? { subjects: read.subjects } : {}), ...(read.factors ? { factors: read.factors } : {}) } : null,
+    data: read.problems.length === 0 ? importedOf(read, times) : null,
+    suggestedTime: times[0] ? null : detectTimeColumn(read.texts.map((r) => r[0])),
+    notes: read.notes,
   };
 }
 

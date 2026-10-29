@@ -1,4 +1,5 @@
 import type { FitModelId } from '../stats/fit';
+import type { TimeColumn } from '../util/timeColumn';
 
 /** Typed project model. Everything here is plain JSON-serialisable data. */
 
@@ -34,6 +35,11 @@ export interface Group {
    * Series that name the same factor are drawn together inside each category (see model/table/factors.ts). Free text; absent = none.
    */
   factor?: string;
+  /**
+   * What the numbers of this column are: dates (days since 1970-01-01), times (seconds since 1970-01-01T00:00:00 UTC) or durations (in a unit). Absent = plain numbers.
+   * Only the X column of an XY table has one so far; the numbers are never changed by it (util/timeColumn.ts, contract section 17).
+   */
+  time?: TimeColumn;
   /** Set only on a column added to a graph from another table: the row titles of that table, which are the ones its points are named by. */
   sourceRowTitles?: string[];
   /** Always exactly `DataTable.rowCount` long. */
@@ -71,7 +77,9 @@ export type ReplicateLayout =
   /** XY tables: a Y and a size for each point, in two columns (the size of a bubble); one value for each point, no replicates. */
   | { kind: 'sized' }
   /** XY tables: a Y and a step (dX, dY) for each point, in three columns: an arrow from (X, Y) to (X + dX, Y + dY). */
-  | { kind: 'vector' };
+  | { kind: 'vector' }
+  /** XY tables: a Y, a +/- error of Y and a +/- error of X for each point, in three columns: error bars along both axes, each of its own. */
+  | { kind: 'xerror' };
 
 export interface DataTable {
   id: Id;
@@ -324,6 +332,9 @@ export interface HeatCustomColours {
   high: string;
 }
 
+/** A mark over a cell of a special kind: none, a slash, a cross, or an outline in the colour of the text on it. */
+export type HeatMark = 'none' | 'slash' | 'cross' | 'outline';
+
 /** Settings of heat maps, one set for the whole chart: colours, normalising, labels (spec 13). */
 export interface HeatmapOptions {
   palette: HeatPalette;
@@ -346,6 +357,31 @@ export interface HeatmapOptions {
   transpose: boolean;
   colourbar: boolean;
   missingColour: string;
+  /** Interval colours: the scale in this many equal steps, each one colour; null = a continuous scale. */
+  steps: number | null;
+  /** Interval colours with the edges set by hand (ascending); they take the place of `steps` while any of them lies inside the range. */
+  breaks: number[];
+  /** Cells of a special kind look different from each other and from the scale: the mark drawn on them, and the colour of those that are excluded or outside the range (null = the missing colour, and the end colour of the scale). */
+  missingMark: HeatMark;
+  excludedColour: string | null;
+  excludedMark: HeatMark;
+  outsideColour: string | null;
+  outsideMark: HeatMark;
+  /** Size of a cell, pt; null = the cells fill the plotting region (a size too large for it is held at the region). */
+  cellWidthPt: number | null;
+  cellHeightPt: number | null;
+  /** Extra space after each this many rows or columns (null = no groups), and its size, pt. */
+  rowGroupSize: number | null;
+  colGroupSize: number | null;
+  groupGapPt: number;
+  /** Only every this many-th label of the rows or columns is written (1 = all). */
+  rowLabelEvery: number;
+  colLabelEvery: number;
+  /** The colour bar: its width, its length as a percentage of the plotting region, the number of ticks wanted (a stepped scale has one at each edge), and its title (null = the automatic one, empty = none). */
+  barWidthPt: number;
+  barLengthPct: number;
+  barTicks: number;
+  barTitle: string | null;
   /** The colours of the 'custom' scale; kept while another scale is chosen. */
   customColours: HeatCustomColours;
 }
@@ -500,6 +536,14 @@ export interface AxisConfig {
   thousands: boolean;
   prefix: string;
   suffix: string;
+  /** XY charts: ticks added at chosen values, between the automatic ones (a threshold, a cut-off); absent = none. A value that has no place on the axis is not drawn. */
+  extraTicks?: ExtraTick[];
+}
+
+/** A tick at a chosen value of an axis; `label` is written instead of the number when it is not empty. */
+export interface ExtraTick {
+  value: number;
+  label: string;
 }
 
 /** Shape of the colour key in the legend: a wide rectangle or a square. */
@@ -545,18 +589,44 @@ export interface JitterConfig {
   bySubject: boolean;
 }
 
+/** A result of a data set that a text or a reference line can be bound to (see model/graph/resultTokens.ts). */
+export type ResultStat = 'n' | 'sum' | 'mean' | 'sd' | 'sem' | 'median' | 'min' | 'max';
+
 /** A line across the plotting region at a value of an axis (a threshold, a target, a control level). */
 export interface ReferenceLine {
   id: Id;
   /** Which axis the value is on: X (a vertical line) or Y (a horizontal one). */
   axis: 'x' | 'y';
   value: number;
+  /**
+   * XY charts: an oblique line y = intercept + slope * x across the plot (the identity line is slope 1, intercept 0). Present, the line is drawn
+   * from these and `axis` and `value` are not used (they stay 'y' and 0). Never bound to a result.
+   */
+  slope?: number;
+  intercept?: number;
+  /** Bound to a result of a data set: the line is drawn at that result, and moves when the data change (`value` is then only what it was last set to). */
+  valueFrom?: { stat: ResultStat; groupId: Id };
   color: string;
   widthPt: number;
   style: LineStyle;
   /** How opaque the line and its label are, 0 (invisible) to 1. */
   opacity: number;
   /** Text written at the end of the line. */
+  label: string;
+  showLabel: boolean;
+}
+
+/** A band across the plotting region between two values of an axis (a normal range, a window): X gives a vertical band, Y a horizontal one. */
+export interface ShadedRegion {
+  id: Id;
+  axis: 'x' | 'y';
+  /** The two limits, in either order. */
+  from: number;
+  to: number;
+  color: string;
+  /** How opaque the band is, 0 (invisible) to 1. */
+  opacity: number;
+  /** Text written inside the band, at its start. */
   label: string;
   showLabel: boolean;
 }
@@ -575,6 +645,15 @@ export interface Bracket {
   widthPt: number;
   /** Size of the label, pt. */
   fontSizePt: number;
+  /**
+   * Grouped bars: the table row (category) of the `from` end, and of the `to` end when it differs (`toRow`; absent = the same row, so the
+   * bracket joins two series inside one category, and one series with two rows joins two categories). The first category when absent.
+   * Ignored by the other charts.
+   */
+  row?: number;
+  toRow?: number;
+  /** XY charts: the X value at which the two series are joined (each must have a point there). Ignored by the other charts. */
+  at?: number;
 }
 
 export interface Annotation {
@@ -695,6 +774,10 @@ export interface Chart {
   annotations: Annotation[];
   /** Lines at chosen values of the axes. */
   referenceLines: ReferenceLine[];
+  /** XY charts: bands between two values of an axis, behind the data. */
+  regions: ShadedRegion[];
+  /** XY charts: both axes are drawn with the same length for one unit, so that an identity line runs at 45 degrees; the axis with the larger room is widened to it. Absent = off. */
+  equalUnits?: boolean;
   /** Comparison brackets between two data sets (charts over columns). */
   brackets: Bracket[];
   /** IDs of layers (see model/graph/layers.ts) that are not drawn. Hiding changes nothing that is calculated. */
@@ -767,6 +850,18 @@ export type LayoutArrangement = { kind: 'grid'; cols: number; rows: number } | {
  */
 export type LayoutScaling = { mode: 'smallest' | 'largest' | 'fit' } | { mode: 'percent'; percent: number };
 
+/**
+ * A legend for the whole page: the legends of the graphs, merged, drawn once in a band along the bottom or the right edge
+ * of the page. The band takes its room from the panels. Absent on a layout means none.
+ */
+export interface LayoutLegend {
+  position: 'bottom' | 'right';
+  /** Size of the text on the page, pt; the keys are scaled with it. */
+  fontSizePt: number;
+  /** True: the graphs on the page are drawn without their own legend (their plot takes the room). False: they keep it. */
+  hideGraphLegends: boolean;
+}
+
 export interface Layout {
   id: Id;
   name: string;
@@ -783,6 +878,8 @@ export interface Layout {
   title: string;
   marginMm: number;
   gapMm: number;
+  /** The master legend of the page; absent = none. */
+  legend?: LayoutLegend;
 }
 
 export interface Project {
@@ -803,7 +900,11 @@ export type Selection =
   | { kind: 'groups'; groupIds: Id[] }
   /** One raw observation's symbol (and its label); mean markers are not selectable. */
   | { kind: 'point'; groupId: Id; pointId: Id }
-  | { kind: 'annotation'; annotationId: Id };
+  /** Several points edited together (two or more; one is a 'point'), in the order they were picked; they may belong to different data sets. */
+  | { kind: 'points'; points: Array<{ groupId: Id; pointId: Id }> }
+  | { kind: 'annotation'; annotationId: Id }
+  /** Several annotations edited together (two or more; one is an 'annotation'). */
+  | { kind: 'annotations'; annotationIds: Id[] };
 
 /** How numbers are written: by the decimal point, by the decimal comma, or either (a comma is taken as a decimal comma). */
 export type DecimalSeparator = 'auto' | 'point' | 'comma';

@@ -25,6 +25,8 @@ export interface ExportReportInput {
   isFontAvailable: (family: string) => boolean;
   /** Every text of the drawing (see drawingTexts), to look the characters up in the font; absent or null when they are not known (a page layout). */
   texts?: readonly string[] | null;
+  /** For a page of several fonts: the texts with the font-family list each is written in (a page layout; see layoutTextGroups). Each group is checked in the first available family of its list. */
+  textGroups?: ReadonlyArray<{ fontFamily: string; texts: readonly string[] }>;
   /** Whether a font has a character; asked only for characters outside basic Latin. */
   hasGlyph?: (family: string, char: string) => boolean;
   /** What the model says it could not draw or clipped, as it words it. */
@@ -51,6 +53,8 @@ export interface ExportReport {
   fonts: FontCheck[];
   /** Characters of the texts that the font in use does not have; null when the texts are not known. */
   glyphs: GlyphCheck | null;
+  /** The same check for each font of a page (one entry for each font-family list that writes texts); empty for a graph. */
+  glyphGroups: GlyphCheck[];
   warnings: string[];
   printWidthMm: number | null;
   printWarnings: string[];
@@ -63,6 +67,7 @@ export function buildExportReport(input: ExportReportInput): ExportReport {
   const { widthPx, heightPx } = input;
   const mm = (px: number) => round((px * 25.4) / 96, 2);
   const fonts = [...new Set(input.fontFamilies)].map((list) => checkFonts(list, input.isFontAvailable));
+  const groups = input.textGroups ?? [];
   const pixels = input.format === 'svg' ? null : exportPixels({ widthPx, heightPx }, input.dpi);
   return {
     name: input.name,
@@ -77,6 +82,7 @@ export function buildExportReport(input: ExportReportInput): ExportReport {
     fonts,
     // The characters are looked up in the font the drawing is made in: the first list is the chart's own.
     glyphs: input.texts && input.hasGlyph ? checkGlyphs(input.texts, fonts[0]?.used ?? null, input.hasGlyph) : null,
+    glyphGroups: input.hasGlyph ? groups.map((g) => checkGlyphs(g.texts, checkFonts(g.fontFamily, input.isFontAvailable).used, input.hasGlyph!)) : [],
     warnings: [...input.warnings],
     printWidthMm: input.printWidthMm,
     printWarnings: [...input.printWarnings],

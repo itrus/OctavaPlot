@@ -28,11 +28,18 @@ describe('the point labels of a column chart as scene elements', () => {
 
 describe('the editor selection marks of a column chart', () => {
   it('are none for nothing selected, and all editor-only otherwise', () => {
-    expect(compileColumnSelection(model, [], null)).toEqual([]);
+    expect(compileColumnSelection(model, [], [])).toEqual([]);
     const pid = model.labels.items[0].id;
-    const sel = compileColumnSelection(model, [model.groups[0].groupId], pid);
+    const sel = compileColumnSelection(model, [model.groups[0].groupId], [pid]);
     expect(sel.map((n) => n.tag)).toEqual(['circle', 'rect', 'rect']);
     expect(sel.every((n) => n.editorOnly)).toBe(true);
-    expect(compileColumnSelection(model, [], 'nobody')).toEqual([]);
+    expect(compileColumnSelection(model, [], ['nobody'])).toEqual([]);
+  });
+  it('mark every selected point, and its label, when several are selected', () => {
+    const two = model.groups.flatMap((g) => g.points).slice(0, 2).map((p) => p.id);
+    const marks = compileColumnSelection(model, [], two);
+    expect(marks.filter((n) => n.tag === 'circle')).toHaveLength(2);
+    expect(marks.every((n) => n.editorOnly)).toBe(true);
+    expect(compileColumnSelection(model, [], [two[0]]).filter((n) => n.tag === 'circle')).toHaveLength(1);
   });
 });

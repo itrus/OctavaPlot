@@ -1,4 +1,4 @@
-import { chartFamily, leadingColumns } from './chartTypes';
+import { bracketKindOf, chartFamily, leadingColumns } from './chartTypes';
 import { centreLower } from '../../stats/summary';
 import { resolveStyle, dataLayer } from './style';
 import { resolveSummary } from './summary';
@@ -11,7 +11,7 @@ import type { Chart, ChartStyle, ChartType, DataTable, Id, LayerStyle, LineStyle
  * decides about them (hidden, kept out of the axis range, their own look, their order) is kept on the chart by layer ID. Every family is
  * drawn from them. Which parts take a look (lookKeysOf) or a place in the axis range (rangeKindsOf) depends on the chart type.
  */
-export type LayerKind = 'atRisk' | 'band' | 'area' | 'bars' | 'distribution' | 'meanLine' | 'pairLines' | 'labels' | 'titles' | 'colourBar' | 'rawPoints' | 'points' | 'line' | 'errorBars' | 'fitCurve' | 'fitBand' | 'referenceLine' | 'bracket' | 'annotation';
+export type LayerKind = 'atRisk' | 'band' | 'area' | 'bars' | 'distribution' | 'meanLine' | 'pairLines' | 'labels' | 'titles' | 'colourBar' | 'rawPoints' | 'points' | 'line' | 'errorBars' | 'xErrorBars' | 'fitCurve' | 'fitBand' | 'referenceLine' | 'region' | 'bracket' | 'annotation';
 
 /** What a layer's numbers come from; a calculation is keyed by what it is computed from, never by how the layer is styled. */
 type CalcRef = { kind: 'summary'; seriesId: Id } | { kind: 'survival'; seriesId: Id } | { kind: 'curvefit'; analysisId: Id };
@@ -53,10 +53,14 @@ export function layersOf(chart: Chart, table: DataTable): LayerSpec[] {
   if (chartFamily(chart.type) === 'heatmap') return finishLayers(chart, heatLayers(chart, table));
   const out: Array<Omit<LayerSpec, 'z'>> = [];
   const bound = (seriesId: Id) => ({ tableId: table.id, seriesId });
-  // Replicates and entered summaries have a calculation behind each point; a single value, or a value with a size, has none.
-  const calc = layoutOf(table).kind === 'replicates' || layoutOf(table).kind === 'summary';
+  // Replicates and entered summaries (and a Y with its errors entered) have a calculation behind each point; a single value, or a value with a size, has none.
+  const calc = layoutOf(table).kind === 'replicates' || layoutOf(table).kind === 'summary' || layoutOf(table).kind === 'xerror';
   const analysisId = chart.fit.analysisId;
 
+  // The shaded regions of an XY chart are behind its reference lines.
+  if (chartFamily(chart.type) === 'xy') {
+    for (const r of chart.regions) out.push({ id: `${r.id}:region`, kind: 'region', binding: null, calc: null, enabled: true, visible: true, rangeContribution: false });
+  }
   for (const r of chart.referenceLines) {
     out.push({ id: `${r.id}:referenceLine`, kind: 'referenceLine', binding: null, calc: null, enabled: true, visible: true, rangeContribution: false });
   }
@@ -90,8 +94,11 @@ export function layersOf(chart: Chart, table: DataTable): LayerSpec[] {
     ...(analysisId !== null ? ofKind('fitCurve', yes, yes, fitRef) : []),
     // A single Y per row has no spread to draw.
     ...(calc ? ofKind('errorBars', (st) => st.showErrorBars, (st) => st.showErrorBars, (id) => ({ kind: 'summary', seriesId: id })) : []),
+    // A table with an error of X entered has the bars along X as a layer of their own, switched on with the others and counted in the range like them.
+    ...(layoutOf(table).kind === 'xerror' ? ofKind('xErrorBars', (st) => st.showErrorBars, (st) => st.showErrorBars) : []),
   ];
   out.push(...(chart.lineOrder === 'onTop' ? [...raw, ...points, ...parts] : [...parts, ...raw, ...points]));
+  out.push(...bracketLayers(chart));
   // The table of subjects at risk under the plot: its room is kept when it is hidden, so hiding it moves nothing.
   if (survival) out.push({ id: `${chart.id}:atRisk`, kind: 'atRisk', binding: null, calc: null, enabled: true, visible: chart.survival.atRisk, rangeContribution: false });
   for (const a of chart.annotations) {
@@ -204,8 +211,14 @@ function groupedLayers(chart: Chart, table: DataTable): Array<Omit<LayerSpec, 'z
     ...chart.referenceLines.map((r) => ({ id: `${r.id}:referenceLine`, kind: 'referenceLine' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: false })),
     ...parts,
     ...labels,
+    ...bracketLayers(chart),
     ...chart.annotations.map((a) => ({ id: `${a.id}:annotation`, kind: 'annotation' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: false })),
   ];
+}
+
+/** The layers of the comparison brackets, for the chart types that have them: drawn above the data, and their room is part of the axis range (hiding one moves nothing). */
+function bracketLayers(chart: Chart): Array<Omit<LayerSpec, 'z'>> {
+  return bracketKindOf(chart.type) === null ? [] : chart.brackets.map((b) => ({ id: `${b.id}:bracket`, kind: 'bracket' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: true }));
 }
 
 /**
@@ -242,14 +255,13 @@ function columnLayers(chart: Chart, table: DataTable): Array<Omit<LayerSpec, 'z'
     ...chart.referenceLines.map((r) => ({ id: `${r.id}:referenceLine`, kind: 'referenceLine' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: false })),
     ...parts,
     ...labels,
-    // The brackets are drawn above the data and their room is part of the axis range (hiding one moves nothing).
-    ...chart.brackets.map((b) => ({ id: `${b.id}:bracket`, kind: 'bracket' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: true })),
+    ...bracketLayers(chart),
     ...chart.annotations.map((a) => ({ id: `${a.id}:annotation`, kind: 'annotation' as LayerKind, binding: null, calc: null, enabled: true, visible: true, rangeContribution: false })),
   ];
 }
 
 /** The kinds of layer that are drawn from the data of a series: the ones that can be put in another order. */
-export const ORDERABLE_LAYER_KINDS: ReadonlyArray<LayerKind> = ['band', 'area', 'bars', 'distribution', 'pairLines', 'line', 'fitBand', 'fitCurve', 'errorBars', 'meanLine', 'rawPoints', 'points', 'labels', 'titles', 'colourBar'];
+export const ORDERABLE_LAYER_KINDS: ReadonlyArray<LayerKind> = ['band', 'area', 'bars', 'distribution', 'pairLines', 'line', 'fitBand', 'fitCurve', 'errorBars', 'xErrorBars', 'meanLine', 'rawPoints', 'points', 'labels', 'titles', 'colourBar'];
 
 /**
  * The order of the chart's own kinds of layer, with the order the user chose over it. `stored` lists IDs, lowest first: those that
@@ -296,9 +308,11 @@ const LAYER_NAMES: Record<LayerKind, string> = {
   points: 'Points',
   line: 'Line',
   errorBars: 'Error bars',
+  xErrorBars: 'X error bars',
   fitCurve: 'Fit curve',
   fitBand: 'Fit band',
   referenceLine: 'Reference line',
+  region: 'Shaded region',
   bracket: 'Comparison bracket',
   annotation: 'Annotation',
 };
@@ -310,6 +324,12 @@ const LAYER_NAMES: Record<LayerKind, string> = {
  * heat map have no axis, and stacked bars are ranged by their totals.
  */
 export function rangeKindsOf(type: ChartType): ReadonlyArray<LayerKind> {
+  const data = dataRangeKindsOf(type);
+  // The room of a comparison bracket is part of the range too, and can be left out of it like any other part.
+  return bracketKindOf(type) !== null ? [...data, 'bracket'] : data;
+}
+
+function dataRangeKindsOf(type: ChartType): ReadonlyArray<LayerKind> {
   switch (type) {
     case 'xyScatter':
     case 'xyLine':
@@ -320,7 +340,7 @@ export function rangeKindsOf(type: ChartType): ReadonlyArray<LayerKind> {
     case 'xyBubble':
     case 'xyVector':
     case 'xyOffset':
-      return ['points', 'rawPoints', 'errorBars', 'fitCurve'];
+      return ['points', 'rawPoints', 'errorBars', 'xErrorBars', 'fitCurve'];
     case 'bar':
     case 'scatter':
     case 'paired':
@@ -432,6 +452,12 @@ function columnName(chart: Chart, kind: LayerKind): string {
   }
 }
 
+/** What an oblique reference line is called: "identity (Y = X)", or "Y = a + b X" with its numbers. */
+function obliqueName(slope: number, intercept: number): string {
+  if (slope === 1 && intercept === 0) return 'identity (Y = X)';
+  return `Y = ${intercept} ${slope < 0 ? '-' : '+'} ${Math.abs(slope)} X`;
+}
+
 /** The layers of an XY or survival chart as the inspector lists them, topmost first. */
 export function layerRows(chart: Chart, table: DataTable, seriesName: (id: Id, fallback: string) => string = (_, f) => f): LayerRow[] {
   const names = new Map(xySeries(table).map((s) => [s.id, s.name]));
@@ -440,11 +466,14 @@ export function layerRows(chart: Chart, table: DataTable, seriesName: (id: Id, f
   const byRange = new Map(layersOf({ ...chart, rangeExcludedLayerIds: [] }, table).map((l) => [l.id, l.rangeContribution]));
   const family = chartFamily(chart.type);
   const lineOf = new Map(chart.referenceLines.map((r) => [`${r.id}:referenceLine`, r]));
+  const regionOf = new Map(chart.regions.map((r) => [`${r.id}:region`, r]));
   const noteOf = new Map(chart.annotations.map((a) => [`${a.id}:annotation`, a]));
   const bracketOf = new Map(chart.brackets.map((b) => [`${b.id}:bracket`, b]));
   const labelOf = (layer: LayerSpec): string => {
     const r = lineOf.get(layer.id);
-    if (r) return `${LAYER_NAMES.referenceLine}: ${r.axis.toUpperCase()} = ${r.value}`;
+    if (r) return `${LAYER_NAMES.referenceLine}: ${r.slope !== undefined ? obliqueName(r.slope, r.intercept ?? 0) : `${r.axis.toUpperCase()} = ${r.value}`}`;
+    const region = regionOf.get(layer.id);
+    if (region) return `${LAYER_NAMES.region}: ${region.axis.toUpperCase()} from ${Math.min(region.from, region.to)} to ${Math.max(region.from, region.to)}`;
     const a = noteOf.get(layer.id);
     const br = bracketOf.get(layer.id);
     if (br) return `${LAYER_NAMES.bracket}: ${br.label.trim() !== '' ? br.label.trim() : 'no label'}`;
@@ -488,6 +517,7 @@ const STYLABLE_LAYERS: Partial<Record<LayerKind, ReadonlyArray<keyof LayerStyle>
   area: ['color', 'opacity'],
   line: ['color', 'widthPt', 'lineStyle', 'opacity'],
   errorBars: ['color', 'widthPt', 'opacity'],
+  xErrorBars: ['color', 'widthPt', 'opacity'],
   points: ['color', 'widthPt', 'opacity', 'shape'],
   rawPoints: ['color', 'widthPt', 'opacity', 'shape'],
   meanLine: ['color', 'widthPt', 'opacity'],
@@ -540,6 +570,7 @@ export function lookKeysOf(type: ChartType, kind: LayerKind): ReadonlyArray<keyo
 const PART_KEYS: Partial<Record<LayerKind, Partial<Record<keyof LayerStyle, ReadonlyArray<keyof ChartStyle>>>>> = {
   line: { color: ['lineColor'], widthPt: ['lineWidthPt'], lineStyle: ['lineStyle'], opacity: ['lineOpacity'] },
   errorBars: { color: ['errorColor'], widthPt: ['errorLineWidthPt'], opacity: ['errorOpacity'] },
+  xErrorBars: { color: ['errorColor'], widthPt: ['errorLineWidthPt'], opacity: ['errorOpacity'] },
   points: { color: ['symbolColor', 'symbolBorderColor'], widthPt: ['symbolBorderWidthPt'], opacity: ['symbolFillOpacity'], shape: ['symbolShape'] },
   rawPoints: { color: ['symbolColor', 'symbolBorderColor'], widthPt: ['symbolBorderWidthPt'], opacity: ['symbolFillOpacity'], shape: ['symbolShape'] },
   meanLine: { color: ['lineColor'], widthPt: ['lineWidthPt'], opacity: ['lineOpacity'] },
@@ -551,7 +582,7 @@ const PART_KEYS: Partial<Record<LayerKind, Partial<Record<keyof LayerStyle, Read
 };
 
 /** The layers drawn in the look of their series with the layer's own settings over it (the others have a look of their own, see layerLook). */
-const SERIES_LOOK_KINDS: ReadonlyArray<LayerKind> = ['line', 'errorBars', 'points', 'rawPoints', 'meanLine', 'pairLines'];
+const SERIES_LOOK_KINDS: ReadonlyArray<LayerKind> = ['line', 'errorBars', 'xErrorBars', 'points', 'rawPoints', 'meanLine', 'pairLines'];
 
 const SYMBOL_SHAPES: ReadonlyArray<SymbolShape> = ['circle', 'square', 'triangle', 'triangleDown', 'diamond', 'hexagon', 'star', 'target', 'plus', 'cross', 'asterisk'];
 

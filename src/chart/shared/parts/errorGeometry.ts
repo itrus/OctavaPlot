@@ -138,6 +138,58 @@ export function buildErrorBar(input: ErrorBarInput): ErrorBarGeom | null {
   };
 }
 
+/** The half-length of an error bar of X that was entered: a number from 0 up, else null (an empty cell is no bar; a negative or non-numeric one is an entry error, see isBadXError). */
+export const usableXError = (v: number | null | undefined): number | null => (v === null || v === undefined || !Number.isFinite(v) || v < 0 ? null : v);
+
+/** An error entered that cannot be a half-length: not empty, and negative or not a number. Its bar is not drawn and the notice counts it. */
+export const isBadXError = (v: number | null | undefined): boolean => v !== null && v !== undefined && usableXError(v) === null;
+
+/** The values of X an error bar of X reaches, in the order lower, upper; only the sides the direction draws. */
+export function xErrorEndValues(x: number, half: number, direction: ErrorDirection): number[] {
+  return [...(direction !== 'positive' ? [x - half] : []), ...(direction !== 'negative' ? [x + half] : [])];
+}
+
+export interface XErrorBarInput {
+  groupId: Id;
+  /** The centre of the bar along X (data units) and its place across, chart pt. */
+  x: number;
+  centerY: number;
+  /** The half-length entered, usable (see usableXError). */
+  half: number;
+  style: ErrorBarStyle;
+  xScale: (v: number) => number;
+  /** Axis domain in data units; either order. */
+  domain: readonly [number, number];
+  /** A log axis: a lower end at or below 0 has no position, so it is drawn at the low end of the domain and counted as clipped. */
+  log?: boolean;
+}
+
+/**
+ * The error bar of X of one point: a stem along X with a cap at each drawn end, built as the bars of Y are (each end is mapped
+ * on its own, so a bar on a log axis stays asymmetric). Null when the bars are hidden, the half-length is 0 or the bar has no place.
+ */
+export function buildXErrorBar(input: XErrorBarInput): Pick<ErrorBarGeom, 'id' | 'groupId' | 'd' | 'clippedUpper' | 'clippedLower'> | null {
+  const { groupId, x, centerY, half: length, style, xScale: mapX, domain, log } = input;
+  if (!style.showErrorBars || !(length > 0)) return null;
+  if (log && !(x > 0)) return null;
+  const floor = Math.min(domain[0], domain[1]);
+  const xScale = log ? (v: number) => mapX(v > 0 ? v : floor) : mapX;
+  const drawUpper = style.errorDirection !== 'negative';
+  const drawLower = style.errorDirection !== 'positive';
+  const at = xScale(x);
+  const [hi, lo] = [drawUpper ? xScale(x + length) : at, drawLower ? xScale(x - length) : at];
+  if (![centerY, hi, lo].every(Number.isFinite)) return null;
+  const cap = style.errorCap === 'bar' ? style.errorCapWidthPt / 2 : 0;
+  let d = `M${lo},${centerY}H${hi}`;
+  if (cap > 0) {
+    if (drawUpper) d += `M${hi},${centerY - cap}V${centerY + cap}`;
+    if (drawLower) d += `M${lo},${centerY - cap}V${centerY + cap}`;
+  }
+  const [dMin, dMax] = [Math.min(domain[0], domain[1]), Math.max(domain[0], domain[1])];
+  const outside = (v: number) => v < dMin || v > dMax;
+  return { id: `${groupId}:xerror`, groupId, d, clippedUpper: drawUpper && outside(x + length), clippedLower: drawLower && outside(x - length) };
+}
+
 /** Drawn error-bar ends that lie outside the axis domain. */
 export function clippedEndpointCount(bars: ReadonlyArray<Pick<ErrorBarGeom, 'clippedUpper' | 'clippedLower'>>): number {
   let count = 0;

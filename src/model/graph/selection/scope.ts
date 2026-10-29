@@ -20,6 +20,8 @@ export function selectedGroupIds(selection: Selection): Id[] {
       return [selection.groupId];
     case 'groups':
       return [...selection.groupIds];
+    case 'points':
+      return [...new Set(selection.points.map((p) => p.groupId))];
     default:
       return [];
   }

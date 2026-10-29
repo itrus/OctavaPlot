@@ -4,6 +4,8 @@ import type { AxisBreak, AxisScaleKind, BreakMark, Chart, NumberFormatKind, Tick
 import { useApp } from '../../../state/AppContext';
 import { patchAxis, type AxisKey } from '../../../state/commands';
 import { Check, Field, NumField, Section, SelectInput, TextInput } from '../common/controls';
+import { TimeField } from '../common/TimeField';
+import type { TimeColumn } from '../../../util/timeColumn';
 
 const DECIMALS = ['auto', '0', '1', '2', '3', '4', '5', '6'] as const;
 
@@ -19,6 +21,7 @@ export function AxisStyleControls({
   name,
   canScale,
   canReverse,
+  time,
 }: {
   chart: Chart;
   which: AxisKey;
@@ -26,6 +29,8 @@ export function AxisStyleControls({
   name: string;
   canScale: boolean;
   canReverse: boolean;
+  /** The axis shows dates, times or durations (the X column of an XY table has this type): it is linear, and its values are typed as dates. */
+  time?: TimeColumn;
 }) {
   const { run } = useApp();
   const axis = chart[which];
@@ -34,7 +39,8 @@ export function AxisStyleControls({
   const minorLogOk = axis.scale === 'log10';
   return (
     <>
-      {canScale && (
+      {time && canScale && <div className="muted small">A date, time or duration axis is linear. Its ticks fall on calendar boundaries (on round multiples for a duration); the tick interval and minor ticks of a calendar axis are not used.</div>}
+      {canScale && !time && (
         <Field label="Scale" hint="A log scale shows values by their powers; it needs values above 0">
           <SelectInput<AxisScaleKind> value={axis.scale} options={AXIS_SCALES.map((s) => ({ value: s.value, label: s.label }))} onChange={(v) => set('scale', { scale: v, majorInterval: null, min: null, max: null })} />
         </Field>
@@ -42,7 +48,8 @@ export function AxisStyleControls({
       <Field label="Scale bar" hint="Hide the axis, and a bar the length of one major interval stands in its place" note={axis.visible ? 'Hide this axis to use a scale bar.' : null}>
         <Check checked={axis.scaleBar} disabled={axis.visible || isLog} onChange={(v) => set('scale bar', { scaleBar: v })} />
       </Field>
-      {canScale && <BreakFields chart={chart} which={which} name={name} scale={scale} blocked={isLog ? 'A log axis cannot be broken.' : axis.reverse ? 'A reversed axis cannot be broken.' : null} />}
+      {/* The right axis cannot be broken: its series share the clip of the left one. */}
+      {canScale && which !== 'y2Axis' && <BreakFields chart={chart} which={which} name={name} scale={scale} time={time} blocked={isLog ? 'A log axis cannot be broken.' : axis.reverse ? 'A reversed axis cannot be broken.' : null} />}
       {canReverse && (
         <Field label="Reverse" hint="Draw the axis the other way round: the largest value where the smallest was">
           <Check checked={axis.reverse} onChange={(v) => set('direction', { reverse: v })} />
@@ -133,7 +140,7 @@ export function TickFields({ chart, which, name }: { chart: Chart; which: AxisKe
  * The breaks of a numeric axis (spec 6.6): up to two ranges of values left out, with a gap between what is above and
  * below. A new break starts in the middle of the axis, a third of its range wide.
  */
-function BreakFields({ chart, which, name, scale, blocked }: { chart: Chart; which: AxisKey; name: string; scale: YAxisScale; blocked: string | null }) {
+function BreakFields({ chart, which, name, scale, blocked, time }: { chart: Chart; which: AxisKey; name: string; scale: YAxisScale; blocked: string | null; time?: TimeColumn }) {
   const { run } = useApp();
   const axis = chart[which];
   const set = (breaks: AxisBreak[], label: string, key?: string) => run(`${name} ${label}`, patchAxis(chart.id, which, { breaks }), key);
@@ -141,15 +148,26 @@ function BreakFields({ chart, which, name, scale, blocked }: { chart: Chart; whi
   const add = () => {
     const third = (hi - lo) / 3;
     const free = axis.breaks.length === 0 ? lo + third : (axis.breaks[axis.breaks.length - 1].to + hi) / 2 - third / 2;
-    set([...axis.breaks, { from: Number(free.toPrecision(6)), to: Number((free + third / 2).toPrecision(6)) }], 'break added');
+    // A date or a time is a whole day or second; the six digits that suit a plain number would cut a time of 1.7 billion seconds.
+    const snap = (v: number) => (time ? (time.kind === 'duration' ? v : Math.round(v)) : Number(v.toPrecision(6)));
+    set([...axis.breaks, { from: snap(free), to: snap(free + third / 2) }], 'break added');
   };
   return (
     <Section title="Breaks" defaultOpen={false}>
       {blocked && <div className="muted small">{blocked}</div>}
       {axis.breaks.map((b, i) => (
         <div key={i}>
-          <NumField label={`Break ${i + 1} from`} value={b.from} slider={false} disabled={!!blocked} validate={(v) => (v < b.to ? null : 'Must be below the end of the break.')} onCommit={(v) => set(axis.breaks.map((x, k) => (k === i ? { ...x, from: v } : x)), 'break start', `axis:${which}:bf${i}`)} />
-          <NumField label={`Break ${i + 1} to`} value={b.to} slider={false} disabled={!!blocked} validate={(v) => (v > b.from ? null : 'Must be above the start of the break.')} onCommit={(v) => set(axis.breaks.map((x, k) => (k === i ? { ...x, to: v } : x)), 'break end', `axis:${which}:bt${i}`)} />
+          {time ? (
+            <>
+              <TimeField label={`Break ${i + 1} from`} time={time} value={b.from} validate={(v) => (v < b.to ? null : 'Must be before the end of the break.')} onCommit={(v) => v !== null && set(axis.breaks.map((x, k) => (k === i ? { ...x, from: v } : x)), 'break start', `axis:${which}:bf${i}`)} />
+              <TimeField label={`Break ${i + 1} to`} time={time} value={b.to} validate={(v) => (v > b.from ? null : 'Must be after the start of the break.')} onCommit={(v) => v !== null && set(axis.breaks.map((x, k) => (k === i ? { ...x, to: v } : x)), 'break end', `axis:${which}:bt${i}`)} />
+            </>
+          ) : (
+            <>
+              <NumField label={`Break ${i + 1} from`} value={b.from} slider={false} disabled={!!blocked} validate={(v) => (v < b.to ? null : 'Must be below the end of the break.')} onCommit={(v) => set(axis.breaks.map((x, k) => (k === i ? { ...x, from: v } : x)), 'break start', `axis:${which}:bf${i}`)} />
+              <NumField label={`Break ${i + 1} to`} value={b.to} slider={false} disabled={!!blocked} validate={(v) => (v > b.from ? null : 'Must be above the start of the break.')} onCommit={(v) => set(axis.breaks.map((x, k) => (k === i ? { ...x, to: v } : x)), 'break end', `axis:${which}:bt${i}`)} />
+            </>
+          )}
           <button className="small-btn" onClick={() => set(axis.breaks.filter((_, k) => k !== i), 'break removed')}>
             Remove break {i + 1}
           </button>

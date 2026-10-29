@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { DecimalSeparator } from '../../model/types';
 import { detectDelimiter, previewCsv, type CsvDelimiter } from '../data/csv';
-import { formatCell } from '../data/cellText';
+import { formatCellFor } from '../data/cellText';
+import { DURATION_UNITS, TIME_KINDS, timeColumn, type TimeColumn, type TimeKind, type TimeUnit } from '../../util/timeColumn';
 import { Check, Field, SelectInput } from '../inspector/common/controls';
 import { Modal } from './NewItemDialogs';
 
@@ -35,6 +36,7 @@ export function ImportCsvDialog({
   fileName,
   text,
   defaultSeparator,
+  xType,
   check,
   onImport,
   onClose,
@@ -42,6 +44,8 @@ export function ImportCsvDialog({
   fileName: string;
   text: string;
   defaultSeparator: DecimalSeparator;
+  /** An XY table: its first data column may hold dates, times or durations, and `current` is the type it has now. Null for other tables. */
+  xType: { current: TimeColumn | undefined } | null;
   check: (data: CsvImportData) => string | null;
   onImport: (data: CsvImportData, separator: DecimalSeparator) => void;
   onClose: () => void;
@@ -51,7 +55,11 @@ export function ImportCsvDialog({
   // null: go by the header "Row title"; once the box is ticked or cleared it is the user's choice.
   const [titlesChoice, setTitlesChoice] = useState<boolean | null>(null);
   const firstColumn = titlesChoice === null ? 'auto' : titlesChoice ? 'titles' : 'values';
-  const preview = useMemo(() => previewCsv(text, { delimiter, separator, firstColumn }), [text, delimiter, separator, firstColumn]);
+  // The type of the first data column (an XY table's X): the table's own to begin with; a suggestion from the file is offered, never taken.
+  const [xKind, setXKind] = useState<TimeKind | 'number'>(xType?.current?.kind ?? 'number');
+  const [xUnit, setXUnit] = useState<TimeUnit>(xType?.current?.kind === 'duration' ? xType.current.unit : 'h');
+  const xTime = xType && xKind !== 'number' ? timeColumn(xKind, xUnit) : undefined;
+  const preview = useMemo(() => previewCsv(text, { delimiter, separator, firstColumn, times: [xTime] }), [text, delimiter, separator, firstColumn, xTime?.kind, xTime?.unit]);
   const shapeProblem = preview.ok && preview.data ? check(preview.data) : null;
   const canImport = preview.ok && preview.data !== null && shapeProblem === null;
 
@@ -86,6 +94,24 @@ export function ImportCsvDialog({
         <Field label="First column is Row titles" hint="Ticked by itself when the first header is Row title. The row titles are text, never numbers.">
           <Check checked={titlesChoice ?? (preview.ok && preview.hasTitles)} onChange={setTitlesChoice} ariaLabel="First column is Row titles" />
         </Field>
+        {xType && (
+          <>
+            <Field label="First data column (X) holds" hint="Dates and times are read as ISO 8601 (2025-03-04, 2025-03-04T10:30:00); nothing else is guessed. A time with an offset (+02:00) is converted to UTC and a notice says so.">
+              <SelectInput<TimeKind | 'number'> value={xKind} options={[{ value: 'number', label: 'Numbers' }, ...TIME_KINDS]} onChange={setXKind} />
+            </Field>
+            {xKind === 'duration' && (
+              <Field label="Durations are stored in" hint="A value written 1:30:00 is converted to this unit; a bare number is already in it.">
+                <SelectInput<TimeUnit> value={xUnit} options={DURATION_UNITS.map((u) => ({ value: u.value, label: u.label }))} onChange={setXUnit} />
+              </Field>
+            )}
+            {preview.ok && preview.suggestedTime && xKind === 'number' && (
+              <div role="status" style={muted}>
+                The first data column looks like {preview.suggestedTime.kind === 'date' ? 'dates' : preview.suggestedTime.kind === 'datetime' ? 'dates and times' : 'durations'}.{' '}
+                <button onClick={() => { setXKind(preview.suggestedTime!.kind); setXUnit(preview.suggestedTime!.unit); }}>Read it that way</button>
+              </div>
+            )}
+          </>
+        )}
         {!preview.ok && (
           <div role="alert" style={{ color: 'var(--danger)' }}>
             {preview.message}
@@ -115,7 +141,7 @@ export function ImportCsvDialog({
                       {r.cells.map((c, i) => (
                         <td key={i} style={cellStyle} title={c.problem ?? undefined}>
                           <div>{c.text === '' ? <span style={muted}>(empty)</span> : c.text}</div>
-                          {c.problem ? <div style={danger}>{c.problem}</div> : c.text.trim() !== '' && <div style={muted}>= {formatCell(c.value, separator)}</div>}
+                          {c.problem ? <div style={danger}>{c.problem}</div> : c.text.trim() !== '' && <div style={muted}>= {formatCellFor(c.value, separator, i === 0 ? xTime : undefined)}</div>}
                         </td>
                       ))}
                       {preview.hiddenColumns > 0 && <td style={cellStyle} />}
@@ -124,6 +150,11 @@ export function ImportCsvDialog({
                 </tbody>
               </table>
             </div>
+            {preview.notes.length > 0 && (
+              <div role="status" style={muted}>
+                {preview.notes.join('. ')}.
+              </div>
+            )}
             {preview.rowCount > preview.rows.length && <div style={muted}>The first {preview.rows.length} of {preview.rowCount} rows are shown.</div>}
             {preview.problems.length > 0 && (
               <div role="alert">

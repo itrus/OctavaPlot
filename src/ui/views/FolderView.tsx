@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import type { BatchFormat, BatchPlan } from '../../chart/export/batchExport';
+import { fitsCanvas } from '../../chart/export/pngDpi';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
 import { newId } from '../../model/ids';
 import { FOLDER_NOUN, FOLDER_TITLE } from '../../model/project/folderItems';
@@ -7,7 +9,10 @@ import { useApp } from '../../state/AppContext';
 import { duplicateItems, moveItems, nudgeItems, removeItems, renameItem, sortItemsByName } from '../../state/commands';
 import { Thumb, type ThumbItem } from './FolderThumbs';
 import { NOTHING_PICKED, pick, pickAll, pickedInOrder, prune, type PickState } from '../navigator/folderSelection';
-import { DeleteIcon } from '../components/icons';
+import { DeleteIcon, ExportIcon } from '../components/icons';
+import { downloadBlob, exportFileName } from '../../util/download';
+import { BatchExportDialog } from '../export/BatchExportDialog';
+import { useExportJob } from '../export/useExportJob';
 
 /** The kind of page each folder holds. */
 const KIND = { tables: 'table', results: 'analysis', graphs: 'chart', layouts: 'layout' } as const satisfies Record<FolderKey, Exclude<ViewRef['kind'], 'folder'>>;
@@ -17,12 +22,15 @@ const KIND = { tables: 'table', results: 'analysis', graphs: 'chart', layouts: '
  * box, Ctrl+A), then open, rename, copy, reorder (drag them, or the arrows) or delete them. Everything can be undone.
  */
 export function FolderView({ folder }: { folder: FolderKey }) {
-  const { project, setView, run, setStatus } = useApp();
+  const { project, setView, run, setStatus, settings } = useApp();
   const [picks, setPicks] = useState<PickState>(NOTHING_PICKED);
   const [renaming, setRenaming] = useState<Id | null>(null);
   const [dragging, setDragging] = useState<Id[] | null>(null);
   const [drop, setDrop] = useState<{ id: Id; side: 'before' | 'after' } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  // Batch export of the picked graphs: one export at a time, like the export of a single graph.
+  const exportJob = useExportJob(setStatus);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const entries = useMemo((): Array<{ id: Id; name: string; entry: ThumbItem; badges: Badge[] }> => {
     switch (folder) {
@@ -52,6 +60,29 @@ export function FolderView({ folder }: { folder: FolderKey }) {
   const open = (id: Id) => setView({ kind: KIND[folder], id } as ViewRef);
   const everyTable = folder === 'tables' && count > 0 && count >= project.dataTables.length;
 
+  const exportPicked = (plan: BatchPlan, format: BatchFormat, dpi: number) => {
+    const tooBig = plan.items.find((it) => it.pixels && !fitsCanvas(it.pixels.width, it.pixels.height))?.pixels ?? null;
+    return exportJob.start({
+      label: `${format.toUpperCase()} ZIP`,
+      pixels: tooBig,
+      tooBigMessage: `A graph of the batch needs more pixels at ${dpi} dpi than the browser can make. Choose a lower resolution, or SVG.`,
+      work: async (phase) => {
+        // The renderer behind export (react-dom/server) is loaded on first use, not at startup.
+        const [{ runBatch }, { chartToSvgString, chartToPngBlob, chartToPdfBlob }] = await Promise.all([import('../../chart/export/batchExport'), import('../../chart/export/export')]);
+        phase('rasterizing');
+        const blob = await runBatch(
+          plan,
+          format,
+          dpi,
+          { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: (kind, c, t, d, f) => (kind === 'png' ? chartToPngBlob(c, t, d, f) : chartToPdfBlob(c, t, d, f)) },
+          (i, n, name) => setStatus(`Drawing ${i} of ${n}: ${name}…`),
+        );
+        phase('encoding');
+        downloadBlob(blob, exportFileName(`${project.name}_graphs`, 'zip', settings.timestampExports));
+        return `Exported ${plan.items.length} graph${plan.items.length === 1 ? '' : 's'} as ${format.toUpperCase()} in one ZIP file.`;
+      },
+    });
+  };
   const remove = () => {
     if (count === 0 || everyTable) return;
     const ids = chosen;
@@ -127,6 +158,11 @@ export function FolderView({ folder }: { folder: FolderKey }) {
         <button onClick={() => open(chosen[0])} disabled={count !== 1}>Open</button>
         <button onClick={() => setRenaming(chosen[0])} disabled={count !== 1} title="Rename (F2)">Rename</button>
         <button onClick={duplicate} disabled={count === 0}>Duplicate</button>
+        {folder === 'graphs' && (
+          <button onClick={() => setExportOpen(true)} disabled={count === 0 || exportJob.busy} title="Export the selected graphs as one ZIP file: format and resolution are shown first">
+            <ExportIcon /> Export{count > 1 ? ` ${count}` : ''}…
+          </button>
+        )}
         <span className="topbar-sep" />
         <button onClick={() => nudge(-1)} disabled={count === 0} title="Move the selected earlier in the list" aria-label="Move earlier">◀ Earlier</button>
         <button onClick={() => nudge(1)} disabled={count === 0} title="Move the selected later in the list" aria-label="Move later">Later ▶</button>
@@ -136,6 +172,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
           <DeleteIcon /> Delete{count > 1 ? ` ${count}` : ''}
         </button>
       </div>
+      {exportOpen && <BatchExportDialog project={project} ids={chosen} state={exportJob.state} onExport={exportPicked} onClose={() => setExportOpen(false)} />}
       {entries.length === 0 ? (
         <div className="empty">No {noun.many} yet. Use the New … line under {FOLDER_TITLE[folder]} in the navigator.</div>
       ) : (

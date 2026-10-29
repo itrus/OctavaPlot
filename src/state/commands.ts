@@ -24,6 +24,7 @@ import { clearGroupSummary, clearGroupSummaryKeys, patchAllSummary, patchGroupSu
 import { folderItems, nudge, reorder, sortedByName } from '../model/project/folderItems';
 import { clearPartStyles, layerKindOf, layersOf, layerStylesAvailable, lookKeysOf, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
 import type { StyleScope } from '../model/graph/selection/scope';
+import type { TimeColumn } from '../util/timeColumn';
 import { LABEL_STYLE_KEYS, clearGroupKeys, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
 import type {
   LayerStyle,
@@ -50,6 +51,7 @@ import type {
   FolderKey,
   Project,
   ReferenceLine,
+  ShadedRegion,
   Bracket,
   ReplicateLayout,
   SummarySpec,
@@ -522,6 +524,7 @@ export const resetAllDataSets = (chartId: Id): Command => (p) =>
       displayNames: c.displayNames,
       annotations: c.annotations,
       referenceLines: c.referenceLines,
+      regions: c.regions,
       brackets: c.brackets,
       fit: { ...fresh.fit, analysisId: c.fit.analysisId },
       xAxis: axis('xAxis'),
@@ -578,6 +581,13 @@ export const patchAnnotation = (chartId: Id, annotationId: Id, patch: Partial<An
     annotations: c.annotations.map((a) => (a.id === annotationId ? { ...a, ...patch } : a)),
   }));
 
+/** The same change to several annotations at once (one history step). */
+export const patchAnnotations = (chartId: Id, annotationIds: readonly Id[], patch: Partial<Annotation>): Command => (p) =>
+  mapChart(p, chartId, (c) => ({
+    ...c,
+    annotations: c.annotations.map((a) => (annotationIds.includes(a.id) ? { ...a, ...patch } : a)),
+  }));
+
 export const removeAnnotation = (chartId: Id, annotationId: Id): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, annotations: c.annotations.filter((a) => a.id !== annotationId) }));
 
@@ -591,6 +601,14 @@ export const patchReferenceLine = (chartId: Id, lineId: Id, patch: Partial<Omit<
 
 export const removeReferenceLine = (chartId: Id, lineId: Id): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, referenceLines: c.referenceLines.filter((l) => l.id !== lineId) }));
+
+/** Shaded regions between two values of an axis (XY charts): added, changed and removed one at a time. */
+export const addRegion = (chartId: Id, region: ShadedRegion): Command => (p) => mapChart(p, chartId, (c) => ({ ...c, regions: [...c.regions, region] }));
+
+export const patchRegion = (chartId: Id, regionId: Id, patch: Partial<Omit<ShadedRegion, 'id'>>): Command => (p) =>
+  mapChart(p, chartId, (c) => ({ ...c, regions: c.regions.map((r) => (r.id === regionId ? { ...r, ...patch } : r)) }));
+
+export const removeRegion = (chartId: Id, regionId: Id): Command => (p) => mapChart(p, chartId, (c) => ({ ...c, regions: c.regions.filter((r) => r.id !== regionId), hiddenLayerIds: c.hiddenLayerIds.filter((id) => id !== `${regionId}:region`) }));
 
 /** Comparison brackets between two data sets: added, changed and removed one at a time. */
 export const addBracket = (chartId: Id, bracket: Bracket): Command => (p) => mapChart(p, chartId, (c) => ({ ...c, brackets: [...c.brackets, bracket] }));
@@ -637,7 +655,7 @@ export const addDataTable = (id: Id, kind: TableKind = 'column', options: NewTab
  * Replace a table's rows and group values (CSV import) as one command. Groups keep their IDs, and so their chart
  * styling, by position; extra groups are added and missing ones dropped. Row titles are kept when the file has none.
  */
-export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>>; excluded?: Array<Array<{ reason: string } | null>>; subjects?: string[][]; factors?: string[] }): Command => (p) =>
+export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>>; excluded?: Array<Array<{ reason: string } | null>>; subjects?: string[][]; factors?: string[]; times?: Array<TimeColumn | undefined> }): Command => (p) =>
   mapTable(p, tableId, (t) => {
     const rowCount = Math.max(1, data.values.length);
     const width = usesSeriesBlocks(t.kind) ? tableSeriesWidth(t) : 1;
@@ -657,6 +675,8 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
         paletteIndex: old?.paletteIndex ?? i,
         // The factor of a series: the file's when it has factor columns, else the one the table had at that place.
         ...((data.factors ? (data.factors[i] ?? '') : (old?.factor ?? '')) !== '' ? { factor: data.factors ? (data.factors[i] ?? '') : old!.factor } : {}),
+        // The type of the X column: the one the import chose when it chose, else the one the table had at that place (the numbers it reads are in its unit).
+        ...((data.times ? data.times[i] : old?.time) && i === 0 && t.kind === 'xy' ? { time: (data.times ? data.times[i] : old?.time)! } : {}),
         observations: fresh.observations.map((o, r) => {
           const ex = data.excluded?.[r]?.[i];
           const subject = data.subjects?.[r]?.[i] ?? '';
@@ -1038,6 +1058,18 @@ export const setFactor = (tableId: Id, groupIds: Id[], factor: string): Command 
       return next === '' ? rest : { ...rest, factor: next };
     });
     return changed ? { ...t, groups } : t;
+  });
+
+/**
+ * Say what the numbers of the X column of an XY table are: dates, times or durations (null = plain numbers). The numbers themselves are
+ * never changed, only what they are read as. The same table for any other column or table, or when nothing changes.
+ */
+export const setColumnTime = (tableId: Id, time: TimeColumn | null): Command => (p) =>
+  mapTable(p, tableId, (t) => {
+    const first = t.groups[0];
+    if (t.kind !== 'xy' || !first || (time === null ? first.time === undefined : first.time?.kind === time.kind && first.time.unit === time.unit)) return t;
+    const { time: _t, ...rest } = first;
+    return { ...t, groups: [time === null ? rest : { ...rest, time }, ...t.groups.slice(1)] };
   });
 
 // ---------------------------------------------------------------- layers

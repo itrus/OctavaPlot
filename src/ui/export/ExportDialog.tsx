@@ -45,6 +45,13 @@ function GlyphsBody({ glyphs }: { glyphs: ExportReport['glyphs'] }) {
   );
 }
 
+/** The checks of characters to show: a page has one for each font, and the fonts that write only basic Latin are not listed one by one. */
+const glyphBodies = (report: ExportReport): ExportReport['glyphs'][] => {
+  if (report.glyphGroups.length === 0) return [report.glyphs];
+  const withSpecials = report.glyphGroups.filter((g) => g.checked > 0);
+  return withSpecials.length > 0 ? withSpecials : [report.glyphGroups[0]];
+};
+
 /** The report in plain language. Separate from the dialog's controls so that it reads as the document it is. */
 function ReportBody({ report }: { report: ExportReport }) {
   const { px, pt, mm } = report.size;
@@ -78,7 +85,7 @@ function ReportBody({ report }: { report: ExportReport }) {
         </div>
       ))}
       <SubHeading>Characters</SubHeading>
-      <GlyphsBody glyphs={report.glyphs} />
+      {glyphBodies(report).map((g, i) => <GlyphsBody key={i} glyphs={g} />)}
       {report.printWidthMm !== null && (
         <>
           <SubHeading>Print width {report.printWidthMm} mm</SubHeading>

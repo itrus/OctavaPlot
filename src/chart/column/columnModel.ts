@@ -12,7 +12,7 @@ import { chartPx2Pt, n2 } from '../../model/units';
 import { statsFor, summarize, type GroupStats, type GroupSummary, type Notice } from '../../stats/summary';
 import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, groupRangeContribution, populateAxes, type RangeRow } from '../shared/axes/axes';
 import type { BracketGeom } from '../shared/parts/brackets';
-import { placeBrackets } from './bracketPlacement';
+import { placeBrackets } from '../shared/axes/bracketPlacement';
 import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, errorEndValues, type ErrorBarGeom } from '../shared/parts/errorGeometry';
 import { countMarks, patternMarks, type Point, type Rect } from '../shared/parts/hatch';
 import { computeLayout, type Layout } from '../shared/parts/layout';
@@ -33,6 +33,7 @@ import type { SceneElement } from '../shared/scene/sceneElement';
 import { Orientation } from '../shared/parts/orientation';
 import { displayName } from '../shared/parts/names';
 import { hash01 } from '../shared/parts/jitter';
+import { stableList } from '../shared/parts/stable';
 import { BarGeom } from '../shared/parts/barGeom';
 import { compileColumnScene } from './columnChrome';
 
@@ -42,7 +43,7 @@ import { compileColumnScene } from './columnChrome';
  * `buildColumnModel` returns everything the SVG drawing layer needs.
  */
 
-interface PointGeom {
+export interface PointGeom {
   id: Id;
   groupId: Id;
   /** Observation ID for raw points; `${groupId}:mean` for mean markers. */
@@ -61,6 +62,10 @@ interface PointGeom {
   /** Opacity of the border of the symbol. */
   borderOpacity: number;
 }
+
+/** Two dots equal in every field: the comparison that keeps a list of them the same object (see stableList). */
+const samePoint = (a: PointGeom, b: PointGeom): boolean =>
+  a.id === b.id && a.cx === b.cx && a.cy === b.cy && a.row === b.row && a.value === b.value && a.size === b.size && a.shape === b.shape && a.color === b.color && a.fillOpacity === b.fillOpacity && a.borderColor === b.borderColor && a.borderWidth === b.borderWidth && a.borderOpacity === b.borderOpacity && a.groupId === b.groupId && a.observationId === b.observationId;
 
 interface LineGeom {
   id: Id;
@@ -255,7 +260,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     order: rows.map((r) => r.group.id),
     tops: rangeRows.map((r) => {
       const v = groupRangeContribution(r, chart.type).values;
-      return v.length > 0 ? Math.max(...v) : null;
+      return v.length > 0 ? v.reduce((m, x) => (x > m ? x : m), -Infinity) : null;
     }),
     primary: rows.map((r) => r.binding === 'primary'),
     log: axisConfigFor(chart, 'primary').scale !== 'linear',
@@ -265,7 +270,8 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     plotLengthPt: (horizontal ? widthPt : heightPt) * 0.6,
   });
   for (const s of placement.skipped) warnings.push(`Bracket "${s.bracket.label.trim() || 'no label'}" is not drawn: ${s.reason}.`);
-  for (const p of placement.placed) pools.primary.values.push(p.top);
+  // A bracket kept out of the range (see rangeContribution) is still placed above its data sets, but the axis does not grow to show it: the plot clips it.
+  for (const p of placement.placed) if (inRange('bracket', p.bracket.id)) pools.primary.values.push(p.top);
   const dual = pools.secondaryInUse;
   const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? widthPt / 120 : heightPt / 100)));
   const axisScaleFor = (binding: AxisBinding): YAxisScale => {
@@ -361,8 +367,8 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     const text = barLabelText(chart.barLabels, centre, n);
     if (text === null || yCentre === null || !Number.isFinite(yCentre) || !Number.isFinite(yBase)) return null;
     // Beyond the error bar and the dots of the raw values, so the text does not sit on top of them.
-    const dotTop = Math.min(Infinity, ...dots.map((p) => p.cy - p.size / 2));
-    const dotBottom = Math.max(-Infinity, ...dots.map((p) => p.cy + p.size / 2));
+    const dotTop = dots.reduce((m, p) => Math.min(m, p.cy - p.size / 2), Infinity);
+    const dotBottom = dots.reduce((m, p) => Math.max(m, p.cy + p.size / 2), -Infinity);
     const far = yCentre <= yBase ? Math.min(err?.top ?? yCentre, dotTop) : Math.max(err?.bottom ?? yCentre, dotBottom);
     const pos = placeBarLabel(chart.barLabels, x, yCentre, far, yBase);
     return { id: `${id}:label`, ...pos, text };
@@ -476,7 +482,8 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
             inGap++;
             return;
           }
-          const ps = { ...pst, ...layer.objectOverrides[o.id] };
+          const own = layer.objectOverrides[o.id];
+          const ps = own ? { ...pst, ...own } : pst;
           points.push({
             id: o.id,
             groupId: group.id,
@@ -570,7 +577,8 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
           inGap++;
           return;
         }
-        const ps = { ...pst, ...layer.objectOverrides[o.id] };
+        const own = layer.objectOverrides[o.id];
+        const ps = own ? { ...pst, ...own } : pst;
         const offset = chart.jitter.enabled ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * dotWidth : 0;
         points.push({ id: o.id, groupId: group.id, observationId: o.id, row, value: o.value, cx: centerX + offset, cy: toY(o.value), shape: ps.symbolShape, size: ps.symbolSizePt, color: ps.symbolColor, fillOpacity: ps.symbolFillOpacity, borderColor: ps.symbolBorderColor, borderWidth: ps.symbolBorderWidthPt, borderOpacity: ps.symbolBorderOpacity });
       });
@@ -608,7 +616,8 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
       centerX,
       bar,
       errorBar,
-      points,
+      // The same list as last time while the dots are the same: an edit of a title or a font then leaves the shapes drawn from it alone.
+      points: stableList(group.observations, `${chart.id}:${group.id}`, points, samePoint),
       meanLine,
       connector: null,
       insideLabel,

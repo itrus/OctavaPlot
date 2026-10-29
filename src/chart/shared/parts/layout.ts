@@ -286,7 +286,8 @@ export function computeLayout(input: LayoutInput): Layout {
   return { plot, title: titleLayout, legend: legendLayout, xTickRotated, xTitle, yTitle, y2Title, extraBottom, categoryRow: categoryRow > 0 ? { y: plot.y + plot.height + tickLabelBlock(xTickRotated), height: categoryRow } : null, warnings };
 }
 
-export const LEGEND_KEY = { width: LEGEND_KEY_WIDTH, gap: LEGEND_KEY_GAP };
+/** The size of a legend key: its width, the gap to the name, and its height (the largest a symbol is drawn in a key, so that a large dot or bubble does not cover the name beside it). */
+export const LEGEND_KEY = { width: LEGEND_KEY_WIDTH, gap: LEGEND_KEY_GAP, height: 20 };
 
 /** Width of a legend colour key: 36 pt for a rectangle, 20 pt for a square. */
 export const keyWidthOf = (legend: Pick<LegendConfig, 'keyShape'>): number => legendKeyWidthPt(legend.keyShape);

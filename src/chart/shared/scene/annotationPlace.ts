@@ -163,3 +163,16 @@ export function changeAnchor(a: Annotation, placer: AnnotationPlacer, to: 'page'
   const v = placer.fromPage(a.xFrac * placer.widthPt, a.yFrac * placer.heightPt);
   return { anchor: 'data', ...(placer.numericX && v.x !== undefined ? { x: v.x } : {}), ...(v.y !== undefined ? { y: v.y } : {}) };
 }
+
+/**
+ * The changes for moving annotations by the same step (fractions of the page; an arrow key): each from where it is drawn (its stored fractions
+ * when it is not drawn), kept inside the chart on its own and rounded to a tenth of a percent, with the data values of a data-anchored one.
+ */
+export function nudgePatches(annotations: readonly Annotation[], placer: AnnotationPlacer | undefined, dx: number, dy: number): Array<{ id: string; patch: Partial<Annotation> }> {
+  const clamp = (v: number) => Math.min(1, Math.max(0, Math.round(v * 1000) / 1000));
+  return annotations.map((a) => {
+    const from = (placer && drawnFractions(a, placer)) ?? { xFrac: a.xFrac, yFrac: a.yFrac };
+    const [xFrac, yFrac] = [clamp(from.xFrac + dx), clamp(from.yFrac + dy)];
+    return { id: a.id, patch: placer ? patchForMove(a, placer, xFrac, yFrac) : { xFrac, yFrac } };
+  });
+}

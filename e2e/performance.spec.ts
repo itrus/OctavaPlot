@@ -91,6 +91,10 @@ test('editing the title, a colour and a stroke of a graph of 100 000 observation
   const t = await timeToUpdate(page, () => title.fill('A different title'));
   note('edit the title: until the drawing changes', t.commit, 'under 50');
   note('edit the title: until the next frame', t.frame, 'under 50');
+  // The first edit can wait for the browser to finish painting what was opened; this one is taken after it has settled.
+  await page.waitForTimeout(3000);
+  const again = await timeToUpdate(page, () => title.fill('A third title'));
+  note('edit the title once the first paint has settled: until the next frame', again.frame, 'under 50');
 
   await page.getByRole('tab', { name: 'Style' }).click();
   const border = page.getByRole('textbox', { name: 'Border', exact: true }).first();
@@ -113,6 +117,14 @@ test('selecting one point among 10 000', async ({ page }) => {
   );
   note('select one point of 10 000: until the drawing changes', t.commit, 'under 100');
   note('select one point of 10 000: until the next frame', t.frame, 'under 100');
+  // The same, for another point, once the browser has finished painting what was opened.
+  await page.waitForTimeout(3000);
+  const other = page.locator('.chart-surface [data-hit="point"]').nth(5001);
+  const box2 = (await other.boundingBox())!;
+  const t2 = await timeToUpdate(page, () =>
+    other.evaluate((el, b) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, clientX: b.x, clientY: b.y })), box2),
+  );
+  note('select one point of 10 000 once the first paint has settled: until the next frame', t2.frame, 'under 100');
 });
 
 test('exporting a normal figure as PNG', async ({ page }) => {

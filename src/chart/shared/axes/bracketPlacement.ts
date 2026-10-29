@@ -1,4 +1,4 @@
-import type { Bracket, Id } from '../../model/types';
+import type { Bracket, Id } from '../../../model/types';
 
 /**
  * Comparison brackets: where each one stands, in data units. A bracket joins two data sets (by ID) and says what the owner of the
@@ -54,18 +54,37 @@ interface PlacementInput {
   includeZero: boolean;
   /** About how long the value axis will be on the page, pt (the plot is not laid out yet; an estimate is enough to keep the labels clear). */
   plotLengthPt: number;
+  /** Which two entries of `order` a bracket joins, when that is not its `from` and `to` (grouped bars: a series in a category). */
+  ends?: (bracket: Bracket) => readonly [Id, Id];
+  /** Both ends must have a value of their own to stand over (grouped bars: a missing value is not a place to join). */
+  strictEnds?: boolean;
 }
 
-export function placeBrackets({ brackets, order, tops, primary, log, values, includeZero, plotLengthPt }: PlacementInput): { placed: PlacedBracket[]; skipped: SkippedBracket[] } {
+/** The lowest and highest of a list and a seed; a spread into Math.min would throw on a list of a hundred thousand numbers or more. */
+function rangeOf(values: readonly number[], seed: readonly number[]): [number, number] {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const list of [values, seed]) {
+    for (const v of list) {
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+  }
+  return [lo, hi];
+}
+
+export function placeBrackets({ brackets, order, tops, primary, log, values, includeZero, plotLengthPt, ends, strictEnds }: PlacementInput): { placed: PlacedBracket[]; skipped: SkippedBracket[] } {
   const skipped: SkippedBracket[] = [];
   const candidates: Array<{ bracket: Bracket; i: number; j: number; base: number; index: number; depth: number }> = [];
   brackets.forEach((bracket, index) => {
-    const a = order.indexOf(bracket.from);
-    const b = order.indexOf(bracket.to);
+    const [from, to] = ends ? ends(bracket) : [bracket.from, bracket.to];
+    const a = order.indexOf(from);
+    const b = order.indexOf(to);
     if (a < 0 || b < 0) return void skipped.push({ bracket, reason: 'a data set it joins is not on the graph' });
     if (a === b) return void skipped.push({ bracket, reason: 'it joins a data set to itself' });
     const [i, j] = a < b ? [a, b] : [b, a];
     if (!primary[i] || !primary[j]) return void skipped.push({ bracket, reason: 'a data set it joins is on the right axis' });
+    if (strictEnds && (tops[i] === null || tops[j] === null)) return void skipped.push({ bracket, reason: 'a value it joins is missing' });
     const span = tops.slice(i, j + 1).filter((v): v is number => v !== null && Number.isFinite(v) && (!log || v > 0));
     if (span.length === 0) return void skipped.push({ bracket, reason: 'the data sets it joins have no values to stand above' });
     candidates.push({ bracket, i, j, base: Math.max(...span), index, depth: 0 });
@@ -86,16 +105,17 @@ export function placeBrackets({ brackets, order, tops, primary, log, values, inc
   // The gap, in data units. Its length in pt is fixed (a label is so tall); the plot shows the data and `depth + 1` such gaps (the stack
   // and the room for the top label), so one gap is a step of the range of the data over what is left of the plot: R * s / (P - (depth + 1) * s).
   const finite = values.filter((v) => Number.isFinite(v) && (!log || v > 0));
+  const [lowest, highest] = rangeOf(finite, includeZero && !log ? [0] : []);
   const stepPt = stepPtFor(brackets);
   const free = Math.max(plotLengthPt * MIN_FREE_SHARE, plotLengthPt - (depth + 1) * stepPt);
   let above: (v: number) => number;
   if (log) {
-    const decades = finite.length > 0 ? Math.max(Math.log10(Math.max(...finite) / Math.min(...finite)), 0.3) : 1;
+    const decades = finite.length > 0 ? Math.max(Math.log10(highest / lowest), 0.3) : 1;
     const factor = 10 ** ((decades * stepPt) / free);
     above = (v) => v * factor;
   } else {
-    const low = finite.length > 0 ? Math.min(...finite, ...(includeZero ? [0] : [])) : 0;
-    const high = finite.length > 0 ? Math.max(...finite, ...(includeZero ? [0] : [])) : 0;
+    const low = finite.length > 0 ? lowest : 0;
+    const high = finite.length > 0 ? highest : 0;
     // The limits of the axis are rounded outward, so the plot shows a little more than the range: a margin keeps the labels clear.
     const range = high - low;
     const step = ((range > 0 ? range : Math.abs(high) || 1) * RANGE_MARGIN * stepPt) / free;

@@ -165,3 +165,79 @@ describe('several data sets selected with the keyboard', () => {
     expect(describeSelection(marks, groups('a', 'b'))).toBe('A, B: 2 data sets edited together');
   });
 });
+
+import { extendAnnotations, extendPoints } from './selectionOrder';
+
+describe('annotations on the keyboard', () => {
+  const stops: ChromeStop[] = ['chart-title', 'legend'];
+  const ids = ['n1', 'n2', 'n3'];
+  const at = (selection: Selection, stop: ChromeStop | null = null): Focus => ({ selection, stop });
+  const note = (annotationId: string): Selection => ({ kind: 'annotation', annotationId });
+  const notes = (...annotationIds: string[]): Selection => ({ kind: 'annotations', annotationIds });
+
+  it('follow the last stop: Right or Down goes on to the first annotation', () => {
+    expect(nextFocus(marks, stops, at(chart, 'legend'), 'ArrowRight', ids)).toEqual(at(note('n1')));
+    expect(nextFocus(marks, stops, at(chart, 'legend'), 'ArrowDown', ids)).toEqual(at(note('n1')));
+    expect(nextFocus(marks, stops, at(chart, 'chart-title'), 'ArrowRight', ids)).toEqual(at(chart, 'legend'));
+    expect(nextFocus(marks, stops, at(chart, 'legend'), 'ArrowRight', [])).toBeNull();
+  });
+  it('follow the last data set when the chart has no stops, and are the only places on a chart with nothing else', () => {
+    expect(nextFocus(marks, [], at(g('c')), 'ArrowRight', ids)).toEqual(at(note('n1')));
+    expect(nextFocus(marks, [], at(g('b')), 'ArrowRight', ids)).toEqual(at(g('c')));
+    expect(nextFocus([], [], at(chart), 'ArrowRight', ids)).toEqual(at(note('n1')));
+    expect(nextFocus([], [], at(chart), 'ArrowRight', [])).toBeNull();
+  });
+  it('Page Down and Page Up step along the annotations, and Page Up from the first goes back to the last stop', () => {
+    expect(nextFocus(marks, stops, at(note('n1')), 'PageDown', ids)).toEqual(at(note('n2')));
+    expect(nextFocus(marks, stops, at(note('n3')), 'PageDown', ids)).toBeNull();
+    expect(nextFocus(marks, stops, at(note('n3')), 'PageUp', ids)).toEqual(at(note('n2')));
+    expect(nextFocus(marks, stops, at(note('n1')), 'PageUp', ids)).toEqual(at(chart, 'legend'));
+    expect(nextFocus(marks, [], at(note('n1')), 'PageUp', ids)).toEqual(at(g('c')));
+    expect(nextFocus([], [], at(note('n1')), 'PageUp', ids)).toEqual(at(chart));
+  });
+  it('leave the arrows to the annotation (they move it) and Escape selects the whole chart', () => {
+    expect(nextFocus(marks, stops, at(note('n2')), 'ArrowRight', ids)).toBeNull();
+    expect(nextFocus(marks, stops, at(note('n2')), 'ArrowDown', ids)).toBeNull();
+    expect(nextFocus(marks, stops, at(note('n2')), 'Escape', ids)).toEqual(at(chart));
+  });
+  it('Shift with Page Down or Page Up adds the annotation next to the selection', () => {
+    expect(extendAnnotations(ids, note('n1'), 'PageDown')).toEqual(notes('n1', 'n2'));
+    expect(extendAnnotations(ids, notes('n1', 'n2'), 'PageDown')).toEqual(notes('n1', 'n2', 'n3'));
+    expect(extendAnnotations(ids, note('n2'), 'PageUp')).toEqual(notes('n1', 'n2'));
+    expect(extendAnnotations(ids, notes('n2', 'n3'), 'PageUp')).toEqual(notes('n1', 'n2', 'n3'));
+    expect(extendAnnotations(ids, notes('n2', 'n3'), 'PageDown')).toBeNull();
+    expect(extendAnnotations(ids, note('n1'), 'PageUp')).toBeNull();
+    expect(extendAnnotations(ids, note('n1'), 'ArrowDown')).toBeNull();
+    expect(extendAnnotations(ids, chart, 'PageDown')).toBeNull();
+  });
+  it('are read out with their place in the list, and the several together', () => {
+    const list = [{ id: 'n1', text: 'First' }, { id: 'n2', text: 'Second' }, { id: 'n3', text: 'Third' }];
+    expect(describeSelection(marks, note('n2'), undefined, list)).toBe('Text annotation 2 of 3 "Second"');
+    expect(describeSelection(marks, notes('n1', 'n3'), undefined, list)).toBe('2 text annotations edited together');
+    expect(describeFocus(marks, at(note('n3')), undefined, list)).toBe('Text annotation 3 of 3 "Third"');
+  });
+});
+
+describe('several points selected with the keyboard', () => {
+  const points = (...refs: Array<[string, string]>): Selection => ({ kind: 'points', points: refs.map(([groupId, pointId]) => ({ groupId, pointId })) });
+  it('Shift+Down and Shift+Up add the point next to the selected ones in their data set', () => {
+    expect(extendPoints(marks, pt('b', 'b3'), 'ArrowDown')).toEqual(points(['b', 'b3'], ['b', 'b4']));
+    expect(extendPoints(marks, points(['b', 'b3'], ['b', 'b4']), 'ArrowDown')).toEqual(points(['b', 'b3'], ['b', 'b4'], ['b', 'b5']));
+    expect(extendPoints(marks, pt('b', 'b3'), 'ArrowUp')).toEqual(points(['b', 'b2'], ['b', 'b3']));
+    expect(extendPoints(marks, points(['b', 'b2'], ['b', 'b3']), 'ArrowUp')).toEqual(points(['b', 'b1'], ['b', 'b2'], ['b', 'b3']));
+  });
+  it('stop at the ends of the data set, and do nothing for a data set, the chart or another key', () => {
+    expect(extendPoints(marks, pt('a', 'a2'), 'ArrowDown')).toBeNull();
+    expect(extendPoints(marks, pt('a', 'a1'), 'ArrowUp')).toBeNull();
+    expect(extendPoints(marks, g('a'), 'ArrowDown')).toBeNull();
+    expect(extendPoints(marks, chart, 'ArrowDown')).toBeNull();
+    expect(extendPoints(marks, pt('a', 'a1'), 'ArrowRight')).toBeNull();
+  });
+  it('a plain arrow from several points goes on from the last picked, and they are read out together', () => {
+    expect(nextSelection(marks, points(['b', 'b3'], ['b', 'b4']), 'ArrowDown')).toEqual(pt('b', 'b5'));
+    expect(nextSelection(marks, points(['b', 'b3'], ['b', 'b4']), 'ArrowRight')).toEqual(g('c'));
+    expect(nextSelection(marks, points(['b', 'b3'], ['b', 'b4']), 'Escape')).toEqual(chart);
+    expect(describeSelection(marks, points(['b', 'b3'], ['b', 'b4']))).toBe('B: 2 points edited together');
+    expect(describeSelection(marks, points(['a', 'a1'], ['b', 'b4']))).toBe('2 points edited together');
+  });
+});

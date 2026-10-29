@@ -5,19 +5,25 @@ import { AXIS_LIMITS } from '../../../model/graph/axis';
 import { FONT_FAMILIES, PRINT_WIDTH_MM } from '../../../model/graph/look';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../../model/defaults';
 import { newId } from '../../../model/ids';
-import { type AnnotationPlacer, changeAnchor, drawnFractions, patchForMove } from '../../../chart/shared/scene/annotationPlace';
+import { type AnnotationPlacer, changeAnchor, nudgePatches } from '../../../chart/shared/scene/annotationPlace';
+import { RESULT_STATS, resultValue } from '../../../model/graph/resultTokens';
+import { mixedAnnotationKeys, selectedAnnotationIds, toggleAnnotationSelection } from '../../../model/graph/selection/multi';
 import { capabilitiesOf } from '../../../model/graph/capabilities';
+import { bracketKindOf } from '../../../model/graph/chartTypes';
+import { xySeries } from '../../../model/table/tableLayout';
 import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../../model/graph/colour/colorVision';
 import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../../model/graph/palettes';
-import type { Chart, Group, Id } from '../../../model/types';
+import type { Annotation, Chart, Group, Id, ResultStat } from '../../../model/types';
 import { useApp } from '../../../state/AppContext';
 import {
   addAnnotation,
   addBracket,
   addReferenceLine,
+  addRegion,
   applyPalette,
   composeCommands,
   patchAnnotation,
+  patchAnnotations,
   patchAxis,
   patchBothAxes,
   patchBracket,
@@ -25,9 +31,11 @@ import {
   patchLegend,
   patchLook,
   patchReferenceLine,
+  patchRegion,
   removeAnnotation,
   removeBracket,
   removeReferenceLine,
+  removeRegion,
   setDisplayName,
   setGroupOnGraph,
   setLegendColumns,
@@ -37,7 +45,7 @@ import {
 import { LINE_STYLES } from '../../../model/graph/look';
 import type { LineStyle } from '../../../model/types';
 import { DialogShell, trapTab } from '../../dialogs/DialogShell';
-import { Check, ColorInput, Field, NumField, Section, SelectInput, SubHeading, TextInput } from '../common/controls';
+import { Check, ColorInput, Field, GroupBox, NumField, Section, SelectInput, SubHeading, TextInput } from '../common/controls';
 import { BarLabelSection, hasBarLabels } from './LookControls';
 import { LegendOrder } from './LegendOrder';
 import { LEGEND_MAX_COLUMNS, LEGEND_MAX_OFFSET_PT, legendColumns, legendOffset } from '../../../model/graph/legendEntries';
@@ -257,25 +265,74 @@ export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[]
 }
 
 /** Lines at chosen values of the axes: a threshold, a target, a control level. */
+/** What the text fields that can hold a result say about it. */
+const RESULT_HINT = 'A result of a data set can be written in the text, as {{n Control}}, {{mean Control}} or {{sd Control|2}} (n, sum, mean, sd, sem, median, min, max; a number of decimals after a bar). It is filled when the graph is drawn, so it follows the data.';
+
 function ReferenceLinesSection({ chart }: { chart: Chart }) {
-  const { run } = useApp();
+  const { run, project } = useApp();
   const lines = capabilitiesOf(chart.type).referenceLines;
   if (lines === 'none') return null;
+  const table = prepareChartInput(project, chart)?.table;
+  const groups = table?.groups ?? [];
   const hasX = lines === 'xy';
+  const oblique = capabilitiesOf(chart.type).guides;
   const add = (axis: 'x' | 'y') => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis, value: 0, color: '#cc0000', widthPt: 2, style: 'dashed', opacity: 1, label: '', showLabel: false }));
+  // An oblique line: y = intercept + slope * x; the identity line is the one with slope 1 and intercept 0.
+  const addOblique = (slope: number, intercept: number) => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis: 'y', value: 0, slope, intercept, color: '#cc0000', widthPt: 2, style: 'dashed', opacity: 1, label: '', showLabel: false }));
   return (
     <Section title="Reference lines">
       <div className="button-row">
         <button onClick={() => add('y')}>+ Line at a Y value</button>
         {hasX && <button onClick={() => add('x')}>+ Line at an X value</button>}
       </div>
+      {oblique && (
+        <div className="button-row">
+          <button onClick={() => addOblique(1, 0)} title="The line Y = X: where a value would lie if both axes agreed">+ Identity line</button>
+          <button onClick={() => addOblique(1, 1)} title="A line Y = a + bX, with its own intercept a and slope b">+ Line Y = a + bX</button>
+        </div>
+      )}
       {chart.referenceLines.length === 0 && <div className="muted small">A reference line is drawn across the plot at a value of an axis. A value outside the axis range is not drawn, and a notice says so.</div>}
       {chart.referenceLines.map((l, i) => {
         const set = (label: string, patch: Parameters<typeof patchReferenceLine>[2], key?: string) => run(label, patchReferenceLine(chart.id, l.id, patch), key === undefined ? undefined : `ref:${l.id}:${key}`);
         return (
           <div key={l.id} className="annotation-card selected">
-            <NumField label={`${l.axis.toUpperCase()} value (line ${i + 1})`} value={l.value} onCommit={(v) => set('Reference line value', { value: v }, 'value')} />
-            <Field label="Label">
+            {l.slope !== undefined ? (
+              <>
+                <NumField label={`Intercept a (line ${i + 1})`} value={l.intercept ?? 0} onCommit={(v) => set('Reference line intercept', { intercept: v }, 'intercept')} hint="The line is Y = a + bX" />
+                <NumField label="Slope b" value={l.slope} onCommit={(v) => set('Reference line slope', { slope: v }, 'slope')} hint="1 with an intercept of 0 is the identity line; both axes need the same length for a unit (Axes: Equal units) for it to run at 45 degrees" />
+              </>
+            ) : l.valueFrom ? (
+              <div className="field-note">
+                Drawn at the {RESULT_STATS.find((s) => s.id === l.valueFrom?.stat)?.label} of {groups.find((g) => g.id === l.valueFrom?.groupId)?.name ?? 'a data set that is not on this graph'}
+                {table && resultValue(table, l.valueFrom.groupId, l.valueFrom.stat) !== null ? `: ${resultValue(table, l.valueFrom.groupId, l.valueFrom.stat)}` : ' (not available)'}. It moves when the data change.
+              </div>
+            ) : (
+              <NumField label={`${l.axis.toUpperCase()} value (line ${i + 1})`} value={l.value} onCommit={(v) => set('Reference line value', { value: v }, 'value')} />
+            )}
+            {groups.length > 0 && l.slope === undefined && (
+              <Field label="Value from" hint="Bind the line to a result of a data set, so that it follows the data. Choosing Typed value keeps the line where it is.">
+                <SelectInput<string>
+                  value={l.valueFrom?.stat ?? 'typed'}
+                  options={[{ value: 'typed', label: 'Typed value' }, ...RESULT_STATS.map((s) => ({ value: s.id, label: s.label }))]}
+                  onChange={(v) => {
+                    if (v === 'typed') {
+                      const now = l.valueFrom && table ? resultValue(table, l.valueFrom.groupId, l.valueFrom.stat) : null;
+                      set('Reference line value', { valueFrom: undefined, ...(now !== null ? { value: now } : {}) });
+                    } else set('Bind reference line', { valueFrom: { stat: v as ResultStat, groupId: l.valueFrom?.groupId ?? groups[0].id } });
+                  }}
+                />
+              </Field>
+            )}
+            {l.valueFrom && (
+              <Field label="Of data set">
+                <SelectInput<string>
+                  value={l.valueFrom.groupId}
+                  options={groups.some((g) => g.id === l.valueFrom?.groupId) ? groups.map((g) => ({ value: g.id, label: displayName(chart, g.id, g.name) })) : [...groups.map((g) => ({ value: g.id, label: displayName(chart, g.id, g.name) })), { value: l.valueFrom.groupId, label: '(not on this graph)' }]}
+                  onChange={(v) => l.valueFrom && set('Bind reference line', { valueFrom: { stat: l.valueFrom.stat, groupId: v } })}
+                />
+              </Field>
+            )}
+            <Field label="Label" hint={RESULT_HINT}>
               <TextInput value={l.label} onChange={(v) => set('Reference line label', { label: v }, 'label')} />
             </Field>
             <Field label="Show label">
@@ -299,32 +356,90 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
   );
 }
 
+/** Shaded regions: a band across the plot between two values of an axis (XY charts), behind the reference lines and the data. */
+function RegionsSection({ chart }: { chart: Chart }) {
+  const { run } = useApp();
+  if (!capabilitiesOf(chart.type).guides) return null;
+  const add = (axis: 'x' | 'y') => run('Add shaded region', addRegion(chart.id, { id: newId('reg'), axis, from: 0, to: 1, color: '#4f81bd', opacity: 0.25, label: '', showLabel: false }));
+  return (
+    <Section title="Shaded regions">
+      <div className="button-row">
+        <button onClick={() => add('y')}>+ Band between two Y values</button>
+        <button onClick={() => add('x')}>+ Band between two X values</button>
+      </div>
+      {chart.regions.length === 0 && <div className="muted small">A band is drawn across the plot between two values of an axis, behind the data (a normal range, a window of time). The part outside the axis range is cut off; a band with nothing left is not drawn, and a notice says so.</div>}
+      {chart.regions.map((r, i) => {
+        const set = (label: string, patch: Parameters<typeof patchRegion>[2], key?: string) => run(label, patchRegion(chart.id, r.id, patch), key === undefined ? undefined : `region:${r.id}:${key}`);
+        const axisName = r.axis.toUpperCase();
+        return (
+          <div key={r.id} className="annotation-card selected">
+            <NumField label={`${axisName} from (band ${i + 1})`} value={r.from} onCommit={(v) => set('Shaded region start', { from: v }, 'from')} />
+            <NumField label={`${axisName} to`} value={r.to} onCommit={(v) => set('Shaded region end', { to: v }, 'to')} hint="The two values can be in either order" />
+            <Field label="Label">
+              <TextInput value={r.label} onChange={(v) => set('Shaded region label', { label: v }, 'label')} />
+            </Field>
+            <Field label="Show label">
+              <Check checked={r.showLabel} onChange={(v) => set('Show shaded region label', { showLabel: v })} />
+            </Field>
+            <Field label="Colour">
+              <ColorInput value={r.color} onChange={(v) => set('Shaded region colour', { color: v }, 'color')} />
+            </Field>
+            <NumField label="Opacity" value={r.opacity} min={0} max={1} onCommit={(v) => set('Shaded region opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
+            <div className="button-row">
+              <button onClick={() => run('Delete shaded region', removeRegion(chart.id, r.id))}>Delete band</button>
+            </div>
+          </div>
+        );
+      })}
+    </Section>
+  );
+}
+
 /** Comparison brackets: a bar joining two data sets with the label the owner supplies. Nothing is calculated from it. */
 function BracketsSection({ chart }: { chart: Chart }) {
   const { run, project } = useApp();
-  if (!capabilitiesOf(chart.type).brackets) return null;
-  const groups = prepareChartInput(project, chart)?.table.groups ?? [];
-  const options = groups.map((g) => ({ value: g.id, label: displayName(chart, g.id, g.name) }));
+  const kind = bracketKindOf(chart.type);
+  if (kind === null) return null;
+  const table = prepareChartInput(project, chart)?.table;
+  // Charts over columns join data sets (columns); grouped and XY charts join the series (blocks of columns) of their table.
+  const sets = !table ? [] : kind === 'columns' ? table.groups.map((g) => ({ id: g.id, name: g.name })) : xySeries(table).map((s) => ({ id: s.id, name: s.name }));
+  const options = sets.map((g) => ({ value: g.id, label: displayName(chart, g.id, g.name) }));
   // A bracket that joins a data set that is no longer on the graph says so, and can be pointed at another.
   const optionsFor = (id: Id) => (options.some((o) => o.value === id) ? options : [...options, { value: id, label: '(not on this graph)' }]);
-  const add = () => run('Add comparison bracket', addBracket(chart.id, { id: newId('brk'), from: groups[0].id, to: groups[1].id, label: '', color: '#000000', widthPt: 2, fontSizePt: 24 }));
+  // Grouped bars: the categories are the rows of the table that have a name (a bracket keeps the row, so inserting a row above moves it).
+  const rows = !table || kind !== 'grouped' ? [] : table.rows.flatMap((r, i) => (r.title.trim() !== '' ? [{ value: String(i), label: r.title.trim() }] : []));
+  const rowOptionsFor = (row: number) => (rows.some((o) => o.value === String(row)) ? rows : [...rows, { value: String(row), label: `Row ${row + 1}` }]);
+  const add = () => run('Add comparison bracket', addBracket(chart.id, { id: newId('brk'), from: sets[0].id, to: sets[1 % sets.length].id, label: '', color: '#000000', widthPt: 2, fontSizePt: 24, ...(kind === 'grouped' ? { row: Number(rows[0]?.value ?? 0) } : {}) }));
+  const what = kind === 'columns' ? 'data sets' : kind === 'grouped' ? 'series, in one category or across two' : 'series at one X';
   return (
     <Section title="Comparison brackets">
       <div className="button-row">
-        <button onClick={add} disabled={groups.length < 2}>+ Bracket between two data sets</button>
+        <button onClick={add} disabled={sets.length < 2 && !(kind === 'grouped' && sets.length >= 1 && rows.length >= 2)}>+ Bracket between two {kind === 'columns' ? 'data sets' : kind === 'grouped' ? 'series or categories' : 'series'}</button>
       </div>
-      {chart.brackets.length === 0 && <div className="muted small">A bracket joins two data sets and shows the label you give it (a p-value, stars, "ns"). Nothing is calculated: the result is yours, from your own test. The axis is extended to fit the brackets, and brackets that overlap stand one above the other.</div>}
+      {chart.brackets.length === 0 && <div className="muted small">A bracket joins two {what} and shows the label you give it (a p-value, stars, "ns"). Nothing is calculated: the result is yours, from your own test. {kind === 'xy' ? 'The bar stands to the right of the two points, and the X axis is extended to fit it.' : 'The axis is extended to fit the brackets, and brackets that overlap stand one above the other.'}</div>}
       {chart.brackets.map((b, i) => {
         const set = (label: string, patch: Parameters<typeof patchBracket>[2], key?: string) => run(label, patchBracket(chart.id, b.id, patch), key === undefined ? undefined : `brk:${b.id}:${key}`);
+        const row = b.row ?? Number(rows[0]?.value ?? 0);
         return (
           <div key={b.id} className="annotation-card selected">
             <Field label={`From (bracket ${i + 1})`}>
               <SelectInput<string> value={b.from} options={optionsFor(b.from)} onChange={(v) => set('Bracket start', { from: v })} />
             </Field>
+            {kind === 'grouped' && (
+              <Field label="Category of From">
+                <SelectInput<string> value={String(row)} options={rowOptionsFor(row)} onChange={(v) => set('Bracket category', { row: Number(v) })} />
+              </Field>
+            )}
             <Field label="To">
               <SelectInput<string> value={b.to} options={optionsFor(b.to)} onChange={(v) => set('Bracket end', { to: v })} />
             </Field>
-            <Field label="Label" hint="What you want written above the bracket: a p-value, stars, ns">
+            {kind === 'grouped' && (
+              <Field label="Category of To" hint="The same category as From, or another one to join two categories.">
+                <SelectInput<string> value={String(b.toRow ?? row)} options={rowOptionsFor(b.toRow ?? row)} onChange={(v) => set('Bracket end category', { row, toRow: Number(v) })} />
+              </Field>
+            )}
+            {kind === 'xy' && <NumField label="At X" value={b.at ?? 0} onCommit={(v) => set('Bracket X', { at: v }, 'at')} hint="Both series must have a point at this X." />}
+            <Field label="Label" hint={`What you want written above the bracket: a p-value, stars, ns. ${RESULT_HINT}`}>
               <TextInput value={b.label} onChange={(v) => set('Bracket label', { label: v }, 'label')} />
             </Field>
             <Field label="Colour">
@@ -348,10 +463,16 @@ function BracketsSection({ chart }: { chart: Chart }) {
  */
 export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: AnnotationPlacer }) {
   const { run, selection, setSelection } = useApp();
+  // Several annotations selected together are edited together, and where they differ a field says so ("Mixed").
+  const picked = selectedAnnotationIds(selection);
+  const chosen = chart.annotations.filter((a) => picked.includes(a.id));
+  const mixed = mixedAnnotationKeys(chosen);
+  const setAll = (label: string, patch: Partial<Annotation>, key: string) => run(label, patchAnnotations(chart.id, chosen.map((a) => a.id), patch), `ann:${chosen.map((a) => a.id).join()}:${key}`);
   return (
     <div className="tab-body">
       {hasBarLabels(chart.type) && <BarLabelSection chart={chart} />}
       <ReferenceLinesSection chart={chart} />
+      <RegionsSection chart={chart} />
       <BracketsSection chart={chart} />
       <div className="button-row">
         <button
@@ -365,33 +486,52 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
         </button>
       </div>
       {chart.annotations.length === 0 && <div className="muted small">No annotations. Added text can be dragged within the chart.</div>}
+      {chosen.length > 1 && (
+        <GroupBox title={`Selected annotations (${chosen.length})`}>
+          <div className="muted small">These annotations are edited together. Ctrl or Shift on an annotation, on the chart or in the list, takes it in or out; the arrow keys move them together.</div>
+          <NumField label="Size" unit="pt" value={chosen[0].fontSizePt} min={8} max={192} overridden={{ mixed: mixed.has('fontSizePt') }} onCommit={(v) => setAll('Annotation size', { fontSizePt: v }, 'size')} />
+          <Field label="Colour" overridden={{ mixed: mixed.has('color') }}>
+            <ColorInput value={chosen[0].color} onChange={(v) => setAll('Annotation colour', { color: v }, 'color')} />
+          </Field>
+          <NumField label="Opacity" value={chosen[0].opacity} min={0} max={1} overridden={{ mixed: mixed.has('opacity') }} onCommit={(v) => setAll('Annotation opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
+          <div className="button-row">
+            <button
+              onClick={() => {
+                run('Delete annotations', composeCommands(...chosen.map((a) => removeAnnotation(chart.id, a.id))));
+                setSelection({ kind: 'chart' });
+              }}
+            >
+              Delete selected annotations
+            </button>
+          </div>
+        </GroupBox>
+      )}
       {chart.annotations.map((a) => {
-        const isSel = selection.kind === 'annotation' && selection.annotationId === a.id;
+        const isSel = picked.length === 1 && picked[0] === a.id;
+        const inSel = picked.includes(a.id);
         return (
           <div
             key={a.id}
-            className={`annotation-card${isSel ? ' selected' : ''}`}
+            className={`annotation-card${inSel ? ' selected' : ''}`}
             onKeyDown={(e) => {
-              // Arrow keys nudge the selected annotation (1% of the chart, 0.1% with Alt, 5% with Shift); typing in a field is left alone.
+              // Arrow keys nudge the selected annotations (1% of the chart, 0.1% with Alt, 5% with Shift); typing in a field is left alone.
               const t = e.target as HTMLElement;
-              if (!isSel || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || !e.key.startsWith('Arrow')) return;
+              if (!inSel || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || !e.key.startsWith('Arrow')) return;
               e.preventDefault();
               const step = e.shiftKey ? 0.05 : e.altKey ? 0.001 : 0.01;
               const dx = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0;
               const dy = e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0;
-              const clamp = (v: number) => Math.min(1, Math.max(0, Math.round(v * 1000) / 1000));
-              // From where the text is drawn; a text anchored to data keeps its new values.
-              const from = (placer && drawnFractions(a, placer)) ?? { xFrac: a.xFrac, yFrac: a.yFrac };
-              const [xFrac, yFrac] = [clamp(from.xFrac + dx), clamp(from.yFrac + dy)];
-              run('Move annotation', patchAnnotation(chart.id, a.id, placer ? patchForMove(a, placer, xFrac, yFrac) : { xFrac, yFrac }), `ann:${a.id}:nudge`);
+              // From where each text is drawn; a text anchored to data keeps its new values.
+              const moves = nudgePatches(chosen, placer, dx, dy);
+              run('Move annotation', composeCommands(...moves.map((m) => patchAnnotation(chart.id, m.id, m.patch))), `ann:${moves.map((m) => m.id).join()}:nudge`);
             }}
           >
-            <button className="list-item" onClick={() => setSelection({ kind: 'annotation', annotationId: a.id })}>
+            <button className="list-item" onClick={(e) => setSelection(e.ctrlKey || e.metaKey || e.shiftKey ? toggleAnnotationSelection(selection, a.id, chart.annotations.map((x) => x.id)) : { kind: 'annotation', annotationId: a.id })}>
               {a.text.split('\n')[0] || '(empty)'}
             </button>
             {isSel && (
               <>
-                <Field label="Text">
+                <Field label="Text" hint={RESULT_HINT}>
                   <textarea rows={2} aria-label="Annotation text" value={a.text} onChange={(e) => run('Edit annotation text', patchAnnotation(chart.id, a.id, { text: e.target.value }), `ann:${a.id}:text`)} />
                 </Field>
                 {placer?.supportsData && (

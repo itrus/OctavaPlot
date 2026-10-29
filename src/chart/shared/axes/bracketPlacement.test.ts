@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Bracket } from '../../model/types';
+import type { Bracket } from '../../../model/types';
 import { placeBrackets } from './bracketPlacement';
 
 const br = (id: string, from: string, to: string, label = id, fontSizePt = 24): Bracket => ({ id, from, to, label, color: '#000000', widthPt: 2, fontSizePt });
@@ -101,5 +101,13 @@ describe('where a comparison bracket stands', () => {
     for (const p of r.placed) expect(Number.isFinite(p.top)).toBe(true);
     const free = 50 * 0.2;
     expect(at(r, 'a').value - 20).toBeCloseTo((20 * 1.1 * 33.6) / free, 6);
+  });
+
+  it('places brackets among hundreds of thousands of values without spreading them into a call', () => {
+    const values = Array.from({ length: 300_000 }, (_, i) => i % 1000);
+    const r = place([br('x', 'A', 'B')], [10, 20, 15, 12], { values, includeZero: true });
+    expect(at(r, 'x').value).toBeGreaterThan(20);
+    expect(() => place([], [10, 20, 15, 12], { values, includeZero: true })).not.toThrow();
+    expect(() => place([br('x', 'A', 'B')], [10, 20, 15, 12], { values: values.map((v) => v + 1), log: true })).not.toThrow();
   });
 });

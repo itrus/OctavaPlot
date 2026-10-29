@@ -8,7 +8,7 @@ import { parseProject, parseProjectWithNotes, stringifyProject } from '../../../
 import { buildAnyModel, ChartCanvas } from '../../anyModel';
 import type { ColumnModel } from '../../column/columnModel';
 import type { XyModel } from '../../xy/xyModel';
-import { annotationPlacer, changeAnchor, drawnFractions, patchForMove } from './annotationPlace';
+import { annotationPlacer, changeAnchor, drawnFractions, nudgePatches, patchForMove } from './annotationPlace';
 import { annotationElements } from './annotations';
 
 const note = (over: Partial<Annotation> = {}): Annotation => ({ id: 'n1', text: 'A note', xFrac: 0.25, yFrac: 0.5, fontSizePt: 12, color: '#000000', opacity: 1, ...over });
@@ -186,5 +186,40 @@ describe('the file', () => {
     expect(read.project.charts.find((c) => c.id === 'c')!.annotations[0].anchor).toBeUndefined();
     expect(read.notes.some((n) => /anchored to data without a value/.test(n))).toBe(true);
     expect(patchAnnotation('c', 'n1', { x: 1 })(p).charts.find((c) => c.id === 'c')!.annotations[0].x).toBe(1);
+  });
+});
+
+describe('moving several annotations by the same step', () => {
+  const p = projectOf('xy', 'xyLineSymbols');
+  const { any, placer } = placerOf(p);
+  const m = any.model as XyModel;
+  const page = note({ id: 'a', xFrac: 0.25, yFrac: 0.5 });
+  const edge = note({ id: 'b', xFrac: 0.995, yFrac: 0.002 });
+  const data = note({ id: 'c', anchor: 'data', x: (m.x.domain[0] + m.x.domain[1]) / 2, y: (m.y.domain[0] + m.y.domain[1]) / 2 });
+
+  it('moves each by the step from where it is drawn, rounded to a tenth of a percent', () => {
+    const out = nudgePatches([page], placer, 0.01, -0.001);
+    expect(out).toEqual([{ id: 'a', patch: { xFrac: 0.26, yFrac: 0.499 } }]);
+  });
+  it('keeps each inside the chart on its own, so the others still move by the full step', () => {
+    const out = nudgePatches([page, edge], placer, 0.05, -0.05);
+    expect(out[0].patch).toEqual({ xFrac: 0.3, yFrac: 0.45 });
+    expect(out[1].patch).toEqual({ xFrac: 1, yFrac: 0 });
+  });
+  it('gives a data-anchored annotation the values at its new place, so it stays there when the axes change', () => {
+    const [patch] = nudgePatches([data], placer, 0.1, 0);
+    const at = placer.place(data)!;
+    expect(patch.patch.xFrac).toBeCloseTo(Math.round((at.x / placer.widthPt + 0.1) * 1000) / 1000, 6);
+    expect(patch.patch.x).toBeGreaterThan(data.x!);
+    // Y changes only by the rounding of the fraction to a tenth of a percent of the page.
+    expect(Math.abs(patch.patch.y! - data.y!)).toBeLessThan((m.y.domain[1] - m.y.domain[0]) * 0.002);
+  });
+  it('moves an annotation that is not drawn from its stored fractions, and does nothing for none', () => {
+    const hidden = note({ id: 'h', anchor: 'data', x: m.x.domain[1] + 1000, y: m.y.domain[0], xFrac: 0.4, yFrac: 0.4 });
+    expect(nudgePatches([hidden], placer, 0.01, 0)[0].patch.xFrac).toBe(0.41);
+    expect(nudgePatches([], placer, 0.01, 0)).toEqual([]);
+  });
+  it('works without a placer: the page fractions', () => {
+    expect(nudgePatches([page], undefined, 0, 0.05)).toEqual([{ id: 'a', patch: { xFrac: 0.25, yFrac: 0.55 } }]);
   });
 });

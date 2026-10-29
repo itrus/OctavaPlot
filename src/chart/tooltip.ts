@@ -2,6 +2,7 @@ import { format } from 'd3';
 import { rowTitleAt } from '../model/table/rows';
 import type { DataTable } from '../model/types';
 import { summaryTooltipLines } from '../stats/describe';
+import { formatTimeCell } from '../util/timeColumn';
 import { AXIS_NAME } from './shared/axes/axes';
 import type { HitTarget } from './shared/scene/hitTest';
 import type { ColumnModel } from './column/columnModel';
@@ -38,12 +39,13 @@ export function xyTooltipLines(model: XyModel, table: DataTable, hit: HitTarget)
   const s = model.series.find((x) => x.groupId === hit.groupId);
   if (!s) return null;
   const lines = [s.label];
+  if (model.y2 != null) lines.push(`Axis: ${AXIS_NAME[s.axis ?? 'primary']}`);
   if (hit.kind === 'point' && hit.objectId) {
     const p = s.points.find((q) => q.id === hit.objectId);
     if (p) {
       const title = rowTitleAt(table, p.row).trim();
       if (title !== '') lines.push(`Row title: ${title}`);
-      lines.push(`X: ${tooltipFmt(p.x)}`, `${p.stats ? 'Centre' : 'Y'}: ${tooltipFmt(p.y)} (row ${p.row + 1})`);
+      lines.push(`X: ${table.groups[0].time ? formatTimeCell(p.x, table.groups[0].time) : tooltipFmt(p.x)}`, `${p.stats ? 'Centre' : 'Y'}: ${tooltipFmt(p.y)} (row ${p.row + 1})`);
       if (p.stats && p.stats.interval.status === 'ok' && p.stats.interval.lower !== null && p.stats.interval.upper !== null) {
         lines.push(`${s.errorMeaning ?? 'Interval'}: ${tooltipFmt(p.stats.interval.lower)} to ${tooltipFmt(p.stats.interval.upper)}`);
       }
@@ -104,7 +106,7 @@ export function heatTooltipLines(model: HeatModel, hit: HitTarget): string[] | n
   const cell = model.cells.find((c) => c.id === hit.objectId);
   if (!cell) return null;
   const lines = [cell.colLabel, cell.rowLabel];
-  if (cell.value === null) lines.push('No value');
+  if (cell.value === null) lines.push(cell.status === 'excluded' ? 'Excluded' : 'No value');
   else {
     lines.push(`${model.valueName}: ${tooltipFmt(cell.value)}`);
     if (cell.original !== null && cell.original !== cell.value) lines.push(`Before normalising: ${tooltipFmt(cell.original)}`);

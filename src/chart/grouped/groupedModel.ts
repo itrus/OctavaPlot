@@ -1,7 +1,7 @@
 import { rowTitleAt } from '../../model/table/rows';
 import { isGroupedChartType, supportsHorizontal } from '../../model/graph/chartTypes';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
-import { legendEntries } from '../../model/graph/legendEntries';
+import { legendEntries, withoutRepeats } from '../../model/graph/legendEntries';
 import { resolveSummary } from '../../model/graph/summary';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
 import { hasSubjects } from '../../model/table/subjects';
@@ -28,6 +28,9 @@ import { displayName } from '../shared/parts/names';
 import { hash01 } from '../shared/parts/jitter';
 import { suppliedStats } from '../../model/table/suppliedStats';
 import { compileGroupedScene } from './groupedChrome';
+import type { BracketGeom } from '../shared/parts/brackets';
+import { placeBrackets } from '../shared/axes/bracketPlacement';
+import { bracketKindOf } from '../../model/graph/chartTypes';
 
 /** How the bars of a cluster are arranged: side by side, stacked as counts, or stacked as shares of the row total. */
 type Arrangement = 'side' | 'stacked' | 'percent';
@@ -134,6 +137,8 @@ export interface GroupedModel {
   factorLabels: GroupedFactorLabel[];
   /** Grouped by series: where each column stands along the axis (one for each series and category) and its category name; absent when grouped by category. */
   axisColumns?: Array<{ key: string; centerX: number; label: string }>;
+  /** Comparison brackets between two series of a category, or two categories, in the vertical drawing (see model/types.ts Bracket). */
+  brackets: BracketGeom[];
   /** Index into `series` of each legend entry. */
   legendSeries: number[];
   warnings: string[];
@@ -196,7 +201,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         if (v !== null && v < 0) negative++;
         value = v === null || v < 0 ? null : v;
         if (value !== null && arrangement === 'percent') value = rowTotals[ci] > 0 ? (value / rowTotals[ci]) * 100 : null;
-      } else if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'vector') value = values[0];
+      } else if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'vector' || layout.kind === 'xerror') value = values[0];
       else if (layout.kind === 'replicates') {
         stats = summaryOf(values, spec);
         value = stats.centre;
@@ -260,18 +265,47 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     }
     return [...(inRange('bars', seriesId) ? body : []), ...(inRange('rawPoints', seriesId) ? dots : [])];
   };
-  const allY =
+  /** What a cell of side by side bars asks the axis to show. */
+  const cellShows = (r: (typeof raw)[number], c: (typeof raw)[number]['cells'][number]): number[] =>
     isDist
-      ? raw.flatMap((r) => r.cells.flatMap((c) => distShow(c, r.style, r.s.id)))
-      : arrangement === 'side'
-      ? raw.flatMap((r) => r.cells.flatMap((c) => (c.value === null ? [] : floating ? (c.span && inRange('bars', r.s.id) ? [...c.span, c.value] : []) : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars && inRange('errorBars', r.s.id), r.style.errorDirection) : [c.value]), ...(showDots(r.style) && inRange('rawPoints', r.s.id) ? c.reps.map((x) => x.value) : [])])))
-      : stackedTotals;
+      ? distShow(c, r.style, r.s.id)
+      : c.value === null ? [] : floating ? (c.span && inRange('bars', r.s.id) ? [...c.span, c.value] : []) : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars && inRange('errorBars', r.s.id), r.style.errorDirection) : [c.value]), ...(showDots(r.style) && inRange('rawPoints', r.s.id) ? c.reps.map((x) => x.value) : [])];
+  const allY = isDist || arrangement === 'side' ? raw.flatMap((r) => r.cells.flatMap((c) => cellShows(r, c))) : stackedTotals;
   const horizontal = chart.orientation === 'horizontal' && supportsHorizontal(chart.type);
   const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? W / 120 : H / 100)));
   // Log scales suit values side by side or on lines, not stacked parts or percentages, so those stay linear.
   const axisCfg = arrangement === 'side' ? chart.yAxis : { ...chart.yAxis, scale: 'linear' as const, reverse: false };
+  // Comparison brackets: each end is a series in a category, and the bracket stands above everything the places between its ends draw (and above the
+  // brackets it overlaps); the axis grows to show it and its label. A bracket that is hidden still takes its room. Places are in the order they stand across the chart.
+  const bracketing = bracketKindOf(chart.type) === 'grouped' && arrangement === 'side' && chart.brackets.length > 0;
+  const slots = bracketing
+    ? raw
+        .flatMap((r, si) => r.cells.map((c) => {
+          const shown = cellShows(r, c);
+          return { id: `${r.s.id}:${c.row}`, at: separated ? si * categoryRows.length + c.ci : c.ci * 1000 + (clusters ? clusters.slot[si] : si), top: shown.length > 0 ? Math.max(...shown) : NaN };
+        }))
+        .sort((a, b) => a.at - b.at)
+    : [];
+  const firstRow = categoryRows[0] ?? 0;
+  const endsOf = (b: Chart['brackets'][number]): [Id, Id] => [`${b.from}:${b.row ?? firstRow}`, `${b.to}:${b.toRow ?? b.row ?? firstRow}`];
+  const placement = placeBrackets({
+    brackets: bracketing ? chart.brackets : [],
+    order: slots.map((sl) => sl.id),
+    tops: slots.map((sl) => (Number.isFinite(sl.top) ? sl.top : null)),
+    primary: slots.map(() => true),
+    log: axisCfg.scale !== 'linear',
+    values: allY,
+    includeZero: axisCfg.scale === 'linear' && !isDist,
+    // The value axis is the length of the chart (its width for a horizontal chart) less the margins, the title and the labels: about 60%.
+    plotLengthPt: (horizontal ? W : H) * 0.6,
+    ends: endsOf,
+    strictEnds: true,
+  });
+  for (const sk of placement.skipped) warnings.push(`Bracket "${sk.bracket.label.trim() || 'no label'}" is not drawn: ${sk.reason}.`);
+  // A bracket kept out of the range (see rangeContribution) is still placed, but the axis does not grow to show it: the plot clips it.
+  const bracketTops = placement.placed.filter((p) => inRange('bracket', p.bracket.id)).map((p) => p.top);
   const yAxis = resolveAxis({
-    values: arrangement === 'percent' ? [0, 100] : allY,
+    values: arrangement === 'percent' ? [0, 100] : [...allY, ...bracketTops],
     includeZero: axisCfg.scale === 'linear' && !isDist && (!asLines || allY.every((v) => v >= 0)),
     min: chart.yAxis.min ?? (arrangement === 'percent' ? 0 : null),
     max: chart.yAxis.max ?? (arrangement === 'percent' ? 100 : null),
@@ -281,7 +315,9 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   warnings.push(...yAxis.warnings);
 
   // 4. Layout with the category labels along the X axis.
-  const legendSeries = legendEntries(chart.legend, raw.map((r) => r.s.id));
+  // Factor clusters repeat their series: a series in the same place of two clusters has the same colour, and is listed once when it has the same name too.
+  const legendAll = legendEntries(chart.legend, raw.map((r) => r.s.id));
+  const legendSeries = clusters ? withoutRepeats(legendAll, (i) => `${clusters.position[i]}|${raw[i].label}`) : legendAll;
   const labels = categoryRows.map((r) => rowTitleAt(table, r).trim() || `Row ${r + 1}`);
   // Separated: the labels along the axis are those of every column, so the layout can tell when they have to turn.
   const axisLabels = separated ? raw.flatMap(() => labels) : labels;
@@ -581,7 +617,20 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     }
   }
 
-  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, pairLines, factorLabels, ...(separated ? { axisColumns: raw.flatMap((r, si) => categories.map((cat, ci) => ({ key: `${r.s.id}:${cat.row}`, centerX: sepCentre(si, ci), label: cat.label }))) } : {}), legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
+  // The brackets as geometry: the places of the two ends across (the middle of the bar of a series in a category), and the height of the bar of the bracket.
+  const barWidth = separated ? sepUnit * CLUSTER_FRACTION : cluster / (clusters?.units ?? nSeries);
+  const centreOf = (id: Id): number => {
+    const si = raw.findIndex((r) => id.startsWith(`${r.s.id}:`));
+    const ci = categoryRows.indexOf(Number(id.slice(raw[si].s.id.length + 1)));
+    return separated ? sepCentre(si, ci) : categories[ci].centerX - cluster / 2 + (clusters ? clusters.slot[si] : si) * barWidth + barWidth / 2;
+  };
+  const brackets: BracketGeom[] = placement.placed.flatMap((p) => {
+    const [a, b] = endsOf(p.bracket);
+    const at = yScale(p.value);
+    if (!Number.isFinite(at) || inBreak(yAxis, p.value)) return [];
+    return [{ id: p.bracket.id, label: p.bracket.label, x1: centreOf(a), x2: centreOf(b), y: at, tick: Math.max(6, p.bracket.fontSizePt * 0.6), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
+  });
+  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, pairLines, factorLabels, brackets, ...(separated ? { axisColumns: raw.flatMap((r, si) => categories.map((cat, ci) => ({ key: `${r.s.id}:${cat.row}`, centerX: sepCentre(si, ci), label: cat.label }))) } : {}), legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileGroupedScene(chart, model);
   // The marks are compiled when a drawing, an export or a hit test first asks for them.
   let marks: SceneElement[] | undefined;

@@ -1,5 +1,5 @@
-import { bool, clamp, hex, numberOrNull, oneOf, record, valuesOf } from '../sanitize';
-import type { HeatCustomColours, HeatPalette, HeatmapOptions } from '../types';
+import { bool, clamp, clampOrNull, hex, numberOrNull, oneOf, optionalHex, record, text, valuesOf } from '../sanitize';
+import type { HeatCustomColours, HeatMark, HeatPalette, HeatmapOptions } from '../types';
 import { HEAT_GRADIENTS, LEGACY_HEAT_PALETTES } from './heatGradients';
 
 /** Settings of heat maps (spec 13). */
@@ -29,7 +29,26 @@ function sanitizeCustomColours(raw: unknown, base: HeatCustomColours): HeatCusto
   return { low: hex(c.low, base.low), mid: typeof c.mid === 'string' ? hex(c.mid, '') || null : null, high: hex(c.high, base.high) };
 }
 
-export const HEAT_LIMITS = { cellGapPt: { min: 0, max: 40 }, decimals: { min: 0, max: 8 } } as const;
+export const HEAT_LIMITS = {
+  cellGapPt: { min: 0, max: 40 },
+  decimals: { min: 0, max: 8 },
+  steps: { min: 2, max: 12 },
+  cellPt: { min: 2, max: 400 },
+  groupSize: { min: 1, max: 1000 },
+  groupGapPt: { min: 0, max: 80 },
+  labelEvery: { min: 1, max: 1000 },
+  barWidthPt: { min: 4, max: 80 },
+  barLengthPct: { min: 20, max: 100 },
+  barTicks: { min: 2, max: 12 },
+} as const;
+
+/** The marks of special cells, as the inspector lists them. */
+export const HEAT_MARKS: ReadonlyArray<{ value: HeatMark; label: string }> = [
+  { value: 'none', label: 'None' },
+  { value: 'slash', label: 'A slash' },
+  { value: 'cross', label: 'A cross' },
+  { value: 'outline', label: 'An outline' },
+];
 
 /** What a cell can show: its label in the inspector and its name in the colour bar title and the tooltip (`lower` after "of"). */
 export const HEAT_STATISTICS: ReadonlyArray<{ value: HeatmapOptions['summary']; label: string; name: string; lower: string }> = [
@@ -46,11 +65,18 @@ const PALETTES = valuesOf(HEAT_PALETTES);
 const BYS: ReadonlyArray<HeatmapOptions['normalise']> = ['none', 'row', 'column'];
 const METHODS: ReadonlyArray<HeatmapOptions['method']> = ['zscore', 'minmax', 'centre'];
 const SUMMARIES = valuesOf(HEAT_STATISTICS);
+const MARKS = valuesOf(HEAT_MARKS);
+
+/** A whole number within the limits, or null when it is not a number (null stays null). */
+const wholeOrNull = (v: unknown, lim: { min: number; max: number }, fallback: number | null): number | null => (v === null ? null : typeof v === 'number' && Number.isFinite(v) ? Math.round(clamp(v, lim.min, lim.max, lim.min)) : fallback);
+
+/** Edges set by hand: finite numbers, ascending, without repeats, at most one fewer than the most steps. */
+const sanitizeBreaks = (v: unknown, base: number[]): number[] => (Array.isArray(v) ? [...new Set(v.filter((x): x is number => typeof x === 'number' && Number.isFinite(x)))].sort((a, b) => a - b).slice(0, HEAT_LIMITS.steps.max - 1) : base);
 
 /** Heat map settings from a file or a patch: a value that is not valid falls back to the one in `base`. */
 export function sanitizeHeatmap(raw: unknown, base: HeatmapOptions): HeatmapOptions {
   const h = record(raw);
-  const { cellGapPt, decimals } = HEAT_LIMITS;
+  const { cellGapPt, decimals, cellPt, groupSize, groupGapPt, labelEvery, steps, barWidthPt, barLengthPct, barTicks } = HEAT_LIMITS;
   const lo = numberOrNull(h.min, base.min);
   const hi = numberOrNull(h.max, base.max);
   // A range that is not a range (lowest not below highest) is dropped: the colours then cover the values.
@@ -69,6 +95,24 @@ export function sanitizeHeatmap(raw: unknown, base: HeatmapOptions): HeatmapOpti
     transpose: bool(h.transpose, base.transpose),
     colourbar: bool(h.colourbar, base.colourbar),
     missingColour: hex(h.missingColour, base.missingColour),
+    steps: wholeOrNull(h.steps, steps, base.steps),
+    breaks: sanitizeBreaks(h.breaks, base.breaks),
+    missingMark: oneOf(MARKS, h.missingMark, base.missingMark),
+    excludedColour: optionalHex(h.excludedColour, base.excludedColour),
+    excludedMark: oneOf(MARKS, h.excludedMark, base.excludedMark),
+    outsideColour: optionalHex(h.outsideColour, base.outsideColour),
+    outsideMark: oneOf(MARKS, h.outsideMark, base.outsideMark),
+    cellWidthPt: clampOrNull(h.cellWidthPt, cellPt.min, cellPt.max, base.cellWidthPt),
+    cellHeightPt: clampOrNull(h.cellHeightPt, cellPt.min, cellPt.max, base.cellHeightPt),
+    rowGroupSize: wholeOrNull(h.rowGroupSize, groupSize, base.rowGroupSize),
+    colGroupSize: wholeOrNull(h.colGroupSize, groupSize, base.colGroupSize),
+    groupGapPt: clamp(h.groupGapPt, groupGapPt.min, groupGapPt.max, base.groupGapPt),
+    rowLabelEvery: Math.round(clamp(h.rowLabelEvery, labelEvery.min, labelEvery.max, base.rowLabelEvery)),
+    colLabelEvery: Math.round(clamp(h.colLabelEvery, labelEvery.min, labelEvery.max, base.colLabelEvery)),
+    barWidthPt: clamp(h.barWidthPt, barWidthPt.min, barWidthPt.max, base.barWidthPt),
+    barLengthPct: clamp(h.barLengthPct, barLengthPct.min, barLengthPct.max, base.barLengthPct),
+    barTicks: Math.round(clamp(h.barTicks, barTicks.min, barTicks.max, base.barTicks)),
+    barTitle: h.barTitle === null ? null : typeof h.barTitle === 'string' ? text(h.barTitle, 80, '') : base.barTitle,
     customColours: sanitizeCustomColours(h.customColours, base.customColours),
   };
 }

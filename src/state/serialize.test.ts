@@ -194,6 +194,19 @@ describe('malformed persisted fields', () => {
     expect(r.notes.some((n) => n.includes('annotations[0]'))).toBe(true);
     expect(() => chartToSvgString(r.project.charts[0], r.project.dataTables[0])).not.toThrow();
   });
+  it('keeps a reference line bound to a result, and drops the binding (with a note) when it cannot be read', () => {
+    const line = { id: 'r1', axis: 'y', value: 3, color: '#000000', widthPt: 2, style: 'dashed', opacity: 1, label: 'mean {{mean Control}}', showLabel: true };
+    const ok = parseProjectWithNotes(build((p) => (p.charts[0].referenceLines = [{ ...line, valueFrom: { stat: 'sem', groupId: 'g1' } }])));
+    expect(ok.project.charts[0].referenceLines[0].valueFrom).toEqual({ stat: 'sem', groupId: 'g1' });
+    expect(ok.notes).toEqual([]);
+    for (const bad of [{ stat: 'mode', groupId: 'g1' }, { stat: 'mean' }, 'mean']) {
+      const r = parseProjectWithNotes(build((p) => (p.charts[0].referenceLines = [{ ...line, valueFrom: bad }])));
+      expect(r.project.charts[0].referenceLines[0]).not.toHaveProperty('valueFrom');
+      expect(r.project.charts[0].referenceLines[0].value).toBe(3);
+      expect(r.notes.some((n) => n.includes('referenceLines[0].valueFrom'))).toBe(true);
+    }
+    expect(parseProjectWithNotes(build((p) => (p.charts[0].referenceLines = [line]))).notes).toEqual([]);
+  });
   it('drops display names that are not text', () => {
     const r = parseProjectWithNotes(build((p) => (p.charts[0].displayNames = { a: { x: 1 }, b: 'ok' })));
     expect(r.project.charts[0].displayNames).toEqual({ b: 'ok' });

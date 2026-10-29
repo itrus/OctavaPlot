@@ -46,7 +46,7 @@ import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisG
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { DataSetPicker } from './sections/DataSetPicker';
 import { DataSetReset } from './sections/DataSetReset';
-import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
+import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
 import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './common/controls';
 import {
   backgroundDisplay,
@@ -64,8 +64,9 @@ import {
 } from './common/fillRules';
 import { SECTIONS, TABS } from './common/nav';
 import { chartTypesFor } from '../../model/graph/chartTypes';
-import { PointLabelControls, SelectedPointBox, type PointEdit } from './sections/PointLabelControls';
-import { pointSelectionState } from './common/pointOverrideUi';
+import { PointLabelControls, SelectedPointBox, SelectedPointsBox, type PointEdit } from './sections/PointLabelControls';
+import { multiPointState, POINT_LABEL_KEYS, pointSelectionState } from './common/pointOverrideUi';
+import { mixedPointStyleKeys } from '../../model/graph/selection/multi';
 import { CalculationOptions,IntervalFields, LineAtField } from './sections/SummaryControls';
 import { displayName } from '../../chart/shared/parts/names';
 import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
@@ -104,8 +105,9 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
   const selectedGroup = sel.groupId ? table.groups.find((g) => g.id === sel.groupId) : undefined;
   const allIds = useMemo(() => table.groups.map((g) => g.id), [table.groups]);
   // Several data sets selected together are edited together, and where they differ a field says so ("Mixed").
-  const several = selection.kind === 'groups' ? scopeGroupIds(selection.groupIds, allIds) : [];
-  const scope: StyleScope = several.length > 1 ? several : selectedGroup ? selectedGroup.id : 'all';
+  // Several points are edited together too; their data sets are the scope of the style settings.
+  const several = selection.kind === 'groups' || selection.kind === 'points' ? scopeGroupIds(selectedGroupIds(selection), allIds) : [];
+  const scope: StyleScope = several.length > 1 ? several : selectedGroup ? selectedGroup.id : several.length === 1 ? several[0] : 'all';
   const scopeIds = scopeGroupIds(scope, allIds);
   // A data set of the selection that is gone (deleted) leaves the selection.
   useEffect(() => {
@@ -113,9 +115,11 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [several.length, selection.kind]);
   // A selected point that no longer exists (deleted data set or row, or a chart type without points) steps back.
-  const fallbackKey = sel.fallback ? JSON.stringify(sel.fallback) : null;
+  const multi = multiPointState(table, selection, chart.type);
+  const fallback = sel.fallback ?? multi.fallback;
+  const fallbackKey = fallback ? JSON.stringify(fallback) : null;
   useEffect(() => {
-    if (sel.fallback) setSelection(sel.fallback);
+    if (fallback) setSelection(fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fallbackKey]);
   const sample = selectedGroup ?? table.groups.find((g) => g.id === several[0]) ?? table.groups[0];
@@ -171,6 +175,17 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
         ...(edit.clear ? [clearPointStyle(chart.id, pointId, edit.clear)] : []),
         ...(edit.set ? [patchPointStyle(chart.id, pointId, edit.set)] : []),
       ),
+      coalesceKey,
+    );
+  // Several points selected together: where their labels differ a field says "Mixed", and an edit reaches them all (one undo step).
+  const multiStyles = multi.points.map((p) => resolveStyle(chart, layer, p.group, p.pointId));
+  const multiMixed = mixedPointStyleKeys(chart, layer, multi.points);
+  const multiOwn = new Set(POINT_LABEL_KEYS.filter((k) => multi.points.some((p) => layer.objectOverrides[p.pointId]?.[k] !== undefined)));
+  const multiMode = (p: { pointId: Id }) => (layer.objectOverrides[p.pointId]?.showPointLabels === true ? 'show' : layer.objectOverrides[p.pointId]?.showPointLabels === false ? 'hide' : 'inherit');
+  const editPoints = (label: string, edit: PointEdit, coalesceKey?: string) =>
+    run(
+      label,
+      composeCommands(...multi.points.flatMap((p) => [...(edit.clear ? [clearPointStyle(chart.id, p.pointId, edit.clear)] : []), ...(edit.set ? [patchPointStyle(chart.id, p.pointId, edit.set)] : [])])),
       coalesceKey,
     );
   // A setting this data set has its own value for: the dot beside it is the way back to the graph's value.
@@ -507,6 +522,19 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             </Field>
             <PointLabelControls type={chart.type} style={st} labels={model.labels} overridden={ov} onChange={setStyle} />
           </GroupBox>
+
+          {multi.points.length > 1 && (
+            <SelectedPointsBox
+              type={chart.type}
+              count={multi.points.length}
+              style={multiStyles[0]}
+              labelMode={multiMode(multi.points[0])}
+              mixed={new Set(multi.points.some((p) => multiMode(p) !== multiMode(multi.points[0])) ? [...multiMixed, 'showPointLabels' as const] : multiMixed)}
+              ownKeys={multiOwn}
+              onEdit={editPoints}
+              onReset={() => run('Reset point labels', composeCommands(...multi.points.map((p) => clearPointStyle(chart.id, p.pointId))))}
+            />
+          )}
 
           {selectedGroup && sel.pointId && (
             <SelectedPointBox

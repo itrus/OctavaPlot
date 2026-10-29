@@ -4,18 +4,18 @@ import { layersOf, type LayerSpec } from '../../model/graph/layers';
 import { rowTitleAt } from '../../model/table/rows';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
 import { DEFAULT_SUMMARY } from '../../model/defaults';
-import type { Chart, DataTable, HeatmapOptions, Id } from '../../model/types';
+import type { Chart, DataTable, HeatMark, HeatmapOptions, Id } from '../../model/types';
 import { chartPx2Pt } from '../../model/units';
 import { cellStatistic, matrixRange, normaliseMatrix, type CellResult, type Matrix, type Unavailable } from '../../stats/matrix';
 import { computeGroupStats } from '../../stats/summary';
-import { contrastColour, scaleColour, type HeatScale } from './heatColours';
+import { colourEdges, contrastColour, intervalColour, intervalIndex, scaleColour, type HeatScale } from './heatColours';
 import { computeLayout, type Layout, type Rect } from '../shared/parts/layout';
 import { compileHeatMarks } from './heatMarks';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { displayName } from '../shared/parts/names';
 import { suppliedStats, suppliedStatistic } from '../../model/table/suppliedStats';
 
-interface HeatCell {
+export interface HeatCell {
   id: Id;
   /** The observation of the series' first column in the row of the cell: what names the cell in the drawing, whatever happens to the order of the rows, and wherever a transposed map puts it. */
   obsId?: Id;
@@ -34,6 +34,19 @@ interface HeatCell {
   fill: string;
   text: string | null;
   textColour: string;
+  /** What the cell is: it has a value, it has none, its values are excluded, or its value lies outside the colour range. */
+  status: 'value' | 'missing' | 'excluded' | 'outside';
+  /** The mark drawn over the cell for its status. */
+  mark: HeatMark;
+}
+
+/** A label of a row or a column that is written (see the setting of every how-many-th), with its place along the axis. */
+interface HeatLabel {
+  /** Position among all the rows or columns: names the label in the drawing. */
+  index: number;
+  text: string;
+  /** y of the middle of a row, x of the middle of a column. */
+  at: number;
 }
 
 interface HeatBar {
@@ -59,6 +72,13 @@ export interface HeatModel {
   rowLabelX: number;
   colLabelY: number;
   bar: HeatBar | null;
+  /** The labels that are written, and the size of the grid of cells (smaller than the plotting region when the cells have a size set). */
+  rowLabelAt: HeatLabel[];
+  colLabelAt: HeatLabel[];
+  gridWidth: number;
+  gridHeight: number;
+  /** The edges of the colour intervals, or null for a continuous scale. */
+  edges: number[] | null;
   /** What the cells show, as the colour bar and the tooltip name it: "SD", or "Row z-score of mean" when normalised. */
   valueName: string;
   warnings: string[];
@@ -68,10 +88,22 @@ export interface HeatModel {
   marks?: SceneElement[];
 }
 
-/** Room taken at the right by the colour bar and its numbers, pt. */
-const BAR_ROOM = 128;
-const BAR_WIDTH = 24;
+/** Room taken at the right by the colour bar and its numbers besides its own width, pt. */
+const BAR_ROOM = 104;
 const STRIPS = 64;
+
+/**
+ * The places of n cells along one axis of room `room`: the size of a cell (the room shared out, or `fixed` when that is smaller),
+ * the start of each, and the length of the whole. After every `every` cells there is the extra space `gap` (at most half the room in all).
+ */
+function slots(n: number, room: number, fixed: number | null, every: number | null, gap: number) {
+  const groups = every === null ? 0 : Math.max(0, Math.ceil(n / every) - 1);
+  const extra = groups === 0 ? 0 : Math.min(gap, room / 2 / groups);
+  const shared = Math.max(0, room - extra * groups) / Math.max(1, n);
+  const size = fixed === null ? shared : Math.min(fixed, shared);
+  const start = (i: number) => i * size + (every === null ? 0 : Math.floor(i / every) * extra);
+  return { size, start, length: n * size + groups * extra };
+}
 
 type StatisticOnly = Exclude<HeatmapOptions['summary'], 'mean' | 'median'>;
 const NORMALISE_NAME = { zscore: 'z-score', minmax: 'min-max', centre: 'centred' } as const;
@@ -113,9 +145,10 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   const cellValue = (s: (typeof defs)[number], r: number): number | null => {
     const values = s.columns.map((c) => c.observations[r]?.value ?? null);
     let result: CellResult;
-    if (layoutKind.kind === 'single' || layoutKind.kind === 'sized' || layoutKind.kind === 'vector') {
+    if (layoutKind.kind === 'single' || layoutKind.kind === 'sized' || layoutKind.kind === 'vector' || layoutKind.kind === 'xerror') {
       const v = values[0] !== null && Number.isFinite(values[0]) ? values[0] : null;
-      result = centreOnly || v === null ? { value: v, unavailable: null } : cellStatistic(values, o.summary as StatisticOnly);
+      // The other columns of an error table are errors, not values of the cell.
+      result = centreOnly || v === null ? { value: v, unavailable: null } : cellStatistic(layoutKind.kind === 'xerror' ? values.slice(0, 1) : values, o.summary as StatisticOnly);
     } else if (layoutKind.kind === 'replicates') {
       result = centreOnly ? { value: computeGroupStats(values, { ...DEFAULT_SUMMARY, centre: o.summary as 'mean' | 'median', spread: 'none' }).centre, unavailable: null } : cellStatistic(values, o.summary as StatisticOnly);
     } else {
@@ -124,14 +157,18 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
     if (result.unavailable) unavailable.set(result.unavailable, (unavailable.get(result.unavailable) ?? 0) + 1);
     return result.value;
   };
+  // A cell without a value whose values were excluded is told from one that never had any.
+  const excludedAt = (s: (typeof defs)[number], r: number) => s.columns.some((c) => c.observations[r]?.excluded === true);
   const rowNames = categoryRows.map((r) => rowTitleAt(table, r).trim() || `Row ${r + 1}`);
   const colNames = defs.map((s) => displayName(chart, s.id, s.name));
   let matrix: Matrix = categoryRows.map((r) => defs.map((s) => cellValue(s, r)));
+  let excluded: boolean[][] = categoryRows.map((r) => defs.map((s) => excludedAt(s, r)));
   let rowLabels = rowNames;
   let colLabels = colNames;
   // Transposing swaps the roles of rows and columns and the labels with them; cells keep their identity (spec 13.2).
   if (o.transpose) {
     matrix = defs.map((_, ci) => matrix.map((row) => row[ci]));
+    excluded = defs.map((_, ci) => excluded.map((row) => row[ci]));
     rowLabels = colNames;
     colLabels = rowNames;
   }
@@ -156,32 +193,42 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   }
   const centre = o.centre ?? (o.normalise !== 'none' && o.method !== 'minmax' ? 0 : (lo + hi) / 2);
   const scale: HeatScale = { palette: o.palette, reverse: o.reverse, lo, hi, centre, custom: o.customColours };
-  const colourOf = (v: number) => scaleColour(v, scale, diverging);
+  // Interval colours: a value takes the colour of its interval (see colourEdges); the stepped bar shows the same colours.
+  const edges = colourEdges(lo, hi, o.steps, o.breaks);
+  if (o.breaks.length > 0 && !o.breaks.some((b) => b > lo && b < hi)) warnings.push(`None of the interval edges lies inside the colour range; the scale is drawn ${edges ? 'in equal steps' : 'continuous'}.`);
+  const colourOf = (v: number) => {
+    const c = Math.min(hi, Math.max(lo, v));
+    return edges ? intervalColour(intervalIndex(edges, c), edges, scale, diverging) : scaleColour(c, scale, diverging);
+  };
   if (!range) warnings.push('Enter numbers in the table to see the heat map.');
   const outside = values.flat().filter((v) => v !== null && (v < lo || v > hi)).length;
   if (outside > 0) warnings.push(`${outside} value${outside === 1 ? ' lies' : 's lie'} outside the colour range and ${outside === 1 ? 'is' : 'are'} drawn in the end colour.`);
 
   // 3. Layout: the labels need room; the colour bar takes a strip at the right.
   const showBar = o.colourbar && range !== null;
+  // Only every this many-th label is written, so the room the labels take is that of those written.
+  const shownRows = rowLabels.map((text, index) => ({ index, text })).filter((l) => l.index % o.rowLabelEvery === 0);
+  const shownCols = colLabels.map((text, index) => ({ index, text })).filter((l) => l.index % o.colLabelEvery === 0);
   const layout = computeLayout({
     fontFamily: chart.fontFamily,
     titleOffsetPt: chart.titleOffsetPt,
-    widthPt: showBar ? W - BAR_ROOM : W,
+    widthPt: showBar ? W - BAR_ROOM - o.barWidthPt : W,
     heightPt: H,
     title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
     xAxis: chart.xAxis,
     yAxis: chart.yAxis,
     legend: { ...chart.legend, visible: false },
     legendLabels: [],
-    categoryLabels: colLabels,
-    yTickLabels: rowLabels,
+    categoryLabels: shownCols.map((l) => l.text),
+    yTickLabels: shownRows.map((l) => l.text),
   });
   warnings.push(...layout.warnings);
   const { plot } = layout;
   const rows = rowLabels.length;
   const cols = colLabels.length;
-  const cw = plot.width / Math.max(1, cols);
-  const ch = plot.height / Math.max(1, rows);
+  const across = slots(cols, plot.width, o.cellWidthPt, o.colGroupSize, o.groupGapPt);
+  const down = slots(rows, plot.height, o.cellHeightPt, o.rowGroupSize, o.groupGapPt);
+  const [cw, ch] = [across.size, down.size];
   const gap = Math.min(o.cellGapPt, cw / 2, ch / 2);
 
   // 4. Cells.
@@ -189,7 +236,10 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   for (let ri = 0; ri < rows; ri++) {
     for (let ci = 0; ci < cols; ci++) {
       const v = values[ri]?.[ci] ?? null;
-      const fill = v === null ? o.missingColour : colourOf(v);
+      const beyond = v !== null && (v < lo || v > hi);
+      const status: HeatCell['status'] = v === null ? (matrix[ri]?.[ci] === null && excluded[ri]?.[ci] ? 'excluded' : 'missing') : beyond ? 'outside' : 'value';
+      const fill = status === 'excluded' ? (o.excludedColour ?? o.missingColour) : status === 'missing' ? o.missingColour : status === 'outside' ? (o.outsideColour ?? colourOf(v!)) : colourOf(v!);
+      const mark = status === 'excluded' ? o.excludedMark : status === 'missing' ? o.missingMark : status === 'outside' ? o.outsideMark : 'none';
       const series = o.transpose ? defs[ri] : defs[ci];
       const tableRow = categoryRows[o.transpose ? ci : ri];
       const text = v === null || !o.showValues ? null : o.decimals === null ? nice(v) : v.toFixed(o.decimals);
@@ -199,8 +249,8 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
         seriesId: series?.id ?? '',
         rowLabel: rowLabels[ri],
         colLabel: colLabels[ci],
-        x: plot.x + ci * cw + gap / 2,
-        y: plot.y + ri * ch + gap / 2,
+        x: plot.x + across.start(ci) + gap / 2,
+        y: plot.y + down.start(ri) + gap / 2,
         width: Math.max(0, cw - gap),
         height: Math.max(0, ch - gap),
         value: v,
@@ -208,6 +258,8 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
         fill,
         text,
         textColour: contrastColour(fill),
+        status,
+        mark,
       });
     }
   }
@@ -215,14 +267,22 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   // 5. The colour bar: high at the top.
   let bar: HeatBar | null = null;
   if (showBar) {
-    const rect: Rect = { x: plot.x + plot.width + 28, y: plot.y, width: BAR_WIDTH, height: plot.height };
-    const strips = Array.from({ length: STRIPS }, (_, i) => {
-      const frac = 1 - (i + 0.5) / STRIPS;
-      const v = lo + frac * (hi - lo);
-      return { y: rect.y + (i * rect.height) / STRIPS, height: rect.height / STRIPS + 0.6, fill: colourOf(v) };
-    });
-    const tickValues = d3Ticks(lo, hi, 5).filter((t) => t >= lo && t <= hi);
-    bar = { rect, lo, hi, diverging, strips, ticks: tickValues.map((value) => ({ value, y: rect.y + rect.height * (1 - (value - lo) / (hi - lo || 1)) })), title: o.summary === 'mean' && o.normalise === 'none' ? null : valueName };
+    const barHeight = (down.length * o.barLengthPct) / 100;
+    const rect: Rect = { x: plot.x + across.length + 28, y: plot.y + (down.length - barHeight) / 2, width: o.barWidthPt, height: barHeight };
+    // A stepped scale is one strip for each interval, as tall as the interval is wide; a continuous one is many thin strips.
+    const strips = edges
+      ? Array.from({ length: edges.length - 1 }, (_, k) => {
+          const i = edges.length - 2 - k;
+          return { y: rect.y + (rect.height * (hi - edges[i + 1])) / (hi - lo), height: (rect.height * (edges[i + 1] - edges[i])) / (hi - lo) + 0.6, fill: intervalColour(i, edges, scale, diverging) };
+        })
+      : Array.from({ length: STRIPS }, (_, i) => {
+          const frac = 1 - (i + 0.5) / STRIPS;
+          const v = lo + frac * (hi - lo);
+          return { y: rect.y + (i * rect.height) / STRIPS, height: rect.height / STRIPS + 0.6, fill: colourOf(v) };
+        });
+    const tickValues = edges ?? d3Ticks(lo, hi, o.barTicks).filter((t) => t >= lo && t <= hi);
+    const auto = o.summary === 'mean' && o.normalise === 'none' ? null : valueName;
+    bar = { rect, lo, hi, diverging, strips, ticks: tickValues.map((value) => ({ value, y: rect.y + rect.height * (1 - (value - lo) / (hi - lo || 1)) })), title: o.barTitle === null ? auto : o.barTitle.trim() === '' ? null : o.barTitle };
   }
 
   const model: HeatModel = {
@@ -233,8 +293,13 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
     cols: colLabels,
     cells,
     rowLabelX: plot.x,
-    colLabelY: plot.y + plot.height,
+    colLabelY: plot.y + down.length,
     bar,
+    rowLabelAt: shownRows.map((l) => ({ ...l, at: plot.y + down.start(l.index) + ch / 2 })),
+    colLabelAt: shownCols.map((l) => ({ ...l, at: plot.x + across.start(l.index) + cw / 2 })),
+    gridWidth: across.length,
+    gridHeight: down.length,
+    edges,
     valueName,
     warnings: [...new Set(warnings)],
     layers: layersOf(chart, table),

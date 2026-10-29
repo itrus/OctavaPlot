@@ -48,6 +48,29 @@ export function scaleColour(v: number, s: HeatScale, diverging: boolean): string
   return paletteColour(s.palette, scalePosition(Math.min(s.hi, Math.max(s.lo, v)), s, diverging), s.reverse, s.custom);
 }
 
+/**
+ * The edges of the colour intervals, from the bottom of the range to its top; null = a continuous scale. Edges set by hand
+ * (those inside the range) take the place of equal steps; fewer than two intervals is no interval colouring.
+ */
+export function colourEdges(lo: number, hi: number, steps: number | null, breaks: readonly number[]): number[] | null {
+  const inside = breaks.filter((b) => b > lo && b < hi);
+  if (inside.length > 0) return [lo, ...inside, hi];
+  if (steps === null || steps < 2) return null;
+  return Array.from({ length: steps + 1 }, (_, i) => (i === steps ? hi : lo + (i * (hi - lo)) / steps));
+}
+
+/** The interval a value is in: an interval holds its lower edge and not its upper one, the last holds both; values outside the range are in the end ones. */
+export function intervalIndex(edges: readonly number[], v: number): number {
+  let i = 0;
+  while (i < edges.length - 2 && v >= edges[i + 1]) i++;
+  return i;
+}
+
+/** The one colour of an interval: the scale's colour at the middle of the interval. */
+export function intervalColour(i: number, edges: readonly number[], s: HeatScale, diverging: boolean): string {
+  return scaleColour((edges[i] + edges[i + 1]) / 2, s, diverging);
+}
+
 /** Position of a value on the scale, 0 to 1: linear, or in two halves round the centre of a diverging palette. */
 export function scalePosition(v: number, s: Pick<HeatScale, 'lo' | 'hi' | 'centre'>, diverging: boolean): number {
   if (!(s.hi > s.lo)) return 0.5;

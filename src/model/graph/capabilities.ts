@@ -1,4 +1,4 @@
-import { CHART_TYPES, chartFamily, isSeriesColourType, supportsHorizontal } from './chartTypes';
+import { bracketKindOf, CHART_TYPES, chartFamily, isSeriesColourType, supportsHorizontal } from './chartTypes';
 import { hasPartLooks, rangeKindsOf } from './layers';
 import type { ChartType } from '../types';
 
@@ -30,12 +30,16 @@ export interface Capabilities {
   rangeSwitch: boolean;
   /** The chart has numeric axes that can be broken, reversed or put on a log scale. */
   numericAxes: boolean;
-  /** Comparison brackets can join two data sets (charts over columns). */
+  /** Comparison brackets can join two data sets (charts over columns, side by side grouped bars, XY charts; see bracketKindOf in chartTypes.ts). */
   brackets: boolean;
+  /** XY charts: an oblique reference line (the identity line, y = a + bx), shaded regions between two values, extra ticks at chosen values, equal-unit scaling of the two axes. */
+  guides: boolean;
+  /** XY charts: error bars along X from an error table (layout 'xerror'), a layer of their own with a look and a range switch. */
+  xErrorBars: boolean;
 }
 
 /** Types whose data sets can be bound to the right axis (see bindingUi in chart/shared/axes/axes.ts). */
-const SECONDARY_AXIS: ReadonlySet<ChartType> = new Set<ChartType>(['bar', 'scatter', 'mean']);
+const SECONDARY_AXIS: ReadonlySet<ChartType> = new Set<ChartType>(['bar', 'scatter', 'mean', 'xyScatter', 'xyLine', 'xyLineSymbols', 'xyBubble', 'xyBars', 'xySpikes', 'xyArea']);
 
 function referenceLinesOf(type: ChartType): Capabilities['referenceLines'] {
   switch (chartFamily(type)) {
@@ -63,7 +67,9 @@ export function capabilitiesOf(type: ChartType): Capabilities {
     seriesColour: isSeriesColourType(type),
     survivalOptions: family === 'survival',
     numericAxes: family !== 'pie' && family !== 'heatmap',
-    brackets: family === 'column' && type !== 'histogram' && type !== 'ecdf',
+    brackets: bracketKindOf(type) !== null,
+    guides: family === 'xy',
+    xErrorBars: family === 'xy',
     partLooks: hasPartLooks(type),
     rangeSwitch: rangeKindsOf(type).length > 0,
   };

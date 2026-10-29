@@ -1,4 +1,5 @@
 import { n2 } from '../../../model/units';
+import { hasMarkup, parseRichText } from '../../../util/richText';
 import { el, type SceneElement } from '../scene/sceneElement';
 import { svgId } from '../scene/svgIds';
 import type { Orientation } from './orientation';
@@ -18,6 +19,12 @@ export interface BracketGeom {
   fontSizePt: number;
 }
 
+/** How far above its bar a label stands, in pt: a subscript sinks 0.28 em and its descender reaches 0.14 em lower, so it needs the room as well. */
+function labelLift(label: string, fontSizePt: number): number {
+  const sinks = hasMarkup(label) && parseRichText(label).some((r) => r.script === 'sub');
+  return sinks ? Math.max(4, 0.42 * fontSizePt + 1.5) : 4;
+}
+
 /**
  * The brackets of a chart as scene elements: a bar with a short stem at each end, and its label centred above it (on a horizontal
  * chart: beside it, upright). Clipped to the plotting region. A bracket whose layer is hidden is not drawn.
@@ -35,7 +42,7 @@ export function bracketElements(brackets: readonly BracketGeom[], orient: Orient
       const common = [['font-size', b.fontSizePt], ['fill', b.color]] as const;
       return orient.horizontal
         ? el('text', [['x', n2(at.x + 6)], ['y', n2(at.y)], ['dy', '0.35em'], ['text-anchor', 'start'], ...common], { id: svgId(`${b.id}:bracket`, 'label'), text: b.label })
-        : el('text', [['x', n2(at.x)], ['y', n2(at.y - 4)], ['text-anchor', 'middle'], ...common], { id: svgId(`${b.id}:bracket`, 'label'), text: b.label });
+        : el('text', [['x', n2(at.x)], ['y', n2(at.y - labelLift(b.label, b.fontSizePt))], ['text-anchor', 'middle'], ...common], { id: svgId(`${b.id}:bracket`, 'label'), text: b.label });
     });
   return [el('g', [['clip-path', 'url(#plot-clip)']], { children: [...(orient.matrix ? [el('g', [['transform', orient.matrix]], { children: bars })] : bars), ...labels] })];
 }
