@@ -47,3 +47,7 @@ export const announced = (page: Page): Locator => page.locator('.chart-wrap [rol
 
 /** The status bar message. */
 export const status = (page: Page): Locator => page.locator('.statusbar-message');
+
+/** Opens a project from its file text through the file input (the same route as Open project). */
+export const openProject = (page: Page, json: string, name = 'test.oplot'): Promise<void> =>
+  page.locator('input[type="file"][accept*="oplot"]').setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(json) });

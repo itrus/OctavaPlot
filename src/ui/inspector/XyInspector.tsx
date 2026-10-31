@@ -282,7 +282,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 </GroupBox>
               )}
 
-              {barChart && supportsHorizontal(chart.type) && <DirectionSection chart={chart} />}
+              {(barChart || chart.type === 'groupedLine') && supportsHorizontal(chart.type) && <DirectionSection chart={chart} />}
               {distChart && <DistributionControls chart={chart} lineColor={st.lineColor} lineWidthPt={st.lineWidthPt} lineOpacity={st.lineOpacity} onLine={(patch) => setStyle(patch)} />}
               {(barChart || chart.type === 'xyBars') && (
                 <GroupBox title={distChart ? (chart.type === 'groupedBox' ? 'Box' : 'Violin') : 'Bars'} {...(chart.type === 'groupedBar' || chart.type === 'xyBars' ? { checked: st.showBars, onCheckedChange: (v: boolean) => setStyle({ showBars: v }), overridden: ov('showBars') } : {})}>
@@ -320,6 +320,21 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                     ? 'The series that share a factor are drawn together; each series keeps the colour of its place in the cluster. Change factors with Factor… in the data table.'
                     : 'Two grouping levels: name the factor of each series with Factor… in the data table, and the series that share one are drawn together inside each category.'}
                 </div>
+              )}
+
+              {chart.type === 'groupedLine' && (
+                <GroupBox title="Summary rows">
+                  <div className="muted small">A summary row (a pooled effect, say) is drawn as a diamond from its lower to its upper limit, with no bar. Tick the rows that are summaries; the limits are the ones in the table.</div>
+                  {table.rows.map((row, i) => {
+                    const name = row.title !== '' ? row.title : `Row ${i + 1}`;
+                    const ids = chart.summaryRows ?? [];
+                    return (
+                      <Field key={row.id} label={name}>
+                        <Check checked={ids.includes(row.id)} ariaLabel={`Summary row: ${name}`} onChange={(v) => run('Summary row', patchLook(chart.id, { summaryRows: v ? [...ids, row.id] : ids.filter((id) => id !== row.id) }))} />
+                      </Field>
+                    );
+                  })}
+                </GroupBox>
               )}
 
               {chart.type === 'groupedBar' && layout.kind === 'replicates' && (

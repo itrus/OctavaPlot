@@ -34,9 +34,9 @@ describe('horizontal grouped and contingency bars', () => {
       expect(svg).not.toContain('NaN');
     });
   }
-  it('lines over categories stay vertical, and the setting is saved', () => {
+  it('lines over categories run horizontally too (a forest plot is these, turned), and the setting is saved', () => {
     const p = horizontal(projectWith('grouped', 'groupedLine'));
-    expect(buildGroupedModel(chartOf(p), tableOf(p)).orient.horizontal).toBe(false);
+    expect(buildGroupedModel(chartOf(p), tableOf(p)).orient.horizontal).toBe(true);
     const q = horizontal(projectWith('grouped', 'groupedBar'));
     expect(parseProject(stringifyProject(q)).charts.find((c) => c.id === 'c')!.orientation).toBe('horizontal');
   });

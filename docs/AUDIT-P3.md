@@ -2,6 +2,25 @@
 
 Date: 27 October 2026. Read-only audit; no source or test file was changed.
 
+## Status on 31 October 2026
+
+The findings below are the state of 27 October and are kept as written. Since then several gaps were built. Checked on 31 October by reading the source and the Playwright specs in `e2e/` (22 passed, run on the development server); not every case of each item was tried by hand.
+
+| Build item (below) | Now | Where |
+|---|---|---|
+| 1 Annotation anchored in data coordinates | Built: `anchor: 'data'` with `x` and `y` on the axes (`types.ts` l.674); the note follows the axis range, and a value outside it hides the note with a notice | `e2e/interaction.spec.ts` (annotations) |
+| 2 Legend position as numbers | Built in part: the legend can be moved (an offset in pt); the numeric fields were not checked | `e2e/interaction.spec.ts` (the legend) |
+| 3 Reset ladder | Built in part: a Reset button for the selected data sets (`DataSetReset.tsx`, one history step) and the dot on a mixed or overridden value resets it. A reset for every overridden field, and heat map, pie and histogram resets, were not checked | `e2e/interaction.spec.ts` (several data sets) |
+| 4 Mixed-state multi-selection | Built for data sets: Ctrl-click and Shift with Left and Right select several, one edit reaches all, "Mixed" shows where they differ. Points and annotations are not multi-selectable (not checked) | `e2e/interaction.spec.ts`, `e2e/keyboard.spec.ts` |
+| 5 Property search | Not built (no search box found under `src/ui`) | |
+| 6 Keyboard selection on the canvas and in the Navigator | Built: arrow keys select data sets and points, Escape returns, the title, legend and axes are stops, the selection is read out; arrow keys and Left and Right fold in the Navigator. A point picker by row was not checked | `e2e/keyboard.spec.ts` |
+| 7 Small-screen fixes | Built in part: the Navigator closes when a different item is chosen. The status message, the inspector rows at 375 px and the stale `BACKLOG.md` line were not checked | `e2e/interaction.spec.ts` (a narrow window) |
+| 8 Grid fill | Built: Home, End and their Ctrl forms, Ctrl+D, Fill series (start, step) | `e2e/keyboard.spec.ts` |
+| 9 Reference line label position and style | Not checked | |
+| 10 Playwright workflows | Built: keyboard grid, chart, Navigator and dialog focus (`keyboard.spec.ts`), plus `interaction.spec.ts`, `workflows.spec.ts`, `fitWorker.spec.ts` | `e2e/` |
+
+Drag-only list: item 5 (selecting on the canvas) and item 6 (the point picker) now have a keyboard route for data sets and points; item 4 (legend placement) can be moved by a command. The exit criterion below is not re-assessed.
+
 ## Method
 
 Read the source under `src/ui`, `src/state`, `src/model`, `src/chart/shared/scene` and `src/styles.css`, with `grep` for the named features. Nothing was run in a browser, so layout findings come from CSS and components only. "Not checked" means not read. Sizes: S half a day, M one to two days, L several days. Exit criterion: a figure can be reproduced from numeric inputs without dragging.

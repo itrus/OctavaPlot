@@ -1,4 +1,5 @@
 import type { FitModelId } from '../../stats/fit';
+import { newId } from '../ids';
 import { supportsHorizontal } from './chartTypes';
 import { NO_FIT_SETTINGS } from '../options/fitOptions';
 import type { Chart, ChartFit, ChartOrientation, FitSettings, HeatPalette, SurvivalOptions } from '../types';
@@ -28,6 +29,11 @@ export interface ChartVariant {
   bySubject?: boolean;
   /** Grouped bars made as dots only: the bars are off, the replicate values are dots and a line marks the mean of each cell. */
   dotsOnly?: boolean;
+  /**
+   * A forest plot: lines over categories turned on their side, with square markers and no joining line, and a dashed line at the null value
+   * (0 for differences; 1 for ratios, on a log axis), and no legend. The estimates and limits are the owner's: nothing is pooled or calculated.
+   */
+  forest?: 'difference' | 'ratio';
   fit?: { model: FitModelId; degree?: number; band?: ChartFit['band'] };
 }
 
@@ -41,6 +47,14 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
   if (variant.heatPalette && chart.type === 'heatmap') next.heatmap = { ...chart.heatmap, palette: variant.heatPalette };
   if (variant.survival && (chart.type === 'survival' || chart.type === 'cumulativeEvent')) next.survival = { ...chart.survival, ...variant.survival };
   if (variant.dotsOnly && chart.type === 'groupedBar') next.layers = chart.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showBars: false, showSymbols: true, showMeanLine: true } } : l));
+  if (variant.forest && chart.type === 'groupedLine') {
+    next.orientation = 'horizontal';
+    next.layers = chart.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showLines: false, symbolShape: 'square' as const } } : l));
+    next.referenceLines = [...chart.referenceLines, { id: newId('ref'), axis: 'y', value: variant.forest === 'ratio' ? 1 : 0, color: '#000000', widthPt: 1, style: 'dashed', opacity: 1, label: '', showLabel: false }];
+    // One series, so no legend; the value axis is named for what it holds.
+    next.legend = { ...chart.legend, visible: false };
+    next.yAxis = { ...chart.yAxis, title: variant.forest === 'ratio' ? 'Ratio (log scale)' : 'Effect and interval', ...(variant.forest === 'ratio' ? { scale: 'log10' as const } : {}) };
+  }
   if (variant.jitter !== undefined && chart.type === 'scatter') next.jitter = { ...chart.jitter, enabled: variant.jitter };
   if (variant.bySubject !== undefined && chart.type === 'scatter') next.jitter = { ...next.jitter, bySubject: variant.bySubject };
   if (variant.separated && chart.type === 'groupedBar') next.groupedBy = 'series';

@@ -44,21 +44,21 @@ npm install
 npm run dev      # development server
 npm run build    # type-check (strict) + production build
 npm test         # unit tests (vitest)
-npm run perf     # timings of the performance table, taken in the browser on the production build (test-results/perf.json)
+npm run perf     # timings of the performance table, taken in the browser on the production build (node_modules/.cache/perf.json)
 npm run e2e      # browser tests (Playwright, in the installed Google Chrome; starts its own dev server on port 5199)
 npm run typecheck # type-check only (no unused locals or parameters allowed)
 ```
 
 ## Structure
 
-Repository: `src/` (the app and its unit tests), `e2e/` (the browser tests), `docs/` (specifications, the example `.oplot`, README assets), `public/` (static files served by the app, such as the logo), `scripts/` (`loc-history.mjs`, which writes the git-ignored `docs/loc-history.csv`, and `logo.rs`), `.github/` (workflows).
+Repository: `src/` (the app and its unit tests), `e2e/` (the browser tests and their configuration, `playwright.config.ts`), `docs/` (the roadmap and the backlog, specifications, the example `.oplot`, README assets), `public/` (static files served by the app, such as the logo), `scripts/` (`loc-history.mjs`, which writes the git-ignored `docs/loc-history.csv`, and `logo.rs`), `.github/` (workflows).
 
 The source is in `src/`, in layers. A layer imports from its own folder and from the layers under it, never upward; `src/architecture.test.ts` checks this, and that no folder grows past 30 files. Tests sit next to the code they test.
 
 | Folder | What is in it |
 |---|---|
 | `src/util/` | Download and file-name helpers; the date stamp of file names; rich text (`richText.ts`); date, time and duration columns (`timeColumn.ts`); a ZIP writer with CRC-32, no library (`zip.ts`) |
-| `src/stats/` | The calculations, with no knowledge of charts: summaries and intervals (`summary.ts`), box and density (`distribution.ts`), curve fits (`fit.ts`), histogram and cumulative bins, matrices, special functions, the calculation cache, and the off-main-thread fits: the engine interface and the worker protocol (`fitEngine.ts`), the worker (`fitWorker.ts`) and the jobs and pending state behind the screen (`fitService.ts`) |
+| `src/stats/` | The calculations, with no knowledge of charts: summaries and intervals (`summary.ts`), box and density (`distribution.ts`), curve fits (`fit.ts`), histogram and cumulative bins, matrices, special functions, the calculation cache, `diagnostics/` (dot apportionment: a calculation that no graph draws yet), and the off-main-thread fits: the engine interface and the worker protocol (`fitEngine.ts`), the worker (`fitWorker.ts`) and the jobs and pending state behind the screen (`fitService.ts`) |
 | `src/model/` | The project as data. `types.ts`, `defaults.ts`, `ids.ts`, `units.ts` at the top, then: |
 | `src/model/table/` | Rows and columns of a data table, how its columns group into series, which data sets a graph draws, exclusions, the roles of the data (subjects in `subjects.ts`, factors in `factors.ts`) and the offset of offset traces (`offset.ts`) |
 | `src/model/graph/` | What a graph is made of: chart types and their gallery, the style hierarchy, fills, looks, palettes, layers (`layers.ts`: the parts of a graph that can be hidden, reordered, given a look of their own), capabilities of each type, linking and formatting graphs, results written into texts (`resultTokens.ts`), selecting several points or annotations (`selection/multi.ts`) |
@@ -99,7 +99,7 @@ A table has a **type**, chosen when it is created (Navigator → New Data Table�
 |---|---|---|
 | Column table | Each column is a group; the rows are its replicate values | Bar chart, Scatter dot plot (also aligned, or nested by subject), Mean with error bars, Floating bars, Box and whiskers, Violin plot, Before and after (these can also run horizontally); Histogram, Cumulative distribution |
 | XY table | First column is X (numbers); every other column is a Y series, or a Y with a size (bubbles) or with dX and dY (vectors) | XY scatter, Line, Line with symbols (also one line for each subject), Offset traces, Vectors, Bubbles, Bars at numeric X, Spikes, Area under the curve |
-| Grouped table | Each row is a category; each block of columns is a series (single values, replicates, or values already calculated) | Grouped bars (also three-way, separated, or joined by subject), Floating bars, Grouped box and violin, Stacked bars, Lines over categories, Heat map |
+| Grouped table | Each row is a category; each block of columns is a series (single values, replicates, or values already calculated) | Grouped bars (also three-way, separated, or joined by subject), Floating bars, Grouped box and violin, Stacked bars, Lines over categories, Forest plot, Heat map |
 | Contingency table | Rows are groups of subjects, columns are outcomes, cells are counts | Side-by-side bars, Stacked bars, 100% stacked bars, Pie charts, Doughnut charts |
 | Survival table | First column is the time; each other column is a group holding 1 (event) or 0 (censored) on the row of each subject | Survival curve (Kaplan-Meier), Cumulative events |
 
@@ -109,7 +109,7 @@ Survival curves use the product-limit estimate (events are counted before censor
 
 XY charts follow spec §3.1 and §7: symbols and a path layer per series (the line joins the points in table order; Connect points in: Ascending X joins them by X instead, still breaking at a missing Y and changing nothing else), a numeric X axis with Auto/Manual limits, input-order paths that break at a missing value (never bridged, never zero), and the automatic range including zero only when the data starts near it. `src/model/graph/chartTypes.ts` is the catalogue; adding a chart type means adding it there, a preset in `defaults.ts`, and its drawing.
 
-**New Graph…** shows a gallery per graph family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. The gallery has 55 entries, and all of them can be made now (32 chart types, some offered as several presets). The counts are those of the catalogue at the time of writing, counted from `src/model/graph/chartGallery.ts`. The gallery always shows every entry; one that is planned but not built would be shown locked, with its thumbnail and its preset ID. The catalogue is `src/model/graph/chartGallery.ts`; to make a planned graph available, give its entry a `type`.
+**New Graph…** shows a gallery per graph family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. The gallery has 57 entries, and all of them can be made now (32 chart types, some offered as several presets). The counts are those of the catalogue at the time of writing, counted from `src/model/graph/chartGallery.ts`. The gallery always shows every entry; one that is planned but not built would be shown locked, with its thumbnail and its preset ID. The catalogue is `src/model/graph/chartGallery.ts`; to make a planned graph available, give its entry a `type`.
 
 ## Roles: subjects and factors
 
@@ -128,7 +128,6 @@ Code: `src/model/table/subjects.ts`, `src/model/table/factors.ts`.
 ## Rich text
 
 The text of a graph (titles, axis titles, names, legend, annotations, labels, brackets) can hold subscripts, superscripts and Greek letters, written as plain text: `H_{2}O` gives H₂O, `m^{-2}` gives m⁻², `\mu mol/L` gives μ mol/L. Greek and symbols by name: `\alpha` ... `\omega`, `\Gamma \Delta \Theta \Lambda \Xi \Pi \Sigma \Upsilon \Phi \Psi \Omega`, `\pm \times \cdot \deg \leq \geq \neq \approx \infty`; `{}` ends a name so a letter can follow (`\mu{}m`); `\_ \^ \\ \{ \}` write the character itself. **The braces are required** so that names such as `Mouse_3` or `Run_2` are never changed; text without a backslash, `_{` or `^{` is written exactly as typed, and what is not understood is kept as typed. Scripts do not nest. Typing the Greek letter directly works too. On the page of a layout the title and the panel labels use it too, and the export checks the glyphs of each font used on the page. The Results sheets and CSV files keep what you typed. Code: `src/util/richText.ts`, `src/chart/shared/scene/richSvg.ts`.
-eq approx infty`; `{}` ends a name so a letter can follow (`mu{}m`); `_ ^ \ { }` write the character itself. **The braces are required** so that names such as `Mouse_3` or `Run_2` are never changed; text without a backslash, `_{` or `^{` is written exactly as typed, and what is not understood is kept as typed. Scripts do not nest. Typing the Greek letter directly works too. The Results sheets and CSV files keep what you typed. Code: `src/util/richText.ts`, `src/chart/shared/scene/richSvg.ts`.
 
 ## What each chart type can do
 
@@ -161,7 +160,7 @@ The table below is generated from the capability registry (`src/model/graph/capa
 | Grouped box and whiskers | yes | Y | – | – | – | – | yes | yes | yes |
 | Grouped violin | yes | Y | – | – | – | – | yes | yes | yes |
 | Heat map | – | – | – | – | – | – | – | – | – |
-| Lines over categories | – | Y | – | – | – | – | yes | yes | – |
+| Lines over categories | yes | Y | – | – | – | – | yes | yes | – |
 | Pie charts | – | – | – | – | – | – | – | – | – |
 | Doughnut charts | – | – | – | – | – | – | – | – | – |
 | Side-by-side bars | yes | Y | – | – | – | – | – | – | – |
@@ -202,7 +201,7 @@ Added on 29 October 2026 and tested in code; their controls have not all been tr
 - **Extra ticks and shaded regions** (XY): ticks at chosen values among the automatic ones, and bands between two values of an axis drawn behind the data (not part of the axis range).
 - **Dates, times and durations** for the X column of an XY table (X type… in the data table; the CSV import suggests a type and never applies it). ISO 8601 only; times are shown in UTC; calendar ticks. Other columns and chart families do not have them; curve fits and equal units are not applied on a time axis. Rules: `docs/calculation-contracts.md`, section 17.
 - **Results in text.** An annotation, a reference line label or a bracket label can hold `{{mean Control}}`, `{{n Drug A}}` or `{{sd Control|2}}` (n, sum, mean, sd, sem, median, min, max; `|2` is the decimals). They are filled when the graph is drawn and follow the data; excluded values are left out; a token that cannot be filled stays as typed and the chart warns. A reference line can also be drawn at a result (Value from). Not in titles, axis titles or the legend.
-- **Selecting several.** Ctrl, Cmd or Shift selects several points (column charts) or several annotations, and the inspector shows "Mixed" where they differ. The arrow keys reach the annotations after the axes (Page Down and Page Up step between them).
+- **Selecting several.** Ctrl, Cmd or Shift selects several data sets, points (column charts) or annotations (with the keyboard, Shift with Left and Right adds data sets), and the inspector shows "Mixed" where they differ. The arrow keys reach the annotations after the axes (Page Down and Page Up step between them).
 - **Large graphs.** Above 100 000 dots the preview of a column-family graph draws the dots in simplified form (a note says so); the export draws every dot.
 
 ## Fitted curves
@@ -214,6 +213,10 @@ A graph draws a curve fit by choosing it under Format graph → Fitted curve (or
 ## More bars and survival options
 
 Grouped and contingency bars (side by side, stacked, 100%) can run horizontally (Format graph → Direction). Grouped tables also draw floating bars: from the smallest to the largest replicate of each series in each category, with a line at the mean. Survival and cumulative-event curves can mark every event with a symbol and draw error bars of one Greenwood standard error at each event time.
+
+## Forest plots
+
+A forest plot shows an estimate and its interval for each study, one row each. Make a grouped table with **Mean (or median), Upper/Lower limits** (the rows are the studies; the three columns are the estimate and its upper and lower limits), then **New Graph… → Grouped → Summary data → Forest plot** (or **Forest plot, ratios**). It is the chart of lines over categories turned on its side (Layout → Direction), with square markers, no joining line, no legend and a dashed reference line at no effect: 0 for differences, 1 for ratios on a log axis (the line and the axis are edited in the inspector like any other). **Nothing is calculated or pooled**: the estimates and limits are what you typed, every marker has the same size, and there are no weights. To mark a pooled row, tick it under **Style → Summary rows** in the inspector: it is then drawn as a diamond from its lower to its upper limit, centred on its estimate, with no bar (a row with no usable interval stays an ordinary marker, and a notice says so). The value axis is titled "Effect and interval" ("Ratio (log scale)" for ratios), and Style → Direction turns the plot upright; both are edited like any other title or setting. Code: `variant.forest` in `src/model/graph/chartVariant.ts`, `summaryRows` in `src/model/graph/look.ts`, the diamond in `src/chart/grouped/groupedModel.ts` and `groupedMarks.ts`; tests: `src/chart/grouped/forest.test.ts` and `e2e/forest.spec.ts`.
 
 ## Symbols
 
@@ -281,7 +284,7 @@ Bars can be solid, patterned or unfilled (the last only from a file). Patterns: 
 
 ## Right Y axis
 
-Each data set can be plotted on the left or right Y axis (bar, scatter and mean charts, and the XY charts XY scatter, Line, Line with symbols, Bubbles, Bars at numeric X, Spikes and Area under the curve; not offset traces, vectors, survival or histogram). Inspector: Plot data on. The right axis has its own range, ticks, title, log scale, reversal, manual limits and gridlines (drawn dashed when the left grid is on); it cannot be broken. On an XY chart the legend marks a right-axis series "(right axis)" and the tooltip names the axis; reference lines, shaded regions, extra ticks and annotations anchored to data stay on the left axis, and equal units concern X and the left Y only. Right-axis margin and title sizes are proposals (P). Notices appear when an axis is empty, hidden, untitled, or when connectors across axes are skipped.
+Each data set can be plotted on the left or right Y axis (bar, scatter and mean charts, and the XY charts XY scatter, Line, Line with symbols, Bubbles, Bars at numeric X, Spikes and Area under the curve; not offset traces, vectors, survival or histogram, and not a column chart turned horizontal). Inspector: Plot data on. The right axis has its own range, ticks, title, log scale, reversal, manual limits and gridlines (drawn dashed when the left grid is on); it cannot be broken. On an XY chart the legend marks a right-axis series "(right axis)" and the tooltip names the axis; reference lines, shaded regions, extra ticks and annotations anchored to data stay on the left axis, and equal units concern X and the left Y only. Right-axis margin and title sizes are proposals (P). Notices appear when an axis is empty, hidden, untitled, or when connectors across axes are skipped.
 
 ## Row titles and point labels
 

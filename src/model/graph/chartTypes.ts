@@ -96,8 +96,8 @@ export const defaultChartTypeFor = (kind: TableKind): ChartType => chartTypesFor
 export const tableTypeInfo = (kind: TableKind): TableTypeInfo => TABLE_TYPES.find((t) => t.kind === kind) ?? TABLE_TYPES[0];
 
 /** How a chart type is drawn: which model and drawing it uses, and so which inspector. */
-/** Chart types that can run horizontally: the column charts (bars, dots, means, boxes and violins) and the bars of grouped and contingency tables. */
-export const supportsHorizontal = (type: ChartType): boolean => type === 'bar' || type === 'scatter' || type === 'mean' || type === 'box' || type === 'violin' || type === 'floating' || type === 'paired' || type === 'groupedBar' || type === 'groupedStacked' || type === 'groupedFloating' || type === 'groupedBox' || type === 'groupedViolin' || type === 'contingencyBars' || type === 'contingencyStacked' || type === 'contingencyPercent';
+/** Chart types that can run horizontally: the column charts (bars, dots, means, boxes and violins), the bars, boxes and violins of grouped and contingency tables, and the lines over categories (a forest plot is these, turned and without the line). */
+export const supportsHorizontal = (type: ChartType): boolean => type === 'bar' || type === 'scatter' || type === 'mean' || type === 'box' || type === 'violin' || type === 'floating' || type === 'paired' || type === 'groupedBar' || type === 'groupedStacked' || type === 'groupedFloating' || type === 'groupedBox' || type === 'groupedViolin' || type === 'groupedLine' || type === 'contingencyBars' || type === 'contingencyStacked' || type === 'contingencyPercent';
 
 type ChartFamily = 'column' | 'xy' | 'grouped' | 'survival' | 'pie' | 'histogram' | 'heatmap';
 

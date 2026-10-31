@@ -750,6 +750,11 @@ export interface Chart {
   traceOffset: number | null;
   /** Grouped bars of side-by-side series: the columns grouped by category (the usual layout) or by series (separated: each series has its own group of columns). */
   groupedBy: GroupedBy;
+  /**
+   * Lines over categories (a forest plot): the rows (by row id) drawn as a summary diamond, from the lower to the upper limit of the row,
+   * centred on its estimate, instead of a marker with a bar. Absent = none. An id of a row that is gone is ignored.
+   */
+  summaryRows?: Id[];
   /** Where the axis lines cross, as values on the other axis (null = the low edge): the Y axis at this X, the X axis at this Y. */
   origin: { x: number | null; y: number | null };
   bars: BarLayout;

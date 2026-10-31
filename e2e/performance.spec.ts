@@ -4,11 +4,11 @@ import { expect, test, type Page } from '@playwright/test';
 import { createExampleProject } from '../src/model/defaults';
 import { replaceTableData, setChartType } from '../src/state/commands';
 import { stringifyProject } from '../src/state/serialize';
-import { openApp } from './helpers';
+import { openApp, openProject } from './helpers';
 
 /**
  * Measurements against the performance table of the ROADMAP (npm run perf). They are not checks: the targets are provisional and
- * depend on the computer, so each timing is written down (test-results/perf.json) and printed, with the machine it was taken on.
+ * depend on the computer, so each timing is written down (node_modules/.cache/perf.json) and printed, with the machine it was taken on.
  * Nothing here runs with the other browser tests.
  */
 test.skip(!process.env.PERF, 'measurements: run with npm run perf');
@@ -30,8 +30,6 @@ function bigProject(rows: number, groups: number, type?: Parameters<typeof setCh
   if (type) p = setChartType(p.charts[0].id, type)(p);
   return stringifyProject({ ...p, name: 'perf' });
 }
-
-const openProject = (page: Page, json: string) => page.locator('input[type="file"][accept*="oplot"]').setInputFiles({ name: 'perf.oplot', mimeType: 'application/json', buffer: Buffer.from(json) });
 
 /** The time from `trigger` to the first change of the drawing, and to the frame after it, as the page sees them. */
 async function timeToUpdate(page: Page, trigger: () => Promise<unknown>): Promise<{ commit: number; frame: number }> {
@@ -58,8 +56,8 @@ async function timeToUpdate(page: Page, trigger: () => Promise<unknown>): Promis
 
 test.afterAll(() => {
   const machine = `${os.cpus()[0]?.model.trim()} (${os.cpus().length} threads), ${Math.round(os.totalmem() / 2 ** 30)} GB, ${os.platform()} ${os.release()}`;
-  mkdirSync('test-results', { recursive: true });
-  writeFileSync('test-results/perf.json', JSON.stringify({ machine, results }, null, 2));
+  mkdirSync('node_modules/.cache', { recursive: true });
+  writeFileSync('node_modules/.cache/perf.json', JSON.stringify({ machine, results }, null, 2));
   console.log(`\nMachine: ${machine}`);
   for (const r of results) console.log(`${String(r.ms).padStart(7)} ms  ${r.what}  (target ${r.target})`);
 });

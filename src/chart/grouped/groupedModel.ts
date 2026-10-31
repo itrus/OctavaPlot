@@ -83,6 +83,8 @@ interface GroupedPoint {
   stats: GroupStats | null;
   /** A mark of its own (the mean of a box plot); absent: the series' symbol. */
   shape?: SymbolShape;
+  /** A summary row of a forest plot: the diamond runs from the lower to the upper limit (positions along the value axis, in the region the chart is made in). */
+  diamond?: { lowerPy: number; upperPy: number };
 }
 
 interface GroupedSeries {
@@ -265,11 +267,15 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     }
     return [...(inRange('bars', seriesId) ? body : []), ...(inRange('rawPoints', seriesId) ? dots : [])];
   };
+  // Rows drawn as a summary diamond (lines over categories only), and the limits of one: its interval when that can be drawn.
+  const summaryIds = new Set(asLines ? chart.summaryRows ?? [] : []);
+  const isSummaryRow = (row: number): boolean => summaryIds.has(table.rows[row]?.id ?? '');
+  const limitsOf = (stats: GroupStats | null): [number, number] | null => (stats && stats.interval.status === 'ok' && stats.interval.lower !== null && stats.interval.upper !== null ? [stats.interval.lower, stats.interval.upper] : null);
   /** What a cell of side by side bars asks the axis to show. */
   const cellShows = (r: (typeof raw)[number], c: (typeof raw)[number]['cells'][number]): number[] =>
     isDist
       ? distShow(c, r.style, r.s.id)
-      : c.value === null ? [] : floating ? (c.span && inRange('bars', r.s.id) ? [...c.span, c.value] : []) : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars && inRange('errorBars', r.s.id), r.style.errorDirection) : [c.value]), ...(showDots(r.style) && inRange('rawPoints', r.s.id) ? c.reps.map((x) => x.value) : [])];
+      : c.value === null ? [] : floating ? (c.span && inRange('bars', r.s.id) ? [...c.span, c.value] : []) : [...(c.stats ? rangeValuesFor(c.stats, r.style.showErrorBars && inRange('errorBars', r.s.id), r.style.errorDirection) : [c.value]), ...(isSummaryRow(c.row) ? limitsOf(c.stats) ?? [] : []), ...(showDots(r.style) && inRange('rawPoints', r.s.id) ? c.reps.map((x) => x.value) : [])];
   const allY = isDist || arrangement === 'side' ? raw.flatMap((r) => r.cells.flatMap((c) => cellShows(r, c))) : stackedTotals;
   const horizontal = chart.orientation === 'horizontal' && supportsHorizontal(chart.type);
   const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? W / 120 : H / 100)));
@@ -365,6 +371,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   let offAxis = 0;
   let inGap = 0;
   let gapErrorBars = 0;
+  let summaryAsMarker = 0;
   let noSpan = 0;
   // Marks of a box or violin are made from whole-sample statistics; a value with no place gives no coordinate, so the mark is not drawn.
   const toYDraw = (v: number) => (placeable(yAxis, v) ? yScale(v) : NaN);
@@ -405,8 +412,12 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
           inGap++;
           continue;
         }
-        points.push({ id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, px, py: yScale(cell.value), value: cell.value, stats: cell.stats });
-        if (cell.stats && !errorEndInGap(cell.stats, r.style)) {
+        // A summary row is a diamond from its lower to its upper limit, when both can be placed on the axis; otherwise it is an ordinary marker (and a notice says so).
+        const limits = isSummaryRow(cell.row) ? limitsOf(cell.stats) : null;
+        const diamond = limits && limits.every((v) => onAxis(yAxis, v) && !inBreak(yAxis, v)) ? { lowerPy: yScale(limits[0]), upperPy: yScale(limits[1]) } : null;
+        if (isSummaryRow(cell.row) && !diamond) summaryAsMarker++;
+        points.push({ id, obsId: r.s.columns[0].observations[cell.row]?.id, row: cell.row, px, py: yScale(cell.value), value: cell.value, stats: cell.stats, ...(diamond ? { diamond } : {}) });
+        if (cell.stats && !diamond && !errorEndInGap(cell.stats, r.style)) {
           const bar = buildErrorBar({ groupId: r.s.id, centerX: px, stats: cell.stats, style: r.style, yScale, domain: yAxis.domain, log: !!yAxis.log });
           if (bar) {
             errorPath += bar.d;
@@ -546,6 +557,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   if (offAxis > 0) warnings.push(`${offAxis} value${offAxis === 1 ? ' is' : 's are'} 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn; the statistics include ${offAxis === 1 ? 'it' : 'them'}.`);
   if (inGap > 0) warnings.push(`${inGap} value${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);
   if (gapErrorBars > 0) warnings.push(`${gapErrorBars} error bar${gapErrorBars === 1 ? ' has' : 's have'} an end inside an omitted range of the axis and ${gapErrorBars === 1 ? 'is' : 'are'} not drawn.`);
+  if (summaryAsMarker > 0) warnings.push(`${summaryAsMarker} summary row${summaryAsMarker === 1 ? ' has' : 's have'} no interval that can be drawn on this axis, so ${summaryAsMarker === 1 ? 'it is' : 'they are'} drawn as ${summaryAsMarker === 1 ? 'an ordinary marker' : 'ordinary markers'}: enter its upper and lower limits.`);
   if (noSpan > 0) warnings.push(`${noSpan} value${noSpan === 1 ? ' has' : 's have'} no range to draw a floating bar from: enter replicates, or limits as the values already calculated.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
 

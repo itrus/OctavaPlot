@@ -8,6 +8,16 @@ const Axes = () => <path d="M10 6V46H78" />;
 const Dot = ({ x, y, open = false }: { x: number; y: number; open?: boolean }) => <circle cx={x} cy={y} r="2.1" fill={open ? '#fff' : 'currentColor'} />;
 const Bar = ({ x, y, w = 8, base = 46, tone = 0.3 }: { x: number; y: number; w?: number; base?: number; tone?: number }) => <rect x={x} y={y} width={w} height={base - y} fill="currentColor" fillOpacity={tone} />;
 const BarH = ({ y, x, h = 6, tone = 0.3 }: { y: number; x: number; h?: number; tone?: number }) => <rect x="10" y={y} width={x - 10} height={h} fill="currentColor" fillOpacity={tone} />;
+const Forest = () => (
+  <>
+    <Axes />
+    <path d="M40 8V44" strokeDasharray="2 2" />
+    <path d="M22 14H42M22 12V16M42 12V16M36 26H66M36 24V28M66 24V28M18 38H38M18 36V40M38 36V40" />
+    <rect x="30" y="12" width="4" height="4" fill="currentColor" />
+    <rect x="49" y="24" width="4" height="4" fill="currentColor" />
+    <rect x="26" y="36" width="4" height="4" fill="currentColor" />
+  </>
+);
 const Lines = ({ d, w = 1.6 }: { d: string; w?: number }) => <path d={d} strokeWidth={w} />;
 const Violin = ({ cx, w = 8, top = 12, bottom = 40 }: { cx: number; w?: number; top?: number; bottom?: number }) => (
   <path d={`M${cx} ${top}C${cx + w} ${top + 8} ${cx + w} ${bottom - 8} ${cx} ${bottom}C${cx - w} ${bottom - 8} ${cx - w} ${top + 8} ${cx} ${top}Z`} />
@@ -62,6 +72,8 @@ const SKETCHES: Record<string, () => ReactElement> = {
   'grp.stacked': () => (<><Axes /><Bar x={18} y={26} w={14} tone={0.55} /><Bar x={18} y={16} w={14} base={26} tone={0.18} /><Bar x={48} y={32} w={14} tone={0.55} /><Bar x={48} y={14} w={14} base={32} tone={0.18} /></>),
   'grp.barsH': () => (<><Axes /><BarH y={8} x={52} h={5} tone={0.55} /><BarH y={14} x={38} h={5} tone={0.18} /><BarH y={26} x={64} h={5} tone={0.55} /><BarH y={32} x={46} h={5} tone={0.18} /></>),
   'grp.stackedH': () => (<><Axes /><BarH y={10} x={36} h={8} tone={0.55} /><rect x="36" y="10" width="22" height="8" fill="currentColor" fillOpacity={0.18} /><BarH y={28} x={46} h={8} tone={0.55} /><rect x="46" y="28" width="24" height="8" fill="currentColor" fillOpacity={0.18} /></>),
+  'grp.forest': () => <Forest />,
+  'grp.forestRatio': () => <Forest />,
   'grp.floating': () => (<><Axes /><rect x="18" y="26" width="9" height="14" fill="currentColor" fillOpacity={0.55} /><rect x="29" y="18" width="9" height="16" fill="currentColor" fillOpacity={0.18} /><rect x="50" y="14" width="9" height="18" fill="currentColor" fillOpacity={0.55} /><rect x="61" y="22" width="9" height="14" fill="currentColor" fillOpacity={0.18} /></>),
   'heat.blue': () => <Heat colors={heatPatch('bs-blue')} />,
   'heat.purple': () => <Heat colors={heatPatch('bs-purple')} />,

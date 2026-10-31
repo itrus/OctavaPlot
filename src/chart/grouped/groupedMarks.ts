@@ -31,6 +31,9 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
   /** Shapes of the vertical drawing: under the matrix of a horizontal chart, as they are otherwise. */
   const turned = (children: SceneElement[]): SceneElement[] => (orient.matrix ? [el('g', [['transform', orient.matrix]], { children })] : children);
   const at = (p: { px: number; py: number }) => orient.toScreen(p.px, p.py);
+  /** A summary diamond: from the lower to the upper limit along the value axis, `height` across it, its corners put in place like any other point. */
+  const diamondPath = (p: { px: number; py: number; diamond: { lowerPy: number; upperPy: number } }, height: number): string =>
+    'M' + [[p.px, p.diamond.upperPy], [p.px + height / 2, p.py], [p.px, p.diamond.lowerPy], [p.px - height / 2, p.py]].map(([x, y]) => { const q = orient.toScreen(x, y); return `${n2(q.x)},${n2(q.y)}`; }).join('L') + 'Z';
   const symbolAttrs = (st: ChartStyle, d: string, borderWidth: number) =>
     [['d', d], ['fill', st.symbolColor], ['fill-opacity', st.symbolFillOpacity < 1 ? st.symbolFillOpacity : undefined], ['stroke', st.symbolBorderColor], ['stroke-width', borderWidth], ['stroke-opacity', st.symbolBorderOpacity < 1 ? st.symbolBorderOpacity : undefined]] as const;
 
@@ -83,7 +86,7 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
       case 'errorBars':
         return s.errorPath !== '' ? [named(el('path', [['d', s.errorPath], ['fill', 'none'], ['stroke', st.errorColor], ['stroke-width', st.errorLineWidthPt], ['stroke-opacity', st.errorOpacity < 1 ? st.errorOpacity : undefined], ['stroke-linecap', 'butt']], { hit: { kind: 'error', groupId: s.groupId } }))] : [];
       case 'points':
-        return st.showSymbols ? s.points.map((p) => named(el('path', symbolAttrs(st, symbolPath(st.symbolShape, at(p).x, at(p).y, st.symbolSizePt), st.symbolBorderWidthPt), { hit: { kind: 'point', groupId: s.groupId, objectId: p.id } }), p.obsId ?? p.id)) : [];
+        return st.showSymbols ? s.points.map((p) => named(el('path', symbolAttrs(st, p.diamond ? diamondPath({ ...p, diamond: p.diamond }, st.symbolSizePt) : symbolPath(st.symbolShape, at(p).x, at(p).y, st.symbolSizePt), st.symbolBorderWidthPt), { hit: { kind: 'point', groupId: s.groupId, objectId: p.id } }), p.obsId ?? p.id)) : [];
       case 'rawPoints':
         return s.dots.map((p) => named(el('path', symbolAttrs(st, symbolPath(p.shape ?? st.symbolShape, at(p).x, at(p).y, st.symbolSizePt), p.shape ? Math.max(st.symbolBorderWidthPt, 2) : st.symbolBorderWidthPt), { hit: { kind: 'point', groupId: s.groupId, objectId: p.id } }), p.id));
       default:

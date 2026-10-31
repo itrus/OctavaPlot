@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import { capabilitiesOf } from '../../model/graph/capabilities';
+import { fitObservations } from '../../model/project/curveFit';
 import { xySeries } from '../../model/table/tableLayout';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
 import type { Annotation, Bracket, ChartType, Project } from '../../model/types';
@@ -217,6 +218,27 @@ describe('the right Y axis of an XY chart', () => {
     // The same series on the left axis has its curve elsewhere: the curve does not follow the left scale.
     const left = buildXyModel(chartOf(patchStyle('c', sid(p)[1], { axisBinding: 'primary' })(p)), tableOf(p), fit).series[1];
     expect(left.fit!.path).not.toBe(s.fit!.path);
+  });
+
+  it('fits a line to every replicate of a series on the right as least squares does, the same as on the left and in the Results sheet', () => {
+    let p = addDataTable('t', 'xy', { layout: { kind: 'replicates', n: 3 }, sample: true })(createExampleProject());
+    p = addChart('c', 't', undefined, 'xyScatter')(p);
+    const fit = { ...NO_FIT_SETTINGS, model: 'linear' as const };
+    const table = tableOf(p);
+    const series = xySeries(table);
+    const xs = table.groups[0].observations.map((o) => o.value);
+    // Least squares over every replicate present, worked out here from the cells.
+    const pts: Array<{ x: number; y: number }> = [];
+    for (let r = 0; r < table.rowCount; r++) for (const c of series[1].columns) if (xs[r] !== null && c.observations[r].value !== null) pts.push({ x: xs[r]!, y: c.observations[r].value! });
+    const [mx, my] = [pts.reduce((a, q) => a + q.x, 0) / pts.length, pts.reduce((a, q) => a + q.y, 0) / pts.length];
+    const slope = pts.reduce((a, q) => a + (q.x - mx) * (q.y - my), 0) / pts.reduce((a, q) => a + (q.x - mx) ** 2, 0);
+    const params = (bound: 'primary' | 'secondary') => buildXyModel(chartOf(patchStyle('c', sid(p)[1], { axisBinding: bound })(p)), tableOf(p), fit).series[1].fit!.summary!.params.map((q) => q.value);
+    for (const bound of ['primary', 'secondary'] as const) {
+      const [a, b] = params(bound);
+      expect(b).toBeCloseTo(slope, 9);
+      expect(a).toBeCloseTo(my - slope * mx, 9);
+    }
+    expect(fitObservations(table)[1].obs).toEqual(pts);
   });
 
   it('tells in the tooltip which axis a series is on, only while two are in use', () => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
-import type { BatchFormat, BatchPlan } from '../../chart/export/batchExport';
+import { runBatch, type BatchFormat, type BatchPlan } from '../../chart/export/batchExport';
 import { fitsCanvas } from '../../chart/export/pngDpi';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
 import { newId } from '../../model/ids';
@@ -68,7 +68,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
       tooBigMessage: `A graph of the batch needs more pixels at ${dpi} dpi than the browser can make. Choose a lower resolution, or SVG.`,
       work: async (phase) => {
         // The renderer behind export (react-dom/server) is loaded on first use, not at startup.
-        const [{ runBatch }, { chartToSvgString, chartToPngBlob, chartToPdfBlob }] = await Promise.all([import('../../chart/export/batchExport'), import('../../chart/export/export')]);
+        const { chartToSvgString, chartToPngBlob, chartToPdfBlob } = await import('../../chart/export/export');
         phase('rasterizing');
         const blob = await runBatch(
           plan,

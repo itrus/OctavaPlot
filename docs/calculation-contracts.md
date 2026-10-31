@@ -1,6 +1,6 @@
 # Calculation contracts and preset catalogue
 
-Carried over from the earlier specification. These are the behavioural rules for calculations, the preset IDs used in the New Graph gallery, and the acceptance fixtures. See [ROADMAP.md](../ROADMAP.md) for scope and phases.
+Carried over from the earlier specification. These are the behavioural rules for calculations, the preset IDs used in the New Graph gallery, and the acceptance fixtures. See [ROADMAP.md](ROADMAP.md) for scope and phases.
 
 Labels: **D** = documented by a public source (GraphPad Prism user guide, ggprism, R manuals). **P** = proposal for this app, not a verified default. **U** = unverified. Every default is P unless marked D. Units are `pt` and `px` (1 px = 0.75 pt); browser zoom and device pixel ratio affect rasterisation only.
 
@@ -67,7 +67,7 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 
 - Replicate reduction, then normalisation, then colour scaling. Geometric mean rejects non-positive values. Percent CV at zero mean is undefined. Zero denominator gives missing with a notice. Auto min/max ignores missing and excluded cells. Interval colours use `[b(i), b(i+1))` with an inclusive final maximum. Reversing colours does not reverse row order. Labels name which value they show. Gaps are layout objects.
 - Weights must be finite, nonnegative, with a positive included total. Hiding a part keeps it in the denominator; excluding removes it. Zero parts keep their ID, with no fabricated slice. A supplied denominator above the included sum shows the remainder or is rejected. Slice angle `2π·w/total`.
-- Dot grid (**not built**, postponed by decision on 29 October 2026; no code and no fixture test): `q = N·w/total`, floor, then the remaining dots by descending fractional remainder, ties by part order. Weights 1, 1, 1 with N = 100 give 34, 33, 33. Percent labels use the original weights.
+- Dot grid (**the calculation is built, the graph is not**, 31 October 2026: `apportionDots` in `src/stats/diagnostics/apportion.ts` with the fixture below and hand-worked cases; no chart, gallery entry or option uses it yet): `q = N·w/total`, floor, then the remaining dots by descending fractional remainder, ties by part order. Weights 1, 1, 1 with N = 100 give 34, 33, 33. Percent labels use the original weights.
 - Stacks: an additive component's height is its own value; positive and negative accumulate separately. Normalised stacks reject negatives; an all-zero denominator is undefined. Component errors are not the total's uncertainty.
 - Nested data: group uncertainty comes from unit summaries, with equal weight per independent unit. n counts units.
 - Counts: nonnegative integers; cross-tabulate after exclusions; no chi-square or effect-size report.
@@ -81,7 +81,7 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 
 ## 9. ROC
 
-*Status, 29 October 2026: not built (postponed by decision). No code and no fixture test.*
+*Status, 31 October 2026: not built (postponed by decision on 29 October). No code and no fixture test; the two ROC rows of section 15 ("ROC perfect", "ROC complete tie") stay open and are what closes this section. Nothing below has been checked against an outside reference, so the values are the contract's own until the stats and the chart are written from an outside source first.*
 
 - Pooled distinct thresholds plus all-negative and all-positive outer points. Equal scores advance together. Sensitivity `TP/P`, FPR `FP/N`. Direction is explicit; never pick the better-looking one.
 - AUC is the trapezoidal area, equal to the fraction of correctly ordered positive-negative pairs plus half the tied fraction. Do not replace AUC < 0.5 by its complement without changing the direction. Both classes must be present.
@@ -98,9 +98,12 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 
 ## 11. Diagnostics and recipes
 
+- *Status, 31 October 2026: deferred by decision (not built, no chart; a first calculation was written and removed; it may be reconsidered later). The rule below is kept as the specification.*
 - Q-Q: sort; probabilities `i/(n+1)` (default) or `(i−0.375)/(n+0.25)`; expected `mean + sd·Φ⁻¹(p)` on the fitted scale, or `Φ⁻¹(p)` on the standard scale. Reference lines live in those coordinates. No normality p value.
+- *Status, 31 October 2026: the Bland-Altman plot is deferred by decision (not built; it may be reconsidered later; the rule below is kept as the specification).*
 - Bland-Altman: `x = (A+B)/2`, `d = B−A`, bias `mean(d)`, limits `bias ± 1.96·sd(d)` (dispersion of differences, not a CI of bias). Percent mode `100(B−A)/((A+B)/2)`, zero denominators invalid. Ratio mode needs positive values and summarises `ln(B/A)`, then exponentiates. The inspector shows the formula.
 - Residuals: observed minus predicted, from the stored model result (no refit when axes change). SD-scaled only if the SD exists; internally studentised needs leverage.
+- *Status, 31 October 2026: the forest plot is built as a gallery preset: a grouped table "Mean (or median), Upper/Lower limits" drawn as lines over categories turned horizontal, with the typed estimates and limits, a dashed null line at 0 (differences) or 1 (ratios, on a log axis), no pooling and no weights. The summary diamond is built for the rows the owner ticks (explicitly supplied, as the rule says): it runs from the lower to the upper limit of the row, centred on its estimate.*
 - Forest: supplied intervals only, no pooled effect, no weight manufactured from n. Null value 0 (differences) or 1 (ratios). Diamond for an explicitly supplied summary row.
 - Volcano: ratio fold change through log2; p through `−log10(p)`; no double transform. Adjusted p is labelled as such. Zero p is capped only against a declared bound and marked. No pseudocount.
 - Pyramid: magnitudes stay nonnegative in the data; sign is applied in the display; tick labels are positive; a common symmetric range.
@@ -120,7 +123,7 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 - Sources: manual text, supplied p, or calculated p. Supplied results are labelled as not recomputed.
 - Methods: one-sample t, Welch, equal-variance t (explicit), paired t (on differences), Mann-Whitney, signed-rank, two-curve logrank, supplied. Welch uses Satterthwaite df. Rank methods use average ranks; signed-rank drops exact zero differences and reports the count; exact distribution when feasible, else a tie-corrected normal approximation with a continuity-correction setting; the method that ran is stored.
 - Logrank: sum `d₁ⱼ − n₁ⱼ·dⱼ/nⱼ` with variance `n₁ⱼ n₀ⱼ dⱼ (nⱼ−dⱼ)/(nⱼ²(nⱼ−1))`, squared standardised total against χ² with 1 df. Zero variance means unavailable.
-- *Status, 29 October 2026: no test is calculated and no p-value is adjusted. Brackets carry the label the owner types or a result token (section 18); the methods and adjustments below are not built (Holm, BH and the exact binomial interval are postponed by decision).*
+- *Status, 31 October 2026: no test is calculated, no p-value is supplied as a number and none is adjusted. A bracket (XY, column and grouped charts) carries the label the owner types, which can hold a result token (section 18), so the only source built is manual text; "supplied p" and "calculated p" are not. The methods and the adjustments below are not built, and the section 15 rows "Holm", "BH" and "Exact binomial" stay open (Holm, BH and the exact binomial interval were skipped by decision on 29 October).*
 - Adjustment over m p-values: Bonferroni `min(1, m·p)`; Holm cumulative maxima of `(m−i+1)·p(i)`; BH reverse cumulative minima of `m·p(i)/i`; BY multiplies BH by `Σ1/j`. Restore the original order. Labels say adjusted or unadjusted. Hiding a bracket never changes its correction family. No automatic test choice after a normality screen.
 - Stars default: ≤0.05 `*`, ≤0.01 `**`, ≤0.001 `***`, ≤0.0001 `****`; otherwise "ns". Brackets stay attached to stable group IDs. Lane gaps are physical (pt).
 
@@ -180,11 +183,11 @@ Exact and rational values keep exact tolerance; ordinary finite summaries target
 | Duration | 1:30:00 in a column of hours, minutes, seconds | 1.5, 90, 5400 |
 | Composition zero total | weights 0, 0 | that row is not drawn (no angle, percent or fabricated slice) and a warning names it; other rows still draw |
 
-Status of the fixtures above, 29 October 2026 (a row is "tested" when a unit test holds the stated values, written from outside the code under test; see [AUDIT-P0.md](AUDIT-P0.md)):
+Status of the fixtures above, 31 October 2026 (a row is "tested" when a unit test holds the stated values, written from outside the code under test; see [AUDIT-P0.md](AUDIT-P0.md)):
 
 | Tested | Not built, no test (postponed by decision) |
 |---|---|
-| Arithmetic summary, mean CI, type-6 quartiles, Tukey whisker (fence 15 pinned), geometric summary, median CI n=5 and n=6, histogram edges, ECDF ties, bubble area, nested weighting, survival ties, no-event survival, exact line, log endpoint (geometry; the warning text was not checked), composition zero total, the eight date, time, zone, tick and duration rows | Dot apportionment, ROC perfect, ROC complete tie, exact binomial, Holm, BH |
+| Arithmetic summary, mean CI, type-6 quartiles, Tukey whisker (fence 15 pinned), geometric summary, median CI n=5 and n=6, histogram edges, ECDF ties, bubble area, nested weighting, survival ties, no-event survival, exact line, log endpoint (geometry; the warning text was not checked), composition zero total, dot apportionment (the function only, `src/stats/diagnostics/apportion.ts`; the values are worked out by hand from the rule, not from an outside tool), the eight date, time, zone, tick and duration rows | ROC perfect, ROC complete tie, exact binomial, Holm, BH |
 
 Interaction and applicability tests:
 
