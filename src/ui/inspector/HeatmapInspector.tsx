@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { chartTypesFor } from '../../model/graph/chartTypes';
 import { editScale, paletteColour, seedCustom } from '../../chart/heatmap/heatColours';
 import { HEAT_LIMITS, HEAT_MARKS, HEAT_PALETTE_GROUPS, HEAT_STATISTICS, isDiverging } from '../../model/options/heatmapOptions';
@@ -6,8 +6,9 @@ import { GroupedSelectField } from './GroupedSelect';
 import type { Chart, ChartType, DataTable, HeatmapOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { patchAxis, patchLook, setChartType } from '../../state/commands';
-import { Check, ColorInput, Field, FieldInput, GroupBox, NumField, OptionalNumField, SectionBar, SelectInput, TabBar, TextInput } from './common/controls';
+import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SectionBar, SelectInput, TabBar, TextInput } from './common/controls';
 import { SECTIONS as ALL_SECTIONS, TABS } from './common/nav';
+import { NumberListField } from './common/NumberListField';
 import { LayersSection } from './sections/LayersSection';
 import { AnnotationsTab, DimensionsSection, TextSections } from './sections/SharedSections';
 import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
@@ -17,44 +18,6 @@ const previewColours = (o: HeatmapOptions): string => Array.from({ length: 16 },
 
 const wholeIn = (lim: { min: number; max: number }) => (v: number) => (Number.isInteger(v) && v >= lim.min && v <= lim.max ? null : `A whole number from ${lim.min} to ${lim.max}.`);
 const sizeIn = (v: number) => (v >= HEAT_LIMITS.cellPt.min && v <= HEAT_LIMITS.cellPt.max ? null : `From ${HEAT_LIMITS.cellPt.min} to ${HEAT_LIMITS.cellPt.max} pt.`);
-
-/** The edges of the colour intervals as a list of numbers, typed with commas and set when the box is left; a text that is not numbers is refused. */
-function EdgesField({ value, onCommit }: { value: number[]; onCommit: (v: number[]) => void }) {
-  const shown = value.join(', ');
-  const [text, setText] = useState(shown);
-  const [error, setError] = useState<string | null>(null);
-  const [focused, setFocused] = useState(false);
-  useEffect(() => {
-    if (!focused) {
-      setText(shown);
-      setError(null);
-    }
-  }, [shown, focused]);
-  const commit = () => {
-    const numbers = text.split(/[;,\s]+/).filter((x) => x !== '').map(Number);
-    if (numbers.some((n) => !Number.isFinite(n))) return setError('Enter numbers separated by commas.');
-    if (numbers.length > HEAT_LIMITS.steps.max - 1) return setError(`At most ${HEAT_LIMITS.steps.max - 1} edges.`);
-    setError(null);
-    onCommit([...new Set(numbers)].sort((a, b) => a - b));
-  };
-  return (
-    <Field label="Interval edges" hint="Colour intervals with edges you choose, for example 2, 5, 10; they replace the equal steps" error={error}>
-      <FieldInput
-        ariaLabel="Interval edges"
-        className={error ? 'invalid' : ''}
-        placeholder="None"
-        value={text}
-        onFocus={() => setFocused(true)}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => {
-          setFocused(false);
-          commit();
-        }}
-        onKeyDown={(e) => e.key === 'Enter' && commit()}
-      />
-    </Field>
-  );
-}
 
 function MarkField({ label, value, onChange }: { label: string; value: HeatmapOptions['missingMark']; onChange: (v: HeatmapOptions['missingMark']) => void }) {
   return (
@@ -138,7 +101,7 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
                 <OptionalNumField label="Highest value" hint="Auto: the largest value" value={o.max} autoValue={1} validate={(v) => (o.min !== null && v <= o.min ? 'Must be above the lowest value.' : null)} onCommit={(v) => set('Highest colour value', { max: v }, 'heat:max')} />
                 {diverging && <OptionalNumField label="Middle colour at" hint="Auto: the middle of the range, or 0 for z-scores and centred values" value={o.centre} autoValue={0} onCommit={(v) => set('Middle colour value', { centre: v }, 'heat:centre')} />}
                 <OptionalNumField label="Colour steps" hint="Auto: a continuous scale; or this many equal intervals, each one colour" value={o.steps} autoValue={5} validate={wholeIn(HEAT_LIMITS.steps)} onCommit={(v) => set('Colour steps', { steps: v }, 'heat:steps')} />
-                <EdgesField value={o.breaks} onCommit={(v) => set('Interval edges', { breaks: v })} />
+                <NumberListField label="Interval edges" hint="Colour intervals with edges you choose, for example 2, 5, 10; they replace the equal steps" value={o.breaks} max={HEAT_LIMITS.steps.max - 1} normalise={(v) => [...new Set(v)].sort((x, y) => x - y)} onCommit={(v) => set('Interval edges', { breaks: v })} />
                 <Field label="Missing cells">
                   <ColorInput value={o.missingColour} ariaLabel="Colour of missing cells" onChange={(v) => set('Missing cell colour', { missingColour: v })} />
                 </Field>

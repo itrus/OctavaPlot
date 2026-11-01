@@ -109,46 +109,59 @@ describe('stored values', () => {
 
 describe('rows', () => {
   const rowsOf = (p: Project) => p.dataTables[0].rows;
-  const v2Json = () => JSON.parse(stringifyProject(createExampleProject())) as Any;
-  const stripRows = (j: Any) => {
-    for (const t of j.dataTables) delete t.rows;
+  const titled = () => {
+    const p = createExampleProject();
+    p.dataTables[0].rows[2] = { ...p.dataTables[0].rows[2], title: 'Sample 3' };
+    return p;
   };
-  it('a file without rows regenerates them', () => {
-    const env = v2Json();
-    stripRows(env.project);
+  const fileJson = (p: Project = titled()) => JSON.parse(stringifyProject(p)) as Any;
+  it('a file without a rows list has one empty row for each value', () => {
+    const env = fileJson(createExampleProject());
+    expect(env.project.dataTables[0].rows).toBeUndefined();
     const p = parseProject(JSON.stringify(env));
     expect(rowsOf(p)).toHaveLength(p.dataTables[0].rowCount);
     expect(new Set(rowsOf(p).map((r) => r.id)).size).toBe(rowsOf(p).length);
     expect(rowsOf(p).every((r) => r.title === '')).toBe(true);
   });
+  it('writes the rows that have a title and no others', () => {
+    expect(fileJson().project.dataTables[0].rows).toEqual([[2, 'Sample 3']]);
+  });
   it('round trips titles and ids', () => {
-    const p = createExampleProject();
-    p.dataTables[0].rows[2] = { ...p.dataTables[0].rows[2], title: 'Sample 3' };
+    const p = titled();
     const q = parseProject(stringifyProject(p));
     expect(q).toEqual(p);
     expect(rowsOf(q)[2].title).toBe('Sample 3');
   });
+  it('writes the ID of a row that is not at its place, and reads it back', () => {
+    const p = titled();
+    p.dataTables[0].rows[1] = { ...p.dataTables[0].rows[1], id: 'row_moved' };
+    expect(fileJson(p).project.dataTables[0].rows).toEqual([[1, '', 'row_moved'], [2, 'Sample 3']]);
+    expect(parseProject(stringifyProject(p))).toEqual(p);
+  });
   it('sanitises titles on load', () => {
-    const j = v2Json();
-    j.project.dataTables[0].rows[0].title = ' a\r\n b\u0000 ';
-    j.project.dataTables[0].rows[1].title = 5;
+    const j = fileJson();
+    j.project.dataTables[0].rows = [[0, ' a\r\n b\u0000 '], [1, '   ']];
     const p = parseProject(JSON.stringify(j));
     expect(rowsOf(p)[0].title).toBe('a b');
     expect(rowsOf(p)[1].title).toBe('');
   });
   it('rejects malformed rows', () => {
-    const bad = (mutate: (rows: Any[]) => unknown) => {
-      const j = v2Json();
-      const t = j.project.dataTables[0];
-      t.rows = mutate(t.rows);
+    const bad = (rows: unknown) => {
+      const j = fileJson();
+      j.project.dataTables[0].rows = rows;
       return () => parseProject(JSON.stringify(j));
     };
-    expect(bad((r) => r.slice(1))).toThrow(/Invalid project file: .*rows/);
-    expect(bad((r) => [...r, { id: 'extra', title: '' }])).toThrow(/rows/);
-    expect(bad((r) => [{ ...r[0], id: r[1].id }, ...r.slice(1)])).toThrow(/duplicated/);
-    expect(bad((r) => [{ ...r[0], id: '' }, ...r.slice(1)])).toThrow(/empty/);
-    expect(bad((r) => [{ title: 'x' }, ...r.slice(1)])).toThrow(/rows/);
-    expect(bad(() => 'nope')).toThrow(/rows/);
+    expect(bad([[99999, 'x']])).toThrow(/row index/);
+    expect(bad([[-1, 'x']])).toThrow(/row index/);
+    expect(bad([[1.5, 'x']])).toThrow(/row index/);
+    expect(bad([[3, 'x'], [2, 'y']])).toThrow(/larger than/);
+    expect(bad([[2, 'x'], [2, 'y']])).toThrow(/larger than/);
+    expect(bad([[1, 'x', '']])).toThrow(/empty/);
+    expect(bad([[1, 'x', 'same'], [2, 'y', 'same']])).toThrow(/another one/);
+    expect(bad([[1, 5]])).toThrow(/string/);
+    expect(bad([[1]])).toThrow(/entries/);
+    expect(bad([{ id: 'r', title: 'x' }])).toThrow(/array/);
+    expect(bad('nope')).toThrow(/rows/);
   });
 });
 
@@ -180,11 +193,10 @@ describe('autosave', () => {
 });
 
 describe('malformed persisted fields', () => {
-  const fmt = JSON.parse(stringifyProject(createExampleProject())).format as string;
   const build = (mutate: (p: Any) => void) => {
     const p = JSON.parse(JSON.stringify(createExampleProject())) as Any;
     mutate(p);
-    return JSON.stringify({ format: fmt, version: 1, project: p });
+    return stringifyProject(p as unknown as Project);
   };
   it('drops null annotations, coerces numeric text and notes both', () => {
     const r = parseProjectWithNotes(build((p) => (p.charts[0].annotations = [null, { id: 'a1', text: 42, xFrac: 2, yFrac: 'x', fontSizePt: -1, color: 'red' }])));
@@ -215,7 +227,7 @@ describe('malformed persisted fields', () => {
   it('rejects repeated table, graph and observation IDs', () => {
     expect(() => parseProject(build((p) => p.dataTables.push(JSON.parse(JSON.stringify(p.dataTables[0])))))).toThrow(/same ID/);
     expect(() => parseProject(build((p) => p.charts.push(JSON.parse(JSON.stringify(p.charts[0])))))).toThrow(/same ID/);
-    expect(() => parseProject(build((p) => (p.dataTables[0].groups[0].observations[1].id = p.dataTables[0].groups[0].observations[0].id)))).toThrow(/duplicated/);
+    expect(() => parseProject(build((p) => p.dataTables[0].groups[0].observations.slice(0, 2).forEach((o: Any) => (o.id = 'twice'))))).toThrow(/ID twice/);
   });
 });
 

@@ -1,7 +1,7 @@
 import { createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
 import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../chart/shared/parts/labels';
 import { CHART_TYPES, chartTypeInfo, defaultChartTypeFor } from '../model/graph/chartTypes';
-import { leadingColumns } from '../model/graph/chartTypes';
+import { BRACKET_LIFT_LIMIT, leadingColumns } from '../model/graph/chartTypes';
 import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../model/table/tableLayout';
 import { sanitizeFillKeys } from '../model/graph/fill';
 import { sanitizeAxis } from '../model/graph/axis';
@@ -11,11 +11,12 @@ import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLegendLayout, withoutLegendLayout } from '../model/graph/legendEntries';
 import { sanitizeLook, sanitizePrintWidthMm } from '../model/graph/look';
 import { sanitizeOrder } from '../model/table/groupOrder';
-import { MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
+import { canonicalObservationId, canonicalRowId, MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
 import { RESULT_STATS } from '../model/graph/resultTokens';
 import { defaultLayout, sanitizeLayout } from '../model/project/layout';
 import { timeColumnOf, type TimeColumn } from '../util/timeColumn';
+import { writeProject } from './tableFile/tableCodec';
 import { FILE_FORMAT, FILE_VERSION, migrateRead, migrateShape, upgradeToCurrent } from './migrate';
 import type { Analysis, Chart, ChartLayer, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, ResultStat, SummarySpec } from '../model/types';
 
@@ -27,7 +28,7 @@ export const AUTOSAVE_KEY = 'octavaplot:project:autosave';
 export const AUTOSAVE_BACKUP_KEY = 'octavaplot:project:autosave:backup';
 
 export function stringifyProject(project: Project): string {
-  return JSON.stringify({ format: FORMAT, version: VERSION, project }, null, 2);
+  return writeProject(project, { format: FORMAT, version: VERSION });
 }
 
 type Obj = Record<string, unknown>;
@@ -41,19 +42,82 @@ const num = (v: unknown, path: string): number => (typeof v === 'number' && Numb
 const arr = (v: unknown, path: string): unknown[] => (Array.isArray(v) ? v : fail(path, 'must be an array'));
 const obj = (v: unknown, path: string): Obj => (isObj(v) ? v : fail(path, 'must be an object'));
 
-/** Rows align with observations: a wrong count or bad IDs fail (a table without rows was given them by migrate.ts). */
-function parseRows(raw: unknown, path: string, rowCount: number): DataRow[] {
-  const list = arr(raw, path);
-  if (list.length !== rowCount) fail(path, `must have ${rowCount} entries`);
-  const ids = new Set<string>();
-  return list.map((rr, i) => {
-    const r = obj(rr, `${path}[${i}]`);
-    const id = str(r.id, `${path}[${i}].id`);
-    if (id === '') fail(`${path}[${i}].id`, 'must not be empty');
-    if (ids.has(id)) fail(`${path}[${i}].id`, 'is duplicated');
-    ids.add(id);
-    return { id, title: typeof r.title === 'string' ? sanitizeRowTitle(r.title) : '' };
+/** A stored list holds only the cells that are not empty, each as `[index, ...]`, in ascending order of index. */
+function storedEntries(raw: unknown, path: string, size: number, min: number, max: number): Array<{ index: number; entry: unknown[]; path: string }> {
+  const out: Array<{ index: number; entry: unknown[]; path: string }> = [];
+  let previous = -1;
+  arr(raw, path).forEach((e, i) => {
+    const ep = `${path}[${i}]`;
+    const entry = arr(e, ep);
+    if (entry.length < min || entry.length > max) fail(ep, `must have ${min} to ${max} entries`);
+    const index = entry[0];
+    if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= size) fail(`${ep}[0]`, `must be a row index from 0 to ${size - 1}`);
+    if (index <= previous) fail(`${ep}[0]`, 'must be larger than the index before it');
+    previous = index;
+    out.push({ index, entry, path: ep });
   });
+  return out;
+}
+
+/**
+ * Gives each place that the file did not name its canonical ID or, if an ID of the file has that one (a moved row or value
+ * that was stored), that ID followed by as many plus signs as it takes to be free. An ID the file names twice is refused.
+ */
+function fillIds(named: Array<string | undefined>, canonical: (i: number) => string, path: string, taken: Set<string>): string[] {
+  const out: string[] = [];
+  named.forEach((id, i) => {
+    if (id === undefined) return;
+    if (taken.has(id)) fail(`${path}[${i}]`, `has the ID ${id}, which another one has too`);
+    taken.add(id);
+    out[i] = id;
+  });
+  named.forEach((id, i) => {
+    if (id !== undefined) return;
+    let made = canonical(i);
+    while (taken.has(made)) made += '+';
+    taken.add(made);
+    out[i] = made;
+  });
+  return out;
+}
+
+/** Rows are stored as `[index, title]` or `[index, title, id]`: only those with a title or an ID that is not the canonical one of their place. */
+function parseRows(raw: unknown, path: string, rowCount: number): DataRow[] {
+  const named: Array<string | undefined> = Array.from({ length: rowCount }, () => undefined);
+  const titles: string[] = Array.from({ length: rowCount }, () => '');
+  if (raw !== undefined) {
+    for (const { index, entry, path: ep } of storedEntries(raw, path, rowCount, 2, 3)) {
+      if (typeof entry[1] !== 'string') fail(`${ep}[1]`, 'must be a string');
+      if (entry.length === 3) {
+        named[index] = str(entry[2], `${ep}[2]`);
+        if (named[index] === '') fail(`${ep}[2]`, 'must not be empty');
+      }
+      titles[index] = sanitizeRowTitle(entry[1]);
+    }
+  }
+  return fillIds(named, canonicalRowId, path, new Set()).map((id, i) => ({ id, title: titles[i] }));
+}
+
+/**
+ * The values of a column: `[index, value]`, or `[index, value, {id, subject, excluded, excludedReason}]` for a cell with
+ * something to say besides its value. A cell that is not listed is empty: null, no subject, not excluded. The ID of a cell
+ * is stored unless it is the canonical one of its place.
+ */
+function parseObservations(raw: unknown, path: string, rowCount: number, groupId: string, taken: Set<string>): Observation[] {
+  const named: Array<string | undefined> = Array.from({ length: rowCount }, () => undefined);
+  const cells: Array<Omit<Observation, 'id'>> = Array.from({ length: rowCount }, () => ({ value: null }));
+  for (const { index, entry, path: ep } of storedEntries(raw, path, rowCount, 2, 3)) {
+    const value = entry[1] === null ? null : num(entry[1], `${ep}[1]`);
+    const o = entry.length === 3 ? obj(entry[2], `${ep}[2]`) : {};
+    if (o.id !== undefined) {
+      named[index] = str(o.id, `${ep}[2].id`);
+      if (named[index] === '') fail(`${ep}[2].id`, 'must not be empty');
+    }
+    // An excluded value is kept, with its reason, but not used (model/table/exclusion.ts).
+    const subject = typeof o.subject === 'string' ? o.subject.trim() : '';
+    cells[index] = { value, ...(subject !== '' ? { subject } : {}), ...(o.excluded === true ? { excluded: true as const, ...(typeof o.excludedReason === 'string' && o.excludedReason !== '' ? { excludedReason: o.excludedReason } : {}) } : {}) };
+  }
+  return fillIds(named, (i) => canonicalObservationId(groupId, i), path, taken).map((id, i) => ({ id, ...cells[i] }));
 }
 
 /**
@@ -116,17 +180,7 @@ function parseTable(raw: unknown, path: string): DataTable {
     const id = str(g.id, `${gp}.id`);
     if (ids.has(id)) fail(`${gp}.id`, 'is duplicated');
     ids.add(id);
-    const observations: Observation[] = arr(g.observations, `${gp}.observations`).map((ro, oi) => {
-      const o = obj(ro, `${gp}.observations[${oi}]`);
-      const value = o.value === null ? null : num(o.value, `${gp}.observations[${oi}].value`);
-      const oid = str(o.id, `${gp}.observations[${oi}].id`);
-      if (obsIds.has(oid)) fail(`${gp}.observations[${oi}].id`, 'is duplicated');
-      obsIds.add(oid);
-      // An excluded value is kept, with its reason, but not used (model/table/exclusion.ts).
-      const subject = typeof o.subject === 'string' ? o.subject.trim() : '';
-      return { id: oid, value, ...(subject !== '' ? { subject } : {}), ...(o.excluded === true ? { excluded: true as const, ...(typeof o.excludedReason === 'string' && o.excludedReason !== '' ? { excludedReason: o.excludedReason } : {}) } : {}) };
-    });
-    if (observations.length !== rowCount) fail(`${gp}.observations`, `must have ${rowCount} entries`);
+    const observations = parseObservations(g.observations, `${gp}.observations`, rowCount, id, obsIds);
     return {
       id,
       name: str(g.name, `${gp}.name`),
@@ -446,6 +500,7 @@ function cleanBrackets(raw: unknown, path: string, notes: string[]): Chart['brac
       ...(isRow(b.row) ? { row: b.row } : {}),
       ...(isRow(b.toRow) ? { toRow: b.toRow } : {}),
       ...(typeof b.at === 'number' && Number.isFinite(b.at) ? { at: b.at } : {}),
+      ...(typeof b.liftPt === 'number' && Number.isFinite(b.liftPt) && b.liftPt !== 0 ? { liftPt: Math.max(-BRACKET_LIFT_LIMIT, Math.min(BRACKET_LIFT_LIMIT, b.liftPt)) } : {}),
     });
   });
   return out;

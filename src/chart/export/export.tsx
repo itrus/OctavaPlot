@@ -1,10 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Chart, DataTable, FitSettings } from '../../model/types';
-import { chartPx2Pt } from '../../model/units';
 import { buildAnyModel, ChartCanvas } from '../anyModel';
-import { buildPdf, rgbaToFlateRgb } from './pdf';
 import { canvasToPngBlob } from './pngDpi';
 import { prefixIds as prefixIdsWith } from './prefixIds';
+import { svgToPdf } from './svgPdf';
 
 /**
  * Export renders the same declarative <ChartCanvas> without editor state, so
@@ -50,13 +49,17 @@ export async function chartToPngBlob(chart: Chart, table: DataTable, dpi: number
   return canvasToPngBlob(canvas, dpi);
 }
 
-/** A one-page PDF the size of the chart (1 px = 0.75 pt) holding a picture of it at `dpi` dots per inch; see pdf.ts. */
-export async function chartToPdfBlob(chart: Chart, table: DataTable, dpi: number, fit?: FitSettings): Promise<Blob> {
-  const canvas = await chartToCanvas(chart, table, dpi / 96, fit);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas 2D context is unavailable.');
-  const flateRgb = await rgbaToFlateRgb(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
-  return new Blob([buildPdf({ widthPt: chartPx2Pt(chart.widthPx), heightPt: chartPx2Pt(chart.heightPx), pxWidth: canvas.width, pxHeight: canvas.height, flateRgb, title: chart.name }) as BlobPart], { type: 'application/pdf' });
+/**
+ * A one-page PDF the size of the chart (1 px = 0.75 pt), written from the same SVG as the SVG export: vector shapes and text, no picture.
+ * `notes` says what could not be written as it is (see svgPdf.ts).
+ */
+export async function chartToPdf(chart: Chart, table: DataTable, fit?: FitSettings): Promise<{ blob: Blob; notes: string[] }> {
+  const { bytes, notes } = await svgToPdf(chartToSvgString(chart, table, fit), { title: chart.name });
+  return { blob: new Blob([bytes as BlobPart], { type: 'application/pdf' }), notes };
+}
+
+export async function chartToPdfBlob(chart: Chart, table: DataTable, fit?: FitSettings): Promise<Blob> {
+  return (await chartToPdf(chart, table, fit)).blob;
 }
 
 async function chartToCanvas(chart: Chart, table: DataTable, scale: number, fit?: FitSettings): Promise<HTMLCanvasElement> {

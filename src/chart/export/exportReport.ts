@@ -7,7 +7,7 @@ type ReportFormat = 'svg' | 'png' | 'pdf';
 
 /** What cannot be promised about an export, whatever the graph. Fixed texts, shown and copied as they are. */
 export const EXPORT_LIMITS = [
-  'PDF holds a raster picture at the chosen resolution, not vector shapes.',
+  'A PDF is vector shapes and text, with no resolution. Its text is written in the standard fonts Helvetica, Times and Courier (Symbol for Greek letters and signs), the nearest to the font of the graph; they are not embedded, and a character none of them has is written as "?".',
   'Fonts are not embedded in an SVG: a computer without the font draws another one.',
   'A PNG records its resolution (dpi), but the physical size depends on the program that places it.',
 ] as const;
@@ -18,7 +18,7 @@ export interface ExportReportInput {
   widthPx: number;
   heightPx: number;
   format: ReportFormat;
-  /** Resolution of a PNG or PDF; ignored for SVG. */
+  /** Resolution of a PNG; ignored for SVG and PDF, which have none. */
   dpi: number;
   /** The font-family lists the drawing asks for (CSS syntax); each is checked once. */
   fontFamilies: readonly string[];
@@ -45,10 +45,10 @@ interface Size {
 export interface ExportReport {
   name: string;
   format: ReportFormat;
-  /** Null for SVG, which has no resolution. */
+  /** Null for SVG and PDF, which have no resolution. */
   dpi: number | null;
   size: { px: Size; pt: Size; mm: Size };
-  /** The pixels of the PNG or of the picture in a PDF; null for SVG. */
+  /** The pixels of the PNG; null for SVG and PDF. */
   raster: { width: number; height: number; megapixels: number; exceedsCanvasLimit: boolean } | null;
   fonts: FontCheck[];
   /** Characters of the texts that the font in use does not have; null when the texts are not known. */
@@ -68,7 +68,7 @@ export function buildExportReport(input: ExportReportInput): ExportReport {
   const mm = (px: number) => round((px * 25.4) / 96, 2);
   const fonts = [...new Set(input.fontFamilies)].map((list) => checkFonts(list, input.isFontAvailable));
   const groups = input.textGroups ?? [];
-  const pixels = input.format === 'svg' ? null : exportPixels({ widthPx, heightPx }, input.dpi);
+  const pixels = input.format === 'png' ? exportPixels({ widthPx, heightPx }, input.dpi) : null;
   return {
     name: input.name,
     format: input.format,

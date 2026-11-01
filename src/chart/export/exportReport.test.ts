@@ -32,8 +32,10 @@ describe('buildExportReport', () => {
     expect(r.dpi).toBeNull();
     expect(r.size.px.width).toBe(100000);
   });
-  it('has a raster for a PDF too', () => {
-    expect(buildExportReport(input({ format: 'pdf', dpi: 150 })).raster).toMatchObject({ width: 1000, height: 750 });
+  it('has no raster and no resolution for a PDF either: it is vector', () => {
+    const r = buildExportReport(input({ format: 'pdf', dpi: 150 }));
+    expect(r.raster).toBeNull();
+    expect(r.dpi).toBeNull();
   });
   it('says when the canvas limit is exceeded, with the limits of fitsCanvas', () => {
     const exceeds = (widthPx: number, heightPx: number) => buildExportReport(input({ widthPx, heightPx })).raster?.exceedsCanvasLimit;
@@ -57,7 +59,7 @@ describe('buildExportReport', () => {
   it('always lists the known limits', () => {
     const r = buildExportReport(input());
     expect(r.limits).toEqual([...EXPORT_LIMITS]);
-    expect(r.limits.join(' ')).toMatch(/PDF.*raster/);
+    expect(r.limits.join(' ')).toMatch(/PDF is vector.*standard fonts/);
     expect(r.limits.join(' ')).toMatch(/not embedded in an SVG/);
     expect(r.limits.join(' ')).toMatch(/PNG.*resolution/);
   });

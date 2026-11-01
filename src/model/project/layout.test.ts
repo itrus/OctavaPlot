@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { buildAnyModel } from '../../chart/anyModel';
 import { drawLayout } from '../../chart/export/layoutExport';
 import { addChart, addDataTable, addFreePanel, addLayout, patchChart, setCells, duplicateLayout, freeLayout, patchLayout, removeChart, removeFreePanel, removeLayout, removeTable, renameItem, setFrame, setLayoutPanel } from '../../state/commands';
-import { buildPdf, rgbaToFlateRgb } from '../../chart/export/pdf';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { createExampleProject } from '../defaults';
 import { arrangeLayout, defaultLayout, mmToPt, pageFrame, panelLabel, sanitizeLayout, slotCount, slotRects, standardArrangements, turnFrames } from './layout';
@@ -275,33 +274,6 @@ describe('free placement', () => {
   });
   it('reads the earlier name of the smallest-size mode', () => {
     expect(sanitizeLayout({ scaling: { mode: 'equal' } }, defaultLayout('x', 'x')).scaling).toEqual({ mode: 'smallest' });
-  });
-});
-
-describe('PDF', () => {
-  it('is a one-page PDF of the page size with a correct cross-reference table', () => {
-    const flateRgb = new Uint8Array([120, 156, 3, 0, 0, 0, 0, 1]);
-    const bytes = buildPdf({ widthPt: 841.89, heightPt: 595.28, pxWidth: 10, pxHeight: 7, flateRgb, title: 'Figure (1)' });
-    const text = new TextDecoder('latin1').decode(bytes);
-    expect(text.startsWith('%PDF-1.4')).toBe(true);
-    expect(text).toContain('/MediaBox[0 0 841.89 595.28]');
-    expect(text).toContain('/Width 10/Height 7');
-    expect(text).toContain(String.raw`/Title(Figure \(1\))`);
-    expect(text.trimEnd().endsWith('%%EOF')).toBe(true);
-    // Every entry of the xref table points at the start of its object.
-    const start = Number(/startxref\n(\d+)/.exec(text)![1]);
-    expect(text.slice(start, start + 4)).toBe('xref');
-    const entries = [...text.slice(start).matchAll(/(\d{10}) 00000 n /g)].map((m) => Number(m[1]));
-    expect(entries).toHaveLength(6);
-    entries.forEach((o, i) => expect(text.slice(o, o + `${i + 1} 0 obj`.length)).toBe(`${i + 1} 0 obj`));
-    // The stream length is that of the image data.
-    expect(text).toContain(`/Length ${flateRgb.length}`);
-  });
-  it('compresses RGB so that it can be read back, with transparency as white', async () => {
-    const rgba = new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 0, 0]);
-    const flate = await rgbaToFlateRgb(rgba);
-    const back = new Uint8Array(await new Response(new Blob([flate as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer());
-    expect([...back]).toEqual([255, 0, 0, 255, 255, 255]);
   });
 });
 

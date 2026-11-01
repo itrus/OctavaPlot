@@ -31,7 +31,8 @@ describe('old files', () => {
       for (const g of t.groups) expect(g.observations).toHaveLength(12);
     }
     // What was kept from the file: the values of the first column of the first table.
-    expect(project.dataTables[0].groups[0].observations.map((o) => o.value)).toEqual(env.project.dataTables[0].groups[0].observations.map((o: { value: number | null }) => o.value));
+    const stored = new Map<number, number | null>(env.project.dataTables[0].groups[0].observations.map((e: [number, number | null]) => [e[0], e[1]]));
+    expect(project.dataTables[0].groups[0].observations.map((o) => o.value)).toEqual(Array.from({ length: 12 }, (_, i) => stored.get(i) ?? null));
     const saved = stringifyProject(project);
     const again = parseProjectWithNotes(saved);
     expect(again.notes).toEqual([]);
@@ -88,32 +89,11 @@ describe('old files', () => {
     expect(project.dataTables[0].groups.some((g) => g.factor !== undefined)).toBe(false);
     expect(project.dataTables[0].groups.some((g) => g.observations.some((o) => o.subject !== undefined))).toBe(false);
   });
-
-  it('keeps a hand-written file working: a table without rows gets one empty title for each value', () => {
-    const env = json('df99336');
-    for (const t of env.project.dataTables) delete t.rows;
-    const { project, notes } = parseProjectWithNotes(JSON.stringify(env));
-    expect(notes).toEqual([]);
-    for (const t of project.dataTables) {
-      expect(t.rows).toHaveLength(12);
-      expect(new Set(t.rows.map((r) => r.id)).size).toBe(12);
-      expect(t.rows.every((r) => r.title === '')).toBe(true);
-    }
-  });
-
-  it('does not make rows for a table whose size is not valid: the file is refused, as before', () => {
-    for (const rowCount of [-1, 1.5, 100001, '12']) {
-      const env = json('df99336');
-      delete env.project.dataTables[0].rows;
-      env.project.dataTables[0].rowCount = rowCount;
-      expect(() => parseProjectWithNotes(JSON.stringify(env))).toThrow(/rowCount|rows/);
-    }
-  });
 });
 
 describe('the shape chain', () => {
   it('has steps with their own ids, in the order they run', () => {
-    expect(SHAPE_STEPS.map((s) => s.id)).toEqual(['rows-generated', 'one-layer']);
+    expect(SHAPE_STEPS.map((s) => s.id)).toEqual(['one-layer']);
   });
 
   it('does nothing to a file of the present shape', () => {

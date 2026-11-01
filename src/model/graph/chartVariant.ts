@@ -59,7 +59,11 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
   if (variant.bySubject !== undefined && chart.type === 'scatter') next.jitter = { ...next.jitter, bySubject: variant.bySubject };
   if (variant.separated && chart.type === 'groupedBar') next.groupedBy = 'series';
   if (variant.subjectLines !== undefined && chart.type === 'groupedBar') next.pairs = { ...next.pairs, bySubject: variant.subjectLines };
-  if (variant.bubbles && chart.type === 'xyBubble') next.defaults = { ...chart.defaults, symbolSizePt: 36, symbolFillOpacity: 0.6 };
+  if (variant.bubbles && chart.type === 'xyBubble') {
+    next.defaults = { ...chart.defaults, symbolSizePt: 36, symbolFillOpacity: 0.6 };
+    // The sizes are not on the axes, so a bubble chart made from the gallery says what they mean.
+    next.sizeLegend = { values: [] };
+  }
   if (variant.offsetTraces && chart.type === 'xyOffset') next.yAxis = { ...next.yAxis, visible: false, scaleBar: true };
   if (variant.lineConnect !== undefined && isXy(chart)) next.lineConnect = variant.lineConnect;
   if (variant.fit?.band && isXy(chart)) next.fit = { ...chart.fit, band: variant.fit.band };

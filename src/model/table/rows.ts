@@ -5,8 +5,22 @@ import type { DataRow, DataTable, Group } from '../types';
 export const MAX_ROW_TITLE_CHARS = 200;
 
 /** Fresh rows with empty titles. */
-export const createRows = (count: number): DataRow[] =>
-  Array.from({ length: count }, () => ({ id: newId('row'), title: '' }));
+/**
+ * The ID a row has when it was made at its place and nothing has moved it since. A file stores the ID of a row only when it
+ * is another one (state/tableCodec.ts), so a table that was made, filled and saved keeps every ID without writing them.
+ */
+export const canonicalRowId = (index: number): string => `~${index}`;
+/** The same for a value: the ID of the cell of column `groupId` at row `index`. */
+export const canonicalObservationId = (groupId: string, index: number): string => `${groupId}~${index}`;
+
+/** An ID that is not in `taken`: the canonical one, or, when a moved row or value has that one, a new random one. */
+export function freshId(canonical: string, prefix: string, taken: ReadonlySet<string>): string {
+  return taken.has(canonical) ? newId(prefix) : canonical;
+}
+
+/** `count` empty rows from row `start` on; `taken` holds the IDs the table has already. */
+export const createRows = (count: number, start = 0, taken: ReadonlySet<string> = new Set()): DataRow[] =>
+  Array.from({ length: count }, (_, i) => ({ id: freshId(canonicalRowId(start + i), 'row', taken), title: '' }));
 
 /**
  * Single-line, printable row title: line breaks and tabs become one space, other

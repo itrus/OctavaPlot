@@ -654,6 +654,11 @@ export interface Bracket {
   toRow?: number;
   /** XY charts: the X value at which the two series are joined (each must have a point there). Ignored by the other charts. */
   at?: number;
+  /**
+   * How far the bracket was moved from where it is placed, pt, away from the data: up on a chart over categories, to the right on a
+   * horizontal one and on an XY chart. Absent = not moved. It moves the drawing only: the axis range and the other brackets stay as they are.
+   */
+  liftPt?: number;
 }
 
 export interface Annotation {
@@ -755,6 +760,11 @@ export interface Chart {
    * centred on its estimate, instead of a marker with a bar. Absent = none. An id of a row that is gone is ignored.
    */
   summaryRows?: Id[];
+  /**
+   * Bubble charts: a legend of the sizes, a row of reference circles under the plot, on the one scale of the chart. `values` are sizes in the units of the
+   * size column (any number above 0); none = the round values below the largest size. Absent = no size legend.
+   */
+  sizeLegend?: { values: number[] };
   /** Where the axis lines cross, as values on the other axis (null = the low edge): the Y axis at this X, the X axis at this Y. */
   origin: { x: number | null; y: number | null };
   bars: BarLayout;

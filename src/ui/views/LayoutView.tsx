@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { drawLayout, layoutPngSize, layoutTextGroups, layoutToPdfBlob, layoutToPngBlob, layoutToSvgString } from '../../chart/export/layoutExport';
+import { drawLayout, layoutPngSize, layoutTextGroups, layoutToPdf, layoutToPngBlob, layoutToSvgString } from '../../chart/export/layoutExport';
 import { FONT_FAMILY } from '../../model/defaults';
 import { clampFrame, FREE_MAX, GAP_MM_MAX, GRID_MAX, LABEL_PT_MAX, LEGEND_PT_MAX, LEGEND_PT_MIN, LABEL_PT_MIN, MARGIN_MM_MAX, pageMm, PERCENT_MAX, PERCENT_MIN, standardArrangements, sameArrangement } from '../../model/project/layout';
 import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, LayoutScaling, PanelLabelStyle } from '../../model/types';
@@ -163,7 +163,21 @@ function LayoutPage({ layout }: { layout: Layout }) {
         return 'Exported SVG.';
       },
     });
-  const exportRaster = (kind: 'png' | 'pdf') => {
+  // A PDF is vector shapes and text: it has no resolution and no canvas limit.
+  const exportPdf = () =>
+    exportJob.start({
+      label: 'PDF',
+      pixels: null,
+      tooBigMessage: '',
+      work: async (phase) => {
+        phase('encoding');
+        const { blob, notes } = await layoutToPdf(layout, project);
+        downloadBlob(blob, exportFileName(layout.name, 'pdf', settings.timestampExports));
+        return notes.length > 0 ? `Exported PDF. ${notes.join(' ')}` : 'Exported PDF.';
+      },
+    });
+  const exportRaster = () => {
+    const kind = 'png';
     const { width, height } = layoutPngSize(layout, dpi);
     const name = kind.toUpperCase();
     return exportJob.start({
@@ -172,7 +186,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
       tooBigMessage: `${name} export at ${dpi} dpi needs ${width} × ${height} px, more than the browser can make. Choose a lower resolution, or export SVG.`,
       work: async (phase) => {
         phase('rasterizing');
-        const blob = kind === 'png' ? await layoutToPngBlob(layout, project, dpi) : await layoutToPdfBlob(layout, project, dpi);
+        const blob = await layoutToPngBlob(layout, project, dpi);
         phase('encoding');
         downloadBlob(blob, exportFileName(layout.name, kind, settings.timestampExports));
         return `Exported ${name}, ${width} × ${height} px (${dpi} dpi).`;
@@ -237,7 +251,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
             printWarnings: [],
           }}
           state={exportJob.state}
-          onExport={() => (settings.exportFormat === 'svg' ? exportSvg() : exportRaster(settings.exportFormat))}
+          onExport={() => (settings.exportFormat === 'svg' ? exportSvg() : settings.exportFormat === 'pdf' ? exportPdf() : exportRaster())}
           onClose={() => setExportOpen(false)}
         />
       )}
@@ -280,7 +294,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
                 ))}
               </span>
             </Field>
-            <Field label="Transparent background" hint="On: the page has no colour of its own (SVG and PNG are transparent; a PDF page is white)">
+            <Field label="Transparent background" hint="On: the page has no colour of its own (SVG and PNG are transparent; a PDF page shows the white of the paper)">
               <Check checked={layout.background === null} onChange={(v) => set('Page background', { background: v ? null : '#ffffff' })} ariaLabel="Transparent background" />
             </Field>
             {layout.background !== null && (

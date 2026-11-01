@@ -74,7 +74,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
           plan,
           format,
           dpi,
-          { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: (kind, c, t, d, f) => (kind === 'png' ? chartToPngBlob(c, t, d, f) : chartToPdfBlob(c, t, d, f)) },
+          { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: (c, t, d, f) => chartToPngBlob(c, t, d, f), pdf: (c, t, f) => chartToPdfBlob(c, t, f) },
           (i, n, name) => setStatus(`Drawing ${i} of ${n}: ${name}…`),
         );
         phase('encoding');

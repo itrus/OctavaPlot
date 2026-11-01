@@ -1,6 +1,5 @@
 import { applyOrder } from '../model/table/groupOrder';
 import { foldGroupGaps } from '../model/options/columnOptions';
-import { createRows, MAX_TABLE_ROWS } from '../model/table/rows';
 import type { Project } from '../model/types';
 
 /**
@@ -55,15 +54,6 @@ interface ShapeStep {
 
 /** The shape steps that work on the file's own text, before it is read. */
 export const SHAPE_STEPS: readonly ShapeStep[] = [
-  {
-    id: 'rows-generated',
-    label: 'A table without a rows list (files written by hand or by a program) gets empty row titles, one row for each of its values.',
-    run: (project) => {
-      for (const t of Array.isArray(project.dataTables) ? project.dataTables : []) {
-        if (isObj(t) && t.rows === undefined && typeof t.rowCount === 'number' && Number.isInteger(t.rowCount) && t.rowCount >= 0 && t.rowCount <= MAX_TABLE_ROWS) t.rows = createRows(t.rowCount);
-      }
-    },
-  },
   {
     id: 'one-layer',
     label: 'A graph was once a stack of layers; it has one now (see dataLayer in model/graph/style.ts). The first layer is read, the others are dropped.',

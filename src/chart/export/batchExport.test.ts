@@ -73,7 +73,7 @@ describe('planning a batch', () => {
 describe('running a batch', () => {
   it('writes the same SVG as the export of the single graph into the ZIP, in order, with its own CRC', async () => {
     const p = three();
-    const renderers: BatchRenderers = { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: () => Promise.reject(new Error('unused')) };
+    const renderers: BatchRenderers = { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: () => Promise.reject(new Error('unused')), pdf: () => Promise.reject(new Error('unused')) };
     const plan = planBatch(p, [p.charts[0].id, p.charts[2].id], 'svg', 96, false);
     const files = unzip(await bytesOf(await runBatch(plan, 'svg', 96, renderers, undefined, WHEN)));
     expect(files.map((f) => f.name)).toEqual(plan.items.map((i) => i.file));
@@ -83,20 +83,39 @@ describe('running a batch', () => {
       expect(f.crc).toBe(crc32(f.data));
     });
   });
-  it('passes the resolution and the kind to the raster renderer and stores the bytes it returns', async () => {
+  it('passes the resolution to the PNG renderer and stores the bytes it returns', async () => {
     const p = three();
     const seen: string[] = [];
     const renderers: BatchRenderers = {
       svg: () => '',
-      raster: async (kind, chart, _t, dpi) => {
-        seen.push(`${kind}:${chart.id}:${dpi}`);
-        return new Blob([new Uint8Array([137, 80, 78, 71, kind === 'png' ? 1 : 2])]);
+      raster: async (chart, _t, dpi) => {
+        seen.push(`png:${chart.id}:${dpi}`);
+        return new Blob([new Uint8Array([137, 80, 78, 71, 1])]);
+      },
+      pdf: () => Promise.reject(new Error('unused')),
+    };
+    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id], 'png', 150, false);
+    const files = unzip(await bytesOf(await runBatch(plan, 'png', 150, renderers, undefined, WHEN)));
+    expect(seen).toEqual([`png:${p.charts[0].id}:150`, `png:${p.charts[1].id}:150`]);
+    expect([...files[0].data]).toEqual([137, 80, 78, 71, 1]);
+  });
+  it('asks the PDF renderer for a PDF, with no resolution and no canvas to fit', async () => {
+    const p = three();
+    const seen: string[] = [];
+    const renderers: BatchRenderers = {
+      svg: () => '',
+      raster: () => Promise.reject(new Error('unused')),
+      pdf: async (chart) => {
+        seen.push(chart.id);
+        return new Blob([new Uint8Array([37, 80, 68, 70])]);
       },
     };
-    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id], 'pdf', 150, false);
-    const files = unzip(await bytesOf(await runBatch(plan, 'pdf', 150, renderers, undefined, WHEN)));
-    expect(seen).toEqual([`pdf:${p.charts[0].id}:150`, `pdf:${p.charts[1].id}:150`]);
-    expect([...files[0].data]).toEqual([137, 80, 78, 71, 2]);
+    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id], 'pdf', 600, false);
+    expect(plan.items.every((i) => i.pixels === null)).toBe(true);
+    expect(plan.tooBig).toEqual([]);
+    const files = unzip(await bytesOf(await runBatch(plan, 'pdf', 600, renderers, undefined, WHEN)));
+    expect(seen).toEqual([p.charts[0].id, p.charts[1].id]);
+    expect([...files[0].data]).toEqual([37, 80, 68, 70]);
   });
   it('draws the graphs of the project it was planned from, even when the project is edited while it runs', async () => {
     const p = three();
@@ -108,7 +127,7 @@ describe('running a batch', () => {
         drawn.push(chart.name);
         return '<svg/>';
       },
-      raster: () => Promise.reject(new Error('unused')),
+      raster: () => Promise.reject(new Error('unused')), pdf: () => Promise.reject(new Error('unused')),
     };
     // An edit between two graphs makes a new project value; the plan holds the old graphs.
     const progress = (i: number) => {
@@ -126,14 +145,14 @@ describe('running a batch', () => {
         if (chart.id === p.charts[1].id) throw new Error('boom');
         return '<svg/>';
       },
-      raster: () => Promise.reject(new Error('unused')),
+      raster: () => Promise.reject(new Error('unused')), pdf: () => Promise.reject(new Error('unused')),
     };
     const plan = planBatch(p, [p.charts[0].id, p.charts[1].id, p.charts[2].id], 'svg', 96, false);
     await expect(runBatch(plan, 'svg', 96, renderers, (i, n, name) => steps.push([i, n, name]), WHEN)).rejects.toThrow('Fig 1: boom');
     expect(steps).toEqual([[1, 3, p.charts[0].name], [2, 3, 'Fig 1']]);
   });
   it('makes an empty ZIP of an empty plan', async () => {
-    const zip = await bytesOf(await runBatch({ items: [], skipped: [], tooBig: [] }, 'svg', 96, { svg: () => '', raster: () => Promise.reject(new Error('unused')) }, undefined, WHEN));
+    const zip = await bytesOf(await runBatch({ items: [], skipped: [], tooBig: [] }, 'svg', 96, { svg: () => '', raster: () => Promise.reject(new Error('unused')), pdf: () => Promise.reject(new Error('unused')) }, undefined, WHEN));
     expect(zip.length).toBe(22);
   });
 });

@@ -1,3 +1,4 @@
+import { legendKeyStyle } from '../../model/graph/layers';
 import type { Chart } from '../../model/types';
 import type { ColumnModel } from './columnModel';
 import type { ChromeScene } from '../shared/scene/scene';
@@ -28,7 +29,7 @@ export function compileColumnScene(chart: Chart, model: ColumnModel): ChromeScen
     keysOf: (it, w) => {
       const g = model.groups[model.legendGroups[it.index]];
       // A bar is a filled key; the others are the line and the symbol, together in a group.
-      return { groupId: g.groupId, keys: g.style.showBars ? [keyMarkElement(g.style, it.x, it.y, chart.id, g.groupId, w)] : [el('g', [], { children: lineAndSymbolKeys(g.style, it.x, it.y, w) })] };
+      return { groupId: g.groupId, keys: g.style.showBars ? [keyMarkElement(g.style, it.x, it.y, chart.id, g.groupId, w)] : [el('g', [], { children: lineAndSymbolKeys(legendKeyStyle(chart, g.groupId, g.style), it.x, it.y, w) })] };
     },
   });
 }

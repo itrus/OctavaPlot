@@ -9,7 +9,7 @@ import { type AnnotationPlacer, changeAnchor, nudgePatches } from '../../../char
 import { RESULT_STATS, resultValue } from '../../../model/graph/resultTokens';
 import { mixedAnnotationKeys, selectedAnnotationIds, toggleAnnotationSelection } from '../../../model/graph/selection/multi';
 import { capabilitiesOf } from '../../../model/graph/capabilities';
-import { bracketKindOf } from '../../../model/graph/chartTypes';
+import { BRACKET_LIFT_LIMIT, bracketKindOf } from '../../../model/graph/chartTypes';
 import { xySeries } from '../../../model/table/tableLayout';
 import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../../model/graph/colour/colorVision';
 import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../../model/graph/palettes';
@@ -439,14 +439,15 @@ function BracketsSection({ chart }: { chart: Chart }) {
               </Field>
             )}
             {kind === 'xy' && <NumField label="At X" value={b.at ?? 0} onCommit={(v) => set('Bracket X', { at: v }, 'at')} hint="Both series must have a point at this X." />}
-            <Field label="Label" hint={`What you want written above the bracket: a p-value, stars, ns. ${RESULT_HINT}`}>
-              <TextInput value={b.label} onChange={(v) => set('Bracket label', { label: v }, 'label')} />
+            <Field label="Label" hint={`What you want written above the bracket: a p-value, stars, ns. Enter starts a new line. ${RESULT_HINT}`}>
+              <textarea rows={Math.min(5, Math.max(1, b.label.split('\n').length))} aria-label={`Label of bracket ${i + 1}`} value={b.label} onChange={(e) => set('Bracket label', { label: e.target.value }, 'label')} />
             </Field>
             <Field label="Colour">
               <ColorInput value={b.color} onChange={(v) => set('Bracket colour', { color: v }, 'color')} />
             </Field>
             <NumField label="Thickness" unit="pt" value={b.widthPt} min={0.2} max={40} onCommit={(v) => set('Bracket thickness', { widthPt: v }, 'width')} />
             <NumField label="Label size" unit="pt" value={b.fontSizePt} min={4} max={200} onCommit={(v) => set('Bracket label size', { fontSizePt: v }, 'font')} />
+            <NumField label={kind === 'columns' || kind === 'grouped' ? 'Move up or right' : 'Move right'} unit="pt" value={b.liftPt ?? 0} min={-BRACKET_LIFT_LIMIT} max={BRACKET_LIFT_LIMIT} slider={false} onCommit={(v) => set('Move bracket', { liftPt: v === 0 ? undefined : v }, 'lift')} hint="How far the bracket was moved from where it is placed, away from the data: up on a vertical chart, to the right on a horizontal chart and on an XY chart. You can also drag it on the chart. The axis range does not follow." />
             <div className="button-row">
               <button onClick={() => run('Delete comparison bracket', removeBracket(chart.id, b.id))}>Delete bracket</button>
             </div>

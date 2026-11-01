@@ -5,12 +5,13 @@ import { CHROME_STOPS, type ChromeStop, describeFocus, extendAnnotations, extend
 import { toggleGroupSelection } from '../../model/graph/selection/scope';
 import { selectedAnnotationIds, selectedPoints, toggleAnnotationSelection, togglePointSelection } from '../../model/graph/selection/multi';
 import { dragLabelPatch } from '../inspector/common/pointOverrideUi';
+import { liftAfterDrag } from '../../chart/shared/parts/brackets';
 import { densePreviewNote, isDense, nearestDot } from '../../chart/shared/scene/denseDots';
 import { hitFromTarget, type HitTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
 import type { PreparedChart } from '../../model/table/preparedChart';
 import { useApp } from '../../state/AppContext';
-import { composeCommands, patchAnnotation, patchPointStyle, removeChart, resetAllDataSets, unlinkChart } from '../../state/commands';
+import { composeCommands, patchAnnotation, patchBracket, patchPointStyle, removeChart, resetAllDataSets, unlinkChart } from '../../state/commands';
 import { exportPixels } from '../../chart/export/pngDpi';
 import { printSizeWarnings } from '../../chart/export/printSize';
 import { exportStatusText } from '../export/exportJob';
@@ -39,6 +40,8 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const [drag, setDrag] = useState<{ id: string; xFrac: number; yFrac: number; dx: number; dy: number; moved: boolean } | null>(null);
   // A point label being dragged: where the pointer started and the labels it moves, each with its point and its box when the drag began.
   const labelDrag = useRef<{ start: { x: number; y: number }; items: Array<{ id: string; cx: number; cy: number; box: Box }>; moved: boolean } | null>(null);
+  // A comparison bracket being dragged: where the pointer started, the lift it had then, and which way is away from the data.
+  const bracketDrag = useRef<{ id: string; start: { x: number; y: number }; lift: number; direction: 'up' | 'right'; moved: boolean } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   // The part of the chart besides its data sets that the keyboard is on (title, legend, an axis), and its outline in the surface.
@@ -93,7 +96,16 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
     if (target) navigateInspector(target);
     const modified = e.ctrlKey || e.metaKey || e.shiftKey;
     const pickable = hit.groupId && hit.objectId && (hit.kind === 'point' || hit.kind === 'label') && !hit.objectId.endsWith(':mean');
-    if (hit.kind === 'annotation' && hit.annotationId && svgRef.current) {
+    if (hit.kind === 'bracket' && hit.objectId && svgRef.current) {
+      // A bracket is moved by dragging it; the lift is stored in points from where it is placed (one undo step for a drag).
+      const b = chart.brackets.find((x) => x.id === hit.objectId);
+      if (!b) return;
+      setSelection({ kind: 'chart' });
+      const horizontal = any.family === 'xy' || ('orient' in any.model && any.model.orient.horizontal);
+      bracketDrag.current = { id: b.id, start: pointerToChartPt(svgRef.current, e.clientX, e.clientY, model.widthPt, model.heightPt), lift: b.liftPt ?? 0, direction: horizontal ? 'right' : 'up', moved: false };
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      setTip(null);
+    } else if (hit.kind === 'annotation' && hit.annotationId && svgRef.current) {
       const a = chart.annotations.find((x) => x.id === hit.annotationId);
       if (!a) return;
       // Ctrl, Cmd or Shift on an annotation adds it to the selection, or takes it out: they are then edited together.
@@ -146,6 +158,16 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const onPointerMove = (e: PointerEvent) => {
     const svg = svgRef.current;
     if (!svg) return;
+    const brk = bracketDrag.current;
+    if (brk) {
+      const pt = pointerToChartPt(svg, e.clientX, e.clientY, model.widthPt, model.heightPt);
+      const [dx, dy] = [pt.x - brk.start.x, pt.y - brk.start.y];
+      // A click that moves a little is still a click.
+      if (!brk.moved && Math.hypot(dx, dy) < 3) return;
+      brk.moved = true;
+      run('Move bracket', patchBracket(chart.id, brk.id, { liftPt: liftAfterDrag(brk.lift, brk.direction, dx, dy) }), `bracket-drag:${brk.id}`);
+      return;
+    }
     const labels = labelDrag.current;
     if (labels) {
       const pt = pointerToChartPt(svg, e.clientX, e.clientY, model.widthPt, model.heightPt);
@@ -242,6 +264,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
 
   const endDrag = () => {
     labelDrag.current = null;
+    bracketDrag.current = null;
     if (drag?.moved) {
       const moved = chart.annotations.find((x) => x.id === drag.id);
       // A text anchored to data keeps the values at its new place, so it stays there when the axes change.
@@ -266,19 +289,34 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
         return 'Exported SVG.';
       },
     });
-  const exportRaster = (kind: 'png' | 'pdf') => {
-    const dpi = kind === 'png' ? settings.pngDpi : settings.exportDpi;
+  // A PDF is vector shapes and text: it has no resolution and no canvas limit.
+  const exportPdf = () =>
+    exportJob.start({
+      label: 'PDF',
+      pixels: null,
+      tooBigMessage: '',
+      work: async (phase) => {
+        const { chartToPdf } = await import('../../chart/export/export');
+        phase('encoding');
+        const { blob, notes } = await chartToPdf(chart, table, curve);
+        downloadBlob(blob, exportFileName(chart.name, 'pdf', settings.timestampExports));
+        return notes.length > 0 ? `Exported PDF. ${notes.join(' ')}` : 'Exported PDF.';
+      },
+    });
+  const exportRaster = () => {
+    const kind = 'png';
+    const dpi = settings.pngDpi;
     const { width: pw, height: ph } = exportPixels(chart, dpi);
     const name = kind.toUpperCase();
     return exportJob.start({
       label: name,
       pixels: { width: pw, height: ph },
       // Browsers limit the size of a canvas; a size above the limit fails or comes out blank.
-      tooBigMessage: `${name} export at ${dpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, lower the ${name} resolution in Settings, or export SVG.`,
+      tooBigMessage: `${name} export at ${dpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, lower the PNG resolution in Settings, or export SVG.`,
       work: async (phase) => {
-        const { chartToPngBlob, chartToPdfBlob } = await import('../../chart/export/export');
+        const { chartToPngBlob } = await import('../../chart/export/export');
         phase('rasterizing');
-        const blob = await (kind === 'png' ? chartToPngBlob(chart, table, dpi, curve) : chartToPdfBlob(chart, table, dpi, curve));
+        const blob = await chartToPngBlob(chart, table, dpi, curve);
         phase('encoding');
         downloadBlob(blob, exportFileName(chart.name, kind, settings.timestampExports));
         return `Exported ${name}, ${pw} × ${ph} px (${dpi} dpi).`;
@@ -342,7 +380,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
           kind="graph"
           subject={{ name: chart.name, widthPx: chart.widthPx, heightPx: chart.heightPx, fontFamilies: [chart.fontFamily], texts: chartTexts(chart, any), warnings: model.warnings, printWidthMm: chart.printWidthMm ?? null, printWarnings: printSizeWarnings(chart) }}
           state={exportJob.state}
-          onExport={() => (settings.exportFormat === 'svg' ? exportSvg() : exportRaster(settings.exportFormat === 'pdf' ? 'pdf' : 'png'))}
+          onExport={() => (settings.exportFormat === 'svg' ? exportSvg() : settings.exportFormat === 'pdf' ? exportPdf() : exportRaster())}
           onClose={() => setExportOpen(false)}
         />
       )}

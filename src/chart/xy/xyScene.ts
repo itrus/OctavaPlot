@@ -1,4 +1,4 @@
-import { type LayerKind, type LayerSpec, DEFAULT_BAND_OPACITY as BAND_OPACITY, layerLook, partStyle } from '../../model/graph/layers';
+import { type LayerKind, type LayerSpec, DEFAULT_BAND_OPACITY as BAND_OPACITY, layerLook, legendKeyStyle, partStyle } from '../../model/graph/layers';
 import type { Chart, Id } from '../../model/types';
 import type { XyModel, XySeries } from './xyModel';
 import { type SceneElement, el } from '../shared/scene/sceneElement';
@@ -14,6 +14,7 @@ import { backgroundElements, frameElement, gridElements, legendElements, numeric
 import { referenceLinesOf, regionsOf } from '../shared/scene/referenceLines';
 import { atRiskElements, fitParameterElements } from './xyChrome';
 import { xyBracketElements } from './xyBrackets';
+import { sizeKeyElements } from '../shared/scene/sizeLegend';
 import { LEGEND_KEY, Y_TICK_LABEL_GAP } from '../shared/parts/layout';
 
 /** The scene of an XY chart (and of a survival curve or a histogram, which have the shape of one): its data layers and its chrome. */
@@ -136,11 +137,14 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
     ...[frameElement(chart, plot, ya.lineWidthPt), scaleBarElement(chart, xa, 'x', x, xScale, plot), scaleBarElement(chart, ya, 'y', y, yScale, plot)].flatMap((e) => (e ? [e] : [])),
     // Offset traces: the sentence that tells the offset stands in the row the layout reserved under the X axis title, centred under the plot.
     ...(model.offsetNote && layout.extraBottom ? [el('text', [['x', n2(plot.x + plot.width / 2)], ['y', n2(layout.extraBottom.y + ya.tickFontSizePt * 1.2)], ['text-anchor', 'middle'], ['font-size', ya.tickFontSizePt], ['fill', chart.textColor]], { text: model.offsetNote })] : []),
+    // Bubbles: the size legend stands in the row the layout reserved under the plot, centred under it.
+    ...(model.sizeKey && layout.extraBottom ? sizeKeyElements(model.sizeKey, plot.x + plot.width / 2, layout.extraBottom.y, chart.textColor, chart.fontFamily) : []),
     ...titleElements(chart, layout, xa, ya, y2 ? y2a : null),
     ...(model.atRisk && !hidden.has(`${chart.id}:atRisk`) ? atRiskElements(chart, model.atRisk, plot.x, plot.x - labelOffset(ya) - Y_TICK_LABEL_GAP) : []),
     ...legendElements(chart, layout, (it, w) => {
       const s = series[model.legendSeries[it.index]];
-      const st = s.style;
+      // The key shows what the marks are drawn in: the look of the series with what the line and the points were given of their own.
+      const st = legendKeyStyle(chart, s.groupId, s.style);
       const keys: SceneElement[] = [];
       if (s.bars) keys.push(el('rect', [['x', n2(it.x)], ['y', n2(it.y - 10)], ['width', w], ['height', 20], ['fill', st.barFill], ['fill-opacity', st.barOpacity], ['stroke', st.barBorderColor], ['stroke-width', st.barBorderWidthPt], ['stroke-opacity', st.barBorderOpacity < 1 ? st.barBorderOpacity : undefined]]));
       if (st.showLines) {

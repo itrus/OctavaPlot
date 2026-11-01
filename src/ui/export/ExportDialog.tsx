@@ -11,7 +11,7 @@ import { exportStatusText, type ExportOutcome, type ExportState } from './export
 type ExportSubject = Omit<ExportReportInput, 'format' | 'dpi' | 'isFontAvailable' | 'hasGlyph'>;
 
 interface Props {
-  /** A graph is PNG at its own resolution and PDF at the layout one; a layout page is both at the layout one. */
+  /** A graph is PNG at its own resolution; the PNG of a layout page is at the layout one. A PDF has none. */
   kind: 'graph' | 'layout';
   subject: ExportSubject;
   /** The state of the export controller of the view that opened the dialog. */
@@ -112,7 +112,7 @@ export function ExportDialog({ kind, subject, state, onExport, onClose }: Props)
   const { settings, updateSettings } = useApp();
   const [copied, setCopied] = useState<string | null>(null);
   const format = settings.exportFormat;
-  // A graph's PNG has its own resolution (96 dpi is its size on screen); every PDF and a layout page use the other one.
+  // A graph's PNG has its own resolution (96 dpi is its size on screen); the PNG of a layout page uses the other one.
   const ownPng = kind === 'graph' && format === 'png';
   const dpi = ownPng ? settings.pngDpi : settings.exportDpi;
   const report = buildExportReport({ ...subject, format, dpi, isFontAvailable: browserFontAvailable, hasGlyph: browserHasGlyph });
@@ -138,7 +138,7 @@ export function ExportDialog({ kind, subject, state, onExport, onClose }: Props)
       onClose={onClose}
       wide
     >
-      <Field label="Format" hint="PNG is a bitmap; SVG is vector; PDF holds a picture at the resolution below.">
+      <Field label="Format" hint="PNG is a bitmap at the resolution below; SVG and PDF are vector, with shapes and text.">
         <span className="switch-group" role="group" aria-label="Export format">
           {FORMATS.map(([value, label]) => (
             <button key={value} className={`switch${format === value ? ' on' : ''}`} aria-pressed={format === value} onClick={() => updateSettings({ exportFormat: value })}>
@@ -147,10 +147,10 @@ export function ExportDialog({ kind, subject, state, onExport, onClose }: Props)
           ))}
         </span>
       </Field>
-      <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : undefined}>
+      <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : format === 'pdf' ? 'PDF has no resolution: it holds shapes and text, not a picture.' : undefined}>
         <SelectInput<string>
           value={String(dpi)}
-          disabled={format === 'svg'}
+          disabled={format !== 'png'}
           options={(ownPng ? PNG_DPI_CHOICES : EXPORT_DPI_CHOICES).map((d) => ({ value: String(d), label: `${d} dpi` }))}
           onChange={(v) => updateSettings(ownPng ? { pngDpi: Number(v) as PngDpi } : { exportDpi: Number(v) as ExportDpi })}
         />

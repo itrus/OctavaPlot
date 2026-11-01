@@ -26,8 +26,8 @@ Labels: **D** = documented by a public source (GraphPad Prism user guide, ggpris
 |---|---|
 | Numeric XY | `xy.scatter`, `xy.line`, `xy.line_symbols`, `xy.area`, `xy.bars`, `xy.spikes`, `xy.vector`, `xy.bubble`, `xy.trajectory`, `xy.offset_traces` |
 | Category and distribution | `category.strip`, `category.aligned`, `category.paired`, `category.bar`, `category.summary`, `category.range`, `distribution.box`, `distribution.violin`, `category.grouped`, `category.stacked`, `category.normalised_stack`, `category.nested`, `category.counts` |
-| Calculated curves and diagnostics | `distribution.histogram`, `distribution.frequency_polygon`, `distribution.ecdf`, `curve.survival`, `curve.cumulative_event`, `curve.roc`, `curve.fit`, `curve.function`, `diagnostic.qq`, `diagnostic.bland_altman`, `diagnostic.residual` |
-| Matrix, composition, specialised | `matrix.heatmap`, `whole.pie`, `whole.doughnut`, `whole.bar`, `whole.dot_grid`, `special.forest`, `special.volcano`, `special.population_pyramid` |
+| Calculated curves and diagnostics | `distribution.histogram`, `distribution.frequency_polygon`, `distribution.ecdf`, `curve.survival`, `curve.cumulative_event`, `curve.fit`, `curve.function` |
+| Matrix, composition, specialised | `matrix.heatmap`, `whole.pie`, `whole.doughnut`, `whole.bar`, `whole.dot_grid`, `special.forest` |
 
 Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, not the calculation. A band is an ordered lower/upper layer, not a shaded rectangle; it can stay visible when its centre path is hidden. A categorical axis never gets measurement uncertainty by rotation.
 
@@ -81,11 +81,7 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 
 ## 9. ROC
 
-*Status, 31 October 2026: not built (postponed by decision on 29 October). No code and no fixture test; the two ROC rows of section 15 ("ROC perfect", "ROC complete tie") stay open and are what closes this section. Nothing below has been checked against an outside reference, so the values are the contract's own until the stats and the chart are written from an outside source first.*
-
-- Pooled distinct thresholds plus all-negative and all-positive outer points. Equal scores advance together. Sensitivity `TP/P`, FPR `FP/N`. Direction is explicit; never pick the better-looking one.
-- AUC is the trapezoidal area, equal to the fraction of correctly ordered positive-negative pairs plus half the tied fraction. Do not replace AUC < 0.5 by its complement without changing the direction. Both classes must be present.
-- Coordinate intervals: Clopper-Pearson, independently for sensitivity and specificity. For k of n: lower is 0 if k = 0, else the α/2 quantile of `Beta(k, n−k+1)`; upper is 1 if k = n, else the 1−α/2 quantile of `Beta(k+1, n−k)`. FPR limits are one minus the reversed specificity limits. These are marginal, not a joint region.
+Not planned (dropped by decision, 1 November 2026); the section number stays so that the others do not move.
 
 ## 10. Fitted and generated curves
 
@@ -98,15 +94,8 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 
 ## 11. Diagnostics and recipes
 
-- *Status, 31 October 2026: deferred by decision (not built, no chart; a first calculation was written and removed; it may be reconsidered later). The rule below is kept as the specification.*
-- Q-Q: sort; probabilities `i/(n+1)` (default) or `(i−0.375)/(n+0.25)`; expected `mean + sd·Φ⁻¹(p)` on the fitted scale, or `Φ⁻¹(p)` on the standard scale. Reference lines live in those coordinates. No normality p value.
-- *Status, 31 October 2026: the Bland-Altman plot is deferred by decision (not built; it may be reconsidered later; the rule below is kept as the specification).*
-- Bland-Altman: `x = (A+B)/2`, `d = B−A`, bias `mean(d)`, limits `bias ± 1.96·sd(d)` (dispersion of differences, not a CI of bias). Percent mode `100(B−A)/((A+B)/2)`, zero denominators invalid. Ratio mode needs positive values and summarises `ln(B/A)`, then exponentiates. The inspector shows the formula.
-- Residuals: observed minus predicted, from the stored model result (no refit when axes change). SD-scaled only if the SD exists; internally studentised needs leverage.
 - *Status, 31 October 2026: the forest plot is built as a gallery preset: a grouped table "Mean (or median), Upper/Lower limits" drawn as lines over categories turned horizontal, with the typed estimates and limits, a dashed null line at 0 (differences) or 1 (ratios, on a log axis), no pooling and no weights. The summary diamond is built for the rows the owner ticks (explicitly supplied, as the rule says): it runs from the lower to the upper limit of the row, centred on its estimate.*
 - Forest: supplied intervals only, no pooled effect, no weight manufactured from n. Null value 0 (differences) or 1 (ratios). Diamond for an explicitly supplied summary row.
-- Volcano: ratio fold change through log2; p through `−log10(p)`; no double transform. Adjusted p is labelled as such. Zero p is capped only against a declared bound and marked. No pseudocount.
-- Pyramid: magnitudes stay nonnegative in the data; sign is applied in the display; tick labels are positive; a common symmetric range.
 - Offset traces: per-series display offsets, disclosed; not cumulative unless generated so.
 
 ## 12. Axes
@@ -120,11 +109,7 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 
 ## 13. Comparisons (bracket labels)
 
-- Sources: manual text, supplied p, or calculated p. Supplied results are labelled as not recomputed.
-- Methods: one-sample t, Welch, equal-variance t (explicit), paired t (on differences), Mann-Whitney, signed-rank, two-curve logrank, supplied. Welch uses Satterthwaite df. Rank methods use average ranks; signed-rank drops exact zero differences and reports the count; exact distribution when feasible, else a tie-corrected normal approximation with a continuity-correction setting; the method that ran is stored.
-- Logrank: sum `d₁ⱼ − n₁ⱼ·dⱼ/nⱼ` with variance `n₁ⱼ n₀ⱼ dⱼ (nⱼ−dⱼ)/(nⱼ²(nⱼ−1))`, squared standardised total against χ² with 1 df. Zero variance means unavailable.
-- *Status, 31 October 2026: no test is calculated, no p-value is supplied as a number and none is adjusted. A bracket (XY, column and grouped charts) carries the label the owner types, which can hold a result token (section 18), so the only source built is manual text; "supplied p" and "calculated p" are not. The methods and the adjustments below are not built, and the section 15 rows "Holm", "BH" and "Exact binomial" stay open (Holm, BH and the exact binomial interval were skipped by decision on 29 October).*
-- Adjustment over m p-values: Bonferroni `min(1, m·p)`; Holm cumulative maxima of `(m−i+1)·p(i)`; BH reverse cumulative minima of `m·p(i)/i`; BY multiplies BH by `Σ1/j`. Restore the original order. Labels say adjusted or unadjusted. Hiding a bracket never changes its correction family. No automatic test choice after a normality screen.
+- Source: manual text, which may hold a result token (section 18). No test is calculated and no p-value is supplied or adjusted: these are out of scope. Hiding a bracket never changes the room it takes.
 - Stars default: ≤0.05 `*`, ≤0.01 `**`, ≤0.001 `***`, ≤0.0001 `****`; otherwise "ns". Brackets stay attached to stable group IDs. Lane gaps are physical (pt).
 
 ## 14. Theme (P unless noted)
@@ -166,12 +151,7 @@ Exact and rational values keep exact tolerance; ordinary finite summaries target
 | Nested weighting | unit A [0,0,0]; unit B [10] | equal-unit mean 5, not pooled 2.5 |
 | Survival ties | (1,event),(2,event),(2,censor),(3,event) | S 0.75, 0.5, 0; median 2 |
 | No-event survival | three censored | S stays 1; median not reached |
-| ROC perfect | neg 0,1; pos 2,3 | AUC 1 |
-| ROC complete tie | identical scores, both classes | AUC 0.5; ties advance together |
-| Exact binomial | k=0, n=10, C=0.95 | lower 0; upper about 0.3084971 |
 | Exact line | X 0,1,2; Y 1,3,5 | intercept 1; slope 2; zero residual |
-| Holm | p = 0.01, 0.03, 0.04 | 0.03, 0.06, 0.06 |
-| BH | same | 0.03, 0.04, 0.04 |
 | Log endpoint | centre 2, interval [−1, 5] on log Y | keep centre; clip or suppress the endpoint; warning |
 | Date to days | 2025-03-04; 2000-02-29; 1900-02-29 | 20151 days from 1970-01-01; 11016; refused (1900 is not a leap year) |
 | Time with an offset | 2025-03-04T12:30:00+02:00 and 2025-03-04T10:30:00Z | both 1741084200 s; both counted in the note "converted to UTC" |
@@ -183,11 +163,11 @@ Exact and rational values keep exact tolerance; ordinary finite summaries target
 | Duration | 1:30:00 in a column of hours, minutes, seconds | 1.5, 90, 5400 |
 | Composition zero total | weights 0, 0 | that row is not drawn (no angle, percent or fabricated slice) and a warning names it; other rows still draw |
 
-Status of the fixtures above, 31 October 2026 (a row is "tested" when a unit test holds the stated values, written from outside the code under test; see [AUDIT-P0.md](AUDIT-P0.md)):
+Status of the fixtures above, 1 November 2026 (a row is "tested" when a unit test holds the stated values, written from outside the code under test). Every row is tested:
 
-| Tested | Not built, no test (postponed by decision) |
-|---|---|
-| Arithmetic summary, mean CI, type-6 quartiles, Tukey whisker (fence 15 pinned), geometric summary, median CI n=5 and n=6, histogram edges, ECDF ties, bubble area, nested weighting, survival ties, no-event survival, exact line, log endpoint (geometry; the warning text was not checked), composition zero total, dot apportionment (the function only, `src/stats/diagnostics/apportion.ts`; the values are worked out by hand from the rule, not from an outside tool), the eight date, time, zone, tick and duration rows | ROC perfect, ROC complete tie, exact binomial, Holm, BH |
+| Tested |
+|---|
+| Arithmetic summary, mean CI, type-6 quartiles, Tukey whisker (fence 15 pinned), geometric summary, median CI n=5 and n=6, histogram edges, ECDF ties, bubble area, nested weighting, survival ties, no-event survival, exact line, log endpoint (geometry; the warning text was not checked), composition zero total, dot apportionment (the function only, `src/stats/diagnostics/apportion.ts`; the values are worked out by hand from the rule, not from an outside tool), the eight date, time, zone, tick and duration rows |
 
 Interaction and applicability tests:
 

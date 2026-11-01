@@ -789,7 +789,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     const { scale, toY } = axisOf('primary');
     const at = toY(p.value);
     if (!Number.isFinite(at) || inBreak(scale, p.value)) return [];
-    return [{ id: p.bracket.id, label: p.bracket.label, x1: groups[p.i].centerX, x2: groups[p.j].centerX, y: at, tick: Math.max(6, p.bracket.fontSizePt * 0.6), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
+    return [{ id: p.bracket.id, label: p.bracket.label, x1: groups[p.i].centerX, x2: groups[p.j].centerX, y: at - (p.bracket.liftPt ?? 0), tick: Math.max(6, p.bracket.fontSizePt * 0.6), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
   });
   const model: ColumnModel = { widthPt, heightPt, layout, orient, y, yScale, y2, y2Scale, clipped, groups, pairLines, brackets, legendGroups, labels, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileColumnScene(chart, model);

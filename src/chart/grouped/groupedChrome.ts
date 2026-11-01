@@ -1,3 +1,4 @@
+import { legendKeyStyle } from '../../model/graph/layers';
 import type { Chart } from '../../model/types';
 import type { GroupedModel } from './groupedModel';
 import type { ChromeScene } from '../shared/scene/scene';
@@ -33,13 +34,15 @@ export function compileGroupedScene(chart: Chart, model: GroupedModel): ChromeSc
     keysOf: (it, w) => {
       const s = model.series[model.legendSeries[it.index]];
       const st = s.style;
+      // The line and the symbol of a key are drawn in the look their layers were given.
+      const marks = legendKeyStyle(chart, s.groupId, st);
       // Bars are a filled key; lines are the line and the symbol; a chart of dots only (bars off, symbols on) has the dot alone, with no bar to stand for.
       const dotsOnly = !model.asLines && !st.showBars && st.showSymbols;
       const keys = dotsOnly
-        ? lineAndSymbolKeys({ ...st, showLines: false }, it.x, it.y, w)
+        ? lineAndSymbolKeys({ ...marks, showLines: false }, it.x, it.y, w)
         : !model.asLines
         ? [el('rect', [['x', n2(it.x)], ['y', n2(it.y - 10)], ['width', w], ['height', 20], ['fill', st.barFill], ['stroke', st.barBorderWidthPt > 0 ? st.barBorderColor : 'none'], ['stroke-width', st.barBorderWidthPt], ['stroke-opacity', st.barBorderOpacity < 1 ? st.barBorderOpacity : undefined]])]
-        : lineAndSymbolKeys(st, it.x, it.y, w);
+        : lineAndSymbolKeys(marks, it.x, it.y, w);
       return { groupId: s.groupId, keys };
     },
   });

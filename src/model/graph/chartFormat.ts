@@ -95,6 +95,7 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
     lineOrder: source.lineOrder,
     lineConnect: source.lineConnect,
     traceOffset: source.traceOffset,
+    ...(source.sizeLegend ? { sizeLegend: { values: [...source.sizeLegend.values] } } : {}),
     groupedBy: source.groupedBy,
     bars: { ...source.bars },
     barLabels: { ...source.barLabels, ...(source.barLabels.inside ? { inside: { ...source.barLabels.inside } } : {}) },

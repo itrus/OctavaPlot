@@ -3,7 +3,7 @@ import { DEFAULT_CUSTOM_COLOURS } from './options/heatmapOptions';
 import { DEFAULT_PALETTE_ID } from './graph/palettes';
 import { chartFamily } from './graph/chartTypes';
 import { defaultSeriesName, subLabels, summaryFormatInfo } from './table/tableLayout';
-import { createRows } from './table/rows';
+import { canonicalObservationId, createRows } from './table/rows';
 import type {
   AxisConfig,
   BarLabels,
@@ -337,13 +337,14 @@ const EXAMPLE_DATA: Array<[string, number[]]> = [
 ];
 
 export function createGroup(name: string, paletteIndex: number, rowCount: number, values: number[] = []): Group {
+  const id = newId('grp');
   return {
-    id: newId('grp'),
+    id,
     name,
     title: '',
     paletteIndex,
     observations: Array.from({ length: rowCount }, (_, i) => ({
-      id: newId('obs'),
+      id: canonicalObservationId(id, i),
       value: i < values.length ? values[i] : null,
     })),
   };

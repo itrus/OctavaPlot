@@ -83,7 +83,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             <Field label="Date and time in file names" hint="Exported JSON, CSV, PNG and SVG files get a suffix like _261022_1435 (yymmdd_HHMM)">
               <Check checked={settings.timestampExports} onChange={(v) => updateSettings({ timestampExports: v })} ariaLabel="Date and time in file names" />
             </Field>
-            <Field label="Format" hint="Used by the Export button on the Graphs page. PNG is a bitmap; SVG is vector; PDF holds a picture at the resolution below, at the size of the graph.">
+            <Field label="Format" hint="Used by the Export button on the Graphs page. PNG is a bitmap; SVG and PDF are vector (shapes and text, with no resolution), at the size of the graph.">
               <span className="switch-group" role="group" aria-label="Export format">
                 {(
                   [
@@ -105,7 +105,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 onChange={(v) => updateSettings({ pngDpi: Number(v) as PngDpi })}
               />
             </Field>
-            <Field label="PDF resolution" hint="Resolution of the picture in a PDF, and of the PNG of a layout page. A4 at 600 dpi is 4960 × 7016 px and takes a few seconds; SVG has no resolution.">
+            <Field label="Layout PNG resolution" hint="Resolution of the PNG of a layout page. A4 at 600 dpi is 4960 × 7016 px and takes a few seconds. SVG and PDF have no resolution.">
               <SelectInput<string>
                 value={String(settings.exportDpi)}
                 options={EXPORT_DPI_CHOICES.map((d) => ({ value: String(d), label: `${d} dpi` }))}

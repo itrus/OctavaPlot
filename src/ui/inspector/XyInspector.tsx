@@ -19,6 +19,8 @@ import { IntervalFields, LineAtField } from './sections/SummaryControls';
 import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
 import type { AxisBinding, AxisConfig, Chart, ChartStyle, ChartType, DataTable, ExtraTick, LineConnect, LineStyle, SummarySpec } from '../../model/types';
 import { useApp } from '../../state/AppContext';
+import { MAX_LEGEND_SIZES } from '../../chart/shared/scene/sizeLegend';
+import { NumberListField } from './common/NumberListField';
 import { clearGroupStyleSettings, clearGroupSummarySettings, composeCommands, patchAxis, patchChart, patchLook, patchStyle, patchSummary, patchSurvival, setChartType } from '../../state/commands';
 import { LINE_STYLES } from '../../model/graph/look';
 import { analysesOf } from '../../model/project/analysis';
@@ -362,6 +364,16 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...SYMBOL_SHAPE_OPTIONS]} onChange={(v) => setStyle({ symbolShape: v })} />
                 </Field>
                 <NumField label={chart.type === 'xyBubble' ? 'Largest bubble' : 'Size'} unit="pt" value={st.symbolSizePt} min={2} max={80} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} {...(chart.type === 'xyBubble' ? { hint: 'The diameter of the largest bubble of the chart; the area of the others follows their size.' } : {})} onCommit={(v) => setStyle({ symbolSizePt: v })} />
+                {chart.type === 'xyBubble' && layout.kind === 'sized' && (
+                  <>
+                    <Field label="Size legend" hint="Circles of chosen sizes under the plot, on the scale of the bubbles, so a reader can tell what a size means.">
+                      <Check checked={chart.sizeLegend !== undefined} ariaLabel="Size legend" onChange={(v) => run('Size legend', patchLook(chart.id, { sizeLegend: v ? { values: [] } : undefined }))} />
+                    </Field>
+                    {chart.sizeLegend && (
+                      <NumberListField label="Sizes shown" hint="Sizes in the units of the size column, for example 10, 50, 100 (at most 6). Empty: three round values below the largest size." value={chart.sizeLegend.values} max={MAX_LEGEND_SIZES} placeholder="Automatic" normalise={(v) => [...new Set(v.filter((x) => x > 0))].sort((x, y) => x - y)} onCommit={(v) => run('Sizes shown', patchLook(chart.id, { sizeLegend: { values: v } }))} />
+                    )}
+                  </>
+                )}
                 <NumField label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
                 <Field label="Border color" overridden={ov('symbolBorderColor')}>
                   <ColorInput value={st.symbolBorderColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolBorderColor: v })} />

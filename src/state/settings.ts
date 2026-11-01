@@ -3,7 +3,7 @@ import type { DecimalSeparator } from '../model/types';
 
 export type ExportFormat = 'png' | 'svg' | 'pdf';
 
-/** Resolutions offered for the PNG and PDF of a layout page. */
+/** Resolutions offered for the PNG of a layout page. */
 export const EXPORT_DPI_CHOICES = [150, 300, 600] as const;
 export type ExportDpi = (typeof EXPORT_DPI_CHOICES)[number];
 
@@ -20,7 +20,7 @@ export interface Settings {
   /** New projects start with blank tables instead of the example data. */
   newProjectEmpty: boolean;
   exportFormat: ExportFormat;
-  /** Resolution of every PDF, and of the PNG of a layout page, in dots per inch (A4 at 600 dpi is 4960 × 7016 px). */
+  /** Resolution of the PNG of a layout page, in dots per inch (A4 at 600 dpi is 4960 × 7016 px). */
   exportDpi: ExportDpi;
   /** Resolution of the PNG of a graph, in dots per inch. */
   pngDpi: PngDpi;

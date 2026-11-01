@@ -72,12 +72,20 @@ export const linePattern = (s: { lineStyle: LineStyle; lineWidthPt: number }) =>
 /** Width of the colour key in the legend, pt: 36 for a rectangle, 20 for a square (its height is 20). */
 export const legendKeyWidthPt = (shape: LegendKeyShape): number => (shape === 'square' ? 20 : 36);
 
-type Look = Pick<Chart, 'summaryRows' | 'origin' | 'orientation' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'groupedBy' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
+type Look = Pick<Chart, 'summaryRows' | 'sizeLegend' | 'origin' | 'orientation' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'groupedBy' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
 
 /** The ids of the summary rows of a file or a patch: the texts in an array, once each, or undefined when there are none. */
 const summaryRowIds = (raw: unknown): string[] | undefined => {
   const ids = Array.isArray(raw) ? [...new Set(raw.filter((v): v is string => typeof v === 'string' && v !== ''))] : [];
   return ids.length > 0 ? ids : undefined;
+};
+
+/** The size legend of a file or a patch: the sizes (finite numbers above 0, once each, from the smallest, at most six), or undefined when it is not an object. */
+const sizeLegendOf = (raw: unknown): { values: number[] } | undefined => {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
+  const list = (raw as { values?: unknown }).values;
+  const values = Array.isArray(list) ? [...new Set(list.filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0))].sort((a, b) => a - b).slice(0, 6) : [];
+  return { values };
 };
 
 /** The look of a chart from a file or a patch: a value that is not valid falls back to the one in `base`. */
@@ -101,6 +109,8 @@ export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
     groupedBy: oneOf(GROUPED_BYS, c.groupedBy, base.groupedBy),
     // Row ids that are drawn as a diamond: text only, once each; none left is the absence of the field.
     summaryRows: 'summaryRows' in c ? summaryRowIds(c.summaryRows) : base.summaryRows,
+    // The size legend of a bubble chart: present = shown (an empty list of sizes means the round values below the largest).
+    sizeLegend: 'sizeLegend' in c ? sizeLegendOf(c.sizeLegend) : base.sizeLegend,
     // The offset between traces: any finite number (0 = none, below 0 = downward), or null for the automatic one.
     traceOffset: 'traceOffset' in c ? (c.traceOffset === null ? null : typeof c.traceOffset === 'number' && Number.isFinite(c.traceOffset) ? c.traceOffset : base.traceOffset) : base.traceOffset,
     origin: { x: numberOrNull(record(c.origin).x, base.origin.x), y: numberOrNull(record(c.origin).y, base.origin.y) },

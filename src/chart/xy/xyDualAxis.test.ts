@@ -47,7 +47,7 @@ const numbersIn = (path: string): number[] => [...path.matchAll(/-?\d+(?:\.\d+)?
 /** A cheap hash (FNV-1a) of a drawing, with the random part of the ids left out and numbers rounded so that the last digit of a float does not matter. */
 const hash = (s: string): string => {
   let h = 0x811c9dc5;
-  for (const ch of s.replace(/(grp|obs|row|tbl|table)_[a-z0-9]+/g, '$1_').replace(/-?\d+\.\d+/g, (m) => Number(m).toFixed(3))) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+  for (const ch of s.replace(/grp_[a-z0-9]+[~-]\d+/g, 'obs_').replace(/(grp|obs|row|tbl|table)_[a-z0-9]+/g, '$1_').replace(/-?\d+\.\d+/g, (m) => Number(m).toFixed(3))) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
   return h.toString(16);
 };
 

@@ -10,9 +10,9 @@ import { el } from '../shared/scene/sceneElement';
 import { SceneElements } from '../shared/scene/SceneElements';
 import { richPieces } from '../shared/scene/richSvg';
 import { layoutMasterLegend, legendEntriesOf, mergeLegendEntries, type LegendEntry, type MasterLegendLayout } from './masterLegend';
-import { buildPdf, rgbaToFlateRgb } from './pdf';
 import { canvasToPngBlob } from './pngDpi';
 import { prefixIds } from './prefixIds';
+import { svgToPdf } from './svgPdf';
 
 /**
  * A layout page as SVG: the page, an optional title, and each graph drawn by the same renderer as the editor and the graph
@@ -182,14 +182,10 @@ export async function layoutToPngBlob(layout: Layout, project: Project, dpi: num
   return canvasToPngBlob(canvas, dpi);
 }
 
-/** A one-page PDF of the page, at A4 size, holding the picture at a resolution (see pdf.ts). A transparent page is white. */
-export async function layoutToPdfBlob(layout: Layout, project: Project, dpi: number): Promise<Blob> {
-  const canvas = await layoutToCanvas(layout, project, dpi);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas 2D context is unavailable.');
-  const flateRgb = await rgbaToFlateRgb(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
-  const { frame } = arrangeLayout(layout, []);
-  return new Blob([buildPdf({ widthPt: frame.widthPt, heightPt: frame.heightPt, pxWidth: canvas.width, pxHeight: canvas.height, flateRgb, title: layout.name }) as BlobPart], { type: 'application/pdf' });
+/** A one-page PDF of the page, at A4 size, written from the same SVG as the SVG export: vector shapes and text, no picture. `notes` says what could not be written as it is. */
+export async function layoutToPdf(layout: Layout, project: Project): Promise<{ blob: Blob; notes: string[] }> {
+  const { bytes, notes } = await svgToPdf(layoutToSvgString(layout, project), { title: layout.name });
+  return { blob: new Blob([bytes as BlobPart], { type: 'application/pdf' }), notes };
 }
 
 /** The texts of a page with the font each is written in, for the check of characters: the title and the panel labels in the page's font, each graph's texts in its own, and the master legend's names in the font of the graph they come from. */

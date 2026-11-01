@@ -1,5 +1,6 @@
 import type { AxisBinding, Bracket, Id } from '../../model/types';
 import { n2 } from '../../model/units';
+import { LABEL_LINE_HEIGHT, labelLines } from '../shared/parts/brackets';
 import { measureText } from '../shared/parts/text';
 import { el, type SceneElement } from '../shared/scene/sceneElement';
 import { svgId } from '../shared/scene/svgIds';
@@ -77,7 +78,7 @@ export function placeXyBrackets(brackets: readonly Bracket[], series: readonly B
 }
 
 /** How wide the label of a bracket stands on the page, pt. */
-const labelWidth = (b: Bracket, fontFamily: string): number => (b.label.trim() === '' ? 0 : measureText(b.label, b.fontSizePt, false, false, fontFamily));
+const labelWidth = (b: Bracket, fontFamily: string): number => (b.label.trim() === '' ? 0 : Math.max(...labelLines(b.label).map((line) => measureText(line, b.fontSizePt, false, false, fontFamily))));
 
 /** The distance of the bar of a lane from its points, pt: a lane is as far as the widest label of the chart and a gap. */
 export function laneOffsetPt(lane: number, brackets: readonly Bracket[], fontFamily: string): number {
@@ -108,11 +109,22 @@ export interface XyBracketGeom {
 export function xyBracketElements(brackets: readonly XyBracketGeom[], hidden: ReadonlySet<string>): SceneElement[] {
   const shown = brackets.filter((b) => !hidden.has(`${b.id}:bracket`));
   if (shown.length === 0) return [];
-  const bars = shown.map((b) =>
-    el('path', [['d', `M${n2(b.x - b.tick)},${n2(b.y1)}H${n2(b.x)}V${n2(b.y2)}H${n2(b.x - b.tick)}`], ['fill', 'none'], ['stroke', b.color], ['stroke-width', b.widthPt], ['stroke-linecap', 'butt'], ['stroke-linejoin', 'miter']], { id: svgId(`${b.id}:bracket`, 'bar') }),
-  );
+  const hit = (b: XyBracketGeom) => ({ kind: 'bracket' as const, objectId: b.id });
+  const bars = shown.flatMap((b) => {
+    const d = `M${n2(b.x - b.tick)},${n2(b.y1)}H${n2(b.x)}V${n2(b.y2)}H${n2(b.x - b.tick)}`;
+    return [
+      el('path', [['d', d], ['fill', 'none'], ['stroke', b.color], ['stroke-width', b.widthPt], ['stroke-linecap', 'butt'], ['stroke-linejoin', 'miter']], { id: svgId(`${b.id}:bracket`, 'bar'), hit: hit(b) }),
+      el('path', [['d', d], ['fill', 'none'], ['stroke', 'transparent'], ['stroke-width', Math.max(12, b.widthPt + 8)]], { editorOnly: true, hit: hit(b) }),
+    ];
+  });
   const labels = shown
     .filter((b) => b.label.trim() !== '')
-    .map((b) => el('text', [['x', n2(b.x + LABEL_GAP_PT)], ['y', n2((b.y1 + b.y2) / 2)], ['dy', '0.35em'], ['text-anchor', 'start'], ['font-size', b.fontSizePt], ['fill', b.color]], { id: svgId(`${b.id}:bracket`, 'label'), text: b.label }));
+    .flatMap((b) => {
+      const lines = labelLines(b.label);
+      const step = b.fontSizePt * LABEL_LINE_HEIGHT;
+      return lines.map((line, i) =>
+        el('text', [['x', n2(b.x + LABEL_GAP_PT)], ['y', n2((b.y1 + b.y2) / 2 + (i - (lines.length - 1) / 2) * step)], ['dy', '0.35em'], ['text-anchor', 'start'], ['font-size', b.fontSizePt], ['fill', b.color]], { id: svgId(`${b.id}:bracket`, 'label', ...(i > 0 ? [i + 1] : [])), text: line, hit: hit(b) }),
+      );
+    });
   return [el('g', [['clip-path', 'url(#plot-clip)']], { children: [...bars, ...labels] })];
 }

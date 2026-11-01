@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { chartToSvgString } from '../chart/export/export';
 import { GALLERY } from '../model/graph/chartGallery';
 import { createEmptyProject, createExampleProject } from '../model/defaults';
+import { canonicalObservationId, canonicalRowId } from '../model/table/rows';
 import type { TableKind } from '../model/types';
 import type { Project } from '../model/types';
 import { addAnnotation, addChart, addDataTable, addReferenceLine, patchStyle, setProjectName, setRowTitles } from './commands';
@@ -31,13 +32,13 @@ function richProject(): Project {
 }
 
 describe('project file (.oplot)', () => {
-  it('is the project as JSON text, the same text every time', () => {
+  it('is the project as JSON text, the same text every time', async () => {
     const p = richProject();
     const text = projectToFileText(p);
     expect(JSON.parse(text).format).toBe('octavaplot-project');
     expect(JSON.parse(text).version).toBe(1);
     expect(projectToFileText(p)).toBe(text);
-    expect(projectToFileText(JSON.parse(text).project)).toBe(text);
+    expect(projectToFileText((await readProjectFile(source('a.oplot', text))).project)).toBe(text);
   });
 
   it('is read back as the same project: text, annotations, styles, sizes, ids', async () => {
@@ -90,7 +91,7 @@ describe('project file (.oplot)', () => {
     await expect(bad((p) => ((p.dataTables = []), (p.charts = [])))).rejects.toThrow(/at least one table/);
     await expect(bad((p) => (p.charts[0].dataTableId = 'nope'))).rejects.toThrow(/missing data table/);
     await expect(bad((p) => p.charts.push(p.charts[0]))).rejects.toThrow(/same ID/);
-    await expect(bad((p) => (p.dataTables[0].groups[0].observations[0].value = 'x'))).rejects.toThrow(/finite number/);
+    await expect(bad((p) => (p.dataTables[0].groups[0].observations[0][1] = 'x'))).rejects.toThrow(/finite number/);
   });
 
   it('survives annotations and display names of the wrong type, with notes', async () => {
@@ -165,8 +166,8 @@ describe('project file (.oplot)', () => {
       dataTables: example.dataTables.map((t) => ({
         ...t,
         id: 'table-1',
-        rows: t.rows.map((r, i) => ({ ...r, id: `row-${i}` })),
-        groups: t.groups.map((g, gi) => ({ ...g, id: `group-${gi}`, observations: g.observations.map((o, oi) => ({ ...o, id: `obs-${gi}-${oi}` })) })),
+        rows: t.rows.map((r, i) => ({ ...r, id: canonicalRowId(i) })),
+        groups: t.groups.map((g, gi) => ({ ...g, id: `group-${gi}`, observations: g.observations.map((o, oi) => ({ ...o, id: canonicalObservationId(`group-${gi}`, oi) })) })),
       })),
       charts: [chart],
     };

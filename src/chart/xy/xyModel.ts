@@ -25,6 +25,7 @@ import { hasSubjects } from '../../model/table/subjects';
 import { offsetStepOf, offsetTable } from '../../model/table/offset';
 import { attachLazyScene } from './xyScene';
 import { laneOffsetPt, placeXyBrackets, reachRightPt, type XyBracketGeom } from './xyBrackets';
+import { type SizeKey, sizeKeyOf } from '../shared/scene/sizeLegend';
 import { bracketKindOf } from '../../model/graph/chartTypes';
 
 /** One plotted point of an XY series: a single Y value, or the centre of replicate / supplied-summary values. */
@@ -132,6 +133,8 @@ export interface XyModel {
   warnings: string[];
   /** Offset traces: the sentence written on the figure that discloses the offset; absent for the other chart types. */
   offsetNote?: string;
+  /** Bubble charts: the size legend, a row under the plot; absent when the chart has none (see Chart.sizeLegend). */
+  sizeKey?: SizeKey;
   /** The curve fit drawn, with its settings (none when the chart has no curve fit). */
   fit: FitSettings;
   /** How many series wait for a fit that is being made off the main thread: they are drawn without curve, band and numbers until it is done. */
@@ -375,6 +378,15 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     skippedConnectors: 0,
   }));
 
+  // Bubbles: the area of a bubble follows its size, so the diameter follows the square root of the size; the largest bubble of the chart is
+  // the symbol size of its series. A point with no size (empty, 0 or less, not a number) is not a bubble and is not drawn, and counted.
+  const validSize = (v: number | null): v is number => v !== null && Number.isFinite(v) && v > 0;
+  const largest = isBubble ? Math.max(0, ...raw.flatMap((r) => r.pts.map((p) => p.size).filter(validSize))) : 0;
+  // The size legend is a row under the plot: the layout reserves it. Its circles are on the scale of the first series (the symbol size is a setting of each series).
+  const sizeKey = isBubble && layout.kind === 'sized' && chart.sizeLegend
+    ? sizeKeyOf({ chosen: chart.sizeLegend.values, largest, symbolSizePt: raw[0]?.style.symbolSizePt ?? 0, title: raw[0]?.s.columns[1]?.name ?? '', fontSizePt: chart.legend.fontSizePt })
+    : null;
+
   // 3. Layout (title, axis titles, legend) with no category labels: the X axis carries numbers.
   const legendSeries = legendEntries(chart.legend, raw.map((r) => r.s.id));
   const layoutFor = (ya: YAxisScale) => computeLayout({
@@ -389,7 +401,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     legendLabels: legendSeries.map((i) => raw[i].label + AXIS_TAG[raw[i].binding]),
     categoryLabels: [],
     // Offset traces: a row of its own under the X axis title for the sentence that tells the offset (inside the plot it could lie on a trace).
-    extraBottomPt: isOffset ? chart.yAxis.tickFontSizePt * 1.8 : 0,
+    extraBottomPt: isOffset ? chart.yAxis.tickFontSizePt * 1.8 : sizeKey ? sizeKey.heightPt : 0,
     yTickLabels: ya.ticks.map(ya.tickLabel),
     y2Axis: y2Axis ? chart.y2Axis : undefined,
     y2TickLabels: y2Axis ? y2Axis.ticks.map(y2Axis.tickLabel) : undefined,
@@ -420,8 +432,6 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
 
   // Bubbles: the area of a bubble follows its size, so the diameter follows the square root of the size; the largest bubble of the chart is
   // the symbol size of its series. A point with no size (empty, 0 or less, not a number) is not a bubble and is not drawn, and counted.
-  const validSize = (v: number | null): v is number => v !== null && Number.isFinite(v) && v > 0;
-  const largest = isBubble ? Math.max(0, ...raw.flatMap((r) => r.pts.map((p) => p.size).filter(validSize))) : 0;
   const sized = layout.kind === 'sized';
   let noSize = 0;
   if (isVector && layout.kind !== 'vector') warnings.push('Vectors need a step for each point: make the data table with the layout "Y, dX and dY" (New Table, XY).');
@@ -590,11 +600,11 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     // A bracket is in the units of the axis its two series are on.
     const [yA, yS] = p.axis === 'secondary' && y2Axis && y2Scale ? [y2Axis, y2Scale] : [yAxis, yScale];
     const [y1, y2] = [yS(p.low), yS(p.high)];
-    const x = xScale(p.at) + laneOffsetPt(p.lane, chart.brackets, chart.fontFamily);
+    const x = xScale(p.at) + laneOffsetPt(p.lane, chart.brackets, chart.fontFamily) + (p.bracket.liftPt ?? 0);
     if (![x, y1, y2].every(Number.isFinite) || inBreak(xAxis, p.at) || inBreak(yA, p.low) || inBreak(yA, p.high)) return [];
     return [{ id: p.bracket.id, label: p.bracket.label, x, y1, y2, tick: Math.max(6, p.bracket.fontSizePt * 0.4), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
   });
-  const model: XyModel = { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, y2: y2Axis, y2Scale, series, brackets, legendSeries, ...(offsetNote ? { offsetNote } : {}), warnings: [...new Set(warnings)], fit, fitsPending: series.filter((q) => q.fit?.pending).length, layers: layerList };
+  const model: XyModel = { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, y2: y2Axis, y2Scale, series, brackets, legendSeries, ...(offsetNote ? { offsetNote } : {}), ...(sizeKey ? { sizeKey } : {}), warnings: [...new Set(warnings)], fit, fitsPending: series.filter((q) => q.fit?.pending).length, layers: layerList };
   attachLazyScene(chart, model);
   return model;
 }

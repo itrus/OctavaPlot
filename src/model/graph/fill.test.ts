@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import type { Project } from '../types';
 import { createChart, createExampleProject, DEFAULT_STYLE, PRESET_KEYS, TYPE_PRESETS } from '../defaults';
 import {
   describeBarFillUi,
@@ -121,7 +122,7 @@ describe('sanitizeFillKeys', () => {
 function fileText(mutate: (p: Any) => void): string {
   const p = JSON.parse(JSON.stringify(createExampleProject())) as Any;
   mutate(p);
-  return JSON.stringify({ format: 'octavaplot-project', version: 1, project: p });
+  return stringifyProject(p as unknown as Project);
 }
 
 describe('serialize', () => {

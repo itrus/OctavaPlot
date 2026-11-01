@@ -162,3 +162,6 @@ export const isSurvivalChartType = (type: ChartType): boolean => chartFamily(typ
 export const leadingColumns = (kind: TableKind): number => (kind === 'xy' || kind === 'survival' ? 1 : 0);
 /** Tables whose columns are grouped into series (blocks); the column table's columns are data sets one by one. */
 export const usesSeriesBlocks = (kind: TableKind): boolean => kind !== 'column';
+
+/** The farthest a comparison bracket can be moved from where it is placed, pt, in either direction (`Bracket.liftPt`). */
+export const BRACKET_LIFT_LIMIT = 1000;

@@ -640,7 +640,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     const [a, b] = endsOf(p.bracket);
     const at = yScale(p.value);
     if (!Number.isFinite(at) || inBreak(yAxis, p.value)) return [];
-    return [{ id: p.bracket.id, label: p.bracket.label, x1: centreOf(a), x2: centreOf(b), y: at, tick: Math.max(6, p.bracket.fontSizePt * 0.6), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
+    return [{ id: p.bracket.id, label: p.bracket.label, x1: centreOf(a), x2: centreOf(b), y: at - (p.bracket.liftPt ?? 0), tick: Math.max(6, p.bracket.fontSizePt * 0.6), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
   });
   const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, pairLines, factorLabels, brackets, ...(separated ? { axisColumns: raw.flatMap((r, si) => categories.map((cat, ci) => ({ key: `${r.s.id}:${cat.row}`, centerX: sepCentre(si, ci), label: cat.label }))) } : {}), legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileGroupedScene(chart, model);

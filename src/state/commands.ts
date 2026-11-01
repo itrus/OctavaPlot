@@ -19,7 +19,7 @@ import { applyVariant, type ChartVariant, variantFits } from '../model/graph/cha
 import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns, usesSeriesBlocks } from '../model/graph/chartTypes';
 import { newId } from '../model/ids';
 import { paletteColor, type Palette } from '../model/graph/palettes';
-import { createRows, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
+import { canonicalObservationId, canonicalRowId, createRows, freshId, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { clearGroupSummary, clearGroupSummaryKeys, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/graph/summary';
 import { folderItems, nudge, reorder, sortedByName } from '../model/project/folderItems';
 import { clearPartStyles, layerKindOf, layersOf, layerStylesAvailable, lookKeysOf, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
@@ -102,14 +102,17 @@ function growRows(table: DataTable, rowCount: number): DataTable {
   return {
     ...table,
     rowCount,
-    rows: [...table.rows, ...createRows(rowCount - table.rowCount)],
-    groups: table.groups.map((g) => ({
-      ...g,
-      observations: [
-        ...g.observations,
-        ...Array.from({ length: rowCount - table.rowCount }, () => ({ id: newId('obs'), value: null })),
-      ],
-    })),
+    rows: [...table.rows, ...createRows(rowCount - table.rowCount, table.rowCount, new Set(table.rows.map((r) => r.id)))],
+    groups: table.groups.map((g) => {
+      const taken = new Set(g.observations.map((o) => o.id));
+      return {
+        ...g,
+        observations: [
+          ...g.observations,
+          ...Array.from({ length: rowCount - table.rowCount }, (_, i) => ({ id: freshId(canonicalObservationId(g.id, table.rowCount + i), 'obs', taken), value: null })),
+        ],
+      };
+    }),
   };
 }
 
@@ -742,7 +745,7 @@ export const addChartLike = (chartId: Id, tableId: Id, sourceChartId: Id, linked
 export const unlinkChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId && c.linkedTo !== undefined) ? mapChart(p, chartId, ({ linkedTo: _gone, ...c }) => c) : p);
 
 /** Colours, frame and gridline style of the chart (see model/graph/axis.ts: sanitizeLook). */
-export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'summaryRows' | 'origin' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'groupedBy' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle>; pairs?: Partial<Chart['pairs']> }): Command => (p) =>
+export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'summaryRows' | 'sizeLegend' | 'origin' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'groupedBy' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle>; pairs?: Partial<Chart['pairs']> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
     const { grid, ...rest } = patch;
     return { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };
@@ -837,8 +840,11 @@ export const duplicateTable = (tableId: Id, copyId: Id): Command => (p) => {
     ...t,
     id: copyId,
     name: copyName(t.name, p.dataTables.map((x) => x.name)),
-    rows: t.rows.map((r) => ({ ...r, id: newId('row') })),
-    groups: t.groups.map((g) => ({ ...g, id: newId('group'), observations: g.observations.map((o) => ({ ...o, id: newId('obs') })) })),
+    rows: t.rows.map((r, i) => ({ ...r, id: canonicalRowId(i) })),
+    groups: t.groups.map((g) => {
+      const id = newId('group');
+      return { ...g, id, observations: g.observations.map((o, i) => ({ ...o, id: canonicalObservationId(id, i) })) };
+    }),
   };
   return { ...p, dataTables: [...p.dataTables, copy] };
 };

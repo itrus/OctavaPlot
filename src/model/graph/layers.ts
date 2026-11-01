@@ -598,6 +598,14 @@ export function partStyle(chart: Chart, layerId: Id, style: ChartStyle): ChartSt
 }
 
 /**
+ * The look a legend key is drawn in: the look of the series with what its line and its points were given of their own (the layers of
+ * individual values and of points both set the symbol; the points win), so that a key shows the marks it stands for.
+ */
+export function legendKeyStyle(chart: Chart, seriesId: Id, style: ChartStyle): ChartStyle {
+  return partStyle(chart, `${seriesId}:points`, partStyle(chart, `${seriesId}:rawPoints`, partStyle(chart, `${seriesId}:line`, style)));
+}
+
+/**
  * The look of the data set a layer belongs to, before the layer's own settings: what the inspector shows for a setting the layer has not
  * been given. A layer of the chart as a whole (the lines joining the rows of a paired plot) takes the first data set's.
  */

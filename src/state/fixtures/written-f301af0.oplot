@@ -10,56 +10,6 @@
         "name": "Data 1",
         "kind": "column",
         "rowCount": 12,
-        "rows": [
-          {
-            "id": "row_ay0v7mmv2",
-            "title": ""
-          },
-          {
-            "id": "row_no7oh8in3",
-            "title": ""
-          },
-          {
-            "id": "row_h1e51lbx4",
-            "title": ""
-          },
-          {
-            "id": "row_ai1mw81x5",
-            "title": ""
-          },
-          {
-            "id": "row_85uuyzj16",
-            "title": ""
-          },
-          {
-            "id": "row_r1duzi7c7",
-            "title": ""
-          },
-          {
-            "id": "row_ycqy3qw58",
-            "title": ""
-          },
-          {
-            "id": "row_8wuwf1gx9",
-            "title": ""
-          },
-          {
-            "id": "row_f9qvgfa8a",
-            "title": ""
-          },
-          {
-            "id": "row_e6bsqppkb",
-            "title": ""
-          },
-          {
-            "id": "row_9xsbp713c",
-            "title": ""
-          },
-          {
-            "id": "row_sbq6s0r2d",
-            "title": ""
-          }
-        ],
         "groups": [
           {
             "id": "grp_z5veht7fm",
@@ -67,54 +17,11 @@
             "title": "",
             "paletteIndex": 0,
             "observations": [
-              {
-                "id": "obs_9iwmfb8sn",
-                "value": 1.1
-              },
-              {
-                "id": "obs_fekppti3o",
-                "value": 1.2
-              },
-              {
-                "id": "obs_0zo97tacp",
-                "value": 1.3
-              },
-              {
-                "id": "obs_twoajxmzq",
-                "value": 1.2
-              },
-              {
-                "id": "obs_xvarwpvzr",
-                "value": 1.4
-              },
-              {
-                "id": "obs_lqbu1wzfs",
-                "value": null
-              },
-              {
-                "id": "obs_sfsdq2umt",
-                "value": null
-              },
-              {
-                "id": "obs_dx90qacyu",
-                "value": null
-              },
-              {
-                "id": "obs_hb12vkiav",
-                "value": null
-              },
-              {
-                "id": "obs_x27jttf8w",
-                "value": null
-              },
-              {
-                "id": "obs_38hq0ls9x",
-                "value": null
-              },
-              {
-                "id": "obs_sdeghgwhy",
-                "value": null
-              }
+              [0,1.1,{"id":"obs_9iwmfb8sn"}],
+              [1,1.2,{"id":"obs_fekppti3o"}],
+              [2,1.3,{"id":"obs_0zo97tacp"}],
+              [3,1.2,{"id":"obs_twoajxmzq"}],
+              [4,1.4,{"id":"obs_xvarwpvzr"}]
             ]
           },
           {
@@ -123,54 +30,11 @@
             "title": "",
             "paletteIndex": 1,
             "observations": [
-              {
-                "id": "obs_sddfecwt18",
-                "value": 1.4
-              },
-              {
-                "id": "obs_r6hrgws919",
-                "value": 1.7
-              },
-              {
-                "id": "obs_0a3kuvcp1a",
-                "value": 1.6
-              },
-              {
-                "id": "obs_17lvl4261b",
-                "value": 1.8
-              },
-              {
-                "id": "obs_zab9mxxs1c",
-                "value": 1.5
-              },
-              {
-                "id": "obs_snhv6pyr1d",
-                "value": null
-              },
-              {
-                "id": "obs_ulsvsjlj1e",
-                "value": null
-              },
-              {
-                "id": "obs_2oqgsqry1f",
-                "value": null
-              },
-              {
-                "id": "obs_1lrksnj11g",
-                "value": null
-              },
-              {
-                "id": "obs_mpovap2u1h",
-                "value": null
-              },
-              {
-                "id": "obs_gyx4rwh01i",
-                "value": null
-              },
-              {
-                "id": "obs_qw64twp71j",
-                "value": null
-              }
+              [0,1.4,{"id":"obs_sddfecwt18"}],
+              [1,1.7,{"id":"obs_r6hrgws919"}],
+              [2,1.6,{"id":"obs_0a3kuvcp1a"}],
+              [3,1.8,{"id":"obs_17lvl4261b"}],
+              [4,1.5,{"id":"obs_zab9mxxs1c"}]
             ]
           },
           {
@@ -179,54 +43,11 @@
             "title": "",
             "paletteIndex": 2,
             "observations": [
-              {
-                "id": "obs_lymtul441t",
-                "value": 1.8
-              },
-              {
-                "id": "obs_1y7jizfr1u",
-                "value": 2
-              },
-              {
-                "id": "obs_486c69y11v",
-                "value": 1.9
-              },
-              {
-                "id": "obs_r1y57knx1w",
-                "value": 2.1
-              },
-              {
-                "id": "obs_kkgjk9re1x",
-                "value": 2.2
-              },
-              {
-                "id": "obs_h8j8omxa1y",
-                "value": null
-              },
-              {
-                "id": "obs_je1r0r9j1z",
-                "value": null
-              },
-              {
-                "id": "obs_rvqat63520",
-                "value": null
-              },
-              {
-                "id": "obs_2p4bs3a921",
-                "value": null
-              },
-              {
-                "id": "obs_gomyswnl22",
-                "value": null
-              },
-              {
-                "id": "obs_2qn8ge3a23",
-                "value": null
-              },
-              {
-                "id": "obs_3v230dav24",
-                "value": null
-              }
+              [0,1.8,{"id":"obs_lymtul441t"}],
+              [1,2,{"id":"obs_1y7jizfr1u"}],
+              [2,1.9,{"id":"obs_486c69y11v"}],
+              [3,2.1,{"id":"obs_r1y57knx1w"}],
+              [4,2.2,{"id":"obs_kkgjk9re1x"}]
             ]
           },
           {
@@ -235,54 +56,11 @@
             "title": "",
             "paletteIndex": 3,
             "observations": [
-              {
-                "id": "obs_uc56t4sv2e",
-                "value": 2.1
-              },
-              {
-                "id": "obs_d0jor4qu2f",
-                "value": 2.4
-              },
-              {
-                "id": "obs_zseezzvo2g",
-                "value": 2.3
-              },
-              {
-                "id": "obs_bbc72woy2h",
-                "value": 2.5
-              },
-              {
-                "id": "obs_q6qeqeol2i",
-                "value": 2.2
-              },
-              {
-                "id": "obs_qjx1ygyp2j",
-                "value": null
-              },
-              {
-                "id": "obs_j967bmp22k",
-                "value": null
-              },
-              {
-                "id": "obs_96yhun6u2l",
-                "value": null
-              },
-              {
-                "id": "obs_q7at84172m",
-                "value": null
-              },
-              {
-                "id": "obs_6b3pwzp52n",
-                "value": null
-              },
-              {
-                "id": "obs_bh5axnc42o",
-                "value": null
-              },
-              {
-                "id": "obs_5nn63dp42p",
-                "value": null
-              }
+              [0,2.1,{"id":"obs_uc56t4sv2e"}],
+              [1,2.4,{"id":"obs_d0jor4qu2f"}],
+              [2,2.3,{"id":"obs_zseezzvo2g"}],
+              [3,2.5,{"id":"obs_bbc72woy2h"}],
+              [4,2.2,{"id":"obs_q6qeqeol2i"}]
             ]
           }
         ]
@@ -292,56 +70,6 @@
         "name": "Dose response",
         "kind": "xy",
         "rowCount": 12,
-        "rows": [
-          {
-            "id": "row_g4ff48pl4t",
-            "title": ""
-          },
-          {
-            "id": "row_cy4eo6wi4u",
-            "title": ""
-          },
-          {
-            "id": "row_iolhbqdu4v",
-            "title": ""
-          },
-          {
-            "id": "row_kf6jykix4w",
-            "title": ""
-          },
-          {
-            "id": "row_vupejf034x",
-            "title": ""
-          },
-          {
-            "id": "row_t3j0i3jp4y",
-            "title": ""
-          },
-          {
-            "id": "row_eulebz7z4z",
-            "title": ""
-          },
-          {
-            "id": "row_630rv28350",
-            "title": ""
-          },
-          {
-            "id": "row_7crv7g8l51",
-            "title": ""
-          },
-          {
-            "id": "row_azrkgkwu52",
-            "title": ""
-          },
-          {
-            "id": "row_vgk1fssd53",
-            "title": ""
-          },
-          {
-            "id": "row_bs9vmed854",
-            "title": ""
-          }
-        ],
         "groups": [
           {
             "id": "grp_rummf6wv31",
@@ -349,54 +77,14 @@
             "title": "",
             "paletteIndex": 0,
             "observations": [
-              {
-                "id": "obs_kf7sw17032",
-                "value": 1
-              },
-              {
-                "id": "obs_3m8jae9p33",
-                "value": 2
-              },
-              {
-                "id": "obs_0a23kmvk34",
-                "value": 3
-              },
-              {
-                "id": "obs_h3dolw5o35",
-                "value": 4
-              },
-              {
-                "id": "obs_a6q3471536",
-                "value": 5
-              },
-              {
-                "id": "obs_nvnpxmb437",
-                "value": 6
-              },
-              {
-                "id": "obs_ed453dvl38",
-                "value": 7
-              },
-              {
-                "id": "obs_l5s644do39",
-                "value": 8
-              },
-              {
-                "id": "obs_gnwruyn23a",
-                "value": null
-              },
-              {
-                "id": "obs_50vl59jc3b",
-                "value": null
-              },
-              {
-                "id": "obs_53sk63a73c",
-                "value": null
-              },
-              {
-                "id": "obs_v5z5smb33d",
-                "value": null
-              }
+              [0,1,{"id":"obs_kf7sw17032"}],
+              [1,2,{"id":"obs_3m8jae9p33"}],
+              [2,3,{"id":"obs_0a23kmvk34"}],
+              [3,4,{"id":"obs_h3dolw5o35"}],
+              [4,5,{"id":"obs_a6q3471536"}],
+              [5,6,{"id":"obs_nvnpxmb437"}],
+              [6,7,{"id":"obs_ed453dvl38"}],
+              [7,8,{"id":"obs_l5s644do39"}]
             ]
           },
           {
@@ -405,54 +93,14 @@
             "title": "",
             "paletteIndex": 1,
             "observations": [
-              {
-                "id": "obs_8j9sf5h63n",
-                "value": 1.1
-              },
-              {
-                "id": "obs_lbtrwan53o",
-                "value": 2.3
-              },
-              {
-                "id": "obs_e0wtsrx83p",
-                "value": 2.9
-              },
-              {
-                "id": "obs_9f4soeef3q",
-                "value": 4.2
-              },
-              {
-                "id": "obs_g5rt31353r",
-                "value": 5.1
-              },
-              {
-                "id": "obs_e0iqb94w3s",
-                "value": 5.8
-              },
-              {
-                "id": "obs_95mz2uqq3t",
-                "value": 7.2
-              },
-              {
-                "id": "obs_pymdhn5i3u",
-                "value": 8.1
-              },
-              {
-                "id": "obs_flsczzn13v",
-                "value": null
-              },
-              {
-                "id": "obs_109q6pyi3w",
-                "value": null
-              },
-              {
-                "id": "obs_xife848i3x",
-                "value": null
-              },
-              {
-                "id": "obs_yxhzqgms3y",
-                "value": null
-              }
+              [0,1.1,{"id":"obs_8j9sf5h63n"}],
+              [1,2.3,{"id":"obs_lbtrwan53o"}],
+              [2,2.9,{"id":"obs_e0wtsrx83p"}],
+              [3,4.2,{"id":"obs_9f4soeef3q"}],
+              [4,5.1,{"id":"obs_g5rt31353r"}],
+              [5,5.8,{"id":"obs_e0iqb94w3s"}],
+              [6,7.2,{"id":"obs_95mz2uqq3t"}],
+              [7,8.1,{"id":"obs_pymdhn5i3u"}]
             ]
           },
           {
@@ -461,54 +109,14 @@
             "title": "",
             "paletteIndex": 2,
             "observations": [
-              {
-                "id": "obs_t7q21rja48",
-                "value": 0.5
-              },
-              {
-                "id": "obs_a2viq71x49",
-                "value": 1.2
-              },
-              {
-                "id": "obs_mhy6s6fp4a",
-                "value": 2.2
-              },
-              {
-                "id": "obs_iylpzsqt4b",
-                "value": 3.9
-              },
-              {
-                "id": "obs_2anirvcg4c",
-                "value": 6.1
-              },
-              {
-                "id": "obs_umsoyadr4d",
-                "value": 8.8
-              },
-              {
-                "id": "obs_b9mgf0mk4e",
-                "value": 12
-              },
-              {
-                "id": "obs_0o58yhy04f",
-                "value": 15.9
-              },
-              {
-                "id": "obs_e3bvfvyl4g",
-                "value": null
-              },
-              {
-                "id": "obs_49jrlgr34h",
-                "value": null
-              },
-              {
-                "id": "obs_l1qnadix4i",
-                "value": null
-              },
-              {
-                "id": "obs_j4dn8kuz4j",
-                "value": null
-              }
+              [0,0.5,{"id":"obs_t7q21rja48"}],
+              [1,1.2,{"id":"obs_a2viq71x49"}],
+              [2,2.2,{"id":"obs_mhy6s6fp4a"}],
+              [3,3.9,{"id":"obs_iylpzsqt4b"}],
+              [4,6.1,{"id":"obs_2anirvcg4c"}],
+              [5,8.8,{"id":"obs_umsoyadr4d"}],
+              [6,12,{"id":"obs_b9mgf0mk4e"}],
+              [7,15.9,{"id":"obs_0o58yhy04f"}]
             ]
           }
         ]
@@ -518,56 +126,6 @@
         "name": "Survival",
         "kind": "survival",
         "rowCount": 12,
-        "rows": [
-          {
-            "id": "row_dw3ll0nz75",
-            "title": ""
-          },
-          {
-            "id": "row_enpucwxe76",
-            "title": ""
-          },
-          {
-            "id": "row_hedvp8ke77",
-            "title": ""
-          },
-          {
-            "id": "row_h8y9sebb78",
-            "title": ""
-          },
-          {
-            "id": "row_jxln0vro79",
-            "title": ""
-          },
-          {
-            "id": "row_d0zln4sk7a",
-            "title": ""
-          },
-          {
-            "id": "row_gerjv8wg7b",
-            "title": ""
-          },
-          {
-            "id": "row_hopt8iy37c",
-            "title": ""
-          },
-          {
-            "id": "row_r3nzehsm7d",
-            "title": ""
-          },
-          {
-            "id": "row_2qv91zqn7e",
-            "title": ""
-          },
-          {
-            "id": "row_bhqhld697f",
-            "title": ""
-          },
-          {
-            "id": "row_ar47oeh57g",
-            "title": ""
-          }
-        ],
         "groups": [
           {
             "id": "grp_rraebv7p5d",
@@ -575,54 +133,18 @@
             "title": "",
             "paletteIndex": 0,
             "observations": [
-              {
-                "id": "obs_3wd58p875e",
-                "value": 3
-              },
-              {
-                "id": "obs_bktg9s6f5f",
-                "value": 5
-              },
-              {
-                "id": "obs_0o5vxjcw5g",
-                "value": 6
-              },
-              {
-                "id": "obs_ucgc1pc35h",
-                "value": 8
-              },
-              {
-                "id": "obs_lmpa3vyz5i",
-                "value": 9
-              },
-              {
-                "id": "obs_hd7nflsn5j",
-                "value": 11
-              },
-              {
-                "id": "obs_h026qgrk5k",
-                "value": 14
-              },
-              {
-                "id": "obs_8gyv4t8u5l",
-                "value": 16
-              },
-              {
-                "id": "obs_kidbn4b45m",
-                "value": 20
-              },
-              {
-                "id": "obs_gsr5cu1y5n",
-                "value": 24
-              },
-              {
-                "id": "obs_3d3ryjsx5o",
-                "value": 6
-              },
-              {
-                "id": "obs_74nvei515p",
-                "value": 9
-              }
+              [0,3,{"id":"obs_3wd58p875e"}],
+              [1,5,{"id":"obs_bktg9s6f5f"}],
+              [2,6,{"id":"obs_0o5vxjcw5g"}],
+              [3,8,{"id":"obs_ucgc1pc35h"}],
+              [4,9,{"id":"obs_lmpa3vyz5i"}],
+              [5,11,{"id":"obs_hd7nflsn5j"}],
+              [6,14,{"id":"obs_h026qgrk5k"}],
+              [7,16,{"id":"obs_8gyv4t8u5l"}],
+              [8,20,{"id":"obs_kidbn4b45m"}],
+              [9,24,{"id":"obs_gsr5cu1y5n"}],
+              [10,6,{"id":"obs_3d3ryjsx5o"}],
+              [11,9,{"id":"obs_74nvei515p"}]
             ]
           },
           {
@@ -631,54 +153,16 @@
             "title": "",
             "paletteIndex": 1,
             "observations": [
-              {
-                "id": "obs_xz4dfkmu5z",
-                "value": 1
-              },
-              {
-                "id": "obs_79mazc0p60",
-                "value": 1
-              },
-              {
-                "id": "obs_sqa55b0u61",
-                "value": 1
-              },
-              {
-                "id": "obs_5tuouz1w62",
-                "value": 0
-              },
-              {
-                "id": "obs_ee89puia63",
-                "value": 1
-              },
-              {
-                "id": "obs_t0votjh064",
-                "value": 1
-              },
-              {
-                "id": "obs_pikl502j65",
-                "value": 1
-              },
-              {
-                "id": "obs_brrki3j366",
-                "value": 0
-              },
-              {
-                "id": "obs_ib7t0v7n67",
-                "value": 1
-              },
-              {
-                "id": "obs_j3x8w1bl68",
-                "value": 1
-              },
-              {
-                "id": "obs_gahe61q469",
-                "value": null
-              },
-              {
-                "id": "obs_k1o1rf4j6a",
-                "value": null
-              }
+              [0,1,{"id":"obs_xz4dfkmu5z"}],
+              [1,1,{"id":"obs_79mazc0p60"}],
+              [2,1,{"id":"obs_sqa55b0u61"}],
+              [3,0,{"id":"obs_5tuouz1w62"}],
+              [4,1,{"id":"obs_ee89puia63"}],
+              [5,1,{"id":"obs_t0votjh064"}],
+              [6,1,{"id":"obs_pikl502j65"}],
+              [7,0,{"id":"obs_brrki3j366"}],
+              [8,1,{"id":"obs_ib7t0v7n67"}],
+              [9,1,{"id":"obs_j3x8w1bl68"}]
             ]
           },
           {
@@ -687,54 +171,8 @@
             "title": "",
             "paletteIndex": 2,
             "observations": [
-              {
-                "id": "obs_c8lt29zw6k",
-                "value": null
-              },
-              {
-                "id": "obs_4tjjaiyj6l",
-                "value": null
-              },
-              {
-                "id": "obs_c4qsp29y6m",
-                "value": null
-              },
-              {
-                "id": "obs_lkfmr0ng6n",
-                "value": null
-              },
-              {
-                "id": "obs_p5uwgewe6o",
-                "value": null
-              },
-              {
-                "id": "obs_53omwjer6p",
-                "value": null
-              },
-              {
-                "id": "obs_0a4ehday6q",
-                "value": null
-              },
-              {
-                "id": "obs_42gatkx56r",
-                "value": null
-              },
-              {
-                "id": "obs_o46b690v6s",
-                "value": null
-              },
-              {
-                "id": "obs_49put1rj6t",
-                "value": null
-              },
-              {
-                "id": "obs_dertp5r66u",
-                "value": 1
-              },
-              {
-                "id": "obs_u56aysvz6v",
-                "value": 0
-              }
+              [10,1,{"id":"obs_dertp5r66u"}],
+              [11,0,{"id":"obs_u56aysvz6v"}]
             ]
           }
         ]

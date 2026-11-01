@@ -1,4 +1,5 @@
 import type { Bracket, Id } from '../../../model/types';
+import { LABEL_LINE_HEIGHT, labelLines } from '../parts/brackets';
 
 /**
  * Comparison brackets: where each one stands, in data units. A bracket joins two data sets (by ID) and says what the owner of the
@@ -13,7 +14,8 @@ import type { Bracket, Id } from '../../../model/types';
  */
 const stepPtFor = (brackets: readonly Bracket[]): number => {
   const labelled = brackets.filter((b) => b.label.trim() !== '');
-  return labelled.length > 0 ? Math.max(...labelled.map((b) => b.fontSizePt)) * 0.9 + 12 : 12;
+  // Each line of a label beyond the first adds its own height.
+  return labelled.length > 0 ? Math.max(...labelled.map((b) => b.fontSizePt * (0.9 + (labelLines(b.label).length - 1) * LABEL_LINE_HEIGHT))) + 12 : 12;
 };
 
 /** The axis limits are rounded to ticks, so the plot shows a little more than the data and the brackets: a step is measured against a range this much larger. */

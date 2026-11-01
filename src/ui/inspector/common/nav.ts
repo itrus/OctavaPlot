@@ -18,6 +18,7 @@ export function inspectorTargetFor(hit: HitTarget): InspectorTarget | null {
     case 'title':
       return { tab: 'appearance', section: 'text' };
     case 'annotation':
+    case 'bracket':
       return { tab: 'annotations' };
     default:
       return null;
