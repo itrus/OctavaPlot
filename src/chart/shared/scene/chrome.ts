@@ -1,6 +1,6 @@
 import { type SceneElement, el } from './sceneElement';
 import { n2 } from '../../../model/units';
-import type { AxisConfig, BreakMark, Chart, GridStyle } from '../../../model/types';
+import type { AxisConfig, BreakMark, Chart, ExtraTick, GridStyle } from '../../../model/types';
 import { dashOf } from '../../../model/graph/look';
 import { type YAxisScale, majorStepOf } from '../axes/scales';
 import type { PlacedReferenceLine, PlacedRegion } from './referenceLines';
@@ -36,7 +36,7 @@ export function backgroundElements(chart: Chart, width: number, height: number, 
   ];
 }
 
-export interface GridProps {
+interface GridProps {
   /** 'h' = horizontal lines (one per Y tick), 'v' = vertical lines (one per X tick). */
   dir: 'h' | 'v';
   grid: GridStyle;
@@ -51,16 +51,35 @@ export interface GridProps {
   to: number;
   /** Pattern for the major lines when the style is solid (the right axis is dashed to tell it from the left). */
   fallbackDash?: string;
+  /** The added ticks of the axis, by the value of their tick: one with a gridline of its own is drawn with that, and not with the others. */
+  extras?: ReadonlyMap<number, ExtraTick>;
 }
 
 const gridLine = (dir: 'h' | 'v', pos: number, from: number, to: number): string => (dir === 'h' ? `M${n2(from)},${n2(pos)}H${n2(to)}` : `M${n2(pos)},${n2(from)}V${n2(to)}`);
 
-/** The gridlines of one axis, major and minor, drawn behind the data. */
-export function gridElements({ dir, grid, major, minor, showMajor, showMinor, at, from, to, fallbackDash }: GridProps): SceneElement[] {
+/** The gridlines that added ticks ask for with settings of their own, behind the data or in front of it. Such a line is drawn whether or not the axis has its gridlines on. */
+export function extraGridElements({ dir, grid, extras, at, from, to }: { dir: 'h' | 'v'; grid: GridStyle; extras: ReadonlyMap<number, ExtraTick> | undefined; at: (v: number) => number; from: number; to: number }, over: boolean): SceneElement[] {
+  if (!extras) return [];
   const out: SceneElement[] = [];
-  if (showMajor) {
-    out.push(el('g', [['stroke', grid.color], ['stroke-width', grid.widthPt], ['stroke-opacity', grid.opacity < 1 ? grid.opacity : undefined], ['fill', 'none'], ['stroke-dasharray', dashOf(grid.style) ?? fallbackDash]], { children: major.map((t) => el('path', [['d', gridLine(dir, at(t), from, to)]])) }));
+  for (const [t, x] of extras) {
+    if (x.showGrid !== true || (x.gridOver === true) !== over) continue;
+    const p = at(t);
+    if (!Number.isFinite(p)) continue;
+    const style = x.gridStyle ?? grid.style;
+    out.push(el('path', [['d', gridLine(dir, p, from, to)], ['stroke', x.gridColor ?? grid.color], ['stroke-width', x.gridWidthPt ?? grid.widthPt], ['stroke-opacity', grid.opacity < 1 && x.gridColor === undefined ? grid.opacity : undefined], ['fill', 'none'], ['stroke-dasharray', dashOf(style, x.gridWidthPt ?? grid.widthPt)]]));
   }
+  return out;
+}
+
+/** The gridlines of one axis, major and minor, drawn behind the data. */
+export function gridElements({ dir, grid, major, minor, showMajor, showMinor, at, from, to, fallbackDash, extras }: GridProps): SceneElement[] {
+  const out: SceneElement[] = [];
+  // An added tick with a say of its own about its gridline is left out of the lines of the axis.
+  const plain = extras ? major.filter((t) => extras.get(t)?.showGrid === undefined) : major;
+  if (showMajor) {
+    out.push(el('g', [['stroke', grid.color], ['stroke-width', grid.widthPt], ['stroke-opacity', grid.opacity < 1 ? grid.opacity : undefined], ['fill', 'none'], ['stroke-dasharray', dashOf(grid.style) ?? fallbackDash]], { children: plain.map((t) => el('path', [['d', gridLine(dir, at(t), from, to)]])) }));
+  }
+  out.push(...extraGridElements({ dir, grid, extras, at, from, to }, false));
   if (showMinor && minor.length > 0) {
     out.push(el('g', [['stroke', grid.minorColor], ['stroke-width', grid.minorWidthPt], ['stroke-opacity', grid.minorOpacity < 1 ? grid.minorOpacity : undefined], ['fill', 'none'], ['stroke-dasharray', dashOf(grid.minorStyle)]], { children: minor.map((t) => el('path', [['d', gridLine(dir, at(t), from, to)]])) }));
   }
@@ -178,7 +197,7 @@ export function regionElements(regions: readonly PlacedRegion[], fontSizePt: num
   ];
 }
 
-export interface NumericAxisProps {
+interface NumericAxisProps {
   /** What the axis is called in the drawing (its id and what a click on it selects); the direction it runs by default. */
   name?: 'x' | 'y';
   chart: Chart;
@@ -204,7 +223,7 @@ export function numericAxisElements({ name: given, chart, cfg, scale, along, cro
   const right = plot.x + plot.width;
   const line = along === 'y' ? axisLineD('y', crossing, plot.y, bottom, pieces) : axisLineD('x', crossing, plot.x, right, pieces);
   const marks = breakMarkElement({ along, fixed: crossing, gaps, mark: cfg.breakMark, color: chart.axisColor, width: cfg.lineWidthPt });
-  const ticks = tickPaths(along === 'y' ? 'left' : 'bottom', crossing, cfg, scale.ticks, scale.minorTicks ?? [], map);
+  const ticks = tickPaths(along === 'y' ? 'left' : 'bottom', crossing, cfg, scale.ticks, scale.minorTicks ?? [], map, scale.extraTicks);
   const axis = el('g', [['stroke', chart.axisColor], ['stroke-width', cfg.lineWidthPt], ['stroke-opacity', chart.axisOpacity < 1 ? chart.axisOpacity : undefined], ['fill', 'none'], ['stroke-linecap', 'square']], {
     hit: { kind: 'axis', objectId: name },
     id: `${name}-axis`,
@@ -212,18 +231,30 @@ export function numericAxisElements({ name: given, chart, cfg, scale, along, cro
       el('path', [['d', line]]),
       el('path', [['d', line], ['stroke', 'transparent'], ['stroke-width', 28]], { editorOnly: true }),
       ...(marks ? [marks] : []),
-      ...ticks.map((p) => el('path', [['d', p.d], ['stroke-linecap', 'butt']])),
+      ...ticks.map((p) => el('path', [['d', p.d], ['stroke-linecap', 'butt'], ['stroke-width', p.widthPt]])),
     ],
   });
-  const labels = scale.ticks.map((t) =>
-    along === 'y'
-      ? el('text', [['x', n2(plot.x - labelOffset(cfg) - Y_TICK_LABEL_GAP)], ['y', n2(map(t))], ['dy', '0.35em'], ['text-anchor', 'end'], ['font-size', cfg.tickFontSizePt], ['font-weight', cfg.tickBold ? 'bold' : undefined], ['fill', chart.textColor]], { hit: { kind: 'axis', objectId: name }, text: scale.tickLabel(t) })
-      : el('text', [['x', n2(map(t))], ['y', n2(bottom + labelOffset(cfg) + X_TICK_LABEL_GAP + cfg.tickFontSizePt * 0.8)], ['text-anchor', 'middle'], ['font-size', cfg.tickFontSizePt], ['font-weight', cfg.tickBold ? 'bold' : undefined], ['fill', chart.textColor]], { hit: { kind: 'axis', objectId: name }, text: scale.tickLabel(t) }),
-  );
+  const labels = scale.ticks.flatMap((t) => {
+    const x = scale.extraTicks?.get(t);
+    if (x?.showText === false) return [];
+    // An added tick can have its text moved away from the axis and turned.
+    const away = x?.textOffsetPt ?? 0;
+    const angle = x?.textAngle ?? 0;
+    const hit = { hit: { kind: 'axis', objectId: name } as const, text: scale.tickLabel(t) };
+    const common = [['font-size', cfg.tickFontSizePt], ['font-weight', cfg.tickBold ? 'bold' : undefined], ['fill', chart.textColor]] as const;
+    if (along === 'y') {
+      const [px, py] = [plot.x - labelOffset(cfg) - Y_TICK_LABEL_GAP - away, map(t)];
+      return [el('text', [['x', n2(px)], ['y', n2(py)], ['dy', '0.35em'], ['text-anchor', 'end'], ['transform', angle !== 0 ? `rotate(${angle} ${n2(px)} ${n2(py)})` : undefined], ...common], hit)];
+    }
+    const [px, py] = [map(t), bottom + labelOffset(cfg) + X_TICK_LABEL_GAP + cfg.tickFontSizePt * 0.8 + away];
+    // Turned text hangs from the tick: it starts at the tick when it is turned clockwise, ends there when it is turned the other way.
+    const anchor = angle === 0 ? 'middle' : angle > 0 ? 'start' : 'end';
+    return [el('text', [['x', n2(px)], ['y', n2(py)], ['text-anchor', anchor], ['transform', angle !== 0 ? `rotate(${angle} ${n2(px)} ${n2(py)})` : undefined], ...common], hit)];
+  });
   return [axis, ...labels];
 }
 
-export interface CategoryAxisProps {
+interface CategoryAxisProps {
   chart: Chart;
   cfg: AxisConfig;
   plot: Rect;

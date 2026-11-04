@@ -3,7 +3,7 @@ import { createExampleProject } from '../../defaults';
 import type { Selection } from '../../types';
 import { historyReducer, initialHistory } from '../../../state/history';
 import { clearGroupStyleSettings, clearGroupSummarySettings, clearSummaryOverrides, composeCommands, patchStyle, patchSummary, resetStyle } from '../../../state/commands';
-import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, scopeOfSelection, selectedGroupIds, selectionOfGroups, toggleGroupSelection } from './scope';
+import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectedGroupIds, selectionOfGroups, toggleGroupSelection } from './scope';
 import { dataLayer, isGroupOverridden } from '../style';
 import { isSummaryOverridden } from '../summary';
 
@@ -23,11 +23,6 @@ describe('the data sets a selection stands for', () => {
     expect(selectedGroupIds({ kind: 'groups', groupIds: ['a', 'b'] })).toEqual(['a', 'b']);
     expect(selectedGroupIds({ kind: 'chart' })).toEqual([]);
     expect(selectedGroupIds({ kind: 'annotation', annotationId: 'n' })).toEqual([]);
-  });
-  it('gives the scope an inspector edits: all, one, or the several', () => {
-    expect(scopeOfSelection({ kind: 'chart' })).toBe('all');
-    expect(scopeOfSelection(g('a'))).toBe('a');
-    expect(scopeOfSelection({ kind: 'groups', groupIds: ['a', 'b'] })).toEqual(['a', 'b']);
   });
   it('makes the selection of some data sets the smallest one that stands for them', () => {
     expect(selectionOfGroups([])).toEqual({ kind: 'chart' });

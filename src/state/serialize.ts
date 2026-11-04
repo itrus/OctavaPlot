@@ -9,7 +9,7 @@ import { analysisTypeInfo } from '../model/project/analysis';
 import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLegendLayout, withoutLegendLayout } from '../model/graph/legendEntries';
-import { sanitizeLook, sanitizePrintWidthMm } from '../model/graph/look';
+import { sanitizeLook, sanitizePrintWidthMm, SYMBOL_SHAPES } from '../model/graph/look';
 import { sanitizeOrder } from '../model/table/groupOrder';
 import { canonicalObservationId, canonicalRowId, MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
@@ -133,13 +133,12 @@ function parseLayout(raw: unknown, path: string): ReplicateLayout | undefined {
     fail(`${path}.n`, `must be a whole number from ${MIN_REPLICATES} to ${MAX_REPLICATES}`);
   }
   if (raw.kind === 'sized') return { kind: 'sized' };
-  if (raw.kind === 'vector') return { kind: 'vector' };
   if (raw.kind === 'xerror') return { kind: 'xerror' };
   if (raw.kind === 'summary') {
     if (SUMMARY_FORMATS.some((f) => f.id === raw.format)) return { kind: 'summary', format: raw.format as SummaryFormat };
     fail(`${path}.format`, `must be one of ${SUMMARY_FORMATS.map((f) => f.id).join(', ')}`);
   }
-  fail(`${path}.kind`, 'must be single, replicates, summary, sized, vector or xerror');
+  fail(`${path}.kind`, 'must be single, replicates, summary, sized or xerror');
 }
 
 /** Stored survival options merged over the defaults; a level outside 0 to 1 or an unknown method falls back. */
@@ -205,7 +204,7 @@ function parseTable(raw: unknown, path: string): DataTable {
 
 /** Enum-valued style keys; an invalid stored value is dropped (the default applies) and noted. */
 const STYLE_ENUMS: Record<string, readonly string[]> = {
-  symbolShape: ['circle', 'square', 'triangle', 'triangleDown', 'diamond', 'hexagon', 'star', 'target', 'plus', 'cross', 'asterisk'],
+  symbolShape: SYMBOL_SHAPES.map((o) => o.value),
   lineStyle: ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'],
   errorDirection: ['both', 'positive', 'negative'],
   errorCap: ['bar', 'none'],
@@ -709,16 +708,6 @@ export function loadAutosave(): Project | null {
     return text ? parseProject(text) : null;
   } catch {
     return null;
-  }
-}
-
-/** Returns false when storage is unavailable (private mode, quota, ...). */
-export function saveAutosave(project: Project): boolean {
-  try {
-    localStorage.setItem(AUTOSAVE_KEY, stringifyProject(project));
-    return true;
-  } catch {
-    return false;
   }
 }
 

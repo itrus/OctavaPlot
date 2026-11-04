@@ -3,11 +3,12 @@ import type { DataTable, DecimalSeparator, TableKind } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import { newId } from '../../model/ids';
-import { addAnalysis, addGroup, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setColumnTime, setExcluded, setFactor, setSubject, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
+import { addAnalysis, addGroup, changeTableKind, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setColumnTime, setExcluded, setFactor, setSubject, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../../util/download';
-import { AddColumnIcon, AddManyRowsIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon } from '../components/icons';
+import { AddColumnIcon, AddManyRowsIcon, CloseIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon } from '../components/icons';
 import { isCsvFile, tableToCsv, type CsvExportMode } from '../data/csv';
 import { excludedCount } from '../../model/table/exclusion';
+import { ChangeTableTypeDialog } from '../dialogs/ChangeTableTypeDialog';
 import { ExportCsvDialog } from '../dialogs/ExportCsvDialog';
 import { ImportCsvDialog, type CsvImportData } from '../dialogs/ImportCsvDialog';
 import { AppendRowsDialog } from '../dialogs/AppendRowsDialog';
@@ -125,7 +126,7 @@ const KIND_TEXT: Record<TableKind, { label: string; noun: string; add: string; l
 };
 
 export function DataTableView({ table }: { table: DataTable }) {
-  const { run, tableZoom: z, settings, setView } = useApp();
+  const { project, run, tableZoom: z, settings, setView, setStatus } = useApp();
   // Tables other than the column table group their columns into series; XY and survival tables lead with X / time.
   const isSeries = usesSeriesBlocks(table.kind);
   const lead = leadingColumns(table.kind);
@@ -150,7 +151,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const scrollerRef = useRef<HTMLDivElement>(null);
   const csvRef = useRef<HTMLInputElement>(null);
-  const [dialog, setDialog] = useState<'append' | 'exportCsv' | 'series' | 'subject' | 'factor' | 'time' | null>(null);
+  const [dialog, setDialog] = useState<'append' | 'exportCsv' | 'series' | 'subject' | 'factor' | 'time' | 'kind' | null>(null);
   // A picked file waits here, read but not imported, while the preview dialog is open.
   const [pendingCsv, setPendingCsv] = useState<{ name: string; text: string } | null>(null);
   const dragging = useRef(false);
@@ -656,6 +657,10 @@ export function DataTableView({ table }: { table: DataTable }) {
   return (
     <div className="table-view">
       <div className="toolbar">
+        <button className="icon-text" onClick={() => setDialog('kind')} title="Change the type of this table, or how its series are entered (single values, replicates, values already calculated): its data stay, and the choice decides what the columns mean and which graphs it can have">
+          {kindText.label}…
+        </button>
+        <span className="sep" />
         <button className="icon-text" onClick={() => run(kindText.add.replace('+ ', ''), addGroup(table.id))} title={kindText.add.replace('+ ', '')}>
           <AddColumnIcon /> {kindText.add.replace('+ ', '')}
         </button>
@@ -787,9 +792,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                           }}
                           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                         />
-                        <button className="icon-btn" title={`Remove ${series.name}`} aria-label={`Remove ${series.name}`} onClick={() => run('Remove series', removeSeries(table.id, series.id))} disabled={seriesList.length <= 1}>
-                          ×
-                        </button>
+                        <button className="icon-btn" title={`Remove ${series.name}`} aria-label={`Remove ${series.name}`} onClick={() => run('Remove series', removeSeries(table.id, series.id))} disabled={seriesList.length <= 1}><CloseIcon size={14} /></button>
                       </div>
                     )}
                     <div className="sub-head">{subs[k % blockWidth]}</div>
@@ -815,9 +818,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                     onClick={() => run('Remove group', removeGroup(table.id, g.id))}
                     disabled={nCols <= 1 || (isSeries && (c < lead || nCols <= lead + 1))}
                     hidden={c < lead}
-                  >
-                    ×
-                  </button>
+                  ><CloseIcon size={14} /></button>
                 </div>
               </div>
               );
@@ -907,6 +908,18 @@ export function DataTableView({ table }: { table: DataTable }) {
         const factors = new Set(xySeries(table).filter((s) => ids.includes(s.id)).map((s) => s.columns[0].factor ?? ''));
         return <FactorDialog series={ids.length} current={factors.size === 1 ? [...factors][0] : ''} onSet={setSelectionFactor} onClose={() => setDialog(null)} />;
       })()}
+      {dialog === 'kind' && (
+        <ChangeTableTypeDialog
+          table={table}
+          project={project}
+          onChange={(kind, layout) => {
+            run('Change table type', changeTableKind(table.id, kind, layout));
+            setStatus(`${table.name} is now a ${KIND_TEXT[kind].label.toLowerCase()}. Undo (Ctrl+Z) restores it.`);
+            setDialog(null);
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog === 'exportCsv' && <ExportCsvDialog excluded={excludedCount(table)} onExport={exportCsv} onClose={() => setDialog(null)} />}
       {dialog === 'append' && <AppendRowsDialog room={rowRoom(table)} limit={MAX_TABLE_ROWS} onAppend={appendCount} onClose={() => setDialog(null)} />}
       {pendingCsv && (

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { CloseIcon } from '../../components/icons';
 import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../../model/graph/aspect';
 import { graphSources, type GraphSource } from '../../../model/table/chartTable';
 import { AXIS_LIMITS } from '../../../model/graph/axis';
@@ -11,7 +12,7 @@ import { mixedAnnotationKeys, selectedAnnotationIds, toggleAnnotationSelection }
 import { capabilitiesOf } from '../../../model/graph/capabilities';
 import { BRACKET_LIFT_LIMIT, bracketKindOf } from '../../../model/graph/chartTypes';
 import { xySeries } from '../../../model/table/tableLayout';
-import { COMPARED_COLOURS, DEFICIENCIES, MIN_DELTA_E, visionReport } from '../../../model/graph/colour/colorVision';
+import { COMPARED_COLOURS, safeColours } from '../../../model/graph/colour/colorVision';
 import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../../model/graph/palettes';
 import type { Annotation, Chart, Group, Id, ResultStat } from '../../../model/types';
 import { useApp } from '../../../state/AppContext';
@@ -51,6 +52,7 @@ import { LegendOrder } from './LegendOrder';
 import { LEGEND_MAX_COLUMNS, LEGEND_MAX_OFFSET_PT, legendColumns, legendOffset } from '../../../model/graph/legendEntries';
 import { displayName } from '../../../chart/shared/parts/names';
 import { prepareChartInput } from '../../../model/table/preparedChart';
+import { SLIDERS } from '../common/sliderRanges';
 
 /**
  * Inspector pieces that do not depend on the kind of chart: titles and fonts, size and shape, legend, annotations and
@@ -75,7 +77,7 @@ export function TextSections({ chart, groups, yName, dual, axes = true }: { char
         <Field label="Chart title">
           <TextInput value={chart.title} disabled={!chart.showTitle} onChange={(v) => setChart('Chart title', { title: v }, 'chart:title')} />
         </Field>
-        <NumField label="Title size" unit="pt" value={chart.titleFontSizePt} min={8} max={144} disabled={!chart.showTitle} onCommit={(v) => setChart('Title size', { titleFontSizePt: v }, 'chart:titlesize')} />
+        <NumField {...SLIDERS.font} label="Title size" unit="pt" value={chart.titleFontSizePt} min={8} max={40} disabled={!chart.showTitle} onCommit={(v) => setChart('Title size', { titleFontSizePt: v }, 'chart:titlesize')} />
         {axes && (
           <>
         <Field label="X axis title">
@@ -114,8 +116,8 @@ export function TextSections({ chart, groups, yName, dual, axes = true }: { char
         <Field label="Text colour">
           <ColorInput value={chart.textColor} ariaLabel="Text colour" onChange={(v) => run('Text colour', patchLook(chart.id, { textColor: v }))} />
         </Field>
-        <NumField label="Tick label size" unit="pt" value={chart.yAxis.tickFontSizePt} min={8} max={96} onCommit={(v) => run('Tick label size', patchBothAxes(chart.id, { tickFontSizePt: v }), 'axis:tf')} />
-        <NumField label="Axis title size" unit="pt" value={chart.yAxis.titleFontSizePt} min={8} max={96} onCommit={(v) => run('Axis title size', patchBothAxes(chart.id, { titleFontSizePt: v }), 'axis:ts')} />
+        <NumField {...SLIDERS.font} label="Tick label size" unit="pt" value={chart.yAxis.tickFontSizePt} min={8} max={40} onCommit={(v) => run('Tick label size', patchBothAxes(chart.id, { tickFontSizePt: v }), 'axis:tf')} />
+        <NumField {...SLIDERS.font} label="Axis title size" unit="pt" value={chart.yAxis.titleFontSizePt} min={8} max={40} onCommit={(v) => run('Axis title size', patchBothAxes(chart.id, { titleFontSizePt: v }), 'axis:ts')} />
         <Field label="Bold chart title">
           <Check checked={chart.titleBold} onChange={(v) => run('Bold chart title', patchLook(chart.id, { titleBold: v }))} />
         </Field>
@@ -129,15 +131,15 @@ export function TextSections({ chart, groups, yName, dual, axes = true }: { char
       </Section>
       {axes && (
       <Section title="Distances" defaultOpen={false}>
-        <NumField label="Chart title from the top" unit="pt" value={chart.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} disabled={!chart.showTitle} onCommit={(v) => run('Title distance', patchLook(chart.id, { titleOffsetPt: v }), 'chart:titleoff')} />
-        <NumField label="X title from the axis" unit="pt" value={chart.xAxis.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('X title distance', patchAxis(chart.id, 'xAxis', { titleOffsetPt: v }), 'axis:xto')} />
-        <NumField label={`${yName} title from the axis`} unit="pt" value={chart.yAxis.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Y title distance', patchAxis(chart.id, 'yAxis', { titleOffsetPt: v }), 'axis:yto')} />
-        <NumField label="X numbers from the axis" unit="pt" value={chart.xAxis.tickLabelOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('X numbers distance', patchAxis(chart.id, 'xAxis', { tickLabelOffsetPt: v }), 'axis:xno')} />
-        <NumField label={`${yName} numbers from the axis`} unit="pt" value={chart.yAxis.tickLabelOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Y numbers distance', patchAxis(chart.id, 'yAxis', { tickLabelOffsetPt: v }), 'axis:yno')} />
+        <NumField {...SLIDERS.distance} label="Chart title from the top" unit="pt" value={chart.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} disabled={!chart.showTitle} onCommit={(v) => run('Title distance', patchLook(chart.id, { titleOffsetPt: v }), 'chart:titleoff')} />
+        <NumField {...SLIDERS.distance} label="X title from the axis" unit="pt" value={chart.xAxis.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('X title distance', patchAxis(chart.id, 'xAxis', { titleOffsetPt: v }), 'axis:xto')} />
+        <NumField {...SLIDERS.distance} label={`${yName} title from the axis`} unit="pt" value={chart.yAxis.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Y title distance', patchAxis(chart.id, 'yAxis', { titleOffsetPt: v }), 'axis:yto')} />
+        <NumField {...SLIDERS.distance} label="X numbers from the axis" unit="pt" value={chart.xAxis.tickLabelOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('X numbers distance', patchAxis(chart.id, 'xAxis', { tickLabelOffsetPt: v }), 'axis:xno')} />
+        <NumField {...SLIDERS.distance} label={`${yName} numbers from the axis`} unit="pt" value={chart.yAxis.tickLabelOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Y numbers distance', patchAxis(chart.id, 'yAxis', { tickLabelOffsetPt: v }), 'axis:yno')} />
         {dual && (
           <>
-            <NumField label="Right Y title from the axis" unit="pt" value={chart.y2Axis.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Right Y title distance', patchAxis(chart.id, 'y2Axis', { titleOffsetPt: v }), 'axis:y2to')} />
-            <NumField label="Right Y numbers from the axis" unit="pt" value={chart.y2Axis.tickLabelOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Right Y numbers distance', patchAxis(chart.id, 'y2Axis', { tickLabelOffsetPt: v }), 'axis:y2no')} />
+            <NumField {...SLIDERS.distance} label="Right Y title from the axis" unit="pt" value={chart.y2Axis.titleOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Right Y title distance', patchAxis(chart.id, 'y2Axis', { titleOffsetPt: v }), 'axis:y2to')} />
+            <NumField {...SLIDERS.distance} label="Right Y numbers from the axis" unit="pt" value={chart.y2Axis.tickLabelOffsetPt} min={AXIS_LIMITS.offsetPt.min} max={AXIS_LIMITS.offsetPt.max} onCommit={(v) => run('Right Y numbers distance', patchAxis(chart.id, 'y2Axis', { tickLabelOffsetPt: v }), 'axis:y2no')} />
           </>
         )}
       </Section>
@@ -161,7 +163,7 @@ export function DimensionsSection({ chart }: { chart: Chart }) {
   const print = chart.printWidthMm;
   const printChoice = print === undefined ? 'none' : customPrint || !(PRINT_WIDTH_MM.presets as readonly number[]).includes(print) ? 'custom' : String(print);
   return (
-    <div className="tab-body">
+    <GroupBox title="Size">
       <Field label="Shape" hint="Free keeps width and height independent; 4:3, 3:4 and Square move one when you change the other">
         <span className="switch-group" role="group" aria-label="Chart shape">
           {(
@@ -209,7 +211,7 @@ export function DimensionsSection({ chart }: { chart: Chart }) {
         <NumField label="Custom print width" unit="mm" step={1} slider={false} value={print ?? 100} min={PRINT_WIDTH_MM.min} max={PRINT_WIDTH_MM.max} onCommit={(v) => setChart('Print width', { printWidthMm: v }, 'chart:pw')} />
       )}
       <div className="muted small">Sizes are in pixels. The default for new charts is set in Settings.</div>
-    </div>
+    </GroupBox>
   );
 }
 
@@ -245,8 +247,8 @@ export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[]
           />
         </Field>
         <NumField label="Columns" value={legendColumns(chart.legend)} min={1} max={LEGEND_MAX_COLUMNS} step={1} disabled={!chart.legend.visible} onCommit={(v) => run('Legend columns', setLegendColumns(chart.id, v))} hint="Entries in a row; 1 is one under the other" />
-        <NumField label="Move right" value={legendOffset(chart.legend).x} min={-LEGEND_MAX_OFFSET_PT} max={LEGEND_MAX_OFFSET_PT} step={1} unit="pt" disabled={!chart.legend.visible} onCommit={(v) => run('Move legend', setLegendOffset(chart.id, v, legendOffset(chart.legend).y))} hint="Shifts the legend from its place; negative moves it left" />
-        <NumField label="Move down" value={legendOffset(chart.legend).y} min={-LEGEND_MAX_OFFSET_PT} max={LEGEND_MAX_OFFSET_PT} step={1} unit="pt" disabled={!chart.legend.visible} onCommit={(v) => run('Move legend', setLegendOffset(chart.id, legendOffset(chart.legend).x, v))} hint="Negative moves it up" />
+        <NumField {...SLIDERS.move} label="Move right" value={legendOffset(chart.legend).x} min={-LEGEND_MAX_OFFSET_PT} max={LEGEND_MAX_OFFSET_PT} step={1} unit="pt" disabled={!chart.legend.visible} onCommit={(v) => run('Move legend', setLegendOffset(chart.id, v, legendOffset(chart.legend).y))} hint="Shifts the legend from its place; negative moves it left" />
+        <NumField {...SLIDERS.move} label="Move down" value={legendOffset(chart.legend).y} min={-LEGEND_MAX_OFFSET_PT} max={LEGEND_MAX_OFFSET_PT} step={1} unit="pt" disabled={!chart.legend.visible} onCommit={(v) => run('Move legend', setLegendOffset(chart.id, legendOffset(chart.legend).x, v))} hint="Negative moves it up" />
         <LegendOrder chart={chart} groups={groups} />
         <SubHeading>Data sets in legend</SubHeading>
         {groups.map((g) => (
@@ -341,8 +343,8 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
             <Field label="Colour">
               <ColorInput value={l.color} onChange={(v) => set('Reference line colour', { color: v }, 'color')} />
             </Field>
-            <NumField label="Thickness" unit="pt" value={l.widthPt} min={0.2} max={40} onCommit={(v) => set('Reference line thickness', { widthPt: v }, 'width')} />
-            <NumField label="Opacity" value={l.opacity} min={0} max={1} onCommit={(v) => set('Reference line opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
+            <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={l.widthPt} min={0.2} max={20} onCommit={(v) => set('Reference line thickness', { widthPt: v }, 'width')} />
+            <NumField {...SLIDERS.fraction} label="Opacity" value={l.opacity} min={0} max={1} onCommit={(v) => set('Reference line opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
             <Field label="Pattern">
               <SelectInput<LineStyle> value={l.style} options={LINE_STYLES.map((o) => ({ value: o.value, label: o.label }))} onChange={(v) => set('Reference line pattern', { style: v })} />
             </Field>
@@ -384,7 +386,7 @@ function RegionsSection({ chart }: { chart: Chart }) {
             <Field label="Colour">
               <ColorInput value={r.color} onChange={(v) => set('Shaded region colour', { color: v }, 'color')} />
             </Field>
-            <NumField label="Opacity" value={r.opacity} min={0} max={1} onCommit={(v) => set('Shaded region opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
+            <NumField {...SLIDERS.fraction} label="Opacity" value={r.opacity} min={0} max={1} onCommit={(v) => set('Shaded region opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
             <div className="button-row">
               <button onClick={() => run('Delete shaded region', removeRegion(chart.id, r.id))}>Delete band</button>
             </div>
@@ -445,8 +447,8 @@ function BracketsSection({ chart }: { chart: Chart }) {
             <Field label="Colour">
               <ColorInput value={b.color} onChange={(v) => set('Bracket colour', { color: v }, 'color')} />
             </Field>
-            <NumField label="Thickness" unit="pt" value={b.widthPt} min={0.2} max={40} onCommit={(v) => set('Bracket thickness', { widthPt: v }, 'width')} />
-            <NumField label="Label size" unit="pt" value={b.fontSizePt} min={4} max={200} onCommit={(v) => set('Bracket label size', { fontSizePt: v }, 'font')} />
+            <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={b.widthPt} min={0.2} max={20} onCommit={(v) => set('Bracket thickness', { widthPt: v }, 'width')} />
+            <NumField {...SLIDERS.font} label="Label size" unit="pt" value={b.fontSizePt} min={4} max={40} onCommit={(v) => set('Bracket label size', { fontSizePt: v }, 'font')} />
             <NumField label={kind === 'columns' || kind === 'grouped' ? 'Move up or right' : 'Move right'} unit="pt" value={b.liftPt ?? 0} min={-BRACKET_LIFT_LIMIT} max={BRACKET_LIFT_LIMIT} slider={false} onCommit={(v) => set('Move bracket', { liftPt: v === 0 ? undefined : v }, 'lift')} hint="How far the bracket was moved from where it is placed, away from the data: up on a vertical chart, to the right on a horizontal chart and on an XY chart. You can also drag it on the chart. The axis range does not follow." />
             <div className="button-row">
               <button onClick={() => run('Delete comparison bracket', removeBracket(chart.id, b.id))}>Delete bracket</button>
@@ -490,11 +492,11 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
       {chosen.length > 1 && (
         <GroupBox title={`Selected annotations (${chosen.length})`}>
           <div className="muted small">These annotations are edited together. Ctrl or Shift on an annotation, on the chart or in the list, takes it in or out; the arrow keys move them together.</div>
-          <NumField label="Size" unit="pt" value={chosen[0].fontSizePt} min={8} max={192} overridden={{ mixed: mixed.has('fontSizePt') }} onCommit={(v) => setAll('Annotation size', { fontSizePt: v }, 'size')} />
+          <NumField {...SLIDERS.font} label="Size" unit="pt" value={chosen[0].fontSizePt} min={8} max={40} overridden={{ mixed: mixed.has('fontSizePt') }} onCommit={(v) => setAll('Annotation size', { fontSizePt: v }, 'size')} />
           <Field label="Colour" overridden={{ mixed: mixed.has('color') }}>
             <ColorInput value={chosen[0].color} onChange={(v) => setAll('Annotation colour', { color: v }, 'color')} />
           </Field>
-          <NumField label="Opacity" value={chosen[0].opacity} min={0} max={1} overridden={{ mixed: mixed.has('opacity') }} onCommit={(v) => setAll('Annotation opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
+          <NumField {...SLIDERS.fraction} label="Opacity" value={chosen[0].opacity} min={0} max={1} overridden={{ mixed: mixed.has('opacity') }} onCommit={(v) => setAll('Annotation opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
           <div className="button-row">
             <button
               onClick={() => {
@@ -564,11 +566,11 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
                     <NumField label="Top" unit="% of chart height" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:y`)} />
                   </>
                 )}
-                <NumField label="Size" unit="pt" value={a.fontSizePt} min={8} max={192} onCommit={(v) => run('Annotation size', patchAnnotation(chart.id, a.id, { fontSizePt: v }), `ann:${a.id}:size`)} />
+                <NumField {...SLIDERS.font} label="Size" unit="pt" value={a.fontSizePt} min={8} max={40} onCommit={(v) => run('Annotation size', patchAnnotation(chart.id, a.id, { fontSizePt: v }), `ann:${a.id}:size`)} />
                 <Field label="Colour">
                   <ColorInput value={a.color} onChange={(v) => run('Annotation colour', patchAnnotation(chart.id, a.id, { color: v }), `ann:${a.id}:color`)} />
                 </Field>
-                <NumField label="Opacity" value={a.opacity} min={0} max={1} onCommit={(v) => run('Annotation opacity', patchAnnotation(chart.id, a.id, { opacity: v }), `ann:${a.id}:opacity`)} hint="0 = transparent, 1 = opaque" />
+                <NumField {...SLIDERS.fraction} label="Opacity" value={a.opacity} min={0} max={1} onCommit={(v) => run('Annotation opacity', patchAnnotation(chart.id, a.id, { opacity: v }), `ann:${a.id}:opacity`)} hint="0 = transparent, 1 = opaque" />
                 <div className="button-row">
                   <button
                     onClick={() => {
@@ -649,15 +651,12 @@ function PaletteOptions() {
   );
 }
 
-/** Whether the first colours of a palette stay distinguishable with a colour-vision deficiency (measured, see colorVision.ts). */
-function VisionNote({ colors }: { colors: readonly string[] }) {
-  const r = useMemo(() => visionReport(colors), [colors]);
-  const worst = (Object.keys(DEFICIENCIES) as (keyof typeof DEFICIENCIES)[]).reduce((a, k) => (r.byKind[k] < r.byKind[a] ? k : a), 'protan' as keyof typeof DEFICIENCIES);
-  return r.safe ? (
-    <div className="small vision vision-ok">✓ Colour-vision safe: the first {COMPARED_COLOURS} colours stay apart for red-weak, green-weak and blue-weak vision.</div>
-  ) : (
-    <div className="small muted vision">Not colour-vision safe: two of the first {COMPARED_COLOURS} colours come close with {DEFICIENCIES[worst].label} vision (difference {r.byKind[worst].toFixed(1)}; {MIN_DELTA_E} or more is clear).</div>
-  );
+/** How many of the first colours of a palette stay clearly apart for colour-blind viewers (measured, see colorVision.ts). */
+function SafeLine({ colors }: { colors: readonly string[] }) {
+  const n = useMemo(() => safeColours(colors), [colors]);
+  if (n >= COMPARED_COLOURS) return <div className="small vision vision-ok">Safe for the first {COMPARED_COLOURS} colours</div>;
+  if (n < 2) return <div className="small muted vision">First two colours clash</div>;
+  return <div className="small muted vision">Safe for the first {n} colours</div>;
 }
 
 /** An info button beside the palette menu; it opens a window with the colours, what the palette is and its source. */
@@ -674,10 +673,10 @@ function PaletteInfo({ paletteId }: { paletteId: string | null }) {
           <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Colour palettes" tabIndex={-1} ref={(el) => el?.focus()}>
             <div className="modal-head">
               <strong>Colour palettes</strong>
-              <button className="icon-btn" onClick={() => setOpen(false)} aria-label="Close">×</button>
+              <button className="modal-close" onClick={() => setOpen(false)} aria-label="Close"><CloseIcon /></button>
             </div>
             <div className="modal-body modal-pad palette-about">
-              <p className="muted small">In use: <strong>{palette.name}</strong>, {palette.colors.length} colours, applied to the data sets in order and repeated when there are more data sets than colours. Colour-vision notes are measured on the first {COMPARED_COLOURS} colours of each palette, by simulating red-weak, green-weak and blue-weak vision (Machado et al., 2009) and taking the smallest CIE76 colour difference between any two of them.</p>
+              <p className="muted small">In use: <strong>{palette.name}</strong>, {palette.colors.length} colours, applied to the data sets in order and repeated when there are more data sets than colours.</p>
               {PALETTE_GROUPS.map((g) => (
                 <section key={g} className="palette-group">
                   <h4>{g}</h4>
@@ -693,7 +692,7 @@ function PaletteInfo({ paletteId }: { paletteId: string | null }) {
                         </span>
                       </div>
                       {p.description && <div className="small">{p.description}</div>}
-                      <VisionNote colors={p.colors} />
+                      <SafeLine colors={p.colors} />
                     </div>
                   ))}
                 </section>
@@ -718,30 +717,36 @@ export function PaletteField({ chart, hint }: { chart: Chart; hint: string }) {
   const { run } = useApp();
   const palette = paletteById(chart.paletteId);
   return (
-    <Field label="Color palette" hint={hint}>
-      <select
-        value={chart.paletteId ?? 'custom'}
-        aria-label="Color palette"
-        onChange={(e) => {
-          const chosen = paletteById(e.target.value);
-          if (chosen) run(`Apply ${chosen.name} palette`, applyPalette(chart.id, chosen));
-        }}
-      >
-        {chart.paletteId === null && (
-          <option value="custom" disabled>
-            Custom colours
-          </option>
-        )}
-        <PaletteOptions />
-      </select>
+    <div className="palette-field">
+      <Field label="Color palette" hint={hint}>
+        <select
+          value={chart.paletteId ?? 'custom'}
+          aria-label="Color palette"
+          onChange={(e) => {
+            const chosen = paletteById(e.target.value);
+            if (chosen) run(`Apply ${chosen.name} palette`, applyPalette(chart.id, chosen));
+          }}
+        >
+          {chart.paletteId === null && (
+            <option value="custom" disabled>
+              Custom colours
+            </option>
+          )}
+          <PaletteOptions />
+        </select>
+        <PaletteInfo paletteId={chart.paletteId} />
+      </Field>
       {palette && (
-        <span className="palette-swatches" aria-hidden="true">
-          {palette.colors.slice(0, 5).map((c) => (
-            <i key={c} style={{ background: c }} />
-          ))}
-        </span>
+        <div className="palette-strip">
+          <span className="palette-swatches" aria-hidden="true">
+            {palette.colors.slice(0, 12).map((c, i) => (
+              <i key={i} style={{ background: c }} title={c} />
+            ))}
+          </span>
+          <SafeLine colors={palette.colors} />
+        </div>
       )}
-      <PaletteInfo paletteId={chart.paletteId} />
-    </Field>
+    </div>
   );
 }
+

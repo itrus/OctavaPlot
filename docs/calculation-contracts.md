@@ -24,7 +24,7 @@ Labels: **D** = documented by a public source (GraphPad Prism user guide, ggpris
 
 | Group | Preset IDs |
 |---|---|
-| Numeric XY | `xy.scatter`, `xy.line`, `xy.line_symbols`, `xy.area`, `xy.bars`, `xy.spikes`, `xy.vector`, `xy.bubble`, `xy.trajectory`, `xy.offset_traces` |
+| Numeric XY | `xy.scatter`, `xy.line`, `xy.line_symbols`, `xy.area`, `xy.bars`, `xy.spikes`, `xy.bubble`, `xy.trajectory`, `xy.offset_traces` |
 | Category and distribution | `category.strip`, `category.aligned`, `category.paired`, `category.bar`, `category.summary`, `category.range`, `distribution.box`, `distribution.violin`, `category.grouped`, `category.stacked`, `category.normalised_stack`, `category.nested`, `category.counts` |
 | Calculated curves and diagnostics | `distribution.histogram`, `distribution.frequency_polygon`, `distribution.ecdf`, `curve.survival`, `curve.cumulative_event`, `curve.fit`, `curve.function` |
 | Matrix, composition, specialised | `matrix.heatmap`, `whole.pie`, `whole.doughnut`, `whole.bar`, `whole.dot_grid`, `special.forest` |
@@ -67,7 +67,6 @@ Boxes and violins can sit at numeric X. Horizontal versions rotate the roles, no
 
 - Replicate reduction, then normalisation, then colour scaling. Geometric mean rejects non-positive values. Percent CV at zero mean is undefined. Zero denominator gives missing with a notice. Auto min/max ignores missing and excluded cells. Interval colours use `[b(i), b(i+1))` with an inclusive final maximum. Reversing colours does not reverse row order. Labels name which value they show. Gaps are layout objects.
 - Weights must be finite, nonnegative, with a positive included total. Hiding a part keeps it in the denominator; excluding removes it. Zero parts keep their ID, with no fabricated slice. A supplied denominator above the included sum shows the remainder or is rejected. Slice angle `2π·w/total`.
-- Dot grid (**the calculation is built, the graph is not**, 31 October 2026: `apportionDots` in `src/stats/diagnostics/apportion.ts` with the fixture below and hand-worked cases; no chart, gallery entry or option uses it yet): `q = N·w/total`, floor, then the remaining dots by descending fractional remainder, ties by part order. Weights 1, 1, 1 with N = 100 give 34, 33, 33. Percent labels use the original weights.
 - Stacks: an additive component's height is its own value; positive and negative accumulate separately. Normalised stacks reject negatives; an all-zero denominator is undefined. Component errors are not the total's uncertainty.
 - Nested data: group uncertainty comes from unit summaries, with equal weight per independent unit. n counts units.
 - Counts: nonnegative integers; cross-tabulate after exclusions; no chi-square or effect-size report.
@@ -147,7 +146,6 @@ Exact and rational values keep exact tolerance; ordinary finite summaries target
 | Histogram edges | 0,1,2,3 with edges 0,1,2,3, final inclusive | counts 1, 1, 2 |
 | ECDF ties | 1,1,2,3 | F(1)=0.5, F(2)=0.75, F(3)=1 |
 | Bubble area | z=10,15,20; d 10..20 | 10, √250 (about 15.8113883), 20 |
-| Dot apportionment | 1,1,1; N=100 | 34, 33, 33 |
 | Nested weighting | unit A [0,0,0]; unit B [10] | equal-unit mean 5, not pooled 2.5 |
 | Survival ties | (1,event),(2,event),(2,censor),(3,event) | S 0.75, 0.5, 0; median 2 |
 | No-event survival | three censored | S stays 1; median not reached |
@@ -167,7 +165,7 @@ Status of the fixtures above, 1 November 2026 (a row is "tested" when a unit tes
 
 | Tested |
 |---|
-| Arithmetic summary, mean CI, type-6 quartiles, Tukey whisker (fence 15 pinned), geometric summary, median CI n=5 and n=6, histogram edges, ECDF ties, bubble area, nested weighting, survival ties, no-event survival, exact line, log endpoint (geometry; the warning text was not checked), composition zero total, dot apportionment (the function only, `src/stats/diagnostics/apportion.ts`; the values are worked out by hand from the rule, not from an outside tool), the eight date, time, zone, tick and duration rows |
+| Arithmetic summary, mean CI, type-6 quartiles, Tukey whisker (fence 15 pinned), geometric summary, median CI n=5 and n=6, histogram edges, ECDF ties, bubble area, nested weighting, survival ties, no-event survival, exact line, log endpoint (geometry; the warning text was not checked), composition zero total, the eight date, time, zone, tick and duration rows |
 
 Interaction and applicability tests:
 

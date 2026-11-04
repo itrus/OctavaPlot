@@ -12,7 +12,7 @@ const SAMPLES = 160;
 /** A drawn position beyond this is cut off: the plot clips it anyway, and a huge number only bloats the path. */
 const FAR = 1e6;
 
-export interface FitSummary {
+interface FitSummary {
   modelLabel: string;
   formula: string;
   params: FitParam[];
@@ -38,7 +38,7 @@ const NO_FIT: FittedCurve = { path: '', bandPath: '', summary: null, failure: nu
 
 export { fitStats } from '../../model/project/curveFit';
 
-export interface FitRun {
+interface FitRun {
   result: FitResult | null;
   failure: string | null;
   /** Range of X of the data used. */

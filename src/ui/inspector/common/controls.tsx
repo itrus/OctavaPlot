@@ -210,12 +210,15 @@ interface NumProps {
   note?: string | null;
   /** Slider step; derived from the range when omitted. Bounded fields (min and max set) get a slider. */
   step?: number;
+  /** The range the slider covers, when it is narrower than the limits of the field (a typed value may go beyond it). */
+  sliderMin?: number;
+  sliderMax?: number;
   /** Pass false to keep a bounded field as a plain number box. */
   slider?: boolean;
 }
 
 /** Numeric field: edits stay local until valid; invalid input shows a message and never reaches the chart. */
-export function NumField({ value, onCommit, min, max, disabled, unit, validate, label, hint, overridden, note, step, slider = true }: NumProps) {
+export function NumField({ value, onCommit, min, max, disabled, unit, validate, label, hint, overridden, note, step, sliderMin, sliderMax, slider = true }: NumProps) {
   const [text, setText] = useState(formatNum(value));
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
@@ -242,17 +245,19 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
   const mixedShown = isMixed(overridden) && !focused;
 
   // Fields with a very wide range (chart sizes in px) pass slider={false}: they are typed, or stepped with the arrow keys.
-  const stepSize = step ?? (min !== undefined && max !== undefined ? sliderStep(min, max) : 1);
-  const showSlider = slider && min !== undefined && max !== undefined && max > min;
-  const sliderValue = showSlider ? Math.min(max, Math.max(min, Number.isFinite(Number(text)) && text.trim() !== '' ? Number(text) : value)) : 0;
+  const lo = sliderMin !== undefined && min !== undefined ? Math.max(min, sliderMin) : min;
+  const hi = sliderMax !== undefined && max !== undefined ? Math.min(max, sliderMax) : max;
+  const stepSize = step ?? (lo !== undefined && hi !== undefined ? sliderStep(lo, hi) : 1);
+  const showSlider = slider && lo !== undefined && hi !== undefined && hi > lo;
+  const sliderValue = showSlider ? Math.min(hi, Math.max(lo, Number.isFinite(Number(text)) && text.trim() !== '' ? Number(text) : value)) : 0;
 
   return (
     <Field label={label} hint={hint} overridden={overridden} error={error} note={note}>
       <span className="num-wrap slider-num">
         {showSlider && !mixedShown && (
           <WheelRange
-            min={min}
-            max={max}
+            min={lo ?? 0}
+            max={hi ?? 0}
             step={stepSize}
             value={sliderValue}
             disabled={disabled}
@@ -348,31 +353,64 @@ export function OptionalNumField({ label, value, onCommit, validate, hint, autoV
           onBlur={() => setFocused(false)}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
-        <label className="auto-check" htmlFor={id}>
-          <input
-            id={id}
-            type="checkbox"
-            aria-label={`Automatic ${label}`}
-            checked={value === null}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setError(null);
-                onCommit(null);
-                return;
-              }
-              const start = Number(Number(autoValue ?? 0).toPrecision(6));
-              const err = validate ? validate(start) : null;
-              setError(err);
-              if (!err) {
-                setText(formatNum(start));
-                onCommit(start);
-              }
-            }}
-          />
-          Auto
-        </label>
+        <AutoCheck
+          id={id}
+          label={label}
+          auto={value === null}
+          start={Number(Number(autoValue ?? 0).toPrecision(6))}
+          validate={validate}
+          setError={setError}
+          setText={(v) => setText(formatNum(v))}
+          onCommit={onCommit}
+        />
       </span>
     </Field>
+  );
+}
+
+/** The "Auto" tick beside a number field that may be automatic: ticking hands the value back, clearing it starts from `start` if that is valid. */
+export function AutoCheck({
+  id,
+  label,
+  auto,
+  start,
+  validate,
+  setError,
+  setText,
+  onCommit,
+}: {
+  id: string;
+  label: string;
+  auto: boolean;
+  start: number;
+  validate?: (v: number) => string | null;
+  setError: (e: string | null) => void;
+  setText: (v: number) => void;
+  onCommit: (v: number | null) => void;
+}) {
+  return (
+    <label className="auto-check" htmlFor={id}>
+      <input
+        id={id}
+        type="checkbox"
+        aria-label={`Automatic ${label}`}
+        checked={auto}
+        onChange={(e) => {
+          if (e.target.checked) {
+            setError(null);
+            onCommit(null);
+            return;
+          }
+          const err = validate ? validate(start) : null;
+          setError(err);
+          if (!err) {
+            setText(start);
+            onCommit(start);
+          }
+        }}
+      />
+      Auto
+    </label>
   );
 }
 

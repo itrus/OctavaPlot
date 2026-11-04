@@ -103,15 +103,16 @@ test.describe('files', () => {
   test('a PNG export has the size and the resolution the dialog states', async ({ page }) => {
     await openApp(page);
     await openGraph(page);
-    await page.getByRole('button', { name: 'Export' }).first().click();
-    const dialog = page.getByRole('dialog', { name: /^Export / });
-    await expect(dialog).toBeVisible();
-    const text = (await dialog.getByText(/^Picture: /).textContent()) ?? '';
+    await expect(page.getByRole('navigation', { name: 'Graph settings pages' })).toBeVisible();
+    await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' }).click();
+    const panel = page.locator('.export-panel');
+    await expect(panel).toBeVisible();
+    const text = (await panel.getByText(/^Picture: /).textContent()) ?? '';
     const [, w, h, dpi] = /Picture: (\d+) × (\d+) px at (\d+) dpi/.exec(text) ?? [];
     expect(Number(w)).toBeGreaterThan(0);
 
     const download = page.waitForEvent('download');
-    await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+    await panel.getByRole('button', { name: 'Export .png' }).click();
     const file = await download;
     expect(file.suggestedFilename()).toMatch(/\.png$/);
     const bytes = await (await import('node:fs/promises')).readFile(await file.path());

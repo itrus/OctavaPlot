@@ -151,7 +151,7 @@ describe('sanitizeLabelStyle', () => {
         pointLabelDecimals: 2.6,
       }),
     );
-    expect(s.pointLabelFontSizePt).toBe(144);
+    expect(s.pointLabelFontSizePt).toBe(40);
     expect(s.pointLabelOffsetXPt).toBe(0);
     expect(s.pointLabelOffsetYPt).toBe(-400);
     expect(s.pointLabelColor).toBeNull();

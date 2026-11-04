@@ -41,7 +41,7 @@ export function fitObservations(source: DataTable): Array<{ id: Id; label: strin
       const x = xs[row];
       if (x === null || x === undefined || !Number.isFinite(x)) continue;
       const values = s.columns.map((c) => c.observations[row]?.value ?? null);
-      if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'vector' || layout.kind === 'xerror') {
+      if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'xerror') {
         if (values[0] !== null && Number.isFinite(values[0])) obs.push({ x, y: values[0] });
       } else if (layout.kind === 'replicates') {
         for (const v of values) if (v !== null && Number.isFinite(v)) obs.push({ x, y: v });
@@ -88,7 +88,7 @@ export function cachedFit(obs: Obs, fit: FitInput): FitResult | FitFailure {
 }
 
 /** A fit that may still be on its way: the result, or pending (the fit is being made off the main thread). */
-export type FitStatus = { state: 'ready'; value: FitResult | FitFailure } | { state: 'pending' };
+type FitStatus = { state: 'ready'; value: FitResult | FitFailure } | { state: 'pending' };
 
 /**
  * The fit for the screen. The result if it is kept; a small fit is calculated on the spot (see `shouldDeferFit`); otherwise the fit

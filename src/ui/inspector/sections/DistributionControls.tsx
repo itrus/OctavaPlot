@@ -4,6 +4,7 @@ import { useApp } from '../../../state/AppContext';
 import { patchDistribution } from '../../../state/commands';
 import { WHISKER_RULES } from '../../../stats/distribution';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SelectInput } from '../common/controls';
+import { SLIDERS } from '../common/sliderRanges';
 
 const SMOOTHING: Array<{ value: SmoothingLevel; label: string }> = [
   { value: 'light', label: 'Light' },
@@ -45,7 +46,7 @@ export function DistributionControls({ chart, lineColor, lineWidthPt, lineOpacit
           {d.whisker === 'tukey' && (
             <NumField label="Tukey multiplier" value={d.tukeyK} min={DISTRIBUTION_LIMITS.tukeyK.min} max={DISTRIBUTION_LIMITS.tukeyK.max} onCommit={(v) => set('Tukey multiplier', { tukeyK: v }, 'dist:k')} />
           )}
-          <NumField label="Box width" hint="Fraction of the space of a column" value={d.boxWidth} min={w.min} max={w.max} onCommit={(v) => set('Box width', { boxWidth: v }, 'dist:bw')} />
+          <NumField {...SLIDERS.fraction} label="Box width" hint="Fraction of the space of a column" value={d.boxWidth} min={w.min} max={w.max} onCommit={(v) => set('Box width', { boxWidth: v }, 'dist:bw')} />
         </>
       ) : (
         <>
@@ -73,7 +74,7 @@ export function DistributionControls({ chart, lineColor, lineWidthPt, lineOpacit
           <Field label="Width scale" hint="How the widths of different violins compare">
             <SelectInput<ViolinNormalisationKind> value={d.normalisation} options={NORMALISATION} onChange={(v) => set('Violin width scale', { normalisation: v })} />
           </Field>
-          <NumField label="Violin width" hint="Fraction of the space of a column" value={d.violinWidth} min={w.min} max={w.max} onCommit={(v) => set('Violin width', { violinWidth: v }, 'dist:vw')} />
+          <NumField {...SLIDERS.fraction} label="Violin width" hint="Fraction of the space of a column" value={d.violinWidth} min={w.min} max={w.max} onCommit={(v) => set('Violin width', { violinWidth: v }, 'dist:vw')} />
           <Field label="Quartile lines">
             <Check checked={d.showQuartiles} onChange={(v) => set('Quartile lines', { showQuartiles: v })} />
           </Field>
@@ -82,8 +83,8 @@ export function DistributionControls({ chart, lineColor, lineWidthPt, lineOpacit
       <Field label="Line colour" hint="Whiskers, median and quartile lines">
         <ColorInput value={lineColor} ariaLabel="Line colour" onChange={(v) => onLine({ lineColor: v })} />
       </Field>
-      <NumField label="Line thickness" unit="pt" value={lineWidthPt} min={0.2} max={40} onCommit={(v) => onLine({ lineWidthPt: v })} />
-      <NumField label="Line opacity" value={lineOpacity} min={0} max={1} onCommit={(v) => onLine({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
+      <NumField {...SLIDERS.line} label="Line thickness" unit="pt" value={lineWidthPt} min={0.2} max={20} onCommit={(v) => onLine({ lineWidthPt: v })} />
+      <NumField {...SLIDERS.fraction} label="Line opacity" value={lineOpacity} min={0} max={1} onCommit={(v) => onLine({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
       <Field label={floating ? 'Line at the centre' : 'Median line'}>
         <Check checked={d.showMedian} onChange={(v) => set(floating ? 'Centre line' : 'Median line', { showMedian: v })} />
       </Field>

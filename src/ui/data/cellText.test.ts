@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockToText, formatCell, matrixToText, parseCell, parseClipboard, parseClipboardBlock, planPaste, splitTsv } from './cellText';
+import { blockToText, formatCell, parseCell, parseClipboardBlock, planPaste, splitTsv } from './cellText';
 
 describe('parseCell', () => {
   it('treats empty text as a missing value, not zero', () => {
@@ -17,17 +17,14 @@ describe('parseCell', () => {
   });
 });
 
-describe('parseClipboard', () => {
+describe('parseClipboardBlock without titles', () => {
   it('parses Excel-style tab/newline blocks with a trailing newline and blanks', () => {
-    const r = parseClipboard('1\t2\r\n3\t\r\n');
-    expect(r).toEqual({ ok: true, matrix: [[1, 2], [3, null]] });
+    const r = parseClipboardBlock('1\t2\r\n3\t\r\n', false);
+    expect(r).toEqual({ ok: true, titles: [], matrix: [[1, 2], [3, null]] });
   });
   it('rejects the whole paste when any cell is non-numeric', () => {
-    const r = parseClipboard('1\t2\nx\t4');
+    const r = parseClipboardBlock('1\t2\nx\t4', false);
     expect(r.ok).toBe(false);
-  });
-  it('round-trips through matrixToText', () => {
-    expect(matrixToText([[1, null], [2.5, 3]])).toBe('1\t\n2.5\t3');
   });
 });
 
@@ -85,9 +82,6 @@ describe('blockToText', () => {
     expect(text.startsWith('"""quoted"" start"')).toBe(true);
     expect(parseClipboardBlock(text, true)).toEqual({ ok: true, titles, matrix });
   });
-  it('without titles matches matrixToText', () => {
-    expect(blockToText(null, [[1, null], [2.5, 3]])).toBe(matrixToText([[1, null], [2.5, 3]]));
-  });
 });
 
 describe('planPaste', () => {
@@ -124,8 +118,8 @@ describe('planPaste', () => {
 
 describe('ragged paste', () => {
   it('pads a short row with missing values so the block is a rectangle', () => {
-    const r = parseClipboard('1\t2\n3');
-    expect(r).toEqual({ ok: true, matrix: [[1, 2], [3, null]] });
+    const r = parseClipboardBlock('1\t2\n3', false);
+    expect(r).toEqual({ ok: true, titles: [], matrix: [[1, 2], [3, null]] });
   });
 });
 
@@ -153,7 +147,7 @@ describe('decimal separator', () => {
     expect(parseCell('1,234.5', 'auto').ok).toBe(false);
   });
   it('applies to pasted blocks', () => {
-    expect(parseClipboard('1,234\t2').ok).toBe(false);
+    expect(parseClipboardBlock('1,234\t2', false).ok).toBe(false);
     expect(parseClipboardBlock('1,234\t2', false, 'comma')).toEqual({ ok: true, titles: [], matrix: [[1.234, 2]] });
   });
 });
@@ -183,7 +177,7 @@ describe('what is written reads back as the same number', () => {
       expect(parseClipboardBlock(text, false, s)).toEqual({ ok: true, titles: [], matrix });
       const titles = matrix.map((_, i) => `row ${i}`);
       expect(parseClipboardBlock(blockToText(titles, matrix, s), true, s)).toEqual({ ok: true, titles, matrix });
-      expect(parseClipboardBlock(matrixToText(matrix, s), false, s)).toEqual({ ok: true, titles: [], matrix });
+      expect(parseClipboardBlock(blockToText(null, matrix, s), false, s)).toEqual({ ok: true, titles: [], matrix });
     }
   });
   it('through a paste plan into the grid', () => {

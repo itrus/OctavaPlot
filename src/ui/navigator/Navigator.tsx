@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { newId } from '../../model/ids';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
@@ -6,7 +6,7 @@ import { FOLDER_TITLE } from '../../model/project/folderItems';
 import type { AnalysisKind, ChartType, FolderKey, Id, TableKind, ViewRef } from '../../model/types';
 import type { ChartVariant } from '../../model/graph/chartVariant';
 import { useApp } from '../../state/AppContext';
-import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, removeAnalysis, type NewTableOptions } from '../../state/commands';
+import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, unlinkChart, removeAnalysis, type NewTableOptions } from '../../state/commands';
 import { DeleteIcon } from '../components/icons';
 import { navFold, navStep } from './navKeys';
 import { NewAnalysisDialog } from '../dialogs/NewAnalysisDialog';
@@ -147,7 +147,8 @@ export function Navigator() {
     setRenaming(null);
     run('Rename', renameItem(ref.kind, ref.id, name));
   };
-  const item = (ref: Exclude<ViewRef, { kind: 'folder' }>, icon: string, name: string, badges: Badge[] = []) =>
+  const item = (ref: Exclude<ViewRef, { kind: 'folder' }>, icon: string, name: string, badges: Badge[] = [], after?: ReactNode) => {
+    const row =
     renaming === ref.id ? (
       <div key={ref.id} className="nav-item active">
         <span className="nav-icon">{icon}</span>
@@ -172,6 +173,16 @@ export function Navigator() {
         ))}
       </button>
     );
+    // A graph that follows another has its Unlink beside the link symbol, in a row of its own so that the buttons are not nested.
+    return after ? (
+      <div key={ref.id} className="nav-row">
+        {row}
+        {after}
+      </div>
+    ) : (
+      row
+    );
+  };
   // Up, Down, Home and End move between the folders and pages (the focus goes with them); Left and Right fold and unfold a folder.
   const onTreeKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const t = e.target as HTMLElement;
@@ -217,7 +228,26 @@ export function Navigator() {
           {folder('graphs')}
           {open.graphs && (
             <>
-              {project.charts.map((c) => item({ kind: 'chart', id: c.id }, '▥', c.name, [chartBadge(c.type), ...(c.linkedTo ? [{ text: '🔗', title: `Linked to ${project.charts.find((x) => x.id === c.linkedTo)?.name ?? 'another graph'}: it follows that graph's format` }] : [])]))}
+              {project.charts.map((c) =>
+                item(
+                  { kind: 'chart', id: c.id },
+                  '▥',
+                  c.name,
+                  [chartBadge(c.type), ...(c.linkedTo ? [{ text: '🔗', title: `Linked to ${project.charts.find((x) => x.id === c.linkedTo)?.name ?? 'another graph'}: it follows that graph's format` }] : [])],
+                  c.linkedTo ? (
+                    <button
+                      className="nav-unlink"
+                      title="Stop following the other graph: the settings stay as they are"
+                      onClick={() => {
+                        run('Unlink graph', unlinkChart(c.id));
+                        setStatus(`Unlinked: ${c.name} no longer follows the format of the other graph.`);
+                      }}
+                    >
+                      Unlink
+                    </button>
+                  ) : undefined,
+                ),
+              )}
               {newItem('New Graph…', () => setDialog('graph'))}
             </>
           )}
@@ -242,7 +272,7 @@ export function Navigator() {
         )}
       </div>
       {/* In the page body, not in the (sliding) panel, so the dialog is positioned against the window. */}
-      {dialog === 'table' && createPortal(<NewTableDialog defaultSample={!settings.newProjectEmpty} onCreate={createTable} onClose={() => setDialog(null)} />, document.body)}
+      {dialog === 'table' && createPortal(<NewTableDialog defaultSample={settings.newProjectSample} onCreate={createTable} onClose={() => setDialog(null)} />, document.body)}
       {dialog === 'layout' && createPortal(<NewLayoutDialog charts={project.charts} initialChartId={view.kind === 'chart' ? view.id : undefined} onCreate={createLayout} onClose={() => setDialog(null)} />, document.body)}
       {dialog === 'analysis' && createPortal(<NewAnalysisDialog tables={project.dataTables} initialTableId={currentTableId ?? project.dataTables[0].id} onCreate={createAnalysis} onClose={() => setDialog(null)} />, document.body)}
       {dialog === 'graph' && createPortal(<NewGraphDialog tables={project.dataTables} charts={project.charts} initialTableId={currentTableId ?? project.dataTables[0].id} initialChartId={view.kind === 'chart' ? view.id : undefined} onCreate={createGraph} onCreateLike={createGraphLike} onClose={() => setDialog(null)} />, document.body)}

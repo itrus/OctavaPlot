@@ -124,24 +124,15 @@ test.describe('the navigator', () => {
   });
 });
 
-test.describe('dialogs', () => {
-  test('the Export dialog takes the focus, keeps it, and gives it back on Escape', async ({ page }) => {
+test.describe('export', () => {
+  test('the Export page of the inspector is not a pop-up', async ({ page }) => {
     await openApp(page);
     await openTable(page);
     await openGraph(page);
-    const toolbarExport = page.getByRole('button', { name: 'Export' }).first();
-    await toolbarExport.click();
-    const dialog = page.getByRole('dialog', { name: /^Export / });
-    await expect(dialog).toBeVisible();
-    const inside = () => page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'));
-    expect(await inside()).toBe(true);
-    // Tabbing round and round never leaves the dialog.
-    for (let i = 0; i < 25; i++) {
-      await page.keyboard.press('Tab');
-      expect(await inside()).toBe(true);
-    }
-    await page.keyboard.press('Escape');
-    await expect(dialog).toHaveCount(0);
-    await expect(toolbarExport).toBeFocused();
+    await expect(page.getByRole('navigation', { name: 'Graph settings pages' })).toBeVisible();
+    await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.locator('.export-panel')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' })).toHaveAttribute('aria-selected', 'true');
   });
 });

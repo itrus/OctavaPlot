@@ -21,7 +21,7 @@ import { svgToPdf } from './svgPdf';
  */
 const escapeXml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export interface LayoutDrawing {
+interface LayoutDrawing {
   svg: string;
   arranged: Arranged;
   widthPt: number;
@@ -189,7 +189,7 @@ export async function layoutToPdf(layout: Layout, project: Project): Promise<{ b
 }
 
 /** The texts of a page with the font each is written in, for the check of characters: the title and the panel labels in the page's font, each graph's texts in its own, and the master legend's names in the font of the graph they come from. */
-export interface TextGroup {
+interface TextGroup {
   fontFamily: string;
   texts: string[];
 }

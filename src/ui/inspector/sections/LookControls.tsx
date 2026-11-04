@@ -7,6 +7,7 @@ import { BAR_LABEL_MODES, INSIDE_LABEL_POSITIONS } from '../../../model/options/
 import { BAR_LABEL_LIMITS } from '../../../chart/shared/parts/barLabels';
 import { patchBarLabels, patchBars, patchBothAxes } from '../../../state/commands';
 import { Check, ColorInput, Field, NumField, OptionalNumField, Section, SelectInput, TextInput } from '../common/controls';
+import { SLIDERS } from '../common/sliderRanges';
 
 /** A colour that can also be "none": the colour box is greyed out while it is. */
 function OptionalColour({ label, value, fallback, onChange }: { label: string; value: string | null; fallback: string; onChange: (v: string | null) => void }) {
@@ -33,7 +34,7 @@ function FrameAndColours({ chart }: { chart: Chart }) {
       <Field label="Axis colour">
         <ColorInput value={chart.axisColor} ariaLabel="Axis colour" onChange={(v) => run('Axis colour', patchLook(chart.id, { axisColor: v }))} />
       </Field>
-      <NumField label="Axis opacity" value={chart.axisOpacity} min={0} max={1} onCommit={(v) => run('Axis opacity', patchLook(chart.id, { axisOpacity: v }), 'axis:opacity')} hint="Axis lines, ticks and the frame; 0 = transparent, 1 = opaque" />
+      <NumField {...SLIDERS.fraction} label="Axis opacity" value={chart.axisOpacity} min={0} max={1} onCommit={(v) => run('Axis opacity', patchLook(chart.id, { axisOpacity: v }), 'axis:opacity')} hint="Axis lines, ticks and the frame; 0 = transparent, 1 = opaque" />
       <OptionalColour label="Plotting area" value={chart.plotColor} fallback="#ffffff" onChange={(v) => run('Plotting area colour', patchLook(chart.id, { plotColor: v }))} />
       <OptionalColour label="Page background" value={chart.pageColor} fallback="#ffffff" onChange={(v) => run('Page background colour', patchLook(chart.id, { pageColor: v }))} />
       <div className="muted small">With no page background a PNG export is transparent.</div>
@@ -52,16 +53,16 @@ function GridStyleSection({ chart }: { chart: Chart }) {
       <Field label="Major colour">
         <ColorInput value={g.color} ariaLabel="Major gridline colour" onChange={(v) => set('Major gridline colour', { color: v })} />
       </Field>
-      <NumField label="Major thickness" unit="pt" value={g.widthPt} min={GRID_LIMITS.widthPt.min} max={GRID_LIMITS.widthPt.max} onCommit={(v) => set('Major gridline thickness', { widthPt: v }, 'grid:w')} />
-      <NumField label="Major opacity" value={g.opacity} min={0} max={1} onCommit={(v) => set('Major gridline opacity', { opacity: v }, 'grid:o')} hint="0 = transparent, 1 = opaque" />
+      <NumField {...SLIDERS.line} label="Major thickness" unit="pt" value={g.widthPt} min={GRID_LIMITS.widthPt.min} max={20} onCommit={(v) => set('Major gridline thickness', { widthPt: v }, 'grid:w')} />
+      <NumField {...SLIDERS.fraction} label="Major opacity" value={g.opacity} min={0} max={1} onCommit={(v) => set('Major gridline opacity', { opacity: v }, 'grid:o')} hint="0 = transparent, 1 = opaque" />
       <Field label="Major pattern">
         <SelectInput<LineStyle> value={g.style} options={styles} onChange={(v) => set('Major gridline pattern', { style: v })} />
       </Field>
       <Field label="Minor colour">
         <ColorInput value={g.minorColor} ariaLabel="Minor gridline colour" onChange={(v) => set('Minor gridline colour', { minorColor: v })} />
       </Field>
-      <NumField label="Minor thickness" unit="pt" value={g.minorWidthPt} min={GRID_LIMITS.widthPt.min} max={GRID_LIMITS.widthPt.max} onCommit={(v) => set('Minor gridline thickness', { minorWidthPt: v }, 'grid:mw')} />
-      <NumField label="Minor opacity" value={g.minorOpacity} min={0} max={1} onCommit={(v) => set('Minor gridline opacity', { minorOpacity: v }, 'grid:mo')} hint="0 = transparent, 1 = opaque" />
+      <NumField {...SLIDERS.line} label="Minor thickness" unit="pt" value={g.minorWidthPt} min={GRID_LIMITS.widthPt.min} max={20} onCommit={(v) => set('Minor gridline thickness', { minorWidthPt: v }, 'grid:mw')} />
+      <NumField {...SLIDERS.fraction} label="Minor opacity" value={g.minorOpacity} min={0} max={1} onCommit={(v) => set('Minor gridline opacity', { minorOpacity: v }, 'grid:mo')} hint="0 = transparent, 1 = opaque" />
       <Field label="Minor pattern">
         <SelectInput<LineStyle> value={g.minorStyle} options={styles} onChange={(v) => set('Minor gridline pattern', { minorStyle: v })} />
       </Field>
@@ -84,7 +85,7 @@ export function FrameSection({ chart, dual, origin = 'y' }: { chart: Chart; dual
         </Section>
       )}
       <Section title="Axis lines">
-        <NumField label="Axis line thickness" unit="pt" value={chart.yAxis.lineWidthPt} min={0} max={20} onCommit={(v) => run('Axis line thickness', patchBothAxes(chart.id, { lineWidthPt: v }), 'axis:lw')} />
+        <NumField {...SLIDERS.line} label="Axis line thickness" unit="pt" value={chart.yAxis.lineWidthPt} min={0} max={20} onCommit={(v) => run('Axis line thickness', patchBothAxes(chart.id, { lineWidthPt: v }), 'axis:lw')} />
         {dual && <div className="muted small">Line thickness applies to both Y axes.</div>}
       </Section>
       <FrameAndColours chart={chart} />
@@ -172,7 +173,7 @@ export function BarLabelSection({ chart }: { chart: Chart }) {
       <Field label="Suffix">
         <TextInput value={l.suffix} disabled={off} onChange={(v) => set('Bar label suffix', { suffix: v }, 'barlabel:suf')} />
       </Field>
-      <NumField label="Size" unit="pt" value={l.sizePt} min={BAR_LABEL_LIMITS.sizePt.min} max={BAR_LABEL_LIMITS.sizePt.max} disabled={off} onCommit={(v) => set('Bar label size', { sizePt: v }, 'barlabel:size')} />
+      <NumField {...SLIDERS.font} label="Size" unit="pt" value={l.sizePt} min={BAR_LABEL_LIMITS.sizePt.min} max={BAR_LABEL_LIMITS.sizePt.max} disabled={off} onCommit={(v) => set('Bar label size', { sizePt: v }, 'barlabel:size')} />
       <Field label="Colour">
         <span className="inline-controls">
           <ColorInput value={l.color ?? chart.textColor} disabled={off || l.color === null} ariaLabel="Bar label colour" onChange={(v) => set('Bar label colour', { color: v })} />

@@ -7,7 +7,7 @@ import { sanitizeFit } from '../options/fitOptions';
 import { sanitizeHistogram } from '../options/histogramOptions';
 import { sanitizePie } from '../options/pieOptions';
 import { bool, clamp, hex, numberOrNull, oneOf, optionalHex, record, valuesOf } from '../sanitize';
-import type { Chart, ChartOrientation, FrameStyle, GridStyle, GroupedBy, LegendKeyShape, LineConnect, LineOrder, LineStyle } from '../types';
+import type { Chart, ChartOrientation, FrameStyle, GridStyle, GroupedBy, LegendKeyShape, LineConnect, LineOrder, LineStyle, SymbolShape } from '../types';
 
 /** How a chart looks as a whole: fonts, colours, frame, gridlines, direction (and the column and box settings it carries). */
 
@@ -18,6 +18,38 @@ export const FONT_FAMILIES: ReadonlyArray<{ value: string; label: string }> = [
   { value: "Georgia, 'Times New Roman', serif", label: 'Georgia' },
   { value: 'Verdana, Geneva, sans-serif', label: 'Verdana' },
   { value: "'Courier New', Courier, monospace", label: 'Courier New' },
+];
+
+/** The symbol shapes, in the order of the shape picker. */
+export const SYMBOL_SHAPES: ReadonlyArray<{ value: SymbolShape; label: string }> = [
+  { value: 'circle', label: 'Circle' },
+  { value: 'square', label: 'Square' },
+  { value: 'triangle', label: 'Triangle' },
+  { value: 'triangleDown', label: 'Triangle (down)' },
+  { value: 'diamond', label: 'Diamond' },
+  { value: 'hexagon', label: 'Hexagon' },
+  { value: 'star', label: 'Star' },
+  { value: 'target', label: 'Circle with dot' },
+  { value: 'plus', label: 'Plus' },
+  { value: 'cross', label: 'Cross' },
+  { value: 'asterisk', label: 'Asterisk' },
+  { value: 'hash', label: 'Hash (#)' },
+  { value: 'circlePlus', label: 'Circle with plus' },
+  { value: 'circleCross', label: 'Circle with cross' },
+  { value: 'squareDot', label: 'Square with dot' },
+  { value: 'squarePlus', label: 'Square with plus' },
+  { value: 'squareCross', label: 'Square with cross' },
+  { value: 'hexagonDot', label: 'Hexagon with dot' },
+  { value: 'pentagon', label: 'Pentagon' },
+  { value: 'octagon', label: 'Octagon' },
+  { value: 'triangleLeft', label: 'Triangle (left)' },
+  { value: 'triangleRight', label: 'Triangle (right)' },
+  { value: 'halfCircleLeft', label: 'Half circle (left)' },
+  { value: 'halfCircleRight', label: 'Half circle (right)' },
+  { value: 'halfCircleUp', label: 'Half circle (up)' },
+  { value: 'halfCircleDown', label: 'Half circle (down)' },
+  { value: 'verticalBar', label: 'Vertical bar' },
+  { value: 'horizontalBar', label: 'Horizontal bar' },
 ];
 
 export const LINE_STYLES: ReadonlyArray<{ value: LineStyle; label: string }> = [

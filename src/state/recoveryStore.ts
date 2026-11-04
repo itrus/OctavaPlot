@@ -29,7 +29,7 @@ const read = (key: string): string | null => {
 /** The state of the stored copy now: remember it as "seen" when this tab reads or writes the copy. */
 export const currentSignature = (): string => signatureOf(read(AUTOSAVE_META_KEY), read(AUTOSAVE_KEY));
 
-export type WriteResult =
+type WriteResult =
   | { kind: 'ok'; savedAt: number; seen: string }
   | { kind: 'conflict' }
   | { kind: 'failed'; message: string };

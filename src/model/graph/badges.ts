@@ -35,7 +35,6 @@ const CHART_TAG: Record<ChartType, string> = {
   xySpikes: 'SPK',
   xyBars: 'XBAR',
   xyBubble: 'BUB',
-  xyVector: 'VEC',
   xyOffset: 'OFF',
   xyArea: 'AREA',
   groupedBar: 'BAR',

@@ -8,7 +8,7 @@ import { svgId } from './svgIds';
 export const SELECT_COLOR = '#2b7fff';
 
 /** The live position (fractions of the chart size) of an annotation being dragged; it overrides the stored one. */
-export interface AnnotationDrag {
+interface AnnotationDrag {
   id: string;
   xFrac: number;
   yFrac: number;

@@ -53,6 +53,17 @@ describe('every control has an accessible name', () => {
     expect(html).toContain('aria-label="Width slider"');
   });
 
+  it('a slider covers the range given for it, not the whole limit, and moves in the step given', () => {
+    const html = renderToStaticMarkup(<NumField label="Thickness" value={1} min={0.2} max={20} sliderMax={10} step={0.2} onCommit={none} />);
+    expect(html).toMatch(/<input[^>]*type="range"[^>]*>/);
+    const range = /<input[^>]*type="range"[^>]*>/.exec(html)![0];
+    expect(range).toContain('min="0.2"');
+    expect(range).toContain('max="10"');
+    expect(range).toContain('step="0.2"');
+    // The box still takes a value up to the limit.
+    expect(html).not.toContain('Must be at most');
+  });
+
   it('names the optional number box and its Auto toggle after what they belong to', () => {
     const html = renderToStaticMarkup(<OptionalNumField label="Y minimum" value={null} onCommit={none} />);
     expect(unnamed(html)).toEqual([]);

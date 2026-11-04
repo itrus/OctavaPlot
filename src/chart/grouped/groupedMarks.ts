@@ -86,9 +86,9 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
       case 'errorBars':
         return s.errorPath !== '' ? [named(el('path', [['d', s.errorPath], ['fill', 'none'], ['stroke', st.errorColor], ['stroke-width', st.errorLineWidthPt], ['stroke-opacity', st.errorOpacity < 1 ? st.errorOpacity : undefined], ['stroke-linecap', 'butt']], { hit: { kind: 'error', groupId: s.groupId } }))] : [];
       case 'points':
-        return st.showSymbols ? s.points.map((p) => named(el('path', symbolAttrs(st, p.diamond ? diamondPath({ ...p, diamond: p.diamond }, st.symbolSizePt) : symbolPath(st.symbolShape, at(p).x, at(p).y, st.symbolSizePt), st.symbolBorderWidthPt), { hit: { kind: 'point', groupId: s.groupId, objectId: p.id } }), p.obsId ?? p.id)) : [];
+        return st.showSymbols ? s.points.map((p) => named(el('path', symbolAttrs(st, p.diamond ? diamondPath({ ...p, diamond: p.diamond }, st.symbolSizePt) : symbolPath(st.symbolShape, at(p).x, at(p).y, st.symbolSizePt, st.symbolBorderWidthPt), st.symbolBorderWidthPt), { hit: { kind: 'point', groupId: s.groupId, objectId: p.id } }), p.obsId ?? p.id)) : [];
       case 'rawPoints':
-        return s.dots.map((p) => named(el('path', symbolAttrs(st, symbolPath(p.shape ?? st.symbolShape, at(p).x, at(p).y, st.symbolSizePt), p.shape ? Math.max(st.symbolBorderWidthPt, 2) : st.symbolBorderWidthPt), { hit: { kind: 'point', groupId: s.groupId, objectId: p.id } }), p.id));
+        return s.dots.map((p) => named(el('path', symbolAttrs(st, symbolPath(p.shape ?? st.symbolShape, at(p).x, at(p).y, st.symbolSizePt, p.shape ? Math.max(st.symbolBorderWidthPt, 2) : st.symbolBorderWidthPt), p.shape ? Math.max(st.symbolBorderWidthPt, 2) : st.symbolBorderWidthPt), { hit: { kind: 'point', groupId: s.groupId, objectId: p.id } }), p.id));
       default:
         return [];
     }

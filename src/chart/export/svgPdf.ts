@@ -385,7 +385,7 @@ interface Gfx {
   alpha: string;
 }
 
-export interface DrawingContent {
+interface DrawingContent {
   widthPt: number;
   heightPt: number;
   content: string;

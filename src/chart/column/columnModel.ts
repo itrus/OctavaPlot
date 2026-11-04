@@ -1,4 +1,5 @@
 import { scaleLinear, scaleLog } from 'd3';
+import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { BAR_PALETTE } from '../../model/defaults';
 import { paletteById } from '../../model/graph/palettes';
 import { legendEntries } from '../../model/graph/legendEntries';
@@ -15,7 +16,7 @@ import type { BracketGeom } from '../shared/parts/brackets';
 import { placeBrackets } from '../shared/axes/bracketPlacement';
 import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, errorEndValues, type ErrorBarGeom } from '../shared/parts/errorGeometry';
 import { countMarks, patternMarks, type Point, type Rect } from '../shared/parts/hatch';
-import { computeLayout, type Layout } from '../shared/parts/layout';
+import { chartLayout, type Layout } from '../shared/parts/layout';
 import { anyLabelsRequested, buildPointLabels, emptyPointLabelModel, labelWarnings, type PointLabelModel } from '../shared/parts/labels';
 import { memoFor } from '../../stats/memo';
 import { boxSummary, densityProfile, normaliseProfiles, sortedFinite, type BoxSummary, type DensityProfile } from '../../stats/distribution';
@@ -278,7 +279,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     const config = axisConfigFor(chart, binding);
     const pool = pools[binding];
     // Only the left axis can be broken: the data of the right one share its clip.
-    return resolveAxis(
+    const resolved = resolveAxis(
       {
         values: pool.values,
         includeZero: pool.hasBars && config.scale === 'linear',
@@ -289,6 +290,8 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
       },
       binding === 'secondary' ? { ...config, breaks: [] } : config,
     );
+    // Ticks can be added to the left axis by hand; the right one has none.
+    return binding === 'secondary' ? resolved : withExtraTicksNoted(resolved, config, 'Y', warnings);
   };
   const y = axisScaleFor('primary');
   const y2 = dual ? axisScaleFor('secondary') : null;
@@ -302,16 +305,10 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   const legendRows = legendGroups.map((i) => rows[i]);
 
   // 3. Layout.
-  const layout = computeLayout({
-    fontFamily: chart.fontFamily,
-    titleOffsetPt: chart.titleOffsetPt,
-    widthPt,
-    heightPt,
-    title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
+  const layout = chartLayout(chart, widthPt, heightPt, {
     // Horizontal: the numbers run along the bottom (the value axis settings) and the data set names down the left.
     xAxis: horizontal ? chart.yAxis : chart.xAxis,
     yAxis: horizontal ? chart.xAxis : chart.yAxis,
-    legend: chart.legend,
     // Legend labels only carry the axis tag; category labels and data set names do not.
     legendLabels: legendRows.map((r) => r.name + AXIS_TAG[r.binding]),
     categoryLabels: horizontal ? [] : rows.map((r) => r.name),

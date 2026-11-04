@@ -1,4 +1,5 @@
 import { isSurvivalChartType } from '../../model/graph/chartTypes';
+import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { DEFAULT_BAND_OPACITY, layersOf } from '../../model/graph/layers';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { legendEntries } from '../../model/graph/legendEntries';
@@ -7,7 +8,7 @@ import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
 import type { Chart, DataTable, SurvivalBandMethod } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { normalQuantile } from '../../stats/special';
-import { computeLayout } from '../shared/parts/layout';
+import { chartLayout } from '../shared/parts/layout';
 import { axisMapper, placeable, resolveAxis, stepPathThroughBreaks } from '../shared/axes/axisScale';
 import type { AtRiskTable, XyModel, XyPoint, XySeries } from '../xy/xyModel';
 import { displayName } from '../shared/parts/names';
@@ -179,8 +180,10 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   // 2. Scales: time from 0, fraction 0 to 1.
   const allT = raw.flatMap((r) => [...r.km.steps.map((x) => x.time), ...r.km.marks.map((m) => m.time)]);
   const linear = { scale: 'linear' as const, reverse: false };
-  const xAxis = resolveAxis({ values: allT.length ? [0, ...allT] : [], includeZero: true, min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) }, { ...chart.xAxis, ...linear });
-  const yAxis = resolveAxis({ values: [0, 1], includeZero: true, min: chart.yAxis.min ?? 0, max: chart.yAxis.max ?? 1, majorInterval: chart.yAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(H / 100))) }, { ...chart.yAxis, ...linear });
+  const xBase = resolveAxis({ values: allT.length ? [0, ...allT] : [], includeZero: true, min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) }, { ...chart.xAxis, ...linear });
+  const yBase = resolveAxis({ values: [0, 1], includeZero: true, min: chart.yAxis.min ?? 0, max: chart.yAxis.max ?? 1, majorInterval: chart.yAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(H / 100))) }, { ...chart.yAxis, ...linear });
+  const xAxis = withExtraTicksNoted(xBase, chart.xAxis, 'X', warnings);
+  const yAxis = withExtraTicksNoted(yBase, chart.yAxis, 'Y', warnings);
   warnings.push(...xAxis.warnings.map((w) => w.replace(/^Y /, 'X ').replace(/ Y limit/, ' X limit')), ...yAxis.warnings);
 
   // The at-risk table sits under the plot: one row per group and a heading, at the ticks of the time axis.
@@ -189,15 +192,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   const atRiskFont = chart.legend.fontSizePt;
   const rowHeight = atRiskFont * 1.3;
   const showAtRisk = opts.atRisk && raw.length > 0 && atRiskTimes.length > 0;
-  const layout = computeLayout({
-    fontFamily: chart.fontFamily,
-    titleOffsetPt: chart.titleOffsetPt,
-    widthPt: W,
-    heightPt: H,
-    title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
-    xAxis: chart.xAxis,
-    yAxis: chart.yAxis,
-    legend: chart.legend,
+  const layout = chartLayout(chart, W, H, {
     legendLabels: legendSeries.map((i) => raw[i].label),
     categoryLabels: [],
     yTickLabels: yAxis.ticks.map(yAxis.tickLabel),

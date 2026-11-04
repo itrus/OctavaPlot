@@ -17,7 +17,7 @@ export type ChromeScene = Pick<Scene, 'defs' | 'back' | 'front'> & {
 };
 
 /** What a click on a shape selects. */
-export interface SceneHit {
+interface SceneHit {
   kind: 'point' | 'line' | 'error';
   groupId: Id;
   /** The observation of a point. */

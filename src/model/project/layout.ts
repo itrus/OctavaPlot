@@ -86,7 +86,7 @@ export interface Rect {
 }
 
 /** The page and the areas on it, in pt. */
-export interface PageFrame {
+interface PageFrame {
   widthPt: number;
   heightPt: number;
   /** The area inside the margins that the panels share (below the title when there is one). */

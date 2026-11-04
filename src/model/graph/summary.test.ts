@@ -164,9 +164,9 @@ describe('commands', () => {
 });
 
 describe('the spread a new chart starts with', () => {
-  it('is the SD for the charts made to show error bars, and none for the others', () => {
+  it('is the SD for the charts made to show error bars, and none for the others (a bar chart shows its individual values as dots instead)', () => {
     const table = createExampleProject().dataTables[0];
-    for (const type of ['bar', 'mean', 'groupedBar', 'groupedLine', 'xyScatter', 'xyLine'] as const) expect(createChart(table.id, undefined, type).layers[0].summary.spread).toBe('sd');
-    for (const type of ['scatter', 'box', 'violin', 'floating', 'paired'] as const) expect(createChart(table.id, undefined, type).layers[0].summary.spread).toBe('none');
+    for (const type of ['mean', 'groupedBar', 'groupedLine', 'xyScatter', 'xyLine'] as const) expect(createChart(table.id, undefined, type).layers[0].summary.spread).toBe('sd');
+    for (const type of ['bar', 'scatter', 'box', 'violin', 'floating', 'paired'] as const) expect(createChart(table.id, undefined, type).layers[0].summary.spread).toBe('none');
   });
 });

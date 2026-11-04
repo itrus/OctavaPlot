@@ -15,6 +15,8 @@ const project = (kind: 'replicates' | 'single', patch: (c: Chart) => Chart = (c)
   const p = addChart('c', 't', undefined, 'xyScatter')(addDataTable('t', 'xy', { sample: true, ...(layout ? { layout } : {}) })(createExampleProject()));
   return { ...p, charts: p.charts.map((c) => (c.id === 'c' ? patch(c) : c)) };
 };
+/** A new graph of replicates shows them from the start and has no error bars; most of these tests are about the layers as they are with the individual values off and the SD shown. */
+const meanOnly = (c: Chart): Chart => ({ ...c, layers: c.layers.map((l, i) => (i === 0 ? { ...l, summary: { ...l.summary, spread: 'sd' as const }, style: { ...l.style, showRawPoints: false } } : l)) });
 const chartOf = (p: Project) => p.charts.find((c) => c.id === 'c')!;
 const tableOf = (p: Project) => p.dataTables.find((t) => t.id === 't')!;
 const rawOn = (c: Chart): Chart => ({ ...c, layers: c.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showRawPoints: true } } : l)) });
@@ -35,7 +37,7 @@ describe('the mean layer and the individual values of an XY chart', () => {
   });
 
   it('a table of replicates has them, off until asked for, under the points, and its points are the mean', () => {
-    const p = project('replicates');
+    const p = project('replicates', meanOnly);
     const ls = layersOf(chartOf(p), tableOf(p));
     const raw = ls.filter((l) => l.kind === 'rawPoints');
     const pts = ls.filter((l) => l.kind === 'points');
@@ -51,8 +53,16 @@ describe('the mean layer and the individual values of an XY chart', () => {
     expect(z('points')).toBeLessThan(z('line'));
   });
 
-  it('names the points layer for the centre it shows', () => {
+  it('a new graph of replicates shows every replicate and has no error bars, a graph of single values has nothing of the kind to show', () => {
     const p = project('replicates');
+    const m = buildXyModel(chartOf(p), tableOf(p));
+    expect(m.series.every((s) => (s.rawPoints?.length ?? 0) > 0 && s.errorPath === '')).toBe(true);
+    const single = project('single');
+    expect(chartOf(single).layers[0].style.showRawPoints).not.toBe(true);
+  });
+
+  it('names the points layer for the centre it shows', () => {
+    const p = project('replicates', meanOnly);
     const label = (q: Project) => layerRows(chartOf(q), tableOf(q)).find((r) => r.layer.kind === 'points')!.label;
     expect(label(p).startsWith('Mean: ')).toBe(true);
     const median = patchSummary('c', 'all', { centre: 'median', spread: 'none' })(p);
@@ -60,9 +70,9 @@ describe('the mean layer and the individual values of an XY chart', () => {
   });
 
   it('draws every replicate when asked for, at the symbol size scaled, and nothing otherwise', () => {
-    const p = project('replicates');
+    const p = project('replicates', meanOnly);
     expect(buildXyModel(chartOf(p), tableOf(p)).series.every((s) => s.rawPoints === undefined)).toBe(true);
-    const on = project('replicates', rawOn);
+    const on = project('replicates', (c) => rawOn(meanOnly(c)));
     const m = buildXyModel(chartOf(on), tableOf(on));
     const replicates = tableOf(on).groups.slice(1).flatMap((g) => g.observations).filter((o) => o.value !== null).length;
     expect(m.series.reduce((n, s) => n + (s.rawPoints?.length ?? 0), 0)).toBe(replicates);
@@ -74,7 +84,7 @@ describe('the mean layer and the individual values of an XY chart', () => {
   it('keeps the axis fitted to what is shown: a replicate beyond the error bars widens it only while shown', () => {
     // No error bars, so that only the mean and, while shown, the individual values hold the axis open.
     const noBars = (q: Project) => patchSummary('c', 'all', { spread: 'none' })(q);
-    const p = noBars(project('replicates'));
+    const p = noBars(project('replicates', meanOnly));
     const t = tableOf(p);
     const outlier = { ...t, groups: t.groups.map((g, i) => (i === 1 ? { ...g, observations: g.observations.map((o, r) => (r === 0 ? { ...o, value: 1e3 } : o)) } : g)) };
     const withOutlier = (q: Project): Project => ({ ...q, dataTables: q.dataTables.map((x) => (x.id === 't' ? outlier : x)) });
@@ -84,9 +94,9 @@ describe('the mean layer and the individual values of an XY chart', () => {
   });
 
   it('draws as before while off, byte for byte, and hides on its own by id without any recalculation', () => {
-    const p = project('replicates');
+    const p = project('replicates', meanOnly);
     expect(render(p, true)).toBe(render(p, false));
-    const on = project('replicates', rawOn);
+    const on = project('replicates', (c) => rawOn(meanOnly(c)));
     const full = render(on);
     expect(paths(full)).toBeGreaterThan(paths(render(p)));
     const ids = layersOf(chartOf(on), tableOf(on)).filter((l) => l.kind === 'rawPoints').map((l) => l.id);

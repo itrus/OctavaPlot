@@ -87,7 +87,7 @@ export const MAX_DAY = daysFromCivil(9999, 12, 31);
 
 // ---------------------------------------------------------------- reading
 
-export type TimeParse = { ok: true; value: number | null; offset?: boolean } | { ok: false; message: string };
+type TimeParse = { ok: true; value: number | null; offset?: boolean } | { ok: false; message: string };
 
 const bad = (message: string): TimeParse => ({ ok: false, message });
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;

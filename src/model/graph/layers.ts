@@ -1,10 +1,11 @@
+import { SYMBOL_SHAPES } from './look';
 import { bracketKindOf, chartFamily, leadingColumns } from './chartTypes';
 import { centreLower } from '../../stats/summary';
 import { resolveStyle, dataLayer } from './style';
 import { resolveSummary } from './summary';
 import { layoutOf, xySeries } from '../table/tableLayout';
 import { seriesPaletteIndex } from '../table/factors';
-import type { Chart, ChartStyle, ChartType, DataTable, Id, LayerStyle, LineStyle, SymbolShape } from '../types';
+import type { Chart, ChartStyle, ChartType, DataTable, Id, LayerStyle, LineStyle } from '../types';
 
 /**
  * The graphical layers of a chart (roadmap P1). The layers are derived from the chart and its table, not stored; what the user
@@ -338,7 +339,6 @@ function dataRangeKindsOf(type: ChartType): ReadonlyArray<LayerKind> {
     case 'xyArea':
     case 'xyBars':
     case 'xyBubble':
-    case 'xyVector':
     case 'xyOffset':
       return ['points', 'rawPoints', 'errorBars', 'xErrorBars', 'fitCurve'];
     case 'bar':
@@ -370,7 +370,7 @@ function dataRangeKindsOf(type: ChartType): ReadonlyArray<LayerKind> {
   }
 }
 
-export interface LayerRow {
+interface LayerRow {
   layer: LayerSpec;
   /** Whether the layer's values are in the axis range now; null when the layer has no say in it (or the chart's family does not read it). */
   inRange: boolean | null;
@@ -584,8 +584,6 @@ const PART_KEYS: Partial<Record<LayerKind, Partial<Record<keyof LayerStyle, Read
 /** The layers drawn in the look of their series with the layer's own settings over it (the others have a look of their own, see layerLook). */
 const SERIES_LOOK_KINDS: ReadonlyArray<LayerKind> = ['line', 'errorBars', 'xErrorBars', 'points', 'rawPoints', 'meanLine', 'pairLines'];
 
-const SYMBOL_SHAPES: ReadonlyArray<SymbolShape> = ['circle', 'square', 'triangle', 'triangleDown', 'diamond', 'hexagon', 'star', 'target', 'plus', 'cross', 'asterisk'];
-
 /** The look of a series with the layer's own settings over it: what a line, error bar, point or individual value is drawn in. */
 export function partStyle(chart: Chart, layerId: Id, style: ChartStyle): ChartStyle {
   const own = chart.layerStyles[layerId];
@@ -695,7 +693,7 @@ export function sanitizeLayerStyles(raw: unknown): { styles: Record<Id, Partial<
         ((k === 'color' && typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ||
           (k === 'widthPt' && typeof v === 'number' && Number.isFinite(v) && v >= (kind === 'points' || kind === 'rawPoints' ? 0 : LAYER_STYLE_LIMITS.widthPt.min) && v <= LAYER_STYLE_LIMITS.widthPt.max) ||
           (k === 'lineStyle' && LINE_STYLE_VALUES.includes(v as LineStyle)) ||
-          (k === 'shape' && SYMBOL_SHAPES.includes(v as SymbolShape)) ||
+          (k === 'shape' && SYMBOL_SHAPES.some((o) => o.value === v)) ||
           (k === 'opacity' && typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1));
       if (!ok) {
         dropped++;

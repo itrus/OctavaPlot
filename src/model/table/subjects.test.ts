@@ -3,7 +3,7 @@ import { createExampleProject } from '../defaults';
 import { addDataTable, deleteRows, duplicateRows, replaceTableData, setExcluded, setSubject } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import type { Project } from '../types';
-import { equalUnitMean, hasSubjects, subjectTrajectories, subjectUnits, unitMeans } from './subjects';
+import { hasSubjects, subjectUnits, unitMeans } from './subjects';
 
 const table = (p: Project) => p.dataTables.find((t) => t.id === 't')!;
 /** A column table with the given columns (A, B ...) of values; no subjects yet. */
@@ -16,9 +16,8 @@ const name = (col: number, subjects: string[]) => (p: Project) => subjects.reduc
 const subjectsOf = (p: Project, col: number, n: number) => table(p).groups[col].observations.slice(0, n).map((o) => o.subject);
 
 describe('observation roles: subject', () => {
-  it('equal-unit mean: unit A [0,0,0] and unit B [10] give 5, not the pooled 2.5 (contract fixture)', () => {
+  it('unit means: unit A [0,0,0] and unit B [10] give means 0 and 10 (contract fixture)', () => {
     const g = table(name(0, ['A', 'A', 'A', 'B'])(withColumns([0, 0, 0, 10]))).groups[0];
-    expect(equalUnitMean(g)).toBe(5);
     expect(unitMeans(g)).toEqual([{ subject: 'A', mean: 0, n: 3 }, { subject: 'B', mean: 10, n: 1 }]);
   });
   it('leaves out missing and excluded values, and counts values with no subject instead of dropping them silently', () => {
@@ -27,7 +26,6 @@ describe('observation roles: subject', () => {
     const r = subjectUnits(table(p).groups[0]);
     expect(r.units).toEqual([{ subject: 'A', rows: [0, 1], values: [1, 2] }]);
     expect(r.unassigned).toBe(1);
-    expect(equalUnitMean({ ...table(p).groups[0], observations: [] })).toBeNull();
   });
   it('is a label: setting it changes no value, and setting the same text again returns the same project', () => {
     const p = name(0, ['A', 'A'])(withColumns([4, 5]));
@@ -58,15 +56,5 @@ describe('observation roles: subject', () => {
     expect(subjectsOf(p, 0, 3)).toEqual(['A', 'A', 'B']);
     p = deleteRows('t', [0])(p);
     expect(subjectsOf(p, 0, 2)).toEqual(['A', 'B']);
-  });
-  it('lines for repeated measures: a subject in two columns, repeats averaged, a subject in one column only left out', () => {
-    let p = name(0, ['A', 'A', 'B'])(withColumns([1, 3, 10], [6, 7]));
-    p = name(1, ['A', 'C'])(p);
-    expect(subjectTrajectories(table(p))).toEqual([{ subject: 'A', values: [2, 6] }]);
-  });
-  it('an excluded value takes no part in a line', () => {
-    let p = name(1, ['A'])(name(0, ['A'])(withColumns([1], [6])));
-    p = setExcluded('t', [{ col: 1, row: 0 }], true)(p);
-    expect(subjectTrajectories(table(p))).toEqual([]);
   });
 });

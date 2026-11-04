@@ -7,7 +7,7 @@ import type { Chart, ChartStyle } from '../../../model/types';
 import type { ChromeScene } from './scene';
 import { axisGaps, axisPieces } from '../axes/axisScale';
 import { crossingPosition } from '../axes/axisTicks';
-import { backgroundElements, categoryAxisElements, frameElement, gridElements, legendElements, numericAxisElements, plotClipElement, referenceLineElements, scaleBarElement, secondaryAxisElements, titleElements } from './chrome';
+import { backgroundElements, categoryAxisElements, extraGridElements, frameElement, gridElements, legendElements, numericAxisElements, plotClipElement, referenceLineElements, scaleBarElement, secondaryAxisElements, titleElements } from './chrome';
 import { linePattern } from '../../../model/graph/look';
 import { n2 } from '../../../model/units';
 import { symbolPath } from '../parts/symbols';
@@ -17,7 +17,7 @@ import { symbolPath } from '../parts/symbols';
  * tables): what is behind the data and what is in front of it. Both kinds are drawn in the vertical drawing of the model and
  * turned into place for horizontal columns, and both have the same value axis, category axis, titles and legend.
  */
-export interface CategoryChromeInput {
+interface CategoryChromeInput {
   widthPt: number;
   heightPt: number;
   layout: Layout;
@@ -62,8 +62,8 @@ export function compileCategoryChrome(chart: Chart, c: CategoryChromeInput): Chr
     ...backgroundElements(chart, W, H, plot),
     ...(ya.visible
       ? horizontal
-        ? gridElements({ dir: 'v', grid: chart.grid, major: y.ticks, minor: y.minorTicks ?? [], showMajor: ya.showGrid, showMinor: ya.showMinorGrid, at: valueX, from: plot.y, to: bottom })
-        : gridElements({ dir: 'h', grid: chart.grid, major: y.ticks, minor: y.minorTicks ?? [], showMajor: ya.showGrid, showMinor: ya.showMinorGrid, at: yScale, from: plot.x, to: right })
+        ? gridElements({ dir: 'v', grid: chart.grid, major: y.ticks, minor: y.minorTicks ?? [], showMajor: ya.showGrid, showMinor: ya.showMinorGrid, at: valueX, from: plot.y, to: bottom, extras: y.extraTicks })
+        : gridElements({ dir: 'h', grid: chart.grid, major: y.ticks, minor: y.minorTicks ?? [], showMajor: ya.showGrid, showMinor: ya.showMinorGrid, at: yScale, from: plot.x, to: right, extras: y.extraTicks })
       : []),
     // Right gridlines: dashed when the left grid is also drawn, so the two sets stay distinguishable.
     ...(y2 ? gridElements({ dir: 'h', grid: chart.grid, major: y2.scale.ticks, minor: y2.scale.minorTicks ?? [], showMajor: y2a.showGrid, showMinor: y2a.showMinorGrid, at: y2.map, from: plot.x, to: right, fallbackDash: ya.visible && ya.showGrid ? '3 3' : undefined }) : []),
@@ -73,6 +73,8 @@ export function compileCategoryChrome(chart: Chart, c: CategoryChromeInput): Chr
     ? numericAxisElements({ ...axis, name: 'y', cfg: ya, scale: y, along: 'x', crossing: bottom, pieces: clipX, gaps: onPage(valueGaps), map: valueX })
     : numericAxisElements({ ...axis, name: 'y', cfg: ya, scale: y, along: 'y', crossing: plot.x, pieces: valuePieces, gaps: valueGaps, map: yScale });
   const front = [
+    // The gridlines that added ticks want in front of the data.
+    ...(ya.visible ? (horizontal ? extraGridElements({ dir: 'v', grid: chart.grid, extras: y.extraTicks, at: valueX, from: plot.y, to: bottom }, true) : extraGridElements({ dir: 'h', grid: chart.grid, extras: y.extraTicks, at: yScale, from: plot.x, to: right }, true)) : []),
     ...valueAxis,
     ...(!horizontal && y2 ? secondaryAxisElements({ chart, cfg: y2a, scale: y2.scale, map: y2.map, plot }) : []),
     ...categoryAxisElements({ ...axis, cfg: xa, items: categories, horizontal, crossing: horizontal ? categoryAxisX : categoryAxisY, categoryY, rotated: layout.xTickRotated }),
@@ -92,7 +94,7 @@ export function lineAndSymbolKeys(style: ChartStyle, x: number, y: number, w: nu
     out.push(el('path', [['d', `M${n2(x)},${n2(y)}H${n2(x + w)}`], ['stroke', style.lineColor], ['stroke-width', style.lineWidthPt], ['stroke-opacity', style.lineOpacity < 1 ? style.lineOpacity : undefined], ['stroke-dasharray', pattern.strokeDasharray], ['stroke-linecap', pattern.strokeLinecap], ['fill', 'none']]));
   }
   if (style.showSymbols) {
-    out.push(el('path', [['d', symbolPath(style.symbolShape, x + w / 2, y, Math.min(style.symbolSizePt, LEGEND_KEY.height))], ['fill', style.symbolColor], ['fill-opacity', style.symbolFillOpacity < 1 ? style.symbolFillOpacity : undefined], ['stroke', style.symbolBorderColor], ['stroke-width', style.symbolBorderWidthPt], ['stroke-opacity', style.symbolBorderOpacity < 1 ? style.symbolBorderOpacity : undefined]]));
+    out.push(el('path', [['d', symbolPath(style.symbolShape, x + w / 2, y, Math.min(style.symbolSizePt, LEGEND_KEY.height), style.symbolBorderWidthPt)], ['fill', style.symbolColor], ['fill-opacity', style.symbolFillOpacity < 1 ? style.symbolFillOpacity : undefined], ['stroke', style.symbolBorderColor], ['stroke-width', style.symbolBorderWidthPt], ['stroke-opacity', style.symbolBorderOpacity < 1 ? style.symbolBorderOpacity : undefined]]));
   }
   return out;
 }

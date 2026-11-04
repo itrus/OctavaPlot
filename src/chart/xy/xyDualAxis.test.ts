@@ -6,7 +6,7 @@ import { xySeries } from '../../model/table/tableLayout';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
 import type { Annotation, Bracket, ChartType, Project } from '../../model/types';
 import { n2 } from '../../model/units';
-import { addAnnotation, addBracket, addChart, addDataTable, addReferenceLine, patchAxis, patchChart, patchStyle, replaceTableData } from '../../state/commands';
+import { addAnnotation, addBracket, addChart, addDataTable, addReferenceLine, patchAxis, patchChart, patchStyle, patchSummary, replaceTableData } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { annotationPlacer } from '../shared/scene/annotationPlace';
 import { referenceLinesOf } from '../shared/scene/referenceLines';
@@ -52,9 +52,9 @@ const hash = (s: string): string => {
 };
 
 describe('the right Y axis of an XY chart', () => {
-  it('is offered for the charts of points, lines, bars, spikes and areas, not for offset traces and vectors', () => {
+  it('is offered for the charts of points, lines, bars, spikes and areas, not for offset traces', () => {
     for (const t of ['xyScatter', 'xyLine', 'xyLineSymbols', 'xyBubble', 'xyBars', 'xySpikes', 'xyArea'] as const) expect(capabilitiesOf(t).secondaryAxis).toBe(true);
-    for (const t of ['xyOffset', 'xyVector', 'survival', 'histogram'] as const) expect(capabilitiesOf(t).secondaryAxis).toBe(false);
+    for (const t of ['xyOffset', 'survival', 'histogram'] as const) expect(capabilitiesOf(t).secondaryAxis).toBe(false);
   });
 
   it('gives each axis the range of its own series, and places each series by its own axis', () => {
@@ -164,7 +164,7 @@ describe('the right Y axis of an XY chart', () => {
   });
 
   it('keeps a stored binding that the chart type cannot honour, and ignores it', () => {
-    for (const t of ['xyOffset', 'xyVector'] as const) {
+    for (const t of ['xyOffset'] as const) {
       const p = dual(t);
       expect(model(p).y2 ?? null).toBeNull();
       expect(svg(p)).not.toContain('id="y2-axis"');
@@ -194,7 +194,7 @@ describe('the right Y axis of an XY chart', () => {
 
   it('draws the error bars and the fitted curve of a series on the right by the right scale', () => {
     let p = addDataTable('t', 'xy', { layout: { kind: 'replicates', n: 3 }, sample: true })(createExampleProject());
-    p = addChart('c', 't', undefined, 'xyScatter')(p);
+    p = patchSummary('c', 'all', { spread: 'sd' })(addChart('c', 't', undefined, 'xyScatter')(p));
     p = patchAxis('c', 'y2Axis', { min: 0, max: 50 })(patchStyle('c', sid(p)[1], { axisBinding: 'secondary' })(p));
     const fit = { ...NO_FIT_SETTINGS, model: 'linear' as const };
     const m = buildXyModel(chartOf(p), tableOf(p), fit);

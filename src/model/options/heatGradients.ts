@@ -3,7 +3,7 @@
  * each a list of colour stops from the low end to the high end of the scale. Only GSEA is diverging (its middle is the centre).
  */
 
-export interface HeatGradient {
+interface HeatGradient {
   value: string;
   family: 'GSEA' | 'Bootstrap 5' | 'Material Design';
   name: string;

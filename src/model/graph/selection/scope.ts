@@ -27,12 +27,6 @@ export function selectedGroupIds(selection: Selection): Id[] {
   }
 }
 
-/** The scope an inspector edits for a selection: all data sets for none, the one, or the several selected. */
-export function scopeOfSelection(selection: Selection): StyleScope {
-  const ids = selectedGroupIds(selection);
-  return ids.length === 0 ? 'all' : ids.length === 1 ? ids[0] : ids;
-}
-
 /** The selection of these data sets: the whole chart for none, the data set for one, 'groups' for several. */
 export function selectionOfGroups(ids: readonly Id[]): Selection {
   return ids.length === 0 ? { kind: 'chart' } : ids.length === 1 ? { kind: 'group', groupId: ids[0] } : { kind: 'groups', groupIds: [...ids] };

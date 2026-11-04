@@ -46,19 +46,6 @@ export function errorValue(s: GroupSummary, kind: ErrorKind): number | null {
   return kind === 'sd' ? s.sd : s.sem;
 }
 
-/** Warning text when a statistic is undefined for a group, else null. */
-export function undefinedStatWarning(
-  groupName: string,
-  s: GroupSummary,
-  errorKind: ErrorKind | 'none',
-): string | null {
-  if (s.n === 0) return `${groupName}: no valid observations, so no mean can be drawn.`;
-  if (errorKind !== 'none' && errorValue(s, errorKind) === null) {
-    return `${groupName}: ${errorKind.toUpperCase()} is undefined for n = ${s.n}; no error bar is drawn.`;
-  }
-  return null;
-}
-
 // ---------------------------------------------------------------------------
 // Summary calculations (spec 9.1). Defaults and thresholds marked P are project choices.
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import type { Annotation, Chart, ChartLayer, ChartStyle, Group, Id, Selection } 
 import { resolveStyle } from '../style';
 
 /** A point of a chart: the data set it is in and the ID of its observation. */
-export interface PointRef {
+interface PointRef {
   groupId: Id;
   pointId: Id;
 }
@@ -45,7 +45,7 @@ export function toggleAnnotationSelection(selection: Selection, id: Id, order: r
 const same = (a: unknown, b: unknown): boolean => Object.is(a, b) || JSON.stringify(a) === JSON.stringify(b);
 
 /** The settings of an annotation that several can be edited in together (the text and the place are each its own). */
-export type AnnotationSharedKey = 'fontSizePt' | 'color' | 'opacity';
+type AnnotationSharedKey = 'fontSizePt' | 'color' | 'opacity';
 const SHARED: readonly AnnotationSharedKey[] = ['fontSizePt', 'color', 'opacity'];
 
 /** The shared settings whose value is not the same in every one of these annotations. */

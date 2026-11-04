@@ -6,6 +6,7 @@ import { sanitizeLook } from '../model/graph/look';
 import { sanitizeLegendLayout, withoutLegendColumns, withoutLegendOffset, withoutLegendOrder } from '../model/graph/legendEntries';
 import { sanitizeOrder } from '../model/table/groupOrder';
 import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createGroup, createXyTable, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
+import { kindChangeEffects } from '../model/table/tableKind';
 import { analysisKindApplies, analysisTypeInfo } from '../model/project/analysis';
 import { sanitizeDegree } from '../model/options/fitOptions';
 import { inheritChart } from '../model/graph/chartFormat';
@@ -15,7 +16,7 @@ import { effectiveTable } from '../model/table/chartTable';
 import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, xySeries } from '../model/table/tableLayout';
 
 /** Chart types whose series colour is the colour of symbols, lines and error bars (not of filled bars). */
-import { applyVariant, type ChartVariant, variantFits } from '../model/graph/chartVariant';
+import { applyVariant, type ChartVariant, showIndividualValues, variantFits } from '../model/graph/chartVariant';
 import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns, usesSeriesBlocks } from '../model/graph/chartTypes';
 import { newId } from '../model/ids';
 import { paletteColor, type Palette } from '../model/graph/palettes';
@@ -723,7 +724,7 @@ export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; hei
   // A type that does not suit the table's type is ignored: the table's default chart type is used.
   const suited = type !== undefined && chartTypeInfo(type)?.tableKind === table.kind ? type : defaultChartTypeFor(table.kind);
   const chart = { ...createChart(tableId, size, suited), id: chartId, name: table.name, title: table.name };
-  const made = applyVariant(chart, variant);
+  const made = applyVariant(showIndividualValues(chart, table), variant);
   if (!variant?.fit || !variantFits(made, variant)) return { ...p, charts: [...p.charts, made] };
   // A chart with a curve fit has its fit in the Results: made here, and the chart points to it.
   const analysisId = `fit-of-${chartId}`;
@@ -1134,3 +1135,74 @@ export const setLayerHidden = (chartId: Id, layerId: Id, hidden: boolean): Comma
     if (hidden === has) return c;
     return { ...c, hiddenLayerIds: hidden ? [...c.hiddenLayerIds, layerId] : c.hiddenLayerIds.filter((id) => id !== layerId) };
   });
+
+/**
+ * The columns of a table after a change of type or of layout. The columns and their values stay, in the same order; what changes is
+ * how they are read. The first column is the X or the time of an XY or a survival table. After it the columns come in series of the
+ * layout's width: a series of one column is named by the column, a series of several has the series name as the title of its first
+ * column and the headings of the layout (Y1, Y2, ... or Mean, SD, N) over its columns. Columns that were subcolumns and are now alone
+ * are named after their series; a series the columns do not fill is completed with empty columns.
+ */
+function restructureGroups(t: DataTable, kind: TableKind, layout: ReplicateLayout): Group[] {
+  const oldLead = leadingColumns(t.kind);
+  const lead = leadingColumns(kind);
+  const oldWidth = tableSeriesWidth(t);
+  const hasBlocks = kind === 'xy' || kind === 'grouped';
+  const width = hasBlocks ? seriesWidth(layout) : 1;
+  const seriesName = (g: Group) => (g.title !== '' ? g.title : g.name);
+  // Each column as a single one: a subcolumn is named after its series and its heading, the first of a series after the series.
+  const flat = t.groups.map((g, i) => {
+    if (i < oldLead || oldWidth === 1) return { group: g, label: g.name };
+    const k = (i - oldLead) % oldWidth;
+    const first = t.groups[i - k];
+    return { group: g, label: k === 0 ? seriesName(first) : `${seriesName(first)} ${g.name}` };
+  });
+  const head = flat.slice(0, lead);
+  const rest = flat.slice(lead);
+  const rows = t.rowCount;
+  if (!hasBlocks || width === 1) {
+    // Single columns: each keeps its values and is named by its label (a column of the first type keeps its own title).
+    return [...head, ...rest].map((c, i) => ({ ...c.group, name: c.label, title: i < lead ? c.group.title : '' }));
+  }
+  // Series of several columns. When the old width is the same the series keep their names and only the headings change.
+  const labels = subLabels(layout);
+  const sameWidth = oldWidth === width && oldLead === lead;
+  const count = Math.ceil(rest.length / width);
+  const out: Group[] = head.map((c) => ({ ...c.group, name: c.label }));
+  for (let sIndex = 0; sIndex < count; sIndex++) {
+    for (let k = 0; k < width; k++) {
+      const c = rest[sIndex * width + k];
+      const g = c ? c.group : createGroup('', out.length, rows);
+      const name = sameWidth && k === 0 ? seriesName(rest[sIndex * width].group) : (rest[sIndex * width]?.label ?? defaultSeriesName(sIndex, kind));
+      out.push({ ...g, name: labels[k], title: k === 0 ? (sameWidth ? name : (c ? c.label : defaultSeriesName(sIndex, kind))) : '' });
+    }
+  }
+  return out;
+}
+
+/**
+ * Change the type of a table in place, or the way its series are entered (its subtype: single values, replicates, values already
+ * calculated, and for XY tables sizes and errors of X). The rows, columns and values stay; only what they mean changes (see
+ * restructureGroups). The graphs of the table whose type does not belong to the new one take the first graph type of it, and the
+ * calculations that do not apply are removed.
+ */
+export const changeTableKind = (tableId: Id, kind: TableKind, layout: ReplicateLayout = { kind: 'single' }): Command => (p) => {
+  const table = p.dataTables.find((t) => t.id === tableId);
+  if (!table) return p;
+  const hasLayout = kind === 'xy' || kind === 'grouped';
+  const next: ReplicateLayout = hasLayout ? layout : { kind: 'single' };
+  if (table.kind === kind && JSON.stringify(layoutOf(table)) === JSON.stringify(next)) return p;
+  const { charts, analyses } = kindChangeEffects(p, tableId, kind);
+  const changed = mapTable(p, tableId, (t) => {
+    const { layout: _layout, ...rest } = t;
+    // A type for the X column (dates, times) belongs to the X column of an XY table only.
+    const groups = restructureGroups(t, kind, next).map((g, i) => {
+      if (!g.time || (kind === 'xy' && i === 0)) return g;
+      const { time: _time, ...others } = g;
+      return others;
+    });
+    return { ...rest, kind, groups, ...(next.kind === 'single' ? {} : { layout: next }) };
+  });
+  const fallback = defaultChartTypeFor(kind);
+  return composeCommands(...charts.map((c) => setChartType(c.id, fallback)), ...analyses.map((a) => removeAnalysis(a.id)))(changed);
+};

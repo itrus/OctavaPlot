@@ -53,7 +53,7 @@ const glyphBodies = (report: ExportReport): ExportReport['glyphs'][] => {
 };
 
 /** The report in plain language. Separate from the dialog's controls so that it reads as the document it is. */
-function ReportBody({ report }: { report: ExportReport }) {
+export function ReportBody({ report }: { report: ExportReport }) {
   const { px, pt, mm } = report.size;
   const { raster } = report;
   return (

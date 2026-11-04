@@ -1,4 +1,5 @@
 import { DialogShell, trapTab } from './DialogShell';
+import { CloseIcon } from '../components/icons';
 import { PALETTE_GROUPS, PALETTE_GROUP_INFO, GGSCI_CITATION, palettesInGroup } from '../../model/graph/palettes';
 
 const link = (href: string) => (
@@ -13,7 +14,7 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
       <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Info" tabIndex={-1} ref={(el) => el?.focus()}>
         <div className="modal-head">
           <strong>Info</strong>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">×</button>
+          <button className="modal-close" onClick={onClose} aria-label="Close"><CloseIcon /></button>
         </div>
         <div className="modal-body modal-pad info-view">
       <div className="info-head">

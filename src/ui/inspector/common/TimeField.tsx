@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { formatTimeCell, parseTimeCell, type TimeColumn } from '../../../util/timeColumn';
-import { Field, FieldInput } from './controls';
+import { AutoCheck, Field, FieldInput } from './controls';
 
 /**
  * A value on a date, time or duration axis, typed as the column writes it (2025-03-04, 2025-03-04T10:30:00, 1:30:00). The stored value is
@@ -72,29 +72,7 @@ export function TimeField({
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
         {optional && (
-          <label className="auto-check" htmlFor={id}>
-            <input
-              id={id}
-              type="checkbox"
-              aria-label={`Automatic ${label}`}
-              checked={value === null}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setError(null);
-                  onCommit(null);
-                  return;
-                }
-                const start = autoValue ?? 0;
-                const err = validate ? validate(start) : null;
-                setError(err);
-                if (!err) {
-                  setText(write(start));
-                  onCommit(start);
-                }
-              }}
-            />
-            Auto
-          </label>
+          <AutoCheck id={id} label={label} auto={value === null} start={autoValue ?? 0} validate={validate} setError={setError} setText={(v) => setText(write(v))} onCommit={onCommit} />
         )}
       </span>
     </Field>

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { buildAnyModelCached, ChartCanvas, chartTexts, fitsPendingOf, previewDotCount } from '../../chart/anyModel';
+import { buildAnyModelCached, ChartCanvas, fitsPendingOf, previewDotCount } from '../../chart/anyModel';
 import { useFitsVersion } from '../components/useFitsVersion';
 import { CHROME_STOPS, type ChromeStop, describeFocus, extendAnnotations, extendGroups, extendPoints, nextFocus, selectableMarks } from '../../chart/selectionOrder';
 import { toggleGroupSelection } from '../../model/graph/selection/scope';
@@ -11,14 +11,8 @@ import { hitFromTarget, type HitTarget, pointerToChartPt } from '../../chart/sha
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
 import type { PreparedChart } from '../../model/table/preparedChart';
 import { useApp } from '../../state/AppContext';
-import { composeCommands, patchAnnotation, patchBracket, patchPointStyle, removeChart, resetAllDataSets, unlinkChart } from '../../state/commands';
-import { exportPixels } from '../../chart/export/pngDpi';
-import { printSizeWarnings } from '../../chart/export/printSize';
-import { exportStatusText } from '../export/exportJob';
+import { composeCommands, patchAnnotation, patchBracket, patchPointStyle, removeChart, resetAllDataSets } from '../../state/commands';
 import { annotationPlacer, drawnFractions, nudgePatches, patchForMove } from '../../chart/shared/scene/annotationPlace';
-import { ExportDialog } from '../export/ExportDialog';
-import { useExportJob } from '../export/useExportJob';
-import { downloadBlob, exportFileName } from '../../util/download';
 import { DeleteIcon, ResetIcon } from '../components/icons';
 import { inspectorTargetFor } from '../inspector/common/nav';
 import type { Box } from '../../chart/shared/parts/labels';
@@ -29,7 +23,7 @@ const SCROLLBAR_ROOM = 17;
 
 export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const { chart, table, fit: curve } = prepared;
-  const { project, selection, setSelection, run, setStatus, zoom, setZoom, settings, fitRequest, navigateInspector } = useApp();
+  const { selection, setSelection, run, setStatus, zoom, setZoom, fitRequest, navigateInspector } = useApp();
   // A fit that takes long is made in a worker: the graph is drawn without it (and says so) until useFitsVersion changes.
   const fitsVersion = useFitsVersion();
   const any = useMemo(() => buildAnyModelCached(chart, table, curve, { deferFits: true }), [chart, table, curve, fitsVersion]);
@@ -273,57 +267,6 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
     setDrag(null);
   };
 
-  // One export at a time: while one runs the Export button is disabled, and a second start is ignored.
-  const exportJob = useExportJob(setStatus);
-  const [exportOpen, setExportOpen] = useState(false);
-  // The renderer behind export (react-dom/server) is loaded on first use, not at startup.
-  const exportSvg = () =>
-    exportJob.start({
-      label: 'SVG',
-      pixels: null,
-      tooBigMessage: '',
-      work: async (phase) => {
-        const { chartToSvgString } = await import('../../chart/export/export');
-        phase('encoding');
-        downloadBlob(new Blob([chartToSvgString(chart, table, curve, { metadata: true })], { type: 'image/svg+xml' }), exportFileName(chart.name, 'svg', settings.timestampExports));
-        return 'Exported SVG.';
-      },
-    });
-  // A PDF is vector shapes and text: it has no resolution and no canvas limit.
-  const exportPdf = () =>
-    exportJob.start({
-      label: 'PDF',
-      pixels: null,
-      tooBigMessage: '',
-      work: async (phase) => {
-        const { chartToPdf } = await import('../../chart/export/export');
-        phase('encoding');
-        const { blob, notes } = await chartToPdf(chart, table, curve);
-        downloadBlob(blob, exportFileName(chart.name, 'pdf', settings.timestampExports));
-        return notes.length > 0 ? `Exported PDF. ${notes.join(' ')}` : 'Exported PDF.';
-      },
-    });
-  const exportRaster = () => {
-    const kind = 'png';
-    const dpi = settings.pngDpi;
-    const { width: pw, height: ph } = exportPixels(chart, dpi);
-    const name = kind.toUpperCase();
-    return exportJob.start({
-      label: name,
-      pixels: { width: pw, height: ph },
-      // Browsers limit the size of a canvas; a size above the limit fails or comes out blank.
-      tooBigMessage: `${name} export at ${dpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, lower the PNG resolution in Settings, or export SVG.`,
-      work: async (phase) => {
-        const { chartToPngBlob } = await import('../../chart/export/export');
-        phase('rasterizing');
-        const blob = await chartToPngBlob(chart, table, dpi, curve);
-        phase('encoding');
-        downloadBlob(blob, exportFileName(chart.name, kind, settings.timestampExports));
-        return `Exported ${name}, ${pw} × ${ph} px (${dpi} dpi).`;
-      },
-    });
-  };
-
   return (
     <div className="graph-view">
       <div className="toolbar">
@@ -349,41 +292,8 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
           <DeleteIcon />
           Delete
         </button>
-        {chart.linkedTo && (
-          <button
-            className="icon-text"
-            onClick={() => {
-              run('Unlink graph', unlinkChart(chart.id));
-              setStatus('Unlinked: this graph no longer follows the format of the other one.');
-            }}
-            title={`Linked to ${project.charts.find((c) => c.id === chart.linkedTo)?.name ?? 'a graph'}: this graph follows its format, except for details you changed here. Click to stop following (settings stay as they are).`}
-          >
-            🔗 Unlink
-          </button>
-        )}
-        <button
-          className="icon-text toolbar-end"
-          disabled={exportJob.busy || fitsPending > 0}
-          onClick={() => setExportOpen(true)}
-          title={fitsPending > 0 ? 'The curve is still being fitted: export is possible when it is done, so that the file holds the final fit' : 'Export this graph: format, resolution, size, fonts and warnings are shown first'}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11" />
-          </svg>
-          Export
-        </button>
         {fitsPending > 0 && <span className="toolbar-info export-status" role="status">Fitting the curve…</span>}
-        {exportJob.busy && <span className="toolbar-info export-status" role="status">{exportStatusText(exportJob.state)}</span>}
       </div>
-      {exportOpen && (
-        <ExportDialog
-          kind="graph"
-          subject={{ name: chart.name, widthPx: chart.widthPx, heightPx: chart.heightPx, fontFamilies: [chart.fontFamily], texts: chartTexts(chart, any), warnings: model.warnings, printWidthMm: chart.printWidthMm ?? null, printWarnings: printSizeWarnings(chart) }}
-          state={exportJob.state}
-          onExport={() => (settings.exportFormat === 'svg' ? exportSvg() : settings.exportFormat === 'pdf' ? exportPdf() : exportRaster())}
-          onClose={() => setExportOpen(false)}
-        />
-      )}
       <div className="chart-scroller" ref={scrollerRef}>
         <div className="chart-wrap" ref={wrapRef} style={{ width: cssW }}>
           <div

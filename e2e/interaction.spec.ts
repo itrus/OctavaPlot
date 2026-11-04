@@ -68,7 +68,7 @@ test.describe('annotations', () => {
   test('a dragged annotation keeps its new place, and Undo puts it back', async ({ page }) => {
     await openApp(page);
     await openGraph(page);
-    await page.getByRole('tab', { name: 'Annotations' }).click();
+    await page.getByRole('tab', { name: 'Notes' }).click();
     await page.getByRole('button', { name: '+ Add text annotation' }).click();
     const left = page.getByRole('textbox', { name: 'Left', exact: true });
     const before = Number(await left.inputValue());
@@ -88,7 +88,7 @@ test.describe('annotations', () => {
   test('anchored to data, a note follows the axis range, and a value outside the range hides it with a notice', async ({ page }) => {
     await openApp(page);
     await openGraph(page);
-    await page.getByRole('tab', { name: 'Annotations' }).click();
+    await page.getByRole('tab', { name: 'Notes' }).click();
     await page.getByRole('button', { name: '+ Add text annotation' }).click();
     await page.getByLabel('Anchor').selectOption('data');
     const yValue = page.getByRole('textbox', { name: 'Y value', exact: true });

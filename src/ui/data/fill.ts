@@ -9,7 +9,7 @@ interface FillBounds {
   c1: number;
 }
 
-export type FillPlan =
+type FillPlan =
   | { ok: false; message: string }
   | {
       ok: true;
@@ -54,7 +54,7 @@ export function planFill(table: DataTable, b: FillBounds, direction: 'down' | 'r
   return { ok: true, edits, titles, label: direction === 'down' ? 'Fill down' : 'Fill right', message: `Filled ${direction}: ${plural(n, 'cell', 'cells')}.` };
 }
 
-export type SeriesPlan = { ok: false; message: string } | { ok: true; edits: CellEdit[]; message: string };
+type SeriesPlan = { ok: false; message: string } | { ok: true; edits: CellEdit[]; message: string };
 
 /** The number with the rounding noise of a sum taken off (0.1 + 0.2 is 0.3). */
 const clean = (v: number): number => Number(v.toPrecision(12));

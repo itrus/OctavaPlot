@@ -1,5 +1,5 @@
 import { numberStartPt } from '../../../model/graph/axis';
-import type { AxisConfig } from '../../../model/types';
+import type { AxisConfig, ExtraTick } from '../../../model/types';
 import { n2 } from '../../../model/units';
 
 /** The side of the plotting region an axis is drawn on. Ticks point outwards: left, up-left... see SIGN. */
@@ -24,10 +24,22 @@ export function tickPath(side: AxisSide, pos: number, base: number, style: TickS
   return side === 'bottom' ? `M${n2(pos)},${n2(start)}v${delta}` : `M${n2(start)},${n2(pos)}h${delta}`;
 }
 
-/** The tick marks of one axis: the major ones, then the minor ones. */
-export function tickPaths(side: AxisSide, base: number, style: TickStyle, major: readonly number[], minor: readonly number[], at: (v: number) => number): Array<{ key: string; d: string }> {
-  const out: Array<{ key: string; d: string }> = [];
-  for (const t of major) out.push({ key: String(t), d: tickPath(side, at(t), base, style) });
+/**
+ * The tick marks of one axis: the major ones, then the minor ones. An added tick (`extras`, by the value of its tick) can have no mark, a minor
+ * one, another direction (the axis' own when it says 'auto') or a thickness of its own, which is given back as `widthPt`.
+ */
+export function tickPaths(side: AxisSide, base: number, style: TickStyle, major: readonly number[], minor: readonly number[], at: (v: number) => number, extras?: ReadonlyMap<number, ExtraTick>): Array<{ key: string; d: string; widthPt?: number }> {
+  const out: Array<{ key: string; d: string; widthPt?: number }> = [];
+  for (const t of major) {
+    const x = extras?.get(t);
+    if (!x) {
+      out.push({ key: String(t), d: tickPath(side, at(t), base, style) });
+      continue;
+    }
+    if (x.showTick === false) continue;
+    const own: TickStyle = { ...style, tickDirection: x.tickDirection && x.tickDirection !== 'auto' ? x.tickDirection : style.tickDirection };
+    out.push({ key: String(t), d: tickPath(side, at(t), base, own, x.tickSize === 'minor'), ...(x.tickWidthPt !== undefined ? { widthPt: x.tickWidthPt } : {}) });
+  }
   for (const t of minor) out.push({ key: `m${t}`, d: tickPath(side, at(t), base, style, true) });
   return out.filter((p) => p.d !== '' && !p.d.includes('NaN'));
 }

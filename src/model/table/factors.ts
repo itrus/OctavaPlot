@@ -29,7 +29,7 @@ interface FactorCluster {
   start: number;
 }
 
-export interface FactorLayout {
+interface FactorLayout {
   clusters: FactorCluster[];
   /** Place of the bar of each series (left edge), in bar widths from the left end of a category's bars. */
   slot: number[];

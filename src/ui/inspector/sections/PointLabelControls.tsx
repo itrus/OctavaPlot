@@ -21,6 +21,7 @@ import {
   placementPatch,
   suppressedRows,
 } from '../common/pointLabelUi';
+import { SLIDERS } from '../common/sliderRanges';
 
 /** "Label each point" and its options; the status block reports on the whole graph. */
 export function PointLabelControls({
@@ -125,7 +126,7 @@ export function PointLabelControls({
               ))}
             </select>
           </Field>
-          <NumField
+          <NumField {...SLIDERS.offset}
             label="Offset X"
             unit="pt"
             value={style.pointLabelOffsetXPt}
@@ -136,7 +137,7 @@ export function PointLabelControls({
             note={ui.offsets.note}
             onCommit={(v) => onChange({ pointLabelOffsetXPt: v })}
           />
-          <NumField
+          <NumField {...SLIDERS.offset}
             label="Offset Y"
             unit="pt"
             value={style.pointLabelOffsetYPt}
@@ -146,7 +147,7 @@ export function PointLabelControls({
             overridden={overridden('pointLabelOffsetYPt')}
             onCommit={(v) => onChange({ pointLabelOffsetYPt: v })}
           />
-          <NumField
+          <NumField {...SLIDERS.font}
             label="Size"
             unit="pt"
             value={style.pointLabelFontSizePt}
@@ -266,7 +267,7 @@ export function SelectedPointBox({
           Auto
         </label>
       </Field>
-      <NumField
+      <NumField {...SLIDERS.font}
         label="Size"
         unit="pt"
         value={style.pointLabelFontSizePt}
@@ -298,7 +299,7 @@ export function SelectedPointBox({
           ))}
         </select>
       </Field>
-      <NumField
+      <NumField {...SLIDERS.offset}
         label="Offset X"
         unit="pt"
         value={style.pointLabelOffsetXPt}
@@ -309,7 +310,7 @@ export function SelectedPointBox({
         note={ui.offsets.note}
         onCommit={(v) => set({ pointLabelOffsetXPt: v })}
       />
-      <NumField
+      <NumField {...SLIDERS.offset}
         label="Offset Y"
         unit="pt"
         value={style.pointLabelOffsetYPt}
@@ -376,15 +377,15 @@ export function SelectedPointsBox({
           }}
         />
       </Field>
-      <NumField label="Size" unit="pt" value={style.pointLabelFontSizePt} min={LABEL_FONT_LIMITS.min} max={LABEL_FONT_LIMITS.max} disabled={off} overridden={ov('pointLabelFontSizePt')} onCommit={(v) => set({ pointLabelFontSizePt: v })} />
+      <NumField {...SLIDERS.font} label="Size" unit="pt" value={style.pointLabelFontSizePt} min={LABEL_FONT_LIMITS.min} max={LABEL_FONT_LIMITS.max} disabled={off} overridden={ov('pointLabelFontSizePt')} onCommit={(v) => set({ pointLabelFontSizePt: v })} />
       <Field label="Bold" overridden={ov('pointLabelBold')}>
         <Check checked={style.pointLabelBold} disabled={off} ariaLabel="Bold labels for these points" onChange={(v) => set({ pointLabelBold: v })} />
       </Field>
       <Field label="Italic" overridden={ov('pointLabelItalic')}>
         <Check checked={style.pointLabelItalic} disabled={off} ariaLabel="Italic labels for these points" onChange={(v) => set({ pointLabelItalic: v })} />
       </Field>
-      <NumField label="Offset X" unit="pt" value={style.pointLabelOffsetXPt} min={LABEL_OFFSET_LIMITS.min} max={LABEL_OFFSET_LIMITS.max} disabled={off} overridden={ov('pointLabelOffsetXPt')} hint="From each point, for labels placed as Custom (drag a label on the chart to set it)" onCommit={(v) => set({ pointLabelPlacement: 'custom', pointLabelOffsetXPt: v })} />
-      <NumField label="Offset Y" unit="pt" value={style.pointLabelOffsetYPt} min={LABEL_OFFSET_LIMITS.min} max={LABEL_OFFSET_LIMITS.max} disabled={off} overridden={ov('pointLabelOffsetYPt')} onCommit={(v) => set({ pointLabelPlacement: 'custom', pointLabelOffsetYPt: v })} />
+      <NumField {...SLIDERS.offset} label="Offset X" unit="pt" value={style.pointLabelOffsetXPt} min={LABEL_OFFSET_LIMITS.min} max={LABEL_OFFSET_LIMITS.max} disabled={off} overridden={ov('pointLabelOffsetXPt')} hint="From each point, for labels placed as Custom (drag a label on the chart to set it)" onCommit={(v) => set({ pointLabelPlacement: 'custom', pointLabelOffsetXPt: v })} />
+      <NumField {...SLIDERS.offset} label="Offset Y" unit="pt" value={style.pointLabelOffsetYPt} min={LABEL_OFFSET_LIMITS.min} max={LABEL_OFFSET_LIMITS.max} disabled={off} overridden={ov('pointLabelOffsetYPt')} onCommit={(v) => set({ pointLabelPlacement: 'custom', pointLabelOffsetYPt: v })} />
       <div className="button-row">
         <button onClick={onReset} disabled={!POINT_LABEL_KEYS.some((k) => ownKeys.has(k))}>Reset point labels</button>
       </div>

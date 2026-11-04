@@ -1,34 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { buildHistogramModel } from '../../chart/histogram/histogramModel';
-import { chartTypesFor } from '../../model/graph/chartTypes';
 import { defaultYTitle, FREQUENCIES, HISTOGRAM_LIMITS } from '../../model/options/histogramOptions';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
-import type { Chart, ChartType, DataTable, HistogramOptions } from '../../model/types';
+import type { Chart, DataTable, HistogramOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { composeCommands, patchAxis, patchChart, patchLook, patchStyle, setChartType } from '../../state/commands';
+import { composeCommands, patchAxis, patchChart, patchLook, patchStyle } from '../../state/commands';
 import { LayersSection } from './sections/LayersSection';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, TabBar } from './common/controls';
+import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput } from './common/controls';
 import { FrameSection } from './sections/LookControls';
-import { SECTIONS, TABS } from './common/nav';
+import { InspectorShell } from './common/InspectorShell';
+import { ExportPanel } from '../export/ExportPanel';
+import type { InspectorPage } from '../../state/inspectorNav';
+import { useInspectorNav } from './common/useInspectorNav';
+import { ChartTypePicker } from './sections/ChartTypePicker';
 import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, PaletteField, TextSections } from './sections/SharedSections';
 import { AxisLimits } from './XyInspector';
-import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
+import { SLIDERS } from './common/sliderRanges';
+
+const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'notes', 'export'];
 
 /** The formatting panel of histograms and cumulative distributions of a column table. */
 export function HistogramInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { run, inspectorNav } = useApp();
-  const [tab, setTab] = useState<InspectorTab>('appearance');
-  const [section, setSection] = useState<AppearanceSection>('style');
-  const [seenNav, setSeenNav] = useState(inspectorNav.n);
-  if (seenNav !== inspectorNav.n) {
-    setSeenNav(inspectorNav.n);
-    const t = inspectorNav.target;
-    if (t) {
-      setTab(t.tab);
-      if (t.section) setSection(t.section);
-    }
-  }
+  const { run } = useApp();
+  const nav = useInspectorNav(PAGES);
+  const { shows } = nav;
   const model = useMemo(() => buildHistogramModel(chart, table), [chart, table]);
   const layer = dataLayer(chart);
   const o = chart.histogram;
@@ -48,17 +44,10 @@ export function HistogramInspector({ chart, table }: { chart: Chart; table: Data
   const rows = table.groups.map((g, i) => ({ g, style: resolveStyle(chart, layer, { id: g.id, paletteIndex: g.paletteIndex ?? i }) }));
 
   return (
-    <aside className="inspector" aria-label="Graph formatting">
-      <TabBar tabs={TABS} value={tab} onChange={setTab} />
-      {tab === 'appearance' && (
-        <div>
-          <SectionBar sections={SECTIONS} value={section} onChange={setSection} />
-          {section === 'style' && (
+    <InspectorShell nav={nav}>
+          {shows('style') && (
             <div className="tab-body">
               <GroupBox title="Style">
-                <Field label="Appearance">
-                  <SelectInput<ChartType> value={chart.type} options={chartTypesFor('column').map((c) => ({ value: c.type, label: c.label }))} onChange={(t) => run('Change graph type', setChartType(chart.id, t))} />
-                </Field>
                 <PaletteField chart={chart} hint="Gives the data sets coordinated colours in order. The colours below still apply on top." />
               </GroupBox>
               <LayersSection chart={chart} table={table} />
@@ -149,19 +138,19 @@ export function HistogramInspector({ chart, table }: { chart: Chart; table: Data
                 ))}
                 {histogram ? (
                   <>
-                    <NumField label="Border" unit="pt" value={rows[0]?.style.barBorderWidthPt ?? 0} min={0} max={40} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderWidthPt: v }), 'style:all:border')} />
+                    <NumField {...SLIDERS.line} label="Border" unit="pt" value={rows[0]?.style.barBorderWidthPt ?? 0} min={0} max={20} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderWidthPt: v }), 'style:all:border')} />
                     <Field label="Border color">
                       <ColorInput value={rows[0]?.style.barBorderColor ?? '#000000'} ariaLabel="Border colour" onChange={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderColor: v }), 'style:all:bordercolor')} />
                     </Field>
-                    <NumField label="Opacity" value={rows[0]?.style.barOpacity ?? 1} min={0} max={1} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barOpacity: v }), 'style:all:opacity')} />
+                    <NumField {...SLIDERS.fraction} label="Opacity" value={rows[0]?.style.barOpacity ?? 1} min={0} max={1} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barOpacity: v }), 'style:all:opacity')} />
                   </>
                 ) : (
-                  <NumField label="Line thickness" unit="pt" value={rows[0]?.style.lineWidthPt ?? 1} min={0.2} max={40} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { lineWidthPt: v }), 'style:all:line')} />
+                  <NumField {...SLIDERS.line} label="Line thickness" unit="pt" value={rows[0]?.style.lineWidthPt ?? 1} min={0.2} max={20} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { lineWidthPt: v }), 'style:all:line')} />
                 )}
               </GroupBox>
             </div>
           )}
-          {section === 'axes' && (
+          {shows('axes') && (
             <div>
               <Section title="X axis (values)">
                 <Field label="Show X axis">
@@ -177,18 +166,18 @@ export function HistogramInspector({ chart, table }: { chart: Chart; table: Data
               </Section>
             </div>
           )}
-          {section === 'frame' && <FrameSection chart={chart} dual={false} origin="xy" />}
-          {section === 'text' && <TextSections chart={chart} groups={table.groups} yName="Y" dual={false} />}
-          {section === 'layout' && <DimensionsSection chart={chart} />}
-          {section === 'legend' && <LegendSection chart={chart} groups={table.groups} />}
-        </div>
-      )}
-      {tab === 'datasets' && (
-        <div className="tab-body">
-          <OnThisGraph chart={chart} />
-        </div>
-      )}
-      {tab === 'annotations' && <AnnotationsTab chart={chart} placer={annotationPlacer({ family: 'histogram', model }, model.widthPt, model.heightPt)} />}
-    </aside>
+          {shows('type') && <ChartTypePicker chart={chart} table={table} />}
+          {shows('layout') && <DimensionsSection chart={chart} />}
+          {shows('frame') && <FrameSection chart={chart} dual={false} origin="xy" />}
+          {shows('text') && <TextSections chart={chart} groups={table.groups} yName="Y" dual={false} />}
+          {shows('legend') && <LegendSection chart={chart} groups={table.groups} />}
+          {shows('datasets') && (
+            <div className="tab-body">
+              <OnThisGraph chart={chart} />
+            </div>
+          )}
+          {shows('annotations') && <AnnotationsTab chart={chart} placer={annotationPlacer({ family: 'histogram', model }, model.widthPt, model.heightPt)} />}
+      {shows('export') && <ExportPanel chart={chart} table={table} />}
+    </InspectorShell>
   );
 }

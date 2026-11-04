@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
-export interface RowsMenuItem {
+interface RowsMenuItem {
   label: string;
   /** The keyboard shortcut, shown at the right of the item. */
   shortcut?: string;

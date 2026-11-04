@@ -8,7 +8,7 @@ import type { ChartType } from '../types';
  * offered and which are absent for every type). Where a capability was already a predicate (supportsHorizontal,
  * chartFamily) the registry is built from it, so the two cannot disagree.
  */
-export interface Capabilities {
+interface Capabilities {
   type: ChartType;
   /** The value axis can run across (Layout → Direction). */
   horizontal: boolean;
@@ -62,7 +62,7 @@ export function capabilitiesOf(type: ChartType): Capabilities {
     horizontal: supportsHorizontal(type),
     referenceLines: referenceLinesOf(type),
     curveFit: family === 'xy',
-    lineConnect: family === 'xy' && type !== 'xySpikes' && type !== 'xyBars' && type !== 'xyBubble' && type !== 'xyVector',
+    lineConnect: family === 'xy' && type !== 'xySpikes' && type !== 'xyBars' && type !== 'xyBubble',
     secondaryAxis: SECONDARY_AXIS.has(type),
     seriesColour: isSeriesColourType(type),
     survivalOptions: family === 'survival',

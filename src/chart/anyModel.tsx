@@ -37,7 +37,7 @@ export type AnyModel = (
  * With `deferFits` (the screen) a fit that takes long is made in a worker and the model is built without it, with `fitsPending` above 0,
  * until it is done. Without (export, thumbnails of a layout) every fit is final when the model is built.
  */
-export interface BuildOptions {
+interface BuildOptions {
   deferFits?: boolean;
 }
 

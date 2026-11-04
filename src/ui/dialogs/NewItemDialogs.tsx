@@ -1,6 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { CloseIcon } from '../components/icons';
 import type { ChartType } from '../../model/types';
 import { DialogShell, trapTab } from './DialogShell';
+import { SKETCH_AXIS, sketchColour as col } from './sketchColours';
 
 /** A small modal with a title, a body and Cancel / confirm buttons. Focus is taken once, when it opens. */
 export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled, wide, children }: { title: string; confirmLabel: string; onConfirm: () => void; onClose: () => void; confirmDisabled?: boolean; wide?: boolean; children: ReactNode }) {
@@ -27,7 +29,7 @@ export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled
       <div className={`modal modal-wide${wide ? ' modal-xwide' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
         <div className="modal-head">
           <strong>{title}</strong>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">×</button>
+          <button className="modal-close" onClick={onClose} aria-label="Close"><CloseIcon /></button>
         </div>
         <div className="modal-body modal-pad">{children}</div>
         <div className="modal-foot">
@@ -40,18 +42,19 @@ export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled
   );
 }
 
-const SKETCH = { width: 84, height: 54, viewBox: '0 0 84 54', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, 'aria-hidden': true } as const;
+// Each data set of a thumbnail has its own colour of the palette, in order; the first is the thumbnail's `currentColor`.
+const SKETCH = { width: 84, height: 54, viewBox: '0 0 84 54', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, 'aria-hidden': true, style: { color: col(0) } } as const;
 
 /** A thumbnail of what each chart type looks like. */
 export function ChartSketch({ type }: { type: ChartType }) {
-  const axes = <path d="M10 6V46H78" />;
+  const axes = <path d="M10 6V46H78" stroke={SKETCH_AXIS} />;
   switch (type) {
     case 'bar':
       return (
         <svg {...SKETCH}>
           {axes}
-          {[[16, 28], [32, 18], [48, 24], [64, 12]].map(([x, y]) => (
-            <rect key={x} x={x} y={y + 6} width="10" height={40 - y - 6} fill="currentColor" fillOpacity={0.25} />
+          {[[16, 28], [32, 18], [48, 24], [64, 12]].map(([x, y], i) => (
+            <rect key={x} x={x} y={y + 6} width="10" height={40 - y - 6} fill={col(i)} fillOpacity={0.85} />
           ))}
         </svg>
       );
@@ -59,8 +62,8 @@ export function ChartSketch({ type }: { type: ChartType }) {
       return (
         <svg {...SKETCH}>
           {axes}
-          {[[21, [34, 30, 36, 28]], [37, [24, 20, 26, 22]], [53, [18, 14, 20, 16]], [69, [12, 10, 15, 8]]].map(([x, ys]) =>
-            (ys as number[]).map((y, i) => <circle key={`${x}-${i}`} cx={(x as number) + (i % 2 ? 3 : -3)} cy={y + 8} r="1.9" fill="currentColor" stroke="none" />),
+          {[[21, [34, 30, 36, 28]], [37, [24, 20, 26, 22]], [53, [18, 14, 20, 16]], [69, [12, 10, 15, 8]]].map(([x, ys], g) =>
+            (ys as number[]).map((y, i) => <circle key={`${x}-${i}`} cx={(x as number) + (i % 2 ? 3 : -3)} cy={y + 8} r="1.9" fill={col(g)} stroke="none" />),
           )}
         </svg>
       );
@@ -68,8 +71,8 @@ export function ChartSketch({ type }: { type: ChartType }) {
       return (
         <svg {...SKETCH}>
           {axes}
-          {[[21, 30], [37, 22], [53, 26], [69, 16]].map(([x, y]) => (
-            <g key={x}>
+          {[[21, 30], [37, 22], [53, 26], [69, 16]].map(([x, y], i) => (
+            <g key={x} style={{ color: col(i) }}>
               <path d={`M${x} ${y - 7}V${y + 9}M${x - 3} ${y - 7}h6M${x - 3} ${y + 9}h6`} />
               <circle cx={x} cy={y + 1} r="2.6" fill="currentColor" stroke="none" />
             </g>
@@ -80,10 +83,10 @@ export function ChartSketch({ type }: { type: ChartType }) {
       return (
         <svg {...SKETCH}>
           {axes}
-          {[[21, 24, 36], [37, 16, 30], [53, 20, 34], [69, 10, 24]].map(([x, top, bottom]) => (
-            <g key={x}>
+          {[[21, 24, 36], [37, 16, 30], [53, 20, 34], [69, 10, 24]].map(([x, top, bottom], i) => (
+            <g key={x} style={{ color: col(i) }}>
               <path d={`M${x} ${top - 6}V${top}M${x} ${bottom}V${bottom + 6}M${x - 3} ${top - 6}h6M${x - 3} ${bottom + 6}h6`} />
-              <rect x={x - 6} y={top} width="12" height={bottom - top} fill="currentColor" fillOpacity={0.25} />
+              <rect x={x - 6} y={top} width="12" height={bottom - top} fill="currentColor" fillOpacity={0.8} />
               <path d={`M${x - 6} ${(top + bottom) / 2}h12`} strokeWidth={2} />
             </g>
           ))}
@@ -94,7 +97,7 @@ export function ChartSketch({ type }: { type: ChartType }) {
         <svg {...SKETCH}>
           {axes}
           {[[34, 22], [26, 30], [38, 18], [20, 36]].map(([a, b], i) => (
-            <g key={i}>
+            <g key={i} style={{ color: col(i) }}>
               <path d={`M26 ${a}L62 ${b}`} />
               <circle cx="26" cy={a} r="2.2" fill="currentColor" stroke="none" />
               <circle cx="62" cy={b} r="2.2" fill="currentColor" stroke="none" />
@@ -107,7 +110,7 @@ export function ChartSketch({ type }: { type: ChartType }) {
         <svg {...SKETCH}>
           {axes}
           {[[14, 14], [26, 26], [38, 36], [50, 30], [62, 16]].map(([x, h]) => (
-            <rect key={x} x={x} y={46 - h} width="12" height={h} fill="currentColor" fillOpacity={0.25} />
+            <rect key={x} x={x} y={46 - h} width="12" height={h} fill="currentColor" fillOpacity={0.85} />
           ))}
         </svg>
       );
@@ -122,9 +125,9 @@ export function ChartSketch({ type }: { type: ChartType }) {
       return (
         <svg {...SKETCH}>
           {axes}
-          {[[21, 26, 38], [37, 14, 30], [53, 20, 36], [69, 8, 26]].map(([x, top, bottom]) => (
-            <g key={x}>
-              <rect x={x - 7} y={top} width="14" height={bottom - top} fill="currentColor" fillOpacity={0.25} />
+          {[[21, 26, 38], [37, 14, 30], [53, 20, 36], [69, 8, 26]].map(([x, top, bottom], i) => (
+            <g key={x} style={{ color: col(i) }}>
+              <rect x={x - 7} y={top} width="14" height={bottom - top} fill="currentColor" fillOpacity={0.8} />
               <path d={`M${x - 7} ${(top + bottom) / 2}h14`} strokeWidth={2} />
             </g>
           ))}
@@ -134,9 +137,9 @@ export function ChartSketch({ type }: { type: ChartType }) {
       return (
         <svg {...SKETCH}>
           {axes}
-          {[[21, 30, 8], [37, 22, 10], [53, 26, 7], [69, 16, 9]].map(([x, mid, half]) => (
-            <g key={x}>
-              <path d={`M${x} ${mid - 14}C${x + half} ${mid - 8} ${x + half} ${mid + 4} ${x} ${mid + 12}C${x - half} ${mid + 4} ${x - half} ${mid - 8} ${x} ${mid - 14}Z`} fill="currentColor" fillOpacity={0.25} />
+          {[[21, 30, 8], [37, 22, 10], [53, 26, 7], [69, 16, 9]].map(([x, mid, half], i) => (
+            <g key={x} style={{ color: col(i) }}>
+              <path d={`M${x} ${mid - 14}C${x + half} ${mid - 8} ${x + half} ${mid + 4} ${x} ${mid + 12}C${x - half} ${mid + 4} ${x - half} ${mid - 8} ${x} ${mid - 14}Z`} fill="currentColor" fillOpacity={0.8} />
               <path d={`M${x - 4} ${mid}h8`} strokeWidth={2} />
             </g>
           ))}
@@ -148,8 +151,8 @@ export function ChartSketch({ type }: { type: ChartType }) {
           {axes}
           {[[14, 26, 18], [46, 34, 12]].map(([x, a, b]) => (
             <g key={x}>
-              <rect x={x} y={46 - a} width="10" height={a} fill="currentColor" fillOpacity={0.25} />
-              <rect x={x + 10} y={46 - b} width="10" height={b} fill="currentColor" fillOpacity={0.55} />
+              <rect x={x} y={46 - a} width="10" height={a} fill="currentColor" fillOpacity={0.85} />
+              <rect x={x + 10} y={46 - b} width="10" height={b} fill={col(1)} fillOpacity={0.85} />
               <path d={`M${x + 5} ${46 - a - 4}v8M${x + 15} ${46 - b - 4}v8`} />
             </g>
           ))}
@@ -161,8 +164,8 @@ export function ChartSketch({ type }: { type: ChartType }) {
           {axes}
           {[[14, 14, 34], [46, 8, 28]].map(([x, top, bottom]) => (
             <g key={x}>
-              <rect x={x} y={top} width="10" height={bottom - top} fill="currentColor" fillOpacity={0.25} />
-              <rect x={x + 10} y={top + 8} width="10" height={bottom - top - 4} fill="currentColor" fillOpacity={0.55} />
+              <rect x={x} y={top} width="10" height={bottom - top} fill="currentColor" fillOpacity={0.85} />
+              <rect x={x + 10} y={top + 8} width="10" height={bottom - top - 4} fill={col(1)} fillOpacity={0.85} />
               <path d={`M${x} ${top + 12}h10M${x + 10} ${top + 20}h10`} strokeWidth={1.6} />
             </g>
           ))}
@@ -173,8 +176,8 @@ export function ChartSketch({ type }: { type: ChartType }) {
         <svg {...SKETCH}>
           {axes}
           <path d="M22 24L56 14" strokeWidth={2} />
-          <path d="M22 34L56 30" strokeWidth={2} strokeOpacity={0.55} />
-          {[[22, 24], [56, 14], [22, 34], [56, 30]].map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="2.4" fill="currentColor" stroke="none" />)}
+          <path d="M22 34L56 30" strokeWidth={2} style={{ color: col(1) }} />
+          {[[22, 24, 0], [56, 14, 0], [22, 34, 1], [56, 30, 1]].map(([x, y, k]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="2.4" fill={col(k)} stroke="none" />)}
         </svg>
       );
     case 'contingencyBars':
@@ -183,8 +186,8 @@ export function ChartSketch({ type }: { type: ChartType }) {
           {axes}
           {[[14, 30, 12], [46, 18, 28]].map(([x, a, b]) => (
             <g key={x}>
-              <rect x={x} y={46 - a} width="10" height={a} fill="currentColor" fillOpacity={0.25} />
-              <rect x={x + 10} y={46 - b} width="10" height={b} fill="currentColor" fillOpacity={0.55} />
+              <rect x={x} y={46 - a} width="10" height={a} fill="currentColor" fillOpacity={0.85} />
+              <rect x={x + 10} y={46 - b} width="10" height={b} fill={col(1)} fillOpacity={0.85} />
             </g>
           ))}
         </svg>
@@ -201,8 +204,8 @@ export function ChartSketch({ type }: { type: ChartType }) {
             const top = full ? 38 * (a / (a + 14)) : a;
             return (
               <g key={x}>
-                <rect x={x} y={46 - top} width="18" height={top} fill="currentColor" fillOpacity={0.25} />
-                <rect x={x} y={46 - total} width="18" height={total - top} fill="currentColor" fillOpacity={0.55} />
+                <rect x={x} y={46 - top} width="18" height={top} fill="currentColor" fillOpacity={0.85} />
+                <rect x={x} y={46 - total} width="18" height={total - top} fill={col(1)} fillOpacity={0.85} />
               </g>
             );
           })}

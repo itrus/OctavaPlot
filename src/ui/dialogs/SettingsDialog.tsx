@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CloseIcon } from '../components/icons';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
 import { useApp } from '../../state/AppContext';
 import { EXPORT_DPI_CHOICES, PNG_DPI_CHOICES, type ExportDpi, type ExportFormat, type PngDpi } from '../../state/settings';
@@ -39,7 +40,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       <div className="modal settings-modal" role="dialog" aria-modal="true" aria-label="Settings" tabIndex={-1} ref={ref}>
         <div className="modal-head">
           <strong>Settings</strong>
-          <button className="icon-btn" onClick={onClose} aria-label="Close settings">×</button>
+          <button className="modal-close" onClick={onClose} aria-label="Close settings"><CloseIcon /></button>
         </div>
         <div className="format-tabs settings-tabs" role="tablist" aria-label="Settings" {...roving.groupProps}>
           {TABS.map((t, i) => (
@@ -58,8 +59,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             >
               <Check checked={settings.autosave} onChange={(v) => updateSettings({ autosave: v })} ariaLabel="Autosave" />
             </Field>
-            <Field label="Start new tables empty" hint="Off: a new project, and the New Data Table dialog, start with sample data. On: they start with blank tables (the dialog still lets you choose).">
-              <Check checked={settings.newProjectEmpty} onChange={(v) => updateSettings({ newProjectEmpty: v })} ariaLabel="Start new tables empty" />
+            <Field label="Start new tables with sample data" hint="On: a new project, and the New Data Table dialog, start with sample data. Off: they start with blank tables (the dialog still lets you choose).">
+              <Check checked={settings.newProjectSample} onChange={(v) => updateSettings({ newProjectSample: v })} ariaLabel="Start new tables with sample data" />
             </Field>
             </>
           )}

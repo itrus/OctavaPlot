@@ -9,7 +9,7 @@ export interface PickState {
 export const NOTHING_PICKED: PickState = { picked: new Set(), anchor: null };
 
 /** What the keys held during a click say: Shift picks the range from the anchor, Ctrl or Cmd (or the check box) adds or drops one. */
-export interface PickKeys {
+interface PickKeys {
   shift: boolean;
   toggle: boolean;
 }

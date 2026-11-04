@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useRoving } from '../inspector/common/roving';
-import { MAX_REPLICATES, MIN_REPLICATES, SUMMARY_FORMATS, subLabels } from '../../model/table/tableLayout';
+import { MAX_REPLICATES, MIN_REPLICATES, subLabels } from '../../model/table/tableLayout';
 import type { ReplicateLayout, SummaryFormat, TableKind } from '../../model/types';
 import type { NewTableOptions } from '../../state/commands';
 import { Modal } from './NewItemDialogs';
+import { TableLayoutOptions } from './TableLayoutOptions';
 
 type FormatId = 'xy' | 'column' | 'grouped' | 'contingency' | 'survival';
 
@@ -157,22 +158,28 @@ function FormatSketch({ id, layout }: { id: FormatId; layout: ReplicateLayout })
   }
 }
 
-type XyMode = 'single' | 'replicates' | 'summary' | 'sized' | 'vector' | 'xerror';
+type XyMode = 'single' | 'replicates' | 'summary' | 'sized' | 'xerror';
 
 /**
  * New data table. The format is chosen in the menu along the top (Column, Grouped, XY, Contingency and
  * Survival), then whether to start empty or with sample data, then how the values are entered.
  */
 export function NewTableDialog({ defaultSample, onCreate, onClose }: { defaultSample: boolean; onCreate: (kind: TableKind, options: NewTableOptions) => void; onClose: () => void }) {
-  const [formatId, setFormatId] = useState<FormatId>('column');
+  const [formatId, setFormatIdRaw] = useState<FormatId>('column');
   const [sample, setSample] = useState(defaultSample);
-  const [mode, setMode] = useState<XyMode>('single');
+  // Replicate values in side-by-side subcolumns are the usual way to enter an XY or a grouped table, so they are the first choice and the default.
+  const [mode, setMode] = useState<XyMode>('replicates');
   const [n, setN] = useState(3);
   const [format, setFormat] = useState<SummaryFormat>('mean-sd-n');
+  // The bubble and error-of-X layouts exist for XY tables only.
+  const setFormatId = (id: FormatId) => {
+    setFormatIdRaw(id);
+    if (id !== 'xy' && (mode === 'sized' || mode === 'xerror')) setMode('replicates');
+  };
   const current = FORMATS.find((f) => f.id === formatId) ?? FORMATS[0];
   // XY and grouped tables let you choose how each series is entered; the others have one way.
   const hasLayoutOptions = formatId === 'xy' || formatId === 'grouped';
-  const layout: ReplicateLayout = !hasLayoutOptions || mode === 'single' ? { kind: 'single' } : mode === 'replicates' ? { kind: 'replicates', n } : mode === 'sized' ? { kind: 'sized' } : mode === 'vector' ? { kind: 'vector' } : mode === 'xerror' ? { kind: 'xerror' } : { kind: 'summary', format };
+  const layout: ReplicateLayout = !hasLayoutOptions || mode === 'single' ? { kind: 'single' } : mode === 'replicates' ? { kind: 'replicates', n } : mode === 'sized' ? { kind: 'sized' } : mode === 'xerror' ? { kind: 'xerror' } : { kind: 'summary', format };
   const create = () => {
     if (current.kind) onCreate(current.kind, { sample, layout });
   };
@@ -213,54 +220,7 @@ export function NewTableDialog({ defaultSample, onCreate, onClose }: { defaultSa
       <fieldset className="dlg-group">
         <legend>Options</legend>
         {hasLayoutOptions ? (
-          <>
-            <label className="dlg-radio">
-              <input type="radio" name="mode" checked={mode === 'single'} onChange={() => setMode('single')} /> {formatId === 'xy' ? 'Enter and plot a single Y value for each point' : 'Enter and plot a single value for each cell'}
-            </label>
-            <label className="dlg-radio">
-              <input type="radio" name="mode" checked={mode === 'replicates'} onChange={() => setMode('replicates')} /> Enter
-              <input
-                className="dlg-number"
-                type="number"
-                min={MIN_REPLICATES}
-                max={MAX_REPLICATES}
-                value={n}
-                aria-label="Number of replicate values"
-                onFocus={() => setMode('replicates')}
-                onChange={(e) => setN(Number(e.target.value))}
-              />
-              replicate values in side-by-side subcolumns
-            </label>
-            {formatId === 'xy' && (
-              <label className="dlg-radio">
-                <input type="radio" name="mode" checked={mode === 'sized'} onChange={() => setMode('sized')} /> Enter a Y and a size for each point (bubbles)
-              </label>
-            )}
-            {formatId === 'xy' && (
-              <label className="dlg-radio">
-                <input type="radio" name="mode" checked={mode === 'vector'} onChange={() => setMode('vector')} /> Enter a Y, dX and dY for each point (vectors: arrows from X, Y to X + dX, Y + dY)
-              </label>
-            )}
-            {formatId === 'xy' && (
-              <label className="dlg-radio">
-                <input type="radio" name="mode" checked={mode === 'xerror'} onChange={() => setMode('xerror')} /> Enter a Y, an error of Y and an error of X for each point (error bars along both axes)
-              </label>
-            )}
-            <label className="dlg-radio">
-              <input type="radio" name="mode" checked={mode === 'summary'} onChange={() => setMode('summary')} /> Enter and plot error values already calculated elsewhere
-            </label>
-            {mode === 'summary' && (
-              <div className="dlg-indent">
-                Enter:{' '}
-                <select value={format} onChange={(e) => setFormat(e.target.value as SummaryFormat)} aria-label="Values entered">
-                  {SUMMARY_FORMATS.map((f) => (
-                    <option key={f.id} value={f.id}>{f.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {mode === 'replicates' && !nValid && <div className="field-error">Enter a whole number from {MIN_REPLICATES} to {MAX_REPLICATES}.</div>}
-          </>
+          <TableLayoutOptions xy={formatId === 'xy'} choice={{ mode, n, format }} onChoice={(c) => { setMode(c.mode); setN(c.n); setFormat(c.format); }} />
         ) : (
           <div className="muted">
             {formatId === 'column' && 'Enter the replicate values of each group down its column.'}

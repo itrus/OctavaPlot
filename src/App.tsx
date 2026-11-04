@@ -165,6 +165,8 @@ function Shell() {
   // The zoom control belongs to the page on screen: the graph or the data table.
   const activeZoom = chart ? zoom : tableZoom;
   const setActiveZoom = chart ? setZoom : setTableZoom;
+  // A graph is not zoomed beyond 200%; a data table can be 400%.
+  const maxZoom = chart ? 2 : 4;
   // The chart draws the data sets that are on it, which may include some from other tables.
   const prepared = useMemo(() => (chart ? prepareChartInput(project, chart) : undefined), [project, chart]);
 
@@ -253,8 +255,8 @@ function Shell() {
         {(chart || table) && (
           <span className="zoom">
             <button className="icon-btn" aria-label="Zoom out" onClick={() => setActiveZoom(Math.max(0.25, Math.round((activeZoom - 0.25) * 100) / 100))}>−</button>
-            <WheelRange min={25} max={400} step={5} value={Math.round(activeZoom * 100)} ariaLabel="Zoom" onValue={(v) => setActiveZoom(v / 100)} />
-            <button className="icon-btn" aria-label="Zoom in" onClick={() => setActiveZoom(Math.min(4, Math.round((activeZoom + 0.25) * 100) / 100))}>+</button>
+            <WheelRange min={25} max={maxZoom * 100} step={5} value={Math.round(activeZoom * 100)} ariaLabel="Zoom" onValue={(v) => setActiveZoom(v / 100)} />
+            <button className="icon-btn" aria-label="Zoom in" onClick={() => setActiveZoom(Math.min(maxZoom, Math.round((activeZoom + 0.25) * 100) / 100))}>+</button>
             <span className="zoom-pct">{Math.round(activeZoom * 100)}%</span>
             <button
               className="zoom-fit"

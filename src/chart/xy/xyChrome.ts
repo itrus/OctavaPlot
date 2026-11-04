@@ -5,7 +5,7 @@ import type { XySeries } from './xyModel';
 import { fitLines } from './fitCurve';
 
 /** The parts of an XY chart's chrome that only an XY chart (or a survival curve) has: the at-risk table and the fitted parameters. */
-export interface AtRiskGeometry {
+interface AtRiskGeometry {
   xs: number[];
   y0: number;
   rowHeight: number;

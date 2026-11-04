@@ -9,7 +9,7 @@ import { chartPx2Pt } from '../../model/units';
 import { cellStatistic, matrixRange, normaliseMatrix, type CellResult, type Matrix, type Unavailable } from '../../stats/matrix';
 import { computeGroupStats } from '../../stats/summary';
 import { colourEdges, contrastColour, intervalColour, intervalIndex, scaleColour, type HeatScale } from './heatColours';
-import { computeLayout, type Layout, type Rect } from '../shared/parts/layout';
+import { chartLayout, type Layout, type Rect } from '../shared/parts/layout';
 import { compileHeatMarks } from './heatMarks';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { displayName } from '../shared/parts/names';
@@ -145,7 +145,7 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   const cellValue = (s: (typeof defs)[number], r: number): number | null => {
     const values = s.columns.map((c) => c.observations[r]?.value ?? null);
     let result: CellResult;
-    if (layoutKind.kind === 'single' || layoutKind.kind === 'sized' || layoutKind.kind === 'vector' || layoutKind.kind === 'xerror') {
+    if (layoutKind.kind === 'single' || layoutKind.kind === 'sized' || layoutKind.kind === 'xerror') {
       const v = values[0] !== null && Number.isFinite(values[0]) ? values[0] : null;
       // The other columns of an error table are errors, not values of the cell.
       result = centreOnly || v === null ? { value: v, unavailable: null } : cellStatistic(layoutKind.kind === 'xerror' ? values.slice(0, 1) : values, o.summary as StatisticOnly);
@@ -209,14 +209,7 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   // Only every this many-th label is written, so the room the labels take is that of those written.
   const shownRows = rowLabels.map((text, index) => ({ index, text })).filter((l) => l.index % o.rowLabelEvery === 0);
   const shownCols = colLabels.map((text, index) => ({ index, text })).filter((l) => l.index % o.colLabelEvery === 0);
-  const layout = computeLayout({
-    fontFamily: chart.fontFamily,
-    titleOffsetPt: chart.titleOffsetPt,
-    widthPt: showBar ? W - BAR_ROOM - o.barWidthPt : W,
-    heightPt: H,
-    title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
-    xAxis: chart.xAxis,
-    yAxis: chart.yAxis,
+  const layout = chartLayout(chart, showBar ? W - BAR_ROOM - o.barWidthPt : W, H, {
     legend: { ...chart.legend, visible: false },
     legendLabels: [],
     categoryLabels: shownCols.map((l) => l.text),

@@ -7,7 +7,7 @@ const SUB_SHIFT = 0.28;
 const SUP_SHIFT = -0.4;
 
 /** One piece of a marked-up text as the SVG writes it: its text, and a size and a shift when it is a script. */
-export interface RichPiece {
+interface RichPiece {
   text: string;
   /** A tspan attribute: a percentage of the size of the text it stands in; absent for normal text. */
   fontSize?: string;

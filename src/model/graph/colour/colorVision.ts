@@ -13,7 +13,7 @@ export const DEFICIENCIES = {
 type Deficiency = keyof typeof DEFICIENCIES;
 
 /** Two colours closer than this (CIE76 ΔE) are hard to tell apart in a chart; about 10 is a clear difference. */
-export const MIN_DELTA_E = 10;
+const MIN_DELTA_E = 10;
 /** How many leading colours are compared: the ones a chart with few data sets actually uses. */
 export const COMPARED_COLOURS = 6;
 
@@ -63,4 +63,14 @@ export function visionReport(colors: readonly string[]): VisionReport {
   const byKind = { protan: minDistance(colors, 'protan'), deutan: minDistance(colors, 'deutan'), tritan: minDistance(colors, 'tritan') };
   const worst = Math.min(byKind.protan, byKind.deutan, byKind.tritan);
   return { normal: minDistance(colors, null), byKind, worst, safe: worst >= MIN_DELTA_E };
+}
+
+/** How many leading colours stay clearly apart under all three deficiencies, from 1 up to COMPARED_COLOURS (1 means the first two already clash). */
+export function safeColours(colors: readonly string[]): number {
+  let n = 1;
+  for (let k = 2; k <= Math.min(COMPARED_COLOURS, colors.length); k++) {
+    if (!visionReport(colors.slice(0, k)).safe) break;
+    n = k;
+  }
+  return n;
 }

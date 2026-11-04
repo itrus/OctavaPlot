@@ -1,12 +1,13 @@
 import { Fragment } from 'react';
 import { layerBaseStyle, layerEditLook, layerRows } from '../../../model/graph/layers';
-import { SYMBOL_SHAPE_OPTIONS } from '../../../chart/shared/parts/symbols';
 import { LINE_STYLES } from '../../../model/graph/look';
 import type { Chart, DataTable, LayerStyle, LineStyle } from '../../../model/types';
 import { useApp } from '../../../state/AppContext';
 import { moveLayer, patchLayerStyle, resetLayerOrder, setLayerHidden, setLayerRange } from '../../../state/commands';
 import { Check, ColorInput, Field, NumField, Section, SelectInput } from '../common/controls';
+import { SymbolPicker } from '../common/SymbolPicker';
 import { displayName } from '../../../chart/shared/parts/names';
+import { SLIDERS } from '../common/sliderRanges';
 
 /**
  * The parts a chart is drawn from (data, reference lines and annotations), topmost first: each can be hidden without changing anything that is
@@ -46,16 +47,16 @@ export function LayersSection({ chart, table }: { chart: Chart; table: DataTable
                 )}
                 {takes.includes('shape') && (
                   <Field label="Symbol" overridden={own.shape !== undefined}>
-                    <SelectInput value={look.shape ?? 'circle'} options={[...SYMBOL_SHAPE_OPTIONS]} onChange={(v) => set({ shape: v }, 'shape')} />
+                    <SymbolPicker shape={look.shape ?? 'circle'} fillOpacity={look.opacity} onChange={(p) => set({ shape: p.symbolShape, ...(p.symbolFillOpacity !== undefined && takes.includes('opacity') ? { opacity: p.symbolFillOpacity } : {}) }, 'shape')} />
                   </Field>
                 )}
-                {takes.includes('widthPt') && <NumField label={points ? 'Border thickness' : 'Thickness'} unit="pt" value={look.widthPt} min={points ? 0 : 0.2} max={40} overridden={own.widthPt !== undefined} onCommit={(v) => set({ widthPt: v }, 'width')} />}
+                {takes.includes('widthPt') && <NumField {...SLIDERS.line} label={points ? 'Border thickness' : 'Thickness'} unit="pt" value={look.widthPt} min={points ? 0 : 0.2} max={20} overridden={own.widthPt !== undefined} onCommit={(v) => set({ widthPt: v }, 'width')} />}
                 {takes.includes('lineStyle') && (
                   <Field label="Pattern" overridden={own.lineStyle !== undefined}>
                     <SelectInput<LineStyle> value={look.lineStyle} options={LINE_STYLES.map((o) => ({ value: o.value, label: o.label }))} onChange={(v) => set({ lineStyle: v }, 'pattern')} />
                   </Field>
                 )}
-                {takes.includes('opacity') && <NumField label={points ? 'Fill opacity' : 'Opacity'} unit="%" value={Number((look.opacity * 100).toPrecision(4))} min={0} max={100} overridden={own.opacity !== undefined} onCommit={(v) => set({ opacity: v / 100 }, 'opacity')} />}
+                {takes.includes('opacity') && <NumField {...SLIDERS.percent} label={points ? 'Fill opacity' : 'Opacity'} unit="%" value={Number((look.opacity * 100).toPrecision(4))} min={0} max={100} overridden={own.opacity !== undefined} onCommit={(v) => set({ opacity: v / 100 }, 'opacity')} />}
                 <div className="button-row">
                   <button disabled={Object.keys(own).length === 0} onClick={() => run('Reset layer style', patchLayerStyle(chart.id, r.layer.id, Object.fromEntries(takes.map((k) => [k, null])) as { [K in keyof LayerStyle]?: null }))}>
                     Use the series' look

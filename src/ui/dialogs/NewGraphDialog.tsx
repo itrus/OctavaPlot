@@ -94,6 +94,19 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
     }
   };
 
+  const tableSelect = (
+    <label className="choice-label">
+      <span>Of table</span>
+      <select value={table.id} onChange={(e) => pickTable(e.target.value)} aria-label="Data table">
+        {tables.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name} ({tableTypeInfo(t.kind).label})
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   return (
     <Modal
       title="New graph"
@@ -125,16 +138,7 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
                 ))}
               </select>
             </label>
-            <label className="choice-label">
-              <span>Of table</span>
-              <select value={table.id} onChange={(e) => pickTable(e.target.value)} aria-label="Data table">
-                {tables.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({tableTypeInfo(t.kind).label})
-                  </option>
-                ))}
-              </select>
-            </label>
+            {tableSelect}
           </div>
           <p className="muted small">
             {sourceTable.kind === table.kind
@@ -166,16 +170,7 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
             ))}
           </select>
         </label>
-        <label className="choice-label">
-          <span>Of table</span>
-          <select value={table.id} onChange={(e) => pickTable(e.target.value)} aria-label="Data table">
-            {tables.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({tableTypeInfo(t.kind).label})
-              </option>
-            ))}
-          </select>
-        </label>
+        {tableSelect}
       </div>
       {tablesOfFamily.length > 1 && <p className="muted small">{tablesOfFamily.length} {FAMILY_LABEL[family].toLowerCase()} tables: choose which one above.</p>}
 

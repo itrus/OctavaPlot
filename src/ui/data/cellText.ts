@@ -49,10 +49,6 @@ export function parseCellFor(text: string, separator: DecimalSeparator = 'auto',
   return plain.ok ? plain : read;
 }
 
-type PasteParse =
-  | { ok: true; matrix: Array<Array<number | null>> }
-  | { ok: false; message: string };
-
 /** Index of the quote that closes the quoted field opening at i, or -1 (unterminated, or followed by more text). */
 function closingQuote(text: string, i: number): number {
   let j = i + 1;
@@ -155,12 +151,6 @@ export function parseClipboardBlock(text: string, withTitles: boolean, separator
   return { ok: true, titles, matrix, ...(notes.length > 0 ? { notes } : {}) };
 }
 
-/** Parse tab/newline separated text (as copied from Excel). Atomic: any bad cell rejects the paste. */
-export function parseClipboard(text: string): PasteParse {
-  const r = parseClipboardBlock(text, false);
-  return r.ok ? { ok: true, matrix: r.matrix } : r;
-}
-
 /** A value as it is shown, edited, copied and exported: full precision, no thousands separator, the decimal separator of the setting (a point unless comma). */
 export function formatCell(value: number | null, separator: DecimalSeparator = 'auto'): string {
   if (value === null) return '';
@@ -171,10 +161,6 @@ export function formatCell(value: number | null, separator: DecimalSeparator = '
 /** A value as `formatCell` writes it, or as a date, a time or a duration when the column has a time type. */
 export function formatCellFor(value: number | null, separator: DecimalSeparator = 'auto', time?: TimeColumn): string {
   return time ? formatTimeCell(value, time) : formatCell(value, separator);
-}
-
-export function matrixToText(rows: Array<Array<number | null>>, separator: DecimalSeparator = 'auto'): string {
-  return rows.map((r) => r.map((v) => formatCell(v, separator)).join('\t')).join('\n');
 }
 
 const quoteField = (s: string) => (/["\t\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);

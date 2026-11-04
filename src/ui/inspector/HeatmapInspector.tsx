@@ -1,17 +1,19 @@
-import { useState } from 'react';
-import { chartTypesFor } from '../../model/graph/chartTypes';
 import { editScale, paletteColour, seedCustom } from '../../chart/heatmap/heatColours';
 import { HEAT_LIMITS, HEAT_MARKS, HEAT_PALETTE_GROUPS, HEAT_STATISTICS, isDiverging } from '../../model/options/heatmapOptions';
 import { GroupedSelectField } from './GroupedSelect';
-import type { Chart, ChartType, DataTable, HeatmapOptions } from '../../model/types';
+import type { Chart, DataTable, HeatmapOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { patchAxis, patchLook, setChartType } from '../../state/commands';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SectionBar, SelectInput, TabBar, TextInput } from './common/controls';
-import { SECTIONS as ALL_SECTIONS, TABS } from './common/nav';
+import { patchAxis, patchLook } from '../../state/commands';
+import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SelectInput, TextInput } from './common/controls';
+import { InspectorShell } from './common/InspectorShell';
+import { ExportPanel } from '../export/ExportPanel';
+import type { InspectorPage } from '../../state/inspectorNav';
+import { useInspectorNav } from './common/useInspectorNav';
+import { ChartTypePicker } from './sections/ChartTypePicker';
 import { NumberListField } from './common/NumberListField';
 import { LayersSection } from './sections/LayersSection';
 import { AnnotationsTab, DimensionsSection, TextSections } from './sections/SharedSections';
-import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
+import { SLIDERS } from './common/sliderRanges';
 
 /** The colours of the scale at 16 even positions, as the stops of a CSS gradient (the scale as the cells show it, reversed or not). */
 const previewColours = (o: HeatmapOptions): string => Array.from({ length: 16 }, (_, i) => paletteColour(o.palette, i / 15, o.reverse, o.customColours)).join(', ');
@@ -27,23 +29,14 @@ function MarkField({ label, value, onChange }: { label: string; value: HeatmapOp
   );
 }
 
-/** A heat map has no axes of numbers, no frame and no legend: its panel has the style, text and layout sections. */
-const SECTIONS = ALL_SECTIONS.filter((s) => s.id === 'style' || s.id === 'text' || s.id === 'layout');
+/** A heat map has no axes of numbers, no frame and no legend: its panel has the graph, plot and notes pages. */
+const PAGES: InspectorPage[] = ['graph', 'plot', 'notes', 'export'];
 
 /** The formatting panel of heat maps of a grouped table. */
 export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { run, inspectorNav } = useApp();
-  const [tab, setTab] = useState<InspectorTab>('appearance');
-  const [section, setSection] = useState<AppearanceSection>('style');
-  const [seenNav, setSeenNav] = useState(inspectorNav.n);
-  if (seenNav !== inspectorNav.n) {
-    setSeenNav(inspectorNav.n);
-    const t = inspectorNav.target;
-    if (t) {
-      setTab(t.tab === 'datasets' ? 'appearance' : t.tab);
-      if (t.section && SECTIONS.some((s) => s.id === t.section)) setSection(t.section);
-    }
-  }
+  const { run } = useApp();
+  const nav = useInspectorNav(PAGES, ['datasets', 'frame', 'legend']);
+  const { shows } = nav;
   const o = chart.heatmap;
   const set = (label: string, patch: Partial<HeatmapOptions>, key?: string) => run(label, patchLook(chart.id, { heatmap: { ...o, ...patch } }), key);
   const diverging = isDiverging(o);
@@ -58,18 +51,9 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
   };
 
   return (
-    <aside className="inspector" aria-label="Graph formatting">
-      <TabBar tabs={TABS.filter((t) => t.id !== 'datasets')} value={tab} onChange={setTab} />
-      {tab === 'appearance' && (
-        <div>
-          <SectionBar sections={SECTIONS} value={section} onChange={setSection} />
-          {section === 'style' && (
+    <InspectorShell nav={nav}>
+          {shows('style') && (
             <div className="tab-body">
-              <GroupBox title="Style">
-                <Field label="Appearance">
-                  <SelectInput<ChartType> value={chart.type} options={chartTypesFor('grouped').map((c) => ({ value: c.type, label: c.label }))} onChange={(t) => run('Change graph type', setChartType(chart.id, t))} />
-                </Field>
-              </GroupBox>
               <LayersSection chart={chart} table={table} />
 
               <GroupBox title="Colours">
@@ -132,8 +116,8 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
                 </Field>
                 {o.colourbar && (
                   <>
-                    <NumField label="Width" unit="pt" value={o.barWidthPt} min={HEAT_LIMITS.barWidthPt.min} max={HEAT_LIMITS.barWidthPt.max} onCommit={(v) => set('Colour bar width', { barWidthPt: v }, 'heat:barWidth')} />
-                    <NumField label="Length" unit="%" hint="Of the height of the cells" value={o.barLengthPct} min={HEAT_LIMITS.barLengthPct.min} max={HEAT_LIMITS.barLengthPct.max} onCommit={(v) => set('Colour bar length', { barLengthPct: v }, 'heat:barLength')} />
+                    <NumField {...SLIDERS.wide} label="Width" unit="pt" value={o.barWidthPt} min={HEAT_LIMITS.barWidthPt.min} max={HEAT_LIMITS.barWidthPt.max} onCommit={(v) => set('Colour bar width', { barWidthPt: v }, 'heat:barWidth')} />
+                    <NumField {...SLIDERS.percent} label="Length" unit="%" hint="Of the height of the cells" value={o.barLengthPct} min={HEAT_LIMITS.barLengthPct.min} max={HEAT_LIMITS.barLengthPct.max} onCommit={(v) => set('Colour bar length', { barLengthPct: v }, 'heat:barLength')} />
                     <NumField label="Ticks" hint="About this many numbers; a scale in intervals has one at each edge" value={o.barTicks} min={HEAT_LIMITS.barTicks.min} max={HEAT_LIMITS.barTicks.max} slider={false} validate={wholeIn(HEAT_LIMITS.barTicks)} onCommit={(v) => set('Colour bar ticks', { barTicks: v }, 'heat:barTicks')} />
                     <Field label="Title">
                       <Check checked={o.barTitle !== ''} onChange={(on) => set('Colour bar title', { barTitle: on ? null : '' })} />
@@ -186,12 +170,12 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
               </GroupBox>
 
               <GroupBox title="Cells">
-                <NumField label="Space between cells" unit="pt" value={o.cellGapPt} min={HEAT_LIMITS.cellGapPt.min} max={HEAT_LIMITS.cellGapPt.max} onCommit={(v) => set('Space between cells', { cellGapPt: v }, 'heat:gap')} />
+                <NumField {...SLIDERS.gap} label="Space between cells" unit="pt" value={o.cellGapPt} min={HEAT_LIMITS.cellGapPt.min} max={HEAT_LIMITS.cellGapPt.max} onCommit={(v) => set('Space between cells', { cellGapPt: v }, 'heat:gap')} />
                 <OptionalNumField label="Cell width" hint="Auto: the cells fill the width; a size too large for it is held at the width" value={o.cellWidthPt} autoValue={40} validate={sizeIn} onCommit={(v) => set('Cell width', { cellWidthPt: v }, 'heat:cellW')} />
                 <OptionalNumField label="Cell height" hint="Auto: the cells fill the height" value={o.cellHeightPt} autoValue={20} validate={sizeIn} onCommit={(v) => set('Cell height', { cellHeightPt: v }, 'heat:cellH')} />
                 <OptionalNumField label="Rows in a group" hint="Auto: no groups; else extra space after this many rows" value={o.rowGroupSize} autoValue={5} validate={wholeIn(HEAT_LIMITS.groupSize)} onCommit={(v) => set('Row groups', { rowGroupSize: v }, 'heat:rowGroup')} />
                 <OptionalNumField label="Columns in a group" hint="Auto: no groups; else extra space after this many columns" value={o.colGroupSize} autoValue={5} validate={wholeIn(HEAT_LIMITS.groupSize)} onCommit={(v) => set('Column groups', { colGroupSize: v }, 'heat:colGroup')} />
-                <NumField label="Space between groups" unit="pt" value={o.groupGapPt} min={HEAT_LIMITS.groupGapPt.min} max={HEAT_LIMITS.groupGapPt.max} disabled={o.rowGroupSize === null && o.colGroupSize === null} onCommit={(v) => set('Space between groups', { groupGapPt: v }, 'heat:groupGap')} />
+                <NumField {...SLIDERS.wide} label="Space between groups" unit="pt" value={o.groupGapPt} min={HEAT_LIMITS.groupGapPt.min} max={HEAT_LIMITS.groupGapPt.max} disabled={o.rowGroupSize === null && o.colGroupSize === null} onCommit={(v) => set('Space between groups', { groupGapPt: v }, 'heat:groupGap')} />
                 <Field label="Numbers in the cells">
                   <Check checked={o.showValues} onChange={(v) => set('Numbers in the cells', { showValues: v })} />
                 </Field>
@@ -207,11 +191,11 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
               </GroupBox>
             </div>
           )}
-          {section === 'text' && <TextSections chart={chart} groups={table.groups} yName="Rows" dual={false} />}
-          {section === 'layout' && <DimensionsSection chart={chart} />}
-        </div>
-      )}
-      {tab === 'annotations' && <AnnotationsTab chart={chart} />}
-    </aside>
+          {shows('type') && <ChartTypePicker chart={chart} table={table} />}
+          {shows('layout') && <DimensionsSection chart={chart} />}
+          {shows('text') && <TextSections chart={chart} groups={table.groups} yName="Rows" dual={false} />}
+          {shows('annotations') && <AnnotationsTab chart={chart} />}
+      {shows('export') && <ExportPanel chart={chart} table={table} />}
+    </InspectorShell>
   );
 }

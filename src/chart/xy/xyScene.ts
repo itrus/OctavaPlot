@@ -10,7 +10,7 @@ import { linePattern } from '../../model/graph/look';
 import { symbolPath } from '../shared/parts/symbols';
 import { axisGaps, axisPieces } from '../shared/axes/axisScale';
 import { crossingPosition, labelOffset } from '../shared/axes/axisTicks';
-import { backgroundElements, frameElement, gridElements, legendElements, numericAxisElements, plotClipElement, referenceLineElements, regionElements, scaleBarElement, secondaryAxisElements, titleElements } from '../shared/scene/chrome';
+import { backgroundElements, extraGridElements, frameElement, gridElements, legendElements, numericAxisElements, plotClipElement, referenceLineElements, regionElements, scaleBarElement, secondaryAxisElements, titleElements } from '../shared/scene/chrome';
 import { referenceLinesOf, regionsOf } from '../shared/scene/referenceLines';
 import { atRiskElements, fitParameterElements } from './xyChrome';
 import { xyBracketElements } from './xyBrackets';
@@ -71,7 +71,7 @@ function pathsOf(chart: Chart, s: XySeries, layerId: Id, kind: LayerKind): Scene
     case 'rawPoints':
       return (s.rawPoints ?? []).map((p) => ({
         id: svgId(base, p.id),
-        d: symbolPath(st.symbolShape, p.px, p.py, st.symbolSizePt * RAW_POINT_SCALE),
+        d: symbolPath(st.symbolShape, p.px, p.py, st.symbolSizePt * RAW_POINT_SCALE, st.symbolBorderWidthPt),
         fill: st.symbolColor,
         fillOpacity: st.symbolFillOpacity < 1 ? st.symbolFillOpacity : undefined,
         stroke: st.symbolBorderColor,
@@ -82,7 +82,7 @@ function pathsOf(chart: Chart, s: XySeries, layerId: Id, kind: LayerKind): Scene
       if (!st.showSymbols) return [];
       return s.points.map((p) => ({
         id: svgId(base, p.id),
-        d: symbolPath(st.symbolShape, p.px, p.py, p.diameterPt ?? st.symbolSizePt),
+        d: symbolPath(st.symbolShape, p.px, p.py, p.diameterPt ?? st.symbolSizePt, st.symbolBorderWidthPt),
         fill: st.symbolColor,
         fillOpacity: st.symbolFillOpacity < 1 ? st.symbolFillOpacity : undefined,
         stroke: st.symbolBorderColor,
@@ -119,15 +119,18 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
 
   const back = [
     ...backgroundElements(chart, W, H, plot),
-    ...(ya.visible ? gridElements({ dir: 'h', grid: chart.grid, major: y.ticks, minor: y.minorTicks ?? [], showMajor: ya.showGrid, showMinor: ya.showMinorGrid, at: yScale, from: plot.x, to: right }) : []),
+    ...(ya.visible ? gridElements({ dir: 'h', grid: chart.grid, major: y.ticks, minor: y.minorTicks ?? [], showMajor: ya.showGrid, showMinor: ya.showMinorGrid, at: yScale, from: plot.x, to: right, extras: y.extraTicks }) : []),
     // Right gridlines: dashed when the left grid is also drawn, so the two sets stay distinguishable.
     ...(y2 ? gridElements({ dir: 'h', grid: chart.grid, major: y2.scale.ticks, minor: y2.scale.minorTicks ?? [], showMajor: y2a.showGrid, showMinor: y2a.showMinorGrid, at: y2.map, from: plot.x, to: right, fallbackDash: ya.visible && ya.showGrid ? '3 3' : undefined }) : []),
-    ...(xa.visible ? gridElements({ dir: 'v', grid: chart.grid, major: x.ticks, minor: x.minorTicks ?? [], showMajor: xa.showGrid, showMinor: xa.showMinorGrid, at: xScale, from: plot.y, to: bottom }) : []),
+    ...(xa.visible ? gridElements({ dir: 'v', grid: chart.grid, major: x.ticks, minor: x.minorTicks ?? [], showMajor: xa.showGrid, showMinor: xa.showMinorGrid, at: xScale, from: plot.y, to: bottom, extras: x.extraTicks }) : []),
     // The shaded regions are behind everything else that is drawn in the plot.
     ...regionElements(regionsOf(chart, { family: 'xy', model }).placed.filter((r) => !hidden.has(`${r.region.id}:region`)), ya.tickFontSizePt),
     ...referenceLineElements(referenceLinesOf(chart, { family: 'xy', model }).placed.filter((l) => !hidden.has(`${l.line.id}:referenceLine`)), ya.tickFontSizePt),
   ];
   const front = [
+    // The gridlines that added ticks want in front of the data.
+    ...(ya.visible ? extraGridElements({ dir: 'h', grid: chart.grid, extras: y.extraTicks, at: yScale, from: plot.x, to: right }, true) : []),
+    ...(xa.visible ? extraGridElements({ dir: 'v', grid: chart.grid, extras: x.extraTicks, at: xScale, from: plot.y, to: bottom }, true) : []),
     // The comparison brackets stand in front of the data; one whose layer is hidden is not drawn.
     ...xyBracketElements(model.brackets ?? [], hidden),
     ...(model.fit.showParameters ? fitParameterElements(series, plot.x + 16, plot.y + 8, ya.tickFontSizePt, model.fit.level) : []),
@@ -151,7 +154,7 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
         const pattern = linePattern(st);
         keys.push(el('path', [['d', `M${n2(it.x)},${n2(it.y)}H${n2(it.x + w)}`], ['stroke', st.lineColor], ['stroke-width', st.lineWidthPt], ['stroke-opacity', st.lineOpacity < 1 ? st.lineOpacity : undefined], ['stroke-dasharray', pattern.strokeDasharray], ['stroke-linecap', pattern.strokeLinecap], ['fill', 'none']]));
       }
-      if (st.showSymbols) keys.push(el('path', [['d', symbolPath(st.symbolShape, it.x + w / 2, it.y, Math.min(st.symbolSizePt, LEGEND_KEY.height))], ['fill', st.symbolColor], ['fill-opacity', st.symbolFillOpacity < 1 ? st.symbolFillOpacity : undefined], ['stroke', st.symbolBorderColor], ['stroke-width', st.symbolBorderWidthPt], ['stroke-opacity', st.symbolBorderOpacity < 1 ? st.symbolBorderOpacity : undefined]]));
+      if (st.showSymbols) keys.push(el('path', [['d', symbolPath(st.symbolShape, it.x + w / 2, it.y, Math.min(st.symbolSizePt, LEGEND_KEY.height), st.symbolBorderWidthPt)], ['fill', st.symbolColor], ['fill-opacity', st.symbolFillOpacity < 1 ? st.symbolFillOpacity : undefined], ['stroke', st.symbolBorderColor], ['stroke-width', st.symbolBorderWidthPt], ['stroke-opacity', st.symbolBorderOpacity < 1 ? st.symbolBorderOpacity : undefined]]));
       return { groupId: s.groupId, keys };
     }),
   ];

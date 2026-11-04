@@ -18,7 +18,7 @@ interface BracketSeries {
   points: ReadonlyArray<{ x: number; y: number }>;
 }
 
-export interface PlacedXyBracket {
+interface PlacedXyBracket {
   bracket: Bracket;
   /** The X where the two series are joined, and the Y of each one's point there. */
   at: number;

@@ -45,7 +45,7 @@ interface AppApi {
   /** Application preferences (autosave, export, default chart size). */
   settings: Settings;
   updateSettings: (patch: Partial<Settings>) => void;
-  /** Graph preview zoom, 0.25–4 (1 = 100%). */
+  /** Graph preview zoom, 0.25–2 (1 = 100%). */
   zoom: number;
   setZoom: (z: number) => void;
   /** Data table zoom, 0.25–4 (1 = 100%); kept apart from the graph zoom. */
@@ -79,7 +79,7 @@ const initialProject = (): { project: Project; recovered: boolean } => {
   }
   const s = loadSettings();
   const size = { widthPx: s.defaultChartWidthPx, heightPx: s.defaultChartHeightPx };
-  return { project: s.newProjectEmpty ? createEmptyProject(size) : createExampleProject(size), recovered: false };
+  return { project: s.newProjectSample ? createExampleProject(size) : createEmptyProject(size), recovered: false };
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -136,7 +136,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const newProject = useCallback(() => {
     const s = settingsRef.current;
     const size = { widthPx: s.defaultChartWidthPx, heightPx: s.defaultChartHeightPx };
-    replaceProject(s.newProjectEmpty ? createEmptyProject(size) : createExampleProject(size));
+    replaceProject(s.newProjectSample ? createExampleProject(size) : createEmptyProject(size));
     setZoom(1);
     setStatus('New project.');
   }, [replaceProject]);

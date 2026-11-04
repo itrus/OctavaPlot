@@ -116,9 +116,12 @@ describe('individual replicate values over grouped bars', () => {
     expect(buildGroupedModel(chartOf(p), tableOf(p)).series[0].dots.map((d) => d.px)).toEqual(m.series[0].dots.map((d) => d.px));
   });
 
-  it('are off by default, and not drawn for a single value, entered values or contingency counts', () => {
+  it('are on by default for replicates, with no error bars, and not drawn for a single value, entered values or contingency counts', () => {
     const p = projectWith('grouped', 'groupedBar', { layout: { kind: 'replicates', n: 3 } });
-    expect(buildGroupedModel(chartOf(p), tableOf(p)).series[0].dots).toEqual([]);
+    expect(buildGroupedModel(chartOf(p), tableOf(p)).series[0].dots.length).toBeGreaterThan(0);
+    expect(buildGroupedModel(chartOf(p), tableOf(p)).series[0].errorPath).toBe('');
+    const off = patchStyle('c', 'all', { showSymbols: false })(p);
+    expect(buildGroupedModel(chartOf(off), tableOf(off)).series[0].dots).toEqual([]);
     const cases: Array<[TableKind, ChartType, Parameters<typeof addDataTable>[2] | undefined]> = [
       ['grouped', 'groupedBar', undefined],
       ['grouped', 'groupedBar', { layout: { kind: 'summary', format: 'mean-sd' } }],

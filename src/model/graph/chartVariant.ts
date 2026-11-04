@@ -2,7 +2,7 @@ import type { FitModelId } from '../../stats/fit';
 import { newId } from '../ids';
 import { supportsHorizontal } from './chartTypes';
 import { NO_FIT_SETTINGS } from '../options/fitOptions';
-import type { Chart, ChartFit, ChartOrientation, FitSettings, HeatPalette, SurvivalOptions } from '../types';
+import type { Chart, ChartFit, ChartOrientation, DataTable, FitSettings, HeatPalette, SurvivalOptions } from '../types';
 
 /** How a gallery entry sets up the chart it creates, beyond its type. */
 export interface ChartVariant {
@@ -46,7 +46,8 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
   if (variant.orientation === 'horizontal' && supportsHorizontal(chart.type)) next.orientation = 'horizontal';
   if (variant.heatPalette && chart.type === 'heatmap') next.heatmap = { ...chart.heatmap, palette: variant.heatPalette };
   if (variant.survival && (chart.type === 'survival' || chart.type === 'cumulativeEvent')) next.survival = { ...chart.survival, ...variant.survival };
-  if (variant.dotsOnly && chart.type === 'groupedBar') next.layers = chart.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showBars: false, showSymbols: true, showMeanLine: true } } : l));
+  // Individual values are shown, so no error bars to begin with.
+  if (variant.dotsOnly && chart.type === 'groupedBar') next.layers = chart.layers.map((l, i) => (i === 0 ? { ...l, summary: { ...l.summary, spread: 'none' as const }, style: { ...l.style, showBars: false, showSymbols: true, showMeanLine: true } } : l));
   if (variant.forest && chart.type === 'groupedLine') {
     next.orientation = 'horizontal';
     next.layers = chart.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showLines: false, symbolShape: 'square' as const } } : l));
@@ -68,6 +69,18 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
   if (variant.lineConnect !== undefined && isXy(chart)) next.lineConnect = variant.lineConnect;
   if (variant.fit?.band && isXy(chart)) next.fit = { ...chart.fit, band: variant.fit.band };
   return next;
+}
+
+/**
+ * A graph of a table that holds the individual values (replicates) starts by showing them, and without error bars: grouped bars show their
+ * values as dots, and the XY graphs of means show every replicate behind the mean. (A column bar chart starts that way whatever its table, see createChart.)
+ */
+export function showIndividualValues(chart: Chart, table: DataTable): Chart {
+  if (table.layout?.kind !== 'replicates') return chart;
+  const grouped = chart.type === 'groupedBar';
+  const xy = chart.type === 'xyScatter' || chart.type === 'xyLine' || chart.type === 'xyLineSymbols' || chart.type === 'xyBars';
+  if (!grouped && !xy) return chart;
+  return { ...chart, layers: chart.layers.map((l, i) => (i === 0 ? { ...l, summary: { ...l.summary, spread: 'none' as const }, style: { ...l.style, ...(grouped ? { showSymbols: true } : { showRawPoints: true }) } } : l)) };
 }
 
 /** Whether the variant asks for a curve fit that suits the chart. */

@@ -55,10 +55,14 @@ test('a long fit does not block the page: a title edit during the fit is drawn a
   // Pending: the data are drawn, the curve is not, and the export waits for the final fit.
   await expect(page.locator('.chart-surface svg [id$="fitCurve"]')).toHaveCount(0);
   expect(await page.locator('.chart-surface svg [id*="-points-"]').count()).toBeGreaterThan(100);
-  await expect(page.getByRole('button', { name: 'Export' })).toBeDisabled();
+  // The Export page does not export while the curve is pending.
+  await expect(page.getByRole('navigation', { name: 'Graph settings pages' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' }).click();
+  await expect(page.locator('.export-panel').getByRole('button', { name: /^Export ./ })).toBeDisabled();
 
   // A style edit while the fit runs is on the screen within a moment (not after the fit).
-  await page.getByRole('tab', { name: 'Text' }).click();
+  await page.getByRole('tab', { name: 'Graph' }).click();
+  await page.getByRole('tab', { name: 'Titles' }).click();
   const edited = Date.now();
   await page.getByLabel('Chart title', { exact: true }).fill('Edited during the fit');
   await expect(page.locator('.chart-surface svg #chart-title')).toHaveText('Edited during the fit', { timeout: 3000 });
@@ -67,11 +71,12 @@ test('a long fit does not block the page: a title edit during the fit is drawn a
   await expect(page.locator('.chart-surface svg [id$="fitCurve"]').first()).toBeVisible({ timeout: 180_000 });
   const fitMs = Date.now() - opened;
   await expect(fitting).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Export' })).toBeEnabled();
+  await page.getByRole('tab', { name: 'Export' }).click();
+  await expect(page.locator('.export-panel').getByRole('button', { name: /^Export ./ })).toBeEnabled();
   // The edit made during the fit is still there. (This noisy data does not settle, so the fit says so and draws no band: no uncertainty from a fit that is doubtful.)
   await expect(page.locator('.chart-surface svg #chart-title')).toHaveText('Edited during the fit');
   await expect(page.locator('.chart-surface svg [id$="fitBand"]')).toHaveCount(0);
-  await expect(page.locator('.warnings')).toContainText('did not settle');
+  await expect(page.locator('.chart-wrap .warnings')).toContainText('did not settle');
   const worst = await page.evaluate(() => Math.max(...(window as unknown as { __gaps: number[] }).__gaps));
   console.log(`fit worker: title edit drawn after ${editMs} ms; curve after ${fitMs} ms; longest gap between frames ${Math.round(worst)} ms`);
   expect(worst).toBeLessThan(1000);

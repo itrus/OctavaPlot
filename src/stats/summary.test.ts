@@ -10,7 +10,6 @@ import {
   quantileType6,
   statsFor,
   summarize,
-  undefinedStatWarning,
 } from './summary';
 
 describe('summarize', () => {
@@ -60,15 +59,6 @@ describe('summarize', () => {
     const s = summarize([2, 2, 2]);
     expect(s.sd).toBe(0);
     expect(s.sem).toBe(0);
-  });
-});
-
-describe('undefinedStatWarning', () => {
-  it('warns for n = 0 and for n = 1 with an error type, and otherwise not', () => {
-    expect(undefinedStatWarning('A', summarize([]), 'sd')).toMatch(/no valid observations/);
-    expect(undefinedStatWarning('A', summarize([1]), 'sem')).toMatch(/SEM is undefined for n = 1/);
-    expect(undefinedStatWarning('A', summarize([1]), 'none')).toBeNull();
-    expect(undefinedStatWarning('A', summarize([1, 2]), 'sd')).toBeNull();
   });
 });
 

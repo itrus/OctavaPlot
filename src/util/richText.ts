@@ -15,7 +15,7 @@
 
 type TextScript = 'normal' | 'sub' | 'sup';
 
-export interface TextRun {
+interface TextRun {
   text: string;
   script: TextScript;
 }

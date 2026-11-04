@@ -116,3 +116,61 @@ export const AddManyRowsIcon = () => (
     <path d="M11.5 9.5v4M9.5 11.5h4" />
   </Icon>
 );
+
+/** The pages of the inspector rail. */
+export const GraphPageIcon = () => (
+  <Icon>
+    <rect x="2" y="2.5" width="12" height="11" rx="1.2" />
+    <path d="M2 5.6h12M5.4 5.6v7.9" />
+  </Icon>
+);
+
+export const PlotPageIcon = () => (
+  <Icon>
+    <path d="M2.2 2.4v11.2h11.6" />
+    <path d="M5 11V8.4M8 11V5.2M11 11V7" />
+  </Icon>
+);
+
+export const AxesPageIcon = () => (
+  <Icon>
+    <path d="M3 2.4v10.6h10.6" />
+    <path d="M3 5.2h1.6M3 8h1.6M6 13v-1.6M9 13v-1.6M12 13v-1.6" />
+  </Icon>
+);
+
+export const LegendPageIcon = () => (
+  <Icon>
+    <rect x="2.2" y="3" width="3" height="3" rx=".6" />
+    <rect x="2.2" y="9.4" width="3" height="3" rx=".6" />
+    <path d="M7.4 4.5h6.2M7.4 10.9h6.2" />
+  </Icon>
+);
+
+export const AnalysisPageIcon = () => (
+  <Icon>
+    <rect x="2.6" y="1.8" width="10.8" height="12.4" rx="1.2" />
+    <path d="M5 4.6h6M5.2 7.6h1M8 7.6h1M10.8 7.6h.2M5.2 10.4h1M8 10.4h1M10.8 10.4h.2" />
+  </Icon>
+);
+
+export const NotesPageIcon = () => (
+  <Icon>
+    <path d="M2.6 3h10.8v7.2H8.4L5.4 13v-2.8H2.6z" />
+    <path d="M5 5.6h6M5 7.6h3.6" />
+  </Icon>
+);
+
+/** A small chevron for menus. */
+export const ChevronDownIcon = () => (
+  <Icon>
+    <path d="M4 6.2l4 4 4-4" />
+  </Icon>
+);
+
+/** The cross of a close button: larger than the other icons and drawn with a heavier line, so that it is easy to see and to hit. */
+export const CloseIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+  </svg>
+);

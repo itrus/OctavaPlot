@@ -5,7 +5,7 @@ import { layoutOf, summaryFormatInfo, xySeries } from './tableLayout';
  * Offset traces: the series of an XY table drawn one above the other, trace i lifted by i times a step, so that curves that would lie on
  * each other can be read apart. The offset is a presentation, never a change of the table: the chart is built from a shifted copy.
  * Only what is a place on the Y axis moves (a single Y, every replicate, the centre and the limits of a summary): a spread (SD, SEM,
- * %CV, +/- error) and a count do not, and the steps of a vector are lengths, so they stay.
+ * %CV, +/- error) and a count do not so they stay.
  */
 
 /** The columns of a series that move with it. */

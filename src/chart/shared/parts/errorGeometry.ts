@@ -149,7 +149,7 @@ export function xErrorEndValues(x: number, half: number, direction: ErrorDirecti
   return [...(direction !== 'positive' ? [x - half] : []), ...(direction !== 'negative' ? [x + half] : [])];
 }
 
-export interface XErrorBarInput {
+interface XErrorBarInput {
   groupId: Id;
   /** The centre of the bar along X (data units) and its place across, chart pt. */
   x: number;

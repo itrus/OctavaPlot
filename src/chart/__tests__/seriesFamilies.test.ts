@@ -3,7 +3,7 @@ import { CHART_TYPES, chartFamily, chartTypesFor } from '../../model/graph/chart
 import { createChart, createExampleProject } from '../../model/defaults';
 import { xySeries } from '../../model/table/tableLayout';
 import type { ChartType, Project, TableKind } from '../../model/types';
-import { addChart, addDataTable, addGroup, pasteMatrix, removeSeries, renameSeries, replaceTableData, setCells } from '../../state/commands';
+import { addChart, addDataTable, addGroup, pasteMatrix, patchSummary, removeSeries, renameSeries, replaceTableData, setCells } from '../../state/commands';
 import { parseProject, parseProjectWithNotes, stringifyProject } from '../../state/serialize';
 import { buildAnyModel } from '../anyModel';
 import { chartToSvgString } from '../export/export';
@@ -142,7 +142,7 @@ describe('grouped chart', () => {
   });
 
   it('bars of replicates are drawn at the mean with an SD error bar', () => {
-    const p = projectWith('grouped', 'groupedBar', { layout: { kind: 'replicates', n: 3 } });
+    const p = patchSummary('c', 'all', { spread: 'sd' })(projectWith('grouped', 'groupedBar', { layout: { kind: 'replicates', n: 3 } }));
     const m = buildGroupedModel(chartOf(p), tableOf(p));
     expect(xySeries(tableOf(p))[0].columns).toHaveLength(3);
     expect(m.series[0].errorPath).not.toBe('');

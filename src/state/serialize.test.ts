@@ -3,7 +3,7 @@ import { chartToSvgString } from '../chart/export/export';
 import { formatLabelValue } from '../chart/shared/parts/labels';
 import { createExampleProject, DEFAULT_STYLE, DEFAULT_SUMMARY } from '../model/defaults';
 import type { Project } from '../model/types';
-import { AUTOSAVE_KEY, loadAutosave, parseProject, parseProjectWithNotes, saveAutosave, stringifyProject } from './serialize';
+import { AUTOSAVE_KEY, loadAutosave, parseProject, parseProjectWithNotes, stringifyProject } from './serialize';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = Record<string, any>;
@@ -177,10 +177,9 @@ describe('autosave', () => {
   };
   afterEach(() => vi.unstubAllGlobals());
 
-  it('saves under one key and loads the project back', () => {
+  it('loads the project back from its one key', () => {
     const p = createExampleProject();
-    const data = fakeStorage();
-    expect(saveAutosave(p)).toBe(true);
+    const data = fakeStorage({ [AUTOSAVE_KEY]: stringifyProject(p) });
     expect([...data.keys()]).toEqual([AUTOSAVE_KEY]);
     expect(loadAutosave()).toEqual(p);
   });

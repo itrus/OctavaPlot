@@ -37,7 +37,7 @@ test.describe('comparison brackets', () => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await open(page, 'Bracket graph');
-    await page.getByRole('tab', { name: 'Annotations' }).click();
+    await page.getByRole('tab', { name: 'Notes' }).click();
     const lift = page.getByRole('textbox', { name: 'Move up or right', exact: true });
     await expect(lift).toHaveValue('0');
     const before = await barTop(page);
@@ -59,7 +59,7 @@ test.describe('comparison brackets', () => {
 
   test('a number moves the bracket and a label of several lines is drawn line by line', async ({ page }) => {
     await open(page, 'Bracket graph');
-    await page.getByRole('tab', { name: 'Annotations' }).click();
+    await page.getByRole('tab', { name: 'Notes' }).click();
     const lift = page.getByRole('textbox', { name: 'Move up or right', exact: true });
     const before = await barTop(page);
     await lift.fill('40');
@@ -106,13 +106,14 @@ test.describe('the size legend of a bubble chart', () => {
 test.describe('PDF', () => {
   test('is vector: shapes and text in the content, no picture, at the size of the graph', async ({ page }) => {
     await open(page, 'Bracket graph');
-    await page.getByRole('button', { name: 'Export' }).first().click();
-    const dialog = page.getByRole('dialog', { name: /^Export / });
-    await dialog.getByRole('group', { name: 'Export format' }).getByRole('button', { name: 'PDF', exact: true }).click();
+    await expect(page.getByRole('navigation', { name: 'Graph settings pages' })).toBeVisible();
+    await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' }).click();
+    const panel = page.locator('.export-panel');
+    await panel.getByRole('button', { name: /^PDF/ }).click();
     // A PDF has no resolution.
-    await expect(dialog.getByRole('combobox', { name: 'Resolution' })).toBeDisabled();
+    await expect(panel.getByRole('combobox', { name: /Resolution/ })).toHaveCount(0);
     const download = page.waitForEvent('download');
-    await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+    await panel.getByRole('button', { name: 'Export .pdf' }).click();
     const file = await download;
     expect(file.suggestedFilename()).toMatch(/\.pdf$/);
     const bytes = await readFile(await file.path());

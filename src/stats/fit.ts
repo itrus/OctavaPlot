@@ -10,7 +10,7 @@ export const FIT_ALGORITHM_VERSION = 2;
 
 export type FitModelId = 'linear' | 'polynomial' | 'exp_decay' | 'exp_association' | 'exp_two_phase' | 'gaussian_peak' | 'hyperbola' | 'hill_4pl' | 'asymmetric_5pl';
 
-export interface FitModel {
+interface FitModel {
   id: FitModelId;
   label: string;
   /** What the curve is, for the help text and the label of the curve. */
@@ -305,7 +305,7 @@ export interface FitResult {
   halfWidth: (x: number, kind: 'confidence' | 'prediction', level: number) => number | null;
 }
 
-export interface FitOptions {
+interface FitOptions {
   model: FitModelId;
   degree?: number;
   /** Confidence level of the parameter intervals and of the bands (default 0.95). */

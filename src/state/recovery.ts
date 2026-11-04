@@ -11,7 +11,7 @@ import { AUTOSAVE_KEY } from './serialize';
  * this version, so closing the page loses it. "recovery": the recovery copy holds this version. "file": nothing has changed
  * since the project was opened, created or saved as a .oplot file.
  */
-export type Protection = 'memory' | 'recovery' | 'file';
+type Protection = 'memory' | 'recovery' | 'file';
 
 export function protectionOf(s: { changedSinceFile: boolean; recoveryHoldsThis: boolean }): Protection {
   if (!s.changedSinceFile) return 'file';

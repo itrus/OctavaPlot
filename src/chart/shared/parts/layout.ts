@@ -1,7 +1,7 @@
 import { legendKeyWidthPt } from '../../../model/graph/look';
 import { numberStartPt } from '../../../model/graph/axis';
 import { FONT_FAMILY } from '../../../model/defaults';
-import type { AxisConfig, LegendConfig } from '../../../model/types';
+import type { AxisConfig, Chart, LegendConfig } from '../../../model/types';
 import { legendColumns, legendOffset } from '../../../model/graph/legendEntries';
 import { measureText } from './text';
 
@@ -113,6 +113,21 @@ function layoutLegendGrid(widths: number[], columns: number, rowHeight: number):
   const colWidths = Array.from({ length: count }, (_, c) => Math.max(...rows.flatMap((r) => (r[c] === undefined ? [] : [widths[r[c]]]))));
   const colX = colWidths.map((_, c) => colWidths.slice(0, c).reduce((a, w) => a + w + LEGEND_ITEM_GAP, 0));
   return { rows, rowHeight, widths, colX, width: colX[count - 1] + colWidths[count - 1] };
+}
+
+/** The layout of a chart: its font, title, axes and legend are taken from it; `rest` adds what the chart type knows and may override any of them. */
+export function chartLayout(chart: Chart, widthPt: number, heightPt: number, rest: Omit<LayoutInput, 'widthPt' | 'heightPt' | 'title' | 'xAxis' | 'yAxis' | 'legend' | 'fontFamily' | 'titleOffsetPt'> & Partial<LayoutInput>): Layout {
+  return computeLayout({
+    fontFamily: chart.fontFamily,
+    titleOffsetPt: chart.titleOffsetPt,
+    widthPt,
+    heightPt,
+    title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
+    xAxis: chart.xAxis,
+    yAxis: chart.yAxis,
+    legend: chart.legend,
+    ...rest,
+  });
 }
 
 export function computeLayout(input: LayoutInput): Layout {

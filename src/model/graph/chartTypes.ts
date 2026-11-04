@@ -69,7 +69,6 @@ export const CHART_TYPES: readonly ChartTypeInfo[] = [
   { type: 'xyLine', tableKind: 'xy', label: 'Line', description: 'Points joined in table order; no symbols.' },
   { type: 'xyLineSymbols', tableKind: 'xy', label: 'Line with symbols', description: 'Points joined in table order, each marked.' },
   { type: 'xyOffset', tableKind: 'xy', label: 'Offset traces', description: 'The series one above the other, each lifted by a fixed step, with a scale bar in place of the Y axis.' },
-  { type: 'xyVector', tableKind: 'xy', label: 'Vectors', description: 'Arrows from (X, Y) to (X + dX, Y + dY): a table of the layout Y, dX and dY.' },
   { type: 'xyBubble', tableKind: 'xy', label: 'Bubbles', description: 'Symbols whose area follows a second column (Y and size); the largest bubble is the symbol size.' },
   { type: 'xyBars', tableKind: 'xy', label: 'Bars at numeric X', description: 'Bars placed at X values, from a baseline up to Y; several series stand side by side.' },
   { type: 'xySpikes', tableKind: 'xy', label: 'Spikes', description: 'Thin lines from the baseline up to each point.' },
@@ -110,7 +109,6 @@ export function chartFamily(type: ChartType): ChartFamily {
     case 'xyArea':
     case 'xyBars':
     case 'xyBubble':
-    case 'xyVector':
     case 'xyOffset':
       return 'xy';
     case 'groupedBar':

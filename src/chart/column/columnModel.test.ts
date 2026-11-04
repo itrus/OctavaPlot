@@ -267,8 +267,8 @@ describe('summary pipeline (S15)', () => {
     for (const g of m.groups) for (const pt of g.points) expect(pt.cy).toBeCloseTo(m.yScale(pt.value), 9);
   });
 
-  it('default regression: SD error bars, no warnings, centre equals the mean', () => {
-    const m = model(project);
+  it('SD error bars, no warnings, centre equals the mean', () => {
+    const m = model(patchSummary(chartId, 'all', { spread: 'sd' })(project));
     expect(m.warnings).toEqual([]);
     expect(m.groups.every((g) => g.errorBar !== null)).toBe(true);
     m.groups.forEach((g) => expect(g.centreValue).toBeCloseTo(g.summary.mean!, 12));

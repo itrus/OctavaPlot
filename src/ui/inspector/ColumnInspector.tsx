@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { SYMBOL_SHAPE_OPTIONS } from '../../chart/shared/parts/symbols';
+import { useEffect, useMemo } from 'react';
 import { supportsHorizontal } from '../../model/graph/chartTypes';
 import { FILL_PATTERN_OPTIONS, describeBarFillUi } from '../../model/graph/fill';
 import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/graph/summary';
-import type { AxisBinding, Chart, ChartStyle, ChartType, DataTable, Id, SummarySpec } from '../../model/types';
+import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SummarySpec } from '../../model/types';
 import { AXIS_SHORT, AXIS_TAG, bindingOf, bindingSelectState } from '../../chart/shared/axes/axes';
 import { clippedEndpointCount, clippedEndpointMessage } from '../../chart/shared/parts/errorGeometry';
 import { buildColumnModel } from '../../chart/column/columnModel';
@@ -34,7 +33,6 @@ import {
   patchPointStyle,
   patchStyle,
   patchSummary,
-  setChartType,
   patchLook,
 } from '../../state/commands';
 import { DistributionControls } from './sections/DistributionControls';
@@ -47,7 +45,8 @@ import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { DataSetPicker } from './sections/DataSetPicker';
 import { DataSetReset } from './sections/DataSetReset';
 import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
-import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SectionBar, SelectInput, SubHeading, TabBar, TextInput } from './common/controls';
+import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput, SubHeading, TextInput } from './common/controls';
+import { SymbolPicker } from './common/SymbolPicker';
 import {
   backgroundDisplay,
   backgroundNonePatch,
@@ -62,14 +61,18 @@ import {
   widthError,
   widthLabel,
 } from './common/fillRules';
-import { SECTIONS, TABS } from './common/nav';
-import { chartTypesFor } from '../../model/graph/chartTypes';
+import { InspectorShell } from './common/InspectorShell';
+import { ExportPanel } from '../export/ExportPanel';
+import { useInspectorNav } from './common/useInspectorNav';
+import { ChartTypePicker } from './sections/ChartTypePicker';
+import { ExtraTicksControls } from './sections/ExtraTicksControls';
 import { PointLabelControls, SelectedPointBox, SelectedPointsBox, type PointEdit } from './sections/PointLabelControls';
 import { multiPointState, POINT_LABEL_KEYS, pointSelectionState } from './common/pointOverrideUi';
 import { mixedPointStyleKeys } from '../../model/graph/selection/multi';
 import { CalculationOptions,IntervalFields, LineAtField } from './sections/SummaryControls';
 import { displayName } from '../../chart/shared/parts/names';
-import type { AppearanceSection, InspectorTab } from '../../state/inspectorNav';
+import type { InspectorPage } from '../../state/inspectorNav';
+import { SLIDERS } from './common/sliderRanges';
 
 /** The formatting panel of the charts over the columns of a table (bar, dots, mean, box, floating, paired, violin). */
 function DatasetSwatchChip({ style }: { style: ChartStyle }) {
@@ -78,7 +81,7 @@ function DatasetSwatchChip({ style }: { style: ChartStyle }) {
     <span
       className="swatch"
       title={sw.title ?? undefined}
-      style={{ background: sw.background, backgroundImage: sw.backgroundImage ?? undefined, borderColor: sw.borderColor }}
+      style={{ backgroundColor: sw.background, backgroundImage: sw.backgroundImage ?? undefined, borderColor: sw.borderColor }}
     />
   );
 }
@@ -86,18 +89,12 @@ function DatasetSwatchChip({ style }: { style: ChartStyle }) {
 /** The value of the data set selector when several data sets are selected together. */
 const SEVERAL = '__several__';
 
+const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'analysis', 'notes', 'export'];
+
 export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { selection, setSelection, run, setStatus, inspectorNav } = useApp();
-  const [tab, setTab] = useState<InspectorTab>('appearance');
-  const [section, setSection] = useState<AppearanceSection>('style');
-  // A click on a chart element sends the inspector to that element's settings.
-  useEffect(() => {
-    const t = inspectorNav.target;
-    if (inspectorNav.n === 0 || !t) return;
-    setTab(t.tab);
-    if (t.section) setSection(t.section);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inspectorNav.n]);
+  const { selection, setSelection, run, setStatus } = useApp();
+  const nav = useInspectorNav(PAGES);
+  const { shows } = nav;
   const layer = dataLayer(chart);
 
   // Selection scope: a selected data set or point edits that data set; anything else edits all groups.
@@ -232,14 +229,8 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
   const widthName = widthLabel(st.barPattern);
 
   return (
-    <aside className="inspector" aria-label="Graph formatting">
-      <TabBar tabs={TABS} value={tab} onChange={setTab} />
-
-      {/* ------------------------------------------------ Appearance */}
-      {tab === 'appearance' && (
-        <div>
-          <SectionBar sections={SECTIONS} value={section} onChange={setSection} />
-          {section === 'style' && (
+    <InspectorShell nav={nav}>
+          {(shows('style') || shows('analysis')) && (
         <div className="tab-body">
           <div className="dataset-row">
             <span className="dataset-label">Data set:</span>
@@ -268,19 +259,16 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
           </div>
           <DataSetPicker sets={table.groups.map((g) => ({ id: g.id, label: displayName(chart, g.id, g.name) }))} selection={selection} setSelection={setSelection} />
 
+          {shows('style') && (
+            <>
           <GroupBox title="Style">
-            <Field label="Appearance">
-              <SelectInput<ChartType>
-                value={chart.type}
-                options={chartTypesFor('column').map((c) => ({ value: c.type, label: c.label }))}
-                onChange={(t) => run('Change graph type', setChartType(chart.id, t))}
-              />
-            </Field>
             <PaletteField chart={chart} hint="Gives the data sets coordinated colours in order. Per-data-set and all-bar colours below still apply on top." />
           </GroupBox>
           <LayersSection chart={chart} table={table} />
+            </>
+          )}
 
-          {(!isDist || chart.type === 'floating') && (
+          {shows('analysis') && (!isDist || chart.type === 'floating') && (
           <GroupBox title="Summary">
             <LineAtField centre={spec.centre} overridden={ovSum('centre')} onChange={setCentre} />
             <div className="muted small">{summaryCaption(spec, st.showErrorBars)}</div>
@@ -290,8 +278,10 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
           </GroupBox>
           )}
 
-          {isDist && <DistributionControls chart={chart} lineColor={st.lineColor} lineWidthPt={st.lineWidthPt} lineOpacity={st.lineOpacity} onLine={(patch) => setStyle(patch)} />}
+          {shows('analysis') && isDist && <DistributionControls chart={chart} lineColor={st.lineColor} lineWidthPt={st.lineWidthPt} lineOpacity={st.lineOpacity} onLine={(patch) => setStyle(patch)} />}
 
+          {shows('style') && (
+          <>
           <GroupBox title={bodyTitle} checked={st.showBars} onCheckedChange={(v) => setStyle({ showBars: v })} overridden={ov('showBars')}>
             {isPattern ? (
               <Field label="Background" overridden={ov('barPatternBackground')} note={fillRowNote(st)}>
@@ -369,9 +359,9 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               validate={(v) => widthError(v, st.barPatternSpacingPt, st.barPattern)}
               onCommit={(v) => setStyle({ barPatternWidthPt: v })}
             />
-            <NumField label="Opacity" value={st.barOpacity} min={0} max={1} disabled={!st.showBars} overridden={ov('barOpacity')} onCommit={(v) => setStyle({ barOpacity: v })} hint="0 = transparent, 1 = opaque" note={opacityNote(st)} />
-            <NumField label="Border" unit="pt" value={st.barBorderWidthPt} min={0} max={40} disabled={!st.showBars} overridden={ov('barBorderWidthPt')} onCommit={(v) => setStyle({ barBorderWidthPt: v })} />
-            <NumField label="Border opacity" value={st.barBorderOpacity} min={0} max={1} disabled={!st.showBars} overridden={ov('barBorderOpacity')} onCommit={(v) => setStyle({ barBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
+            <NumField {...SLIDERS.fraction} label="Opacity" value={st.barOpacity} min={0} max={1} disabled={!st.showBars} overridden={ov('barOpacity')} onCommit={(v) => setStyle({ barOpacity: v })} hint="0 = transparent, 1 = opaque" note={opacityNote(st)} />
+            <NumField {...SLIDERS.line} label="Border" unit="pt" value={st.barBorderWidthPt} min={0} max={20} disabled={!st.showBars} overridden={ov('barBorderWidthPt')} onCommit={(v) => setStyle({ barBorderWidthPt: v })} />
+            <NumField {...SLIDERS.fraction} label="Border opacity" value={st.barBorderOpacity} min={0} max={1} disabled={!st.showBars} overridden={ov('barBorderOpacity')} onCommit={(v) => setStyle({ barBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
             <Field label="Border color" overridden={ov('barBorderColor')}>
               <ColorInput value={st.barBorderColor} disabled={!st.showBars} onChange={(v) => setStyle({ barBorderColor: v })} />
             </Field>
@@ -387,21 +377,21 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               <ColorInput value={st.symbolColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolColor: v })} />
             </Field>
             <Field label="Shape" overridden={ov('symbolShape')}>
-              <SelectInput value={st.symbolShape} disabled={!st.showSymbols} options={[...SYMBOL_SHAPE_OPTIONS]} onChange={(v) => setStyle({ symbolShape: v })} />
+              <SymbolPicker shape={st.symbolShape} fillOpacity={st.symbolFillOpacity} disabled={!st.showSymbols} onChange={setStyle} />
             </Field>
-            <NumField label="Size" unit="pt" value={st.symbolSizePt} min={2} max={80} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
-            <NumField label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
+            <NumField {...SLIDERS.symbol} label="Size" unit="pt" value={st.symbolSizePt} min={2} max={60} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
+            <NumField {...SLIDERS.fraction} label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
             <Field label="Border color" overridden={ov('symbolBorderColor')}>
               <ColorInput value={st.symbolBorderColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolBorderColor: v })} />
             </Field>
-            <NumField label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={20} disabled={!st.showSymbols} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
-            <NumField label="Border opacity" value={st.symbolBorderOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolBorderOpacity')} onCommit={(v) => setStyle({ symbolBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
+            <NumField {...SLIDERS.line} label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={20} disabled={!st.showSymbols} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
+            <NumField {...SLIDERS.fraction} label="Border opacity" value={st.symbolBorderOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolBorderOpacity')} onCommit={(v) => setStyle({ symbolBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
             {chart.type !== 'mean' && (
               <>
                 <Field label="Horizontal jitter" note={st.showSymbols ? null : 'Jitter moves symbols. Turn on symbols to use it.'}>
                   <Check checked={chart.jitter.enabled} disabled={!st.showSymbols} onChange={(v) => run('Jitter', patchJitter(chart.id, { enabled: v }))} />
                 </Field>
-                <NumField label="Jitter width" value={chart.jitter.widthFraction} min={0} max={1} disabled={!st.showSymbols || !chart.jitter.enabled} hint="Fraction of the group slot; deterministic, never moves values vertically" onCommit={(v) => run('Jitter width', patchJitter(chart.id, { widthFraction: v }), 'jitter:w')} />
+                <NumField {...SLIDERS.fraction} label="Jitter width" value={chart.jitter.widthFraction} min={0} max={1} disabled={!st.showSymbols || !chart.jitter.enabled} hint="Fraction of the group slot; deterministic, never moves values vertically" onCommit={(v) => run('Jitter width', patchJitter(chart.id, { widthFraction: v }), 'jitter:w')} />
                 {chart.type === 'scatter' && (
                   <Field label="Group dots by subject" note="The dots of each subject sit together with a marker at their mean; the mean line and error bar are of the subjects. Name subjects in the data table (Subject…).">
                     <Check checked={chart.jitter.bySubject === true} disabled={!st.showSymbols} onChange={(v) => run('Group dots by subject', patchJitter(chart.id, { bySubject: v }))} />
@@ -445,7 +435,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
                 onChange={(v) => setStyle({ errorCap: v })}
               />
             </Field>
-            <NumField label="Cap width" unit="pt" value={st.errorCapWidthPt} min={0} max={120} disabled={errorOff || st.errorCap === 'none'} overridden={ov('errorCapWidthPt')} onCommit={(v) => setStyle({ errorCapWidthPt: v })} />
+            <NumField {...SLIDERS.cap} label="Cap width" unit="pt" value={st.errorCapWidthPt} min={0} max={40} disabled={errorOff || st.errorCap === 'none'} overridden={ov('errorCapWidthPt')} onCommit={(v) => setStyle({ errorCapWidthPt: v })} />
             <Field label="Dir." overridden={ov('errorDirection')} hint={DIRECTION_HINT}>
               <SelectInput
                 value={st.errorDirection}
@@ -458,10 +448,16 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
                 onChange={(v) => setStyle({ errorDirection: v })}
               />
             </Field>
-            <NumField label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={40} disabled={errorOff} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
-            <NumField label="Opacity" value={st.errorOpacity} min={0} max={1} disabled={errorOff} overridden={ov('errorOpacity')} onCommit={(v) => setStyle({ errorOpacity: v })} hint="0 = transparent, 1 = opaque" />
+            <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={20} disabled={errorOff} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
+            <NumField {...SLIDERS.fraction} label="Opacity" value={st.errorOpacity} min={0} max={1} disabled={errorOff} overridden={ov('errorOpacity')} onCommit={(v) => setStyle({ errorOpacity: v })} hint="0 = transparent, 1 = opaque" />
           </GroupBox>
 
+          </>
+          )}
+          </>
+          )}
+
+          {shows('analysis') && !isDist && (
           <CalculationOptions
             smallSamplePolicy={spec.smallSamplePolicy}
             invalidPolicy={spec.invalidPolicy}
@@ -469,16 +465,18 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             invalidOverridden={ovSum('invalidPolicy')}
             onChange={(patch) => setSummary(patch, 'Change calculation option')}
           />
-          </>
           )}
+
+          {shows('style') && (
+          <>
 
           {(chart.type === 'mean' || chart.type === 'paired') && (
             <GroupBox title={chart.type === 'paired' ? 'Lines joining the rows' : 'Lines'} checked={st.showLines} onCheckedChange={(v) => setStyle({ showLines: v })} overridden={ov('showLines')}>
               <Field label="Color" overridden={ov('lineColor')}>
                 <ColorInput value={st.lineColor} disabled={!st.showLines} onChange={(v) => setStyle({ lineColor: v })} />
               </Field>
-              <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={40} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
-              <NumField label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showLines} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
+              <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={20} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+              <NumField {...SLIDERS.fraction} label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showLines} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
               {chart.type === 'paired' && (
                 <Field label="Join across a missing value" hint="A row with a missing value: join the values either side of it. Nothing is made up for the missing one.">
                   <Check checked={chart.pairs.bridge} disabled={!st.showLines} onChange={(v) => run('Join across missing values', patchLook(chart.id, { pairs: { bridge: v } }))} />
@@ -491,8 +489,8 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               <Field label="Color" overridden={ov('lineColor')}>
                 <ColorInput value={st.lineColor} disabled={!st.showMeanLine} onChange={(v) => setStyle({ lineColor: v })} />
               </Field>
-              <NumField label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={40} disabled={!st.showMeanLine} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
-              <NumField label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showMeanLine} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
+              <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={20} disabled={!st.showMeanLine} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+              <NumField {...SLIDERS.fraction} label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showMeanLine} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
             </GroupBox>
           )}
 
@@ -552,10 +550,12 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               onReset={() => run('Reset point label', clearPointStyle(chart.id, sel.pointId as Id))}
             />
           )}
+          </>
+          )}
         </div>
           )}
 
-          {section === 'axes' && (
+          {shows('axes') && (
             <div>
               <Section title="X axis">
                 <Field label="Show X axis">
@@ -604,6 +604,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
                 <Field label={dual ? 'Left major gridlines' : 'Major gridlines'}>
                   <Check checked={chart.yAxis.showGrid} onChange={(v) => run('Gridlines', patchAxis(chart.id, 'yAxis', { showGrid: v }))} />
                 </Field>
+                <ExtraTicksControls chart={chart} which="yAxis" scale={model.y} name={leftName} />
                 <AxisStyleControls chart={chart} which="yAxis" scale={model.y} name={leftName} canScale canReverse />
               </Section>
           {dual && model.y2 && (
@@ -660,9 +661,10 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             </div>
           )}
 
-          {section === 'text' && <TextSections chart={chart} groups={table.groups} yName={leftName} dual={dual} />}
-          {section === 'frame' && <FrameSection chart={chart} dual={dual} origin="y" />}
-          {section === 'layout' && (
+          {shows('type') && <ChartTypePicker chart={chart} table={table} />}
+          {shows('text') && <TextSections chart={chart} groups={table.groups} yName={leftName} dual={dual} />}
+          {shows('frame') && <FrameSection chart={chart} dual={dual} origin="y" />}
+          {shows('layout') && (
             <div>
               <DimensionsSection chart={chart} />
               {supportsHorizontal(chart.type) && <DirectionSection chart={chart} />}
@@ -670,12 +672,9 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               <ColumnLayoutSection chart={chart} spacing baseline={chart.type === 'bar'} />
             </div>
           )}
-          {section === 'legend' && <LegendSection chart={chart} groups={table.groups} />}
-        </div>
-      )}
-
+          {shows('legend') && <LegendSection chart={chart} groups={table.groups} />}
       {/* ------------------------------------------------ Data sets */}
-      {tab === 'datasets' && (
+      {shows('datasets') && (
         <div className="tab-body">
           <OnThisGraph chart={chart} />
           <DataSetOrder chart={chart} groups={model.groups.map((g) => ({ id: g.groupId, label: g.label }))} />
@@ -688,7 +687,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
                   className={`list-item${selectedGroup?.id === g.groupId ? ' selected' : ''}`}
                   onClick={() => {
                     setSelection({ kind: 'group', groupId: g.groupId });
-                    setTab('appearance');
+                    nav.setPage('plot');
                   }}
                 >
                   <DatasetSwatchChip style={g.style} />
@@ -705,7 +704,8 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
       )}
 
       {/* ------------------------------------------------ Annotations */}
-      {tab === 'annotations' && <AnnotationsTab chart={chart} placer={annotationPlacer({ family: 'column', model }, model.widthPt, model.heightPt)} />}
-    </aside>
+      {shows('annotations') && <AnnotationsTab chart={chart} placer={annotationPlacer({ family: 'column', model }, model.widthPt, model.heightPt)} />}
+      {shows('export') && <ExportPanel chart={chart} table={table} />}
+    </InspectorShell>
   );
 }

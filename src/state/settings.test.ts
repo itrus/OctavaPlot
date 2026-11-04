@@ -8,15 +8,21 @@ describe('sanitizeSettings', () => {
     expect(DEFAULT_SETTINGS.exportFormat).toBe('png');
     expect(DEFAULT_SETTINGS.autosave).toBe(true);
     expect(DEFAULT_SETTINGS.timestampExports).toBe(true);
-    expect(DEFAULT_SETTINGS.newProjectEmpty).toBe(false);
+    expect(DEFAULT_SETTINGS.newProjectSample).toBe(true);
     expect(DEFAULT_SETTINGS.defaultChartWidthPx).toBe(1024);
     expect(DEFAULT_SETTINGS.defaultChartHeightPx).toBe(768);
     expect('exportScale' in DEFAULT_SETTINGS).toBe(false);
   });
 
   it('keeps valid values', () => {
-    const s = sanitizeSettings({ autosave: false, newProjectEmpty: true, timestampExports: false, exportFormat: 'svg', defaultChartWidthPx: 800, defaultChartHeightPx: 500 });
-    expect(s).toEqual({ autosave: false, newProjectEmpty: true, timestampExports: false, exportFormat: 'svg', exportDpi: 600, pngDpi: 96, decimalSeparator: 'auto', defaultChartWidthPx: 800, defaultChartHeightPx: 500 });
+    const s = sanitizeSettings({ autosave: false, newProjectSample: false, timestampExports: false, exportFormat: 'svg', defaultChartWidthPx: 800, defaultChartHeightPx: 500 });
+    expect(s).toEqual({ autosave: false, newProjectSample: false, timestampExports: false, exportFormat: 'svg', exportDpi: 600, pngDpi: 96, decimalSeparator: 'auto', defaultChartWidthPx: 800, defaultChartHeightPx: 500 });
+  });
+
+  it('reads the setting as it was stored before it was turned round', () => {
+    expect(sanitizeSettings({ newProjectEmpty: true }).newProjectSample).toBe(false);
+    expect(sanitizeSettings({ newProjectEmpty: false }).newProjectSample).toBe(true);
+    expect(sanitizeSettings({ newProjectEmpty: true, newProjectSample: true }).newProjectSample).toBe(true);
   });
 
   it('replaces invalid values with defaults and clamps sizes', () => {

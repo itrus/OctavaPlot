@@ -8,7 +8,7 @@ import { chartPx2Pt, n2 } from '../../model/units';
 import { compilePieMarks } from './pieMarks';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { measureText } from '../shared/parts/text';
-import { computeLayout, type Layout, type Rect } from '../shared/parts/layout';
+import { chartLayout, type Layout, type Rect } from '../shared/parts/layout';
 import { formatLabelValue } from '../shared/parts/labels';
 import { displayName } from '../shared/parts/names';
 
@@ -63,8 +63,10 @@ interface PieGeom {
   rInner: number;
   total: number;
   slices: PieSlice[];
-  /** Where the title of the pie goes, under it. */
+  /** Where the title of the pie goes, above it (the baseline of its text). */
   titleAt: { x: number; y: number };
+  /** Where the total goes when it does not fit in the hole (or the pie has none): under the pie. */
+  totalAt: { x: number; y: number };
   totalText: string | null;
   /** The total fits in the hole of a doughnut; otherwise it is written under the pie, like the total of a pie. */
   totalInHole: boolean;
@@ -117,7 +119,7 @@ export function slicePath(cx: number, cy: number, r: number, rInner: number, a0:
 
 /**
  * How many pies go across and down so that each gets the most room. `roomX` and `roomY` are what a pie needs beside
- * and above or below it for its labels, `band` what its title needs under it; the diameter is what is left.
+ * and above or below it for its labels, `band` what its title and total need above and below it; the diameter is what is left.
  */
 export function pieGrid(count: number, width: number, height: number, roomX = 0, roomY = 0, band = 0): { cols: number; rows: number; diameter: number } {
   let best = { cols: 1, rows: Math.max(1, count), diameter: -Infinity };
@@ -152,15 +154,9 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
 
   const hiddenAxis = { ...chart.xAxis, visible: false };
   const legendKeyParts = legendEntries(chart.legend, parts.map((p) => p.g.id));
-  const layout = computeLayout({
-    fontFamily: chart.fontFamily,
-    titleOffsetPt: chart.titleOffsetPt,
-    widthPt: W,
-    heightPt: H,
-    title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
+  const layout = chartLayout(chart, W, H, {
     xAxis: hiddenAxis,
     yAxis: { ...chart.yAxis, visible: false },
-    legend: chart.legend,
     legendLabels: legendKeyParts.map((i) => parts[i].label),
     categoryLabels: [],
     yTickLabels: [],
@@ -170,7 +166,9 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   const plot: Rect = layout.plot;
   const fontPt = chart.xAxis.tickFontSizePt;
   const labelPt = chart.legend.fontSizePt;
-  const titleBand = fontPt * 1.8 + (opts.showTotal ? fontPt * 1.4 : 0);
+  // The title stands above the pie, the total (when it is not in the hole) under it.
+  const titleH = fontPt * 1.8;
+  const titleBand = titleH + (opts.showTotal ? fontPt * 1.4 : 0);
   // Room for the labels round the pie when they are written outside it: the widest one that can occur, and one line.
   const biggest = Math.max(1, ...shown.flatMap((p) => p.g.observations.map((o) => (o.value !== null && Number.isFinite(o.value) ? o.value : 0))));
   const widest = Math.max(0, ...shown.map((p) => measureText(sliceLabelText(opts.labels, p.label, biggest, 1, opts.percentDigits) ?? '', labelPt, false, false, chart.fontFamily)));
@@ -191,7 +189,7 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
     const col = k % cols;
     const line = Math.floor(k / cols);
     const cx = plot.x + cellW * (col + 0.5);
-    const cy = plot.y + cellH * line + (cellH - titleBand) / 2;
+    const cy = plot.y + cellH * line + titleH + (cellH - titleBand) / 2;
     const title = rowTitleAt(table, row).trim() || `Row ${row + 1}`;
     const raw = shown.map((p) => p.g.observations[row]?.value ?? null);
     if (raw.some((v) => v !== null && (!Number.isFinite(v) || v < 0))) {
@@ -232,7 +230,8 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
       rInner,
       total,
       slices,
-      titleAt: { x: cx, y: cy + r + roomY + fontPt * 0.8 },
+      titleAt: { x: cx, y: cy - r - roomY - fontPt * 0.4 },
+      totalAt: { x: cx, y: cy + r + roomY + fontPt * 0.8 },
       totalText,
       totalInHole: totalText !== null && rInner > 0 && measureText(totalText, fontPt, false, false, chart.fontFamily) <= rInner * 1.7,
     });

@@ -76,8 +76,6 @@ export type ReplicateLayout =
   | { kind: 'summary'; format: SummaryFormat }
   /** XY tables: a Y and a size for each point, in two columns (the size of a bubble); one value for each point, no replicates. */
   | { kind: 'sized' }
-  /** XY tables: a Y and a step (dX, dY) for each point, in three columns: an arrow from (X, Y) to (X + dX, Y + dY). */
-  | { kind: 'vector' }
   /** XY tables: a Y, a +/- error of Y and a +/- error of X for each point, in three columns: error bars along both axes, each of its own. */
   | { kind: 'xerror' };
 
@@ -110,7 +108,6 @@ export type ChartType =
   | 'xySpikes'
   | 'xyBars'
   | 'xyBubble'
-  | 'xyVector'
   | 'xyOffset'
   | 'xyArea'
   | 'groupedBar'
@@ -127,7 +124,35 @@ export type ChartType =
   | 'contingencyPercent'
   | 'survival'
   | 'cumulativeEvent';
-export type SymbolShape = 'circle' | 'square' | 'triangle' | 'triangleDown' | 'diamond' | 'hexagon' | 'star' | 'target' | 'plus' | 'cross' | 'asterisk';
+export type SymbolShape =
+  | 'circle'
+  | 'square'
+  | 'triangle'
+  | 'triangleDown'
+  | 'diamond'
+  | 'hexagon'
+  | 'star'
+  | 'target'
+  | 'plus'
+  | 'cross'
+  | 'asterisk'
+  | 'hash'
+  | 'circlePlus'
+  | 'circleCross'
+  | 'squareDot'
+  | 'squarePlus'
+  | 'squareCross'
+  | 'hexagonDot'
+  | 'pentagon'
+  | 'octagon'
+  | 'triangleLeft'
+  | 'triangleRight'
+  | 'halfCircleLeft'
+  | 'halfCircleRight'
+  | 'halfCircleUp'
+  | 'halfCircleDown'
+  | 'verticalBar'
+  | 'horizontalBar';
 export type ErrorDirection = 'both' | 'positive' | 'negative';
 type ErrorCap = 'bar' | 'none';
 type LegendPosition = 'right' | 'bottom' | 'top';
@@ -536,14 +561,40 @@ export interface AxisConfig {
   thousands: boolean;
   prefix: string;
   suffix: string;
-  /** XY charts: ticks added at chosen values, between the automatic ones (a threshold, a cut-off); absent = none. A value that has no place on the axis is not drawn. */
+  /** Ticks added at chosen values, between the automatic ones (a threshold, a cut-off); absent = none. A value that has no place on the axis is not drawn. */
   extraTicks?: ExtraTick[];
 }
 
-/** A tick at a chosen value of an axis; `label` is written instead of the number when it is not empty. */
+/** Which way the mark of an added tick points: the way the axis' own ticks do, or out, in or both ways. */
+export type ExtraTickDirection = 'auto' | 'out' | 'in' | 'both';
+
+/**
+ * A tick at a chosen value of an axis. `label` is written instead of the number when it is not empty. Everything else is optional, and absent
+ * means: the text is shown, the mark is a major tick pointing the way the axis' ticks do and as thick as the axis line, and the gridline
+ * is that of the automatic ticks (drawn while the axis has its gridlines on).
+ */
 export interface ExtraTick {
   value: number;
   label: string;
+  /** false: no text at the tick. */
+  showText?: boolean;
+  /** Degrees the text is turned, clockwise, from -90 to 90. */
+  textAngle?: number;
+  /** Extra distance of the text from the axis, pt. */
+  textOffsetPt?: number;
+  /** false: no mark at the tick. */
+  showTick?: boolean;
+  /** A minor tick is half as long as a major one. */
+  tickSize?: 'major' | 'minor';
+  tickDirection?: ExtraTickDirection;
+  tickWidthPt?: number;
+  /** true: a gridline of its own at the tick, whatever the axis does; false: none. Absent: as the gridlines of the automatic ticks. */
+  showGrid?: boolean;
+  gridWidthPt?: number;
+  gridStyle?: LineStyle;
+  gridColor?: string;
+  /** The gridline is drawn in front of the data, not behind it. */
+  gridOver?: boolean;
 }
 
 /** Shape of the colour key in the legend: a wide rectangle or a square. */

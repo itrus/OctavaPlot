@@ -94,7 +94,7 @@ export function compileColumnMarks(chart: Chart, model: ColumnModel, preview = f
         const dot = (p: PointGeom, d: string) => el('path', [['d', d], ['fill', p.color], ['fill-opacity', p.fillOpacity < 1 ? p.fillOpacity : undefined], ['stroke', p.borderColor], ['stroke-width', p.borderWidth], ['stroke-opacity', p.borderOpacity < 1 ? p.borderOpacity : undefined]], { hit: { kind: 'point', groupId: g.groupId, objectId: p.id } });
         const shapeOf = (p: PointGeom): string => {
           const at = orient.toScreen(p.cx, p.cy);
-          return symbolPath(p.shape, at.x, at.y, p.size);
+          return symbolPath(p.shape, at.x, at.y, p.size, p.borderWidth);
         };
         return cachedFor(g.points, key, () => {
           if (!dense) return g.points.map((p) => named(dot(p, shapeOf(p)), p.id));

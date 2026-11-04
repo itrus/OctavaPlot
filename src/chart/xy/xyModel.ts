@@ -10,11 +10,11 @@ import type { AxisBinding, Chart, ChartStyle, DataTable, FitSettings, Id, LayerS
 import { chartPx2Pt, n2 } from '../../model/units';
 import { summaryOf, type GroupStats } from '../../stats/summary';
 import { buildErrorBar, buildXErrorBar, clippedEndpointCount, errorEndValues, isBadXError, usableXError, xErrorEndValues } from '../shared/parts/errorGeometry';
-import { computeLayout, type Layout } from '../shared/parts/layout';
+import { chartLayout, type Layout } from '../shared/parts/layout';
 import { curveYValues, drawFit, runFit, type FittedCurve } from './fitCurve';
 import { type Scene } from '../shared/scene/scene';
 import { axisMapper, inBreak, onAxis, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
-import { withExtraTicks } from '../shared/axes/extraTicks';
+import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { resolveTimeAxis } from '../shared/axes/timeAxis';
 import type { YAxisScale } from '../shared/axes/scales';
 import { AXIS_NAME, AXIS_TAG, axisNotices, bindingOf } from '../shared/axes/axes';
@@ -206,7 +206,6 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   const xCfg = timeX && chart.xAxis.scale !== 'linear' ? { ...chart.xAxis, scale: 'linear' as const } : chart.xAxis;
   if (timeX && xCfg !== chart.xAxis) warnings.push('A date, time or duration X axis is linear: the log scale is not applied.');
   const isBubble = chart.type === 'xyBubble';
-  const isVector = chart.type === 'xyVector';
   const fromBaseline = chart.type === 'xySpikes' || chart.type === 'xyArea' || chart.type === 'xyBars';
   const isBars = chart.type === 'xyBars';
   const xs = table.groups[0].observations.map((o) => o.value);
@@ -215,10 +214,10 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   // 1. Per series and row: the centre and, where there is a spread, its stats.
   const raw = xySeries(table).map((s, i) => {
     const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? i });
-    // A binding stored for a type that cannot use the right axis (offset traces, vectors) is kept in the project and ignored here.
+    // A binding stored for a type that cannot use the right axis (offset traces) is kept in the project and ignored here.
     const binding: AxisBinding = canBind ? bindingOf(style) : 'primary';
     const spec = resolveSummary(layer, s.id);
-    const pts: Array<{ id: Id; row: number; x: number; y: number; stats: GroupStats | null; size: number | null; dx: number | null; dy: number | null; xErr: number | null }> = [];
+    const pts: Array<{ id: Id; row: number; x: number; y: number; stats: GroupStats | null; size: number | null; xErr: number | null }> = [];
     // What a curve is fitted to: every replicate on its own, or the single Y or entered mean of each row.
     const obs: Array<{ x: number; y: number }> = [];
     // Each replicate as it is, for the individual-values layer.
@@ -238,10 +237,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
       let stats: GroupStats | null = null;
       // A sized table: the second column of the series is the size of the bubble (kept apart from Y, and no replicate).
       const size = layout.kind === 'sized' ? values[1] : null;
-      // A vector table: the step of the arrow that starts at (X, Y), in the second and third column of the series.
-      const dx = layout.kind === 'vector' ? values[1] : null;
-      const dy = layout.kind === 'vector' ? values[2] : null;
-      if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'vector') y = values[0];
+      if (layout.kind === 'single' || layout.kind === 'sized') y = values[0];
       else if (layout.kind === 'xerror') {
         // The Y and its error are a supplied mean with a +/- error (an error that is negative is refused as for any supplied one); the error of X is the third column.
         const supplied = suppliedStats('mean-pm', values.slice(0, 2));
@@ -281,7 +277,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
       if (layout.kind !== 'replicates') obs.push({ x, y });
       const xErr = layout.kind === 'xerror' ? values[2] : null;
       if (isBadXError(xErr)) badXError++;
-      pts.push({ id: s.columns[0].observations[row].id, row, x, y, stats, size, dx, dy, xErr: usableXError(xErr) });
+      pts.push({ id: s.columns[0].observations[row].id, row, x, y, stats, size, xErr: usableXError(xErr) });
     }
     if (noError > 0) warnings.push(`${s.name}: ${noError} row${noError === 1 ? ' has' : 's have'} a mean but no usable error, so no error bar is drawn there.`);
     if (badXError > 0) warnings.push(`${s.name}: ${badXError} row${badXError === 1 ? ' has' : 's have'} an error of X that is negative or not a number, so no error bar along X is drawn there.`);
@@ -299,13 +295,9 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   // The space between bars is a percent of a bar's width, as for the columns: the bars fill the slot less that space.
   const barsWidth = slot / (1 + (chart.bars.gapPct ?? AUTO_BAR_GAP_PCT) / 100);
   const barWidth = barsWidth / Math.max(1, raw.length);
-  // Vectors: the end of an arrow (X + dX, Y + dY), when both steps are numbers and not both 0; the axes hold the ends as well as the starts.
-  const tipOf = (p: { x: number; y: number; dx: number | null; dy: number | null }): { x: number; y: number } | null =>
-    p.dx !== null && p.dy !== null && Number.isFinite(p.dx) && Number.isFinite(p.dy) && (p.dx !== 0 || p.dy !== 0) ? { x: p.x + p.dx, y: p.y + p.dy } : null;
   const allX = raw.flatMap((r) => [
     ...(counts('points', r.s.id) ? r.pts.map((p) => p.x) : []),
     ...(counts('rawPoints', r.s.id) ? r.rawObs.map((o) => o.x) : []),
-    ...(isVector && counts('line', r.s.id) ? r.pts.flatMap((p) => { const t = tipOf(p); return t ? [t.x] : []; }) : []),
     // The ends of the bars along X: part of the range while the bars are shown and the layer counts.
     ...(layout.kind === 'xerror' && counts('xErrorBars', r.s.id) && r.style.showErrorBars ? r.pts.flatMap((p) => (p.xErr !== null ? xErrorEndValues(p.x, p.xErr, r.style.errorDirection) : [])) : []),
     ...(isBars && counts('bars', r.s.id) ? r.pts.flatMap((p) => [p.x - barsWidth / 2, p.x + barsWidth / 2]) : []),
@@ -314,7 +306,6 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   const yValuesOf = (r: (typeof raw)[number]): number[] => [
     ...(counts('points', r.s.id) ? r.pts.map((p) => p.y) : []),
     ...(counts('errorBars', r.s.id) ? r.pts.flatMap((p) => (p.stats ? errorEndValues(p.stats, r.style.showErrorBars, r.style.errorDirection) : [])) : []),
-    ...(isVector && counts('line', r.s.id) ? r.pts.flatMap((p) => { const t = tipOf(p); return t ? [t.y] : []; }) : []),
     ...(counts('fitCurve', r.s.id) ? curveYValues(r.fitRun) : []),
     ...(counts('rawPoints', r.s.id) ? r.rawObs.map((o) => o.y) : []),
   ];
@@ -355,9 +346,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   const axisOf = (which: 'x' | 'y', limits?: { min: number; max: number }): YAxisScale => {
     const cfg = which === 'x' ? xCfg : chart.yAxis;
     const resolved = which === 'x' && timeX ? resolveTimeAxis({ ...axisInput.x, ...limits }, cfg, timeX) : resolveAxis({ ...axisInput[which], ...limits }, cfg);
-    const added = withExtraTicks(resolved, cfg.extraTicks);
-    if (added.skipped > 0) warnings.push(`${added.skipped} extra tick${added.skipped === 1 ? ' is' : 's are'} on the ${which.toUpperCase()} axis at a value outside its range, in an omitted range or at or below 0 on a log axis, and ${added.skipped === 1 ? 'is' : 'are'} not drawn.`);
-    return added.axis;
+    return withExtraTicksNoted(resolved, cfg, which.toUpperCase(), warnings);
   };
   let xAxis = axisOf('x');
   let yAxis = axisOf('y');
@@ -389,15 +378,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
 
   // 3. Layout (title, axis titles, legend) with no category labels: the X axis carries numbers.
   const legendSeries = legendEntries(chart.legend, raw.map((r) => r.s.id));
-  const layoutFor = (ya: YAxisScale) => computeLayout({
-    fontFamily: chart.fontFamily,
-    titleOffsetPt: chart.titleOffsetPt,
-    widthPt: W,
-    heightPt: H,
-    title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
-    xAxis: chart.xAxis,
-    yAxis: chart.yAxis,
-    legend: chart.legend,
+  const layoutFor = (ya: YAxisScale) => chartLayout(chart, W, H, {
     legendLabels: legendSeries.map((i) => raw[i].label + AXIS_TAG[raw[i].binding]),
     categoryLabels: [],
     // Offset traces: a row of its own under the X axis title for the sentence that tells the offset (inside the plot it could lie on a trace).
@@ -434,7 +415,6 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   // the symbol size of its series. A point with no size (empty, 0 or less, not a number) is not a bubble and is not drawn, and counted.
   const sized = layout.kind === 'sized';
   let noSize = 0;
-  if (isVector && layout.kind !== 'vector') warnings.push('Vectors need a step for each point: make the data table with the layout "Y, dX and dY" (New Table, XY).');
   if (isBubble && !sized) warnings.push('Bubbles need a size for each point: make the data table with the layout "Y and size" (New Table, XY). Until then every bubble has the symbol size.');
 
   // 4. Geometry.
@@ -445,10 +425,6 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   let inGap = 0;
   let gapErrorBars = 0;
   let gapXErrorBars = 0;
-  // Vectors that cannot be drawn: a step missing, no length, or an end where the axis has no place.
-  let noComponent = 0;
-  let noLength = 0;
-  let tipOut = 0;
   const series: XySeries[] = raw.map((r, si) => {
     // The axis of the series: all of its geometry (points, lines, bars, error bars, the curve fit) is made by this one.
     const [yA, yS] = r.binding === 'secondary' && y2Axis && y2Scale ? [y2Axis, y2Scale] : [yAxis, yScale];
@@ -458,7 +434,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     const drawn = r.pts.filter((p) => onAxis(xAxis, p.x) && onAxis(yA, p.y) && sizedOk(p));
     offAxis += r.pts.length - drawn.length;
     // A value inside a gap of a broken axis has no place on it: it is not drawn, and the line is cut at the gap's edge.
-    const points: XyPoint[] = drawn.filter((p) => !inBreak(xAxis, p.x) && !inBreak(yA, p.y)).map(({ size, dx: _dx, dy: _dy, xErr: _xErr, ...p }) => ({ ...p, px: xScale(p.x), py: yS(p.y), ...(isBubble && sized && validSize(size) && largest > 0 ? { diameterPt: r.style.symbolSizePt * Math.sqrt(size / largest) } : {}) }));
+    const points: XyPoint[] = drawn.filter((p) => !inBreak(xAxis, p.x) && !inBreak(yA, p.y)).map(({ size, xErr: _xErr, ...p }) => ({ ...p, px: xScale(p.x), py: yS(p.y), ...(isBubble && sized && validSize(size) && largest > 0 ? { diameterPt: r.style.symbolSizePt * Math.sqrt(size / largest) } : {}) }));
     // Individual values are placed like the points: none where a log axis or a break gives them no position.
     const rawOnAxis = r.rawObs.filter((o) => onAxis(xAxis, o.x) && onAxis(yA, o.y));
     const rawPoints: XyRawPoint[] = rawOnAxis.filter((o) => !inBreak(xAxis, o.x) && !inBreak(yA, o.y)).map((o) => ({ ...o, px: xScale(o.x), py: yS(o.y) }));
@@ -499,34 +475,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     // The baseline: 0, or the nearest edge of the axis when 0 is out of range (a log axis has no 0).
     const baseY = yS(Math.min(Math.max(0, yA.domain[0]), yA.domain[1]));
     // A spike is a stem from the baseline to its point; an area is closed down to the baseline at both ends of each run.
-    // Vectors: the shaft from (X, Y) to its end and an open head of two strokes, one path; the head is 4 line widths long (at least 5 pt, at most half the shaft).
-    let arrowPath = '';
-    if (isVector) {
-      for (const p of drawn) {
-        if (inBreak(xAxis, p.x) || inBreak(yA, p.y)) continue;
-        if (p.dx === null || p.dy === null || !Number.isFinite(p.dx) || !Number.isFinite(p.dy)) {
-          noComponent++;
-          continue;
-        }
-        const tip = tipOf(p);
-        if (!tip) {
-          noLength++;
-          continue;
-        }
-        if (!onAxis(xAxis, tip.x) || !onAxis(yA, tip.y) || inBreak(xAxis, tip.x) || inBreak(yA, tip.y)) {
-          tipOut++;
-          continue;
-        }
-        const [x0, y0, x1, y1] = [xScale(p.x), yS(p.y), xScale(tip.x), yS(tip.y)];
-        const length = Math.hypot(x1 - x0, y1 - y0);
-        if (!(length > 0)) continue;
-        const head = Math.min(Math.max(5, 4 * r.style.lineWidthPt), length * 0.5);
-        const direction = Math.atan2(y1 - y0, x1 - x0);
-        const wing = (side: number) => `${n2(x1 - head * Math.cos(direction + side * 0.45))},${n2(y1 - head * Math.sin(direction + side * 0.45))}`;
-        arrowPath += `M${n2(x0)},${n2(y0)}L${n2(x1)},${n2(y1)}M${wing(1)}L${n2(x1)},${n2(y1)}L${wing(-1)}`;
-      }
-    }
-    const d = isVector ? arrowPath : chart.type === 'xySpikes' ? points.map((p) => `M${n2(p.px)},${n2(baseY)}L${n2(p.px)},${n2(p.py)}`).join('') : outline;
+    const d = chart.type === 'xySpikes' ? points.map((p) => `M${n2(p.px)},${n2(baseY)}L${n2(p.px)},${n2(p.py)}`).join('') : outline;
     const areaPath = chart.type === 'xyArea'
       ? runs.filter((part) => part.length > 0).map((part) => `${part.map((q, i) => `${i === 0 ? `M${n2(xScale(q.x))},${n2(baseY)}L` : 'L'}${n2(xScale(q.x))},${n2(yS(q.y))}`).join('')}L${n2(xScale(part[part.length - 1].x))},${n2(baseY)}Z`).join('')
       : undefined;
@@ -580,9 +529,6 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
       : undefined;
     return { groupId: r.s.id, label: r.label, style: r.style, axis: r.binding, points, ...(bars ? { bars } : {}), linePath: d, ...(areaPath !== undefined ? { areaPath } : {}), errorPath, ...(layout.kind === 'xerror' ? { xErrorPath } : {}), errorMeaning, skipped: r.skipped, ...(r.style.showRawPoints ? { rawPoints } : {}), fit: fitted, fitCurveLook: layerLook(chart, `${r.s.id}:fitCurve`, r.style), fitBandLook: layerLook(chart, `${r.s.id}:fitBand`, r.style) };
   });
-  if (noComponent > 0) warnings.push(`${noComponent} vector${noComponent === 1 ? ' lacks' : 's lack'} dX or dY and ${noComponent === 1 ? 'is' : 'are'} not drawn.`);
-  if (noLength > 0) warnings.push(`${noLength} vector${noLength === 1 ? ' has' : 's have'} no length (dX and dY are 0) and ${noLength === 1 ? 'is' : 'are'} not drawn.`);
-  if (tipOut > 0) warnings.push(`${tipOut} vector${tipOut === 1 ? ' ends' : 's end'} where the axis has no place (a log axis or an omitted range) and ${tipOut === 1 ? 'is' : 'are'} not drawn.`);
   if (noSize > 0) warnings.push(`${noSize} point${noSize === 1 ? ' has' : 's have'} no size above 0 and ${noSize === 1 ? 'is' : 'are'} not drawn as ${noSize === 1 ? 'a bubble' : 'bubbles'}.`);
   if (offAxis > 0) warnings.push(`${offAxis} point${offAxis === 1 ? ' has' : 's have'} a value of 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
   if (inGap > 0) warnings.push(`${inGap} value${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);

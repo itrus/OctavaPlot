@@ -1,4 +1,5 @@
 import { rowTitleAt } from '../../model/table/rows';
+import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { isGroupedChartType, supportsHorizontal } from '../../model/graph/chartTypes';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { legendEntries, withoutRepeats } from '../../model/graph/legendEntries';
@@ -15,7 +16,7 @@ import { boxSummary, densityProfile, normaliseProfiles, quantile6, sortedFinite,
 import { buildBox, buildViolin, type DistGeom } from '../shared/parts/distributionGeom';
 import { boxNeeds, unplacedMarkNote } from '../shared/parts/distributionNotes';
 import { buildErrorBar, clippedEndpointCount, errorEndValues, rangeValuesFor } from '../shared/parts/errorGeometry';
-import { computeLayout, type Layout } from '../shared/parts/layout';
+import { chartLayout, type Layout } from '../shared/parts/layout';
 import { barLabelText, insideLabelText, placeBarLabel, placeInsideBarLabel, type BarLabelGeom, type InsideLabelGeom } from '../shared/parts/barLabels';
 import { axisMapper, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
@@ -203,7 +204,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         if (v !== null && v < 0) negative++;
         value = v === null || v < 0 ? null : v;
         if (value !== null && arrangement === 'percent') value = rowTotals[ci] > 0 ? (value / rowTotals[ci]) * 100 : null;
-      } else if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'vector' || layout.kind === 'xerror') value = values[0];
+      } else if (layout.kind === 'single' || layout.kind === 'sized' || layout.kind === 'xerror') value = values[0];
       else if (layout.kind === 'replicates') {
         stats = summaryOf(values, spec);
         value = stats.centre;
@@ -310,7 +311,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   for (const sk of placement.skipped) warnings.push(`Bracket "${sk.bracket.label.trim() || 'no label'}" is not drawn: ${sk.reason}.`);
   // A bracket kept out of the range (see rangeContribution) is still placed, but the axis does not grow to show it: the plot clips it.
   const bracketTops = placement.placed.filter((p) => inRange('bracket', p.bracket.id)).map((p) => p.top);
-  const yAxis = resolveAxis({
+  const yBase = resolveAxis({
     values: arrangement === 'percent' ? [0, 100] : [...allY, ...bracketTops],
     includeZero: axisCfg.scale === 'linear' && !isDist && (!asLines || allY.every((v) => v >= 0)),
     min: chart.yAxis.min ?? (arrangement === 'percent' ? 0 : null),
@@ -318,6 +319,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     majorInterval: chart.yAxis.majorInterval,
     tickCountHint,
   }, axisCfg);
+  const yAxis = withExtraTicksNoted(yBase, chart.yAxis, 'Y', warnings);
   warnings.push(...yAxis.warnings);
 
   // 4. Layout with the category labels along the X axis.
@@ -327,16 +329,10 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const labels = categoryRows.map((r) => rowTitleAt(table, r).trim() || `Row ${r + 1}`);
   // Separated: the labels along the axis are those of every column, so the layout can tell when they have to turn.
   const axisLabels = separated ? raw.flatMap(() => labels) : labels;
-  const lay = computeLayout({
-    fontFamily: chart.fontFamily,
-    titleOffsetPt: chart.titleOffsetPt,
-    widthPt: W,
-    heightPt: H,
-    title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
+  const lay = chartLayout(chart, W, H, {
     // Horizontal: the numbers run along the bottom (the value axis settings) and the category names down the left.
     xAxis: horizontal ? chart.yAxis : chart.xAxis,
     yAxis: horizontal ? chart.xAxis : chart.yAxis,
-    legend: chart.legend,
     legendLabels: legendSeries.map((i) => raw[i].label),
     categoryLabels: horizontal ? [] : axisLabels,
     yTickLabels: horizontal ? labels : yAxis.ticks.map(yAxis.tickLabel),

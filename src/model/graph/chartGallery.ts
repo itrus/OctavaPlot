@@ -38,7 +38,6 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('xy.bars', 'Bars at numeric X', 'Bars placed at X values, with a baseline.', 'xyBars', 'xy.bars'),
         item('xy.area', 'Area under the curve', 'A filled area below, above or between curves.', 'xyArea', 'xy.area'),
         item('xy.spikes', 'Spikes', 'Thin lines from the baseline up to each point.', 'xySpikes', 'xy.spikes'),
-        item('xy.vector', 'Vectors', 'Arrows from (X, Y) to (X + dX, Y + dY): make the table with "Y, dX and dY"; from the origin is X = 0, Y = 0.', 'xyVector', 'xy.vector'),
         item('xy.bubble', 'Bubbles', 'Symbols whose area follows a second column: make the table with "Y and size".', 'xyBubble', 'xy.bubble', { bubbles: true }),
         item('xy.trajectory', 'Repeated measures', 'One line per subject, for example before and after: name the subjects in the table (Subject…).', 'xyLineSymbols', 'xy.trajectory', { lineConnect: 'subject' }),
         item('xy.offset', 'Offset traces', 'Several series stacked with a fixed offset and a scale bar.', 'xyOffset', 'xy.offset_traces', { offsetTraces: true }),

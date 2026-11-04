@@ -1,4 +1,5 @@
 import { layersOf, type LayerKind } from '../../model/graph/layers';
+import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { legendEntries } from '../../model/graph/legendEntries';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
@@ -7,7 +8,7 @@ import { chartPx2Pt, n2 } from '../../model/units';
 import { autoBinWidth, binEdges, binHeights, countBins, ecdfSteps } from '../../stats/histogram';
 import { sortedFinite } from '../../stats/distribution';
 import { axisMapper, resolveAxis, stepPathThroughBreaks } from '../shared/axes/axisScale';
-import { computeLayout } from '../shared/parts/layout';
+import { chartLayout } from '../shared/parts/layout';
 import type { XyModel, XyPoint, XySeries } from '../xy/xyModel';
 import { displayName } from '../shared/parts/names';
 import { attachLazyScene } from '../xy/xyScene';
@@ -56,26 +57,20 @@ export function buildHistogramModel(chart: Chart, table: DataTable): XyModel {
     ? bins.flatMap((b, i) => (inRange('bars', data[i].g.id) ? b?.heights ?? [] : []))
     : ecdf.flatMap((e, i) => (e && e.steps.length && stepsIn[i] ? [startLevel(e.n), ...e.steps.map((s) => s.f * scaleOf(e.n))] : []));
   const linear = { scale: 'linear' as const, reverse: false };
-  const xAxis = resolveAxis(
+  const xBase = resolveAxis(
     { values: allX, includeZero: false, min: chart.xAxis.min ?? (histogram && edges.length > 1 ? edges[0] : null), max: chart.xAxis.max ?? (histogram && edges.length > 1 ? edges[edges.length - 1] : null), majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) },
     { ...chart.xAxis, ...linear },
   );
-  const yAxis = resolveAxis(
+  const yBase = resolveAxis(
     { values: allY.length ? [0, ...allY] : [], includeZero: true, min: chart.yAxis.min, max: chart.yAxis.max, majorInterval: chart.yAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(H / 100))) },
     { ...chart.yAxis, ...linear },
   );
+  const xAxis = withExtraTicksNoted(xBase, chart.xAxis, 'X', warnings);
+  const yAxis = withExtraTicksNoted(yBase, chart.yAxis, 'Y', warnings);
   warnings.push(...xAxis.warnings.map((w) => w.replace(/^Y /, 'X ').replace(/ Y limit/, ' X limit')), ...yAxis.warnings);
 
   const legendSeries = legendEntries(chart.legend, data.map((d) => d.g.id));
-  const layout = computeLayout({
-    fontFamily: chart.fontFamily,
-    titleOffsetPt: chart.titleOffsetPt,
-    widthPt: W,
-    heightPt: H,
-    title: chart.showTitle ? { text: chart.title, fontSizePt: chart.titleFontSizePt } : null,
-    xAxis: chart.xAxis,
-    yAxis: chart.yAxis,
-    legend: chart.legend,
+  const layout = chartLayout(chart, W, H, {
     legendLabels: legendSeries.map((i) => data[i].label),
     categoryLabels: [],
     yTickLabels: yAxis.ticks.map(yAxis.tickLabel),

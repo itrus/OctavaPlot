@@ -44,7 +44,7 @@ export function compilePieMarks(chart: Chart, model: PieModel): SceneElement[] {
               ? [
                   pie.totalInHole
                     ? el('text', [['x', n2(pie.cx)], ['y', n2(pie.cy)], ['dy', '0.35em'], ['text-anchor', 'middle'], ['font-size', fontPt], ['fill', chart.textColor]], { text: pie.totalText, id: svgId(layer.id, name, 'total') })
-                    : el('text', [['x', n2(pie.titleAt.x)], ['y', n2(pie.titleAt.y + fontPt * 1.3)], ['text-anchor', 'middle'], ['font-size', fontPt], ['fill', chart.textColor]], { text: pie.totalText, id: svgId(layer.id, name, 'total') }),
+                    : el('text', [['x', n2(pie.totalAt.x)], ['y', n2(pie.totalAt.y)], ['text-anchor', 'middle'], ['font-size', fontPt], ['fill', chart.textColor]], { text: pie.totalText, id: svgId(layer.id, name, 'total') }),
                 ]
               : []),
           ];

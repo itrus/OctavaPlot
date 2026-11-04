@@ -84,7 +84,8 @@ test('editing the title, a colour and a stroke of a graph of 100 000 observation
   await page.locator('.nav-item').filter({ hasText: /BAR$/ }).first().click();
   await expect(page.locator('.chart-surface svg')).toBeVisible({ timeout: 240_000 });
 
-  await page.getByRole('tab', { name: 'Text' }).click();
+  await page.getByRole('tab', { name: 'Graph' }).click();
+  await page.getByRole('tab', { name: 'Titles' }).click();
   const title = page.getByLabel('Chart title', { exact: true });
   const t = await timeToUpdate(page, () => title.fill('A different title'));
   note('edit the title: until the drawing changes', t.commit, 'under 50');
@@ -94,7 +95,7 @@ test('editing the title, a colour and a stroke of a graph of 100 000 observation
   const again = await timeToUpdate(page, () => title.fill('A third title'));
   note('edit the title once the first paint has settled: until the next frame', again.frame, 'under 50');
 
-  await page.getByRole('tab', { name: 'Style' }).click();
+  await page.getByRole('tab', { name: 'Plot' }).click();
   const border = page.getByRole('textbox', { name: 'Border', exact: true }).first();
   const s = await timeToUpdate(page, () => border.fill('3'));
   note('edit a stroke width: until the next frame', s.frame, 'under 50');
@@ -129,11 +130,12 @@ test('exporting a normal figure as PNG', async ({ page }) => {
   await openApp(page);
   await page.locator('.nav-item').filter({ hasText: /BAR$/ }).first().click();
   await expect(page.locator('.chart-surface svg')).toBeVisible({ timeout: 240_000 });
-  await page.getByRole('button', { name: 'Export' }).first().click();
-  const dialog = page.getByRole('dialog', { name: /^Export / });
+  await expect(page.getByRole('navigation', { name: 'Graph settings pages' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' }).click();
+  const panel = page.locator('.export-panel');
   const wait = page.waitForEvent('download');
   const t0 = Date.now();
-  await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+  await panel.getByRole('button', { name: 'Export .png' }).click();
   await wait;
   note('export a normal figure as PNG: until the file is made', Date.now() - t0, 'under 2000');
 });
@@ -149,7 +151,8 @@ for (const [label, json] of [
     await expect(page.getByLabel('Project name')).toHaveValue('perf');
     await page.locator('.nav-item').filter({ hasText: '▥' }).first().click();
     await expect(page.locator('.chart-surface svg')).toBeVisible({ timeout: 240_000 });
-    await page.getByRole('tab', { name: 'Text' }).click();
+    await page.getByRole('tab', { name: 'Graph' }).click();
+  await page.getByRole('tab', { name: 'Titles' }).click();
     const t = await timeToUpdate(page, () => page.getByLabel('Chart title', { exact: true }).fill('A different title'));
     note(`edit the title of ${label}: until the next frame`, t.frame, 'under 50');
   });

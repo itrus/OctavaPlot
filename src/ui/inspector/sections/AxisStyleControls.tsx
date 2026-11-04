@@ -6,6 +6,7 @@ import { patchAxis, type AxisKey } from '../../../state/commands';
 import { Check, Field, NumField, Section, SelectInput, TextInput } from '../common/controls';
 import { TimeField } from '../common/TimeField';
 import type { TimeColumn } from '../../../util/timeColumn';
+import { SLIDERS } from '../common/sliderRanges';
 
 const DECIMALS = ['auto', '0', '1', '2', '3', '4', '5', '6'] as const;
 
@@ -123,7 +124,7 @@ export function TickFields({ chart, which, name }: { chart: Chart; which: AxisKe
       <Field label="Tick direction">
         <SelectInput<TickDirection> value={axis.tickDirection} options={TICK_DIRECTIONS.map((d) => ({ value: d.value, label: d.label }))} onChange={(v) => set('tick direction', { tickDirection: v })} />
       </Field>
-      <NumField
+      <NumField {...SLIDERS.tick}
         label="Tick length"
         unit="pt"
         value={axis.tickLengthPt}

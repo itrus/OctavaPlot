@@ -17,8 +17,8 @@ export interface Settings {
   autosave: boolean;
   /** Add the date and time (yymmdd_HHMM) to the names of exported files. */
   timestampExports: boolean;
-  /** New projects start with blank tables instead of the example data. */
-  newProjectEmpty: boolean;
+  /** New projects, and the New Data Table dialog, start with sample data (off: blank tables). */
+  newProjectSample: boolean;
   exportFormat: ExportFormat;
   /** Resolution of the PNG of a layout page, in dots per inch (A4 at 600 dpi is 4960 × 7016 px). */
   exportDpi: ExportDpi;
@@ -34,7 +34,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   autosave: true,
   timestampExports: true,
-  newProjectEmpty: false,
+  newProjectSample: true,
   exportFormat: 'png',
   exportDpi: 600,
   pngDpi: 96,
@@ -61,7 +61,8 @@ export function sanitizeSettings(raw: unknown): Settings {
   return {
     autosave: typeof r.autosave === 'boolean' ? r.autosave : d.autosave,
     timestampExports: typeof r.timestampExports === 'boolean' ? r.timestampExports : d.timestampExports,
-    newProjectEmpty: typeof r.newProjectEmpty === 'boolean' ? r.newProjectEmpty : d.newProjectEmpty,
+    // Stored before the setting was turned round (newProjectEmpty): the opposite.
+    newProjectSample: typeof r.newProjectSample === 'boolean' ? r.newProjectSample : typeof r.newProjectEmpty === 'boolean' ? !r.newProjectEmpty : d.newProjectSample,
     exportFormat: r.exportFormat === 'svg' || r.exportFormat === 'png' || r.exportFormat === 'pdf' ? r.exportFormat : d.exportFormat,
     exportDpi: EXPORT_DPI_CHOICES.find((v) => v === r.exportDpi) ?? d.exportDpi,
     pngDpi: PNG_DPI_CHOICES.find((v) => v === r.pngDpi) ?? d.pngDpi,

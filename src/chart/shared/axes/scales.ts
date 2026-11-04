@@ -1,4 +1,5 @@
 import { format, precisionFixed, ticks as d3Ticks } from 'd3';
+import type { ExtraTick } from '../../../model/types';
 import { extent } from '../../../model/units';
 
 export interface YAxisInput {
@@ -26,6 +27,8 @@ export interface YAxisScale {
   reverse?: boolean;
   /** Breaks: the stretches of the domain that are shown, from low to high; absent = one stretch. */
   segments?: Array<{ lo: number; hi: number }>;
+  /** The added ticks that are on the axis, by the value of the tick they stand at (see withExtraTicks): what each says of its text, mark and gridline. */
+  extraTicks?: ReadonlyMap<number, ExtraTick>;
   /** Room between two stretches of a broken axis, pt: at least the height of a number, so the numbers either side of a gap do not touch. */
   gapPt?: number;
 }
