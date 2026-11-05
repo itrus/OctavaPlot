@@ -150,6 +150,7 @@ The table below is generated from the capability registry (`src/model/graph/capa
 | Line with symbols | – | X and Y | yes | yes | yes | – | yes | yes | yes |
 | Offset traces | – | X and Y | – | yes | yes | – | yes | yes | yes |
 | Bubbles | – | X and Y | yes | yes | – | – | yes | yes | yes |
+| Volcano plot | – | X and Y | – | yes | – | – | yes | yes | yes |
 | Bars at numeric X | – | X and Y | yes | yes | – | – | yes | yes | yes |
 | Spikes | – | X and Y | yes | yes | – | – | yes | yes | yes |
 | Area under the curve | – | X and Y | yes | yes | yes | – | yes | yes | yes |
@@ -162,6 +163,8 @@ The table below is generated from the capability registry (`src/model/graph/capa
 | Lines over categories | yes | Y | – | – | – | – | yes | yes | – |
 | Pie charts | – | – | – | – | – | – | – | – | – |
 | Doughnut charts | – | – | – | – | – | – | – | – | – |
+| Slices | – | – | – | – | – | – | – | – | – |
+| 10 × 10 dot plot | – | – | – | – | – | – | – | – | – |
 | Side-by-side bars | yes | Y | – | – | – | – | – | – | – |
 | Stacked bars | yes | Y | – | – | – | – | – | – | – |
 | 100% stacked bars | yes | Y | – | – | – | – | – | – | – |

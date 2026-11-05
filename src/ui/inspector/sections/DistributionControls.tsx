@@ -47,6 +47,9 @@ export function DistributionControls({ chart, lineColor, lineWidthPt, lineOpacit
             <NumField label="Tukey multiplier" value={d.tukeyK} min={DISTRIBUTION_LIMITS.tukeyK.min} max={DISTRIBUTION_LIMITS.tukeyK.max} onCommit={(v) => set('Tukey multiplier', { tukeyK: v }, 'dist:k')} />
           )}
           <NumField {...SLIDERS.fraction} label="Box width" hint="Fraction of the space of a column" value={d.boxWidth} min={w.min} max={w.max} onCommit={(v) => set('Box width', { boxWidth: v }, 'dist:bw')} />
+          <Field label="Notches" hint="The box narrows at the median to its 95 % confidence interval (median ± 1.58 × IQR / √n): boxes whose notches do not overlap differ in their medians. The box is then an outline with a plain fill. With few values a notch would pass a quartile; it is cut there.">
+            <Check checked={d.notched} onChange={(v) => set('Box notches', { notched: v })} />
+          </Field>
         </>
       ) : (
         <>

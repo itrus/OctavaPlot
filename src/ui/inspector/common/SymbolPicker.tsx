@@ -34,7 +34,7 @@ const ROWS: Cell[][] = [
 const labelOf = (shape: SymbolShape): string => SYMBOL_SHAPES.find((o) => o.value === shape)?.label ?? shape;
 
 /** A small drawing of a shape, in the current text colour. */
-export function SymbolGlyph({ shape, open }: { shape: SymbolShape; open: boolean }) {
+function SymbolGlyph({ shape, open }: { shape: SymbolShape; open: boolean }) {
   return (
     <svg width="20" height="20" viewBox="-10 -10 20 20" aria-hidden="true">
       <path d={symbolPath(shape, 0, 0, 12, 1.4)} fill={open ? 'none' : 'currentColor'} stroke="currentColor" strokeWidth={1.4} strokeLinejoin="round" />

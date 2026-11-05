@@ -26,6 +26,7 @@ import { folderItems, nudge, reorder, sortedByName } from '../model/project/fold
 import { clearPartStyles, layerKindOf, layersOf, layerStylesAvailable, lookKeysOf, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
 import type { StyleScope } from '../model/graph/selection/scope';
 import type { TimeColumn } from '../util/timeColumn';
+import { followThresholds, sanitizeVolcano, withVolcanoLines } from '../model/options/volcanoOptions';
 import { LABEL_STYLE_KEYS, clearGroupKeys, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
 import type {
   LayerStyle,
@@ -47,6 +48,7 @@ import type {
   Id,
   Observation,
   JitterConfig,
+  VolcanoOptions,
   Layout,
   LegendConfig,
   FolderKey,
@@ -440,6 +442,13 @@ export const applyPalette = (chartId: Id, palette: Palette): Command => (p) => {
 export const patchSurvival = (chartId: Id, patch: Partial<SurvivalOptions>): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, survival: { ...c.survival, ...patch } }));
 
+/** Change the settings of a volcano plot; the lines at its thresholds follow a changed threshold (for as long as they exist). */
+export const patchVolcano = (chartId: Id, patch: Partial<VolcanoOptions>): Command => (p) =>
+  mapChart(p, chartId, (c) => {
+    const volcano = sanitizeVolcano({ ...c.volcano, ...patch }, c.volcano);
+    return { ...c, volcano, referenceLines: followThresholds(c.referenceLines, volcano) };
+  });
+
 export const patchJitter = (chartId: Id, patch: Partial<JitterConfig>): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, jitter: { ...c.jitter, ...patch } }));
 
@@ -465,7 +474,7 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
       }
       return out;
     };
-    return {
+    const next: Chart = {
       ...c,
       type,
       distribution: (type === 'violin' || type === 'groupedViolin') && c.distribution.points === 'none' ? { ...c.distribution, points: 'all' } : c.distribution,
@@ -476,6 +485,8 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
         objectOverrides: strip(l.objectOverrides),
       })),
     };
+    // A chart that becomes a volcano plot gets the lines at its thresholds, as a new one has (once: a chart that has had them keeps what it has).
+    return type === 'xyVolcano' && c.volcano.lineIds.length === 0 ? withVolcanoLines(next) : next;
   });
 
 /** Style edit for all groups ('all') or one group. */
@@ -746,7 +757,7 @@ export const addChartLike = (chartId: Id, tableId: Id, sourceChartId: Id, linked
 export const unlinkChart = (chartId: Id): Command => (p) => (p.charts.some((c) => c.id === chartId && c.linkedTo !== undefined) ? mapChart(p, chartId, ({ linkedTo: _gone, ...c }) => c) : p);
 
 /** Colours, frame and gridline style of the chart (see model/graph/axis.ts: sanitizeLook). */
-export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'summaryRows' | 'sizeLegend' | 'origin' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'groupedBy' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle>; pairs?: Partial<Chart['pairs']> }): Command => (p) =>
+export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'summaryRows' | 'sizeLegend' | 'origin' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'volcano' | 'groupedBy' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle>; pairs?: Partial<Chart['pairs']> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
     const { grid, ...rest } = patch;
     return { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };

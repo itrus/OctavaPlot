@@ -159,21 +159,42 @@ export function ColorInput({
   return <input type="color" className={mixed ? 'mixed' : undefined} value={value} disabled={disabled} {...aria} title={mixed ? 'Mixed: the selected data sets differ. Choosing a colour sets it for all of them.' : title} onChange={(e) => onChange(e.target.value)} />;
 }
 
+/** A list of two or three short choices is shown as buttons that sit side by side; anything longer stays a drop-down. */
+const BUTTON_CHOICES = { maxOptions: 3, maxLabelChars: 26 } as const;
+const showsAsButtons = (options: ReadonlyArray<{ label: string }>): boolean =>
+  options.length >= 2 && options.length <= BUTTON_CHOICES.maxOptions && options.reduce((n, o) => n + o.label.length, 0) <= BUTTON_CHOICES.maxLabelChars;
+
 export function SelectInput<T extends string>({
   value,
   options,
   onChange,
   disabled,
   ariaLabel,
+  dropdown,
 }: {
   value: T;
   options: Array<{ value: T; label: string }>;
   onChange: (v: T) => void;
   disabled?: boolean;
   ariaLabel?: string;
+  /** Keep the drop-down for a list that comes from the project (graphs, data sets, results), whose length changes. */
+  dropdown?: boolean;
 }) {
   const aria = useFieldAria(ariaLabel);
   const mixed = useContext(FieldContext)?.mixed ?? false;
+  if (!dropdown && showsAsButtons(options)) {
+    // The same buttons as the export format in Settings; with several data sets that differ, none is pressed.
+    return (
+      <span className="switch-group" role="group" {...aria}>
+        {options.map((o) => (
+          <button key={o.value} type="button" className={`switch${!mixed && o.value === value ? ' on' : ''}`} aria-pressed={!mixed && o.value === value} disabled={disabled} onClick={() => onChange(o.value)}>
+            {o.label}
+          </button>
+        ))}
+        {mixed && <span className="muted small"> Mixed</span>}
+      </span>
+    );
+  }
   return (
     <select value={mixed ? '' : value} disabled={disabled} {...aria} onChange={(e) => onChange(e.target.value as T)}>
       {mixed && (

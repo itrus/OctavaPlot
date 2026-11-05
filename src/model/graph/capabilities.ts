@@ -62,7 +62,7 @@ export function capabilitiesOf(type: ChartType): Capabilities {
     horizontal: supportsHorizontal(type),
     referenceLines: referenceLinesOf(type),
     curveFit: family === 'xy',
-    lineConnect: family === 'xy' && type !== 'xySpikes' && type !== 'xyBars' && type !== 'xyBubble',
+    lineConnect: family === 'xy' && type !== 'xySpikes' && type !== 'xyBars' && type !== 'xyBubble' && type !== 'xyVolcano',
     secondaryAxis: SECONDARY_AXIS.has(type),
     seriesColour: isSeriesColourType(type),
     survivalOptions: family === 'survival',

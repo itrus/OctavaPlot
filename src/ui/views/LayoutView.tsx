@@ -314,7 +314,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
           </Section>
           <Section title="Arrangement">
             <Field label="Panels">
-              <SelectInput<string>
+              <SelectInput<string> dropdown
                 value={a.kind === 'free' ? 'free' : standard ? arrangementKey(a) : 'array'}
                 options={[
                   ...standards.map((s) => ({ value: arrangementKey(s.arrangement), label: s.label })),
@@ -341,7 +341,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
               <>
                 <div className="muted small">Drag a box on the page to move it, or a corner to resize it. Choose a standard arrangement above to go back to a grid.</div>
                 <Field label="Selected panel">
-                  <SelectInput<string> value={String(slot)} options={frames.map((_, i) => ({ value: String(i), label: `Panel ${drawing.arranged.placements[i]?.label || i + 1}` }))} onChange={(v) => setSelected(Number(v))} />
+                  <SelectInput<string> dropdown value={String(slot)} options={frames.map((_, i) => ({ value: String(i), label: `Panel ${drawing.arranged.placements[i]?.label || i + 1}` }))} onChange={(v) => setSelected(Number(v))} />
                 </Field>
                 <NumField label="Left" unit="mm" step={1} slider={false} min={0} max={mm.width} value={current.x} onCommit={(v) => setBox({ x: v })} />
                 <NumField label="Top" unit="mm" step={1} slider={false} min={0} max={mm.height} value={current.y} onCommit={(v) => setBox({ y: v })} />
@@ -361,7 +361,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
           <Section title="Graphs in the panels">
             {layout.panels.map((id, i) => (
               <Field key={i} label={`Panel ${drawing.arranged.placements[i]?.label || i + 1}`}>
-                <SelectInput<string>
+                <SelectInput<string> dropdown
                   value={id ?? ''}
                   options={[{ value: '', label: '(empty)' }, ...project.charts.map((c) => ({ value: c.id, label: c.name }))]}
                   onChange={(v) => run('Graph in panel', setLayoutPanel(layout.id, i, v === '' ? null : v))}

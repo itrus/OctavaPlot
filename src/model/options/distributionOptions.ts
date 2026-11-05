@@ -30,5 +30,6 @@ export function sanitizeDistribution(raw: unknown, base: DistributionOptions): D
     trim: oneOf(TRIMS, d.trim, base.trim),
     normalisation: oneOf(NORMALISATIONS, d.normalisation, base.normalisation),
     showQuartiles: bool(d.showQuartiles, base.showQuartiles),
+    notched: bool(d.notched, base.notched),
   };
 }

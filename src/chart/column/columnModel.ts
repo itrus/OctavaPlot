@@ -33,7 +33,7 @@ import type { ChromeScene } from '../shared/scene/scene';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { Orientation } from '../shared/parts/orientation';
 import { displayName } from '../shared/parts/names';
-import { hash01 } from '../shared/parts/jitter';
+import { dotOffsets, hash01 } from '../shared/parts/jitter';
 import { stableList } from '../shared/parts/stable';
 import { BarGeom } from '../shared/parts/barGeom';
 import { compileColumnScene } from './columnChrome';
@@ -459,6 +459,13 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
           });
         }
       } else {
+        // Where the dots sit sideways: jitter, or a swarm made of the dots that are drawn. A paired plot keeps them on the line of the column.
+        const sideways = new Map<string, number>();
+        if (chart.type !== 'paired') {
+          const shown = group.observations.filter((o) => o.value !== null && Number.isFinite(o.value) && onAxis(scale, o.value) && !inBreak(scale, o.value));
+          const xs = dotOffsets(chart.jitter, shown.map((o) => o.id), shown.map((o) => toY(o.value as number)), pst.symbolSizePt, chart.jitter.widthFraction * bw);
+          shown.forEach((o, k) => sideways.set(o.id, xs[k]));
+        }
         group.observations.forEach((o, row) => {
           if (o.value === null || !Number.isFinite(o.value)) return;
           if (!onAxis(scale, o.value)) {
@@ -466,7 +473,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
             return;
           }
           // The dots of a paired plot stay on the line of their column: a subject's line would not meet them otherwise.
-          let offset = chart.jitter.enabled && chart.type !== 'paired' ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * bw : 0;
+          let offset = sideways.get(o.id) ?? 0;
           if (nested) {
             // Each subject has a cluster of its own across the slot; a value with no subject stays in the middle.
             const k = nested.units.findIndex((u) => u.subject === (o.subject ?? ''));
@@ -567,6 +574,13 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
       const dotWidth = chart.type === 'floating' ? bw : dist?.kind === 'box' ? slotWidth * opts.boxWidth : slotWidth * opts.violinWidth;
       // With no density the values themselves are the picture of a violin.
       const showAll = chart.type === 'violin' && dist?.shape === 'points';
+      // Where the dots sit sideways: only the ones that are drawn count, as a swarm is made of the dots that are there.
+      const sideways = new Map<string, number>();
+      {
+        const shown = group.observations.filter((o) => o.value !== null && Number.isFinite(o.value) && onAxis(scale, o.value) && (showAll || wantDot(o.value)) && !inBreak(scale, o.value));
+        const xs = dotOffsets(chart.jitter, shown.map((o) => o.id), shown.map((o) => toY(o.value as number)), pst.symbolSizePt, chart.jitter.widthFraction * dotWidth);
+        shown.forEach((o, k) => sideways.set(o.id, xs[k]));
+      }
       group.observations.forEach((o, row) => {
         if (o.value === null || !Number.isFinite(o.value) || !onAxis(scale, o.value)) return;
         if (!showAll && !wantDot(o.value)) return;
@@ -576,7 +590,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
         }
         const own = layer.objectOverrides[o.id];
         const ps = own ? { ...pst, ...own } : pst;
-        const offset = chart.jitter.enabled ? (hash01(o.id) - 0.5) * chart.jitter.widthFraction * dotWidth : 0;
+        const offset = sideways.get(o.id) ?? 0;
         points.push({ id: o.id, groupId: group.id, observationId: o.id, row, value: o.value, cx: centerX + offset, cy: toY(o.value), shape: ps.symbolShape, size: ps.symbolSizePt, color: ps.symbolColor, fillOpacity: ps.symbolFillOpacity, borderColor: ps.symbolBorderColor, borderWidth: ps.symbolBorderWidthPt, borderOpacity: ps.symbolBorderOpacity });
       });
       if (opts.showMean && pre.summary) {

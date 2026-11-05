@@ -1,6 +1,7 @@
 import { type LayerKind, type LayerSpec, DEFAULT_BAND_OPACITY as BAND_OPACITY, layerLook, legendKeyStyle, partStyle } from '../../model/graph/layers';
 import type { Chart, Id } from '../../model/types';
-import type { XyModel, XySeries } from './xyModel';
+import type { XyModel, XyPoint, XySeries } from './xyModel';
+import type { PointLabelModel } from '../shared/parts/labels';
 import { type SceneElement, el } from '../shared/scene/sceneElement';
 import { n2 } from '../../model/units';
 import { SELECT_COLOR } from '../shared/scene/annotations';
@@ -33,6 +34,24 @@ function drawnLayers(chart: Chart, model: XyModel): Array<{ id: Id; kind: LayerK
 function barElements(s: XySeries, layerId: Id): SceneElement[] {
   const st = s.style;
   return (s.bars ?? []).map((b) => el('rect', [['x', n2(b.x)], ['y', n2(b.y)], ['width', n2(b.width)], ['height', n2(b.height)], ['fill', st.barFill], ['fill-opacity', st.barOpacity], ['stroke', st.barBorderColor], ['stroke-width', st.barBorderWidthPt], ['stroke-opacity', st.barBorderOpacity < 1 ? st.barBorderOpacity : undefined]], { hit: { kind: 'bar', groupId: s.groupId, objectId: b.id }, id: svgId(layerId, b.id) }));
+}
+
+/** The colour of a volcano plot's point from its class; null for the points of every other chart. */
+function classColour(chart: Chart, cls: XyPoint['cls']): string | null {
+  return cls === undefined ? null : cls === 'up' ? chart.volcano.upColor : cls === 'down' ? chart.volcano.downColor : chart.volcano.nsColor;
+}
+
+/** The labels of the points of a volcano plot (leader lines first, then the texts), outside the plot clip, as those of a column chart. */
+function labelElements(chart: Chart, labels: PointLabelModel | undefined): SceneElement[] {
+  if (!labels || labels.items.length === 0) return [];
+  return [
+    el('g', [], {
+      children: [
+        ...labels.items.flatMap((it) => (it.leader ? [el('path', [['d', `M${n2(it.leader.x1)},${n2(it.leader.y1)}L${n2(it.leader.x2)},${n2(it.leader.y2)}`], ['fill', 'none'], ['stroke', it.color ?? chart.textColor], ['stroke-width', 1]], { id: svgId('leader', it.id) })] : [])),
+        ...labels.items.map((it) => el('text', [['x', n2(it.x)], ['y', n2(it.y)], ['font-size', it.fontSizePt], ['fill', it.color ?? chart.textColor], ['font-weight', it.bold ? 'bold' : undefined], ['font-style', it.italic ? 'italic' : undefined]], { text: it.shown, id: svgId('point-label', it.id) })),
+      ],
+    }),
+  ];
 }
 
 function pathsOf(chart: Chart, s: XySeries, layerId: Id, kind: LayerKind): ScenePath[] {
@@ -83,9 +102,9 @@ function pathsOf(chart: Chart, s: XySeries, layerId: Id, kind: LayerKind): Scene
       return s.points.map((p) => ({
         id: svgId(base, p.id),
         d: symbolPath(st.symbolShape, p.px, p.py, p.diameterPt ?? st.symbolSizePt, st.symbolBorderWidthPt),
-        fill: st.symbolColor,
+        fill: classColour(chart, p.cls) ?? st.symbolColor,
         fillOpacity: st.symbolFillOpacity < 1 ? st.symbolFillOpacity : undefined,
-        stroke: st.symbolBorderColor,
+        stroke: classColour(chart, p.cls) ?? st.symbolBorderColor,
         strokeWidth: st.symbolBorderWidthPt,
         strokeOpacity: st.symbolBorderOpacity < 1 ? st.symbolBorderOpacity : undefined,
         hit: { kind: 'point', groupId: s.groupId, objectId: p.id },
@@ -142,6 +161,7 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
     ...(model.offsetNote && layout.extraBottom ? [el('text', [['x', n2(plot.x + plot.width / 2)], ['y', n2(layout.extraBottom.y + ya.tickFontSizePt * 1.2)], ['text-anchor', 'middle'], ['font-size', ya.tickFontSizePt], ['fill', chart.textColor]], { text: model.offsetNote })] : []),
     // Bubbles: the size legend stands in the row the layout reserved under the plot, centred under it.
     ...(model.sizeKey && layout.extraBottom ? sizeKeyElements(model.sizeKey, plot.x + plot.width / 2, layout.extraBottom.y, chart.textColor, chart.fontFamily) : []),
+    ...labelElements(chart, model.labels),
     ...titleElements(chart, layout, xa, ya, y2 ? y2a : null),
     ...(model.atRisk && !hidden.has(`${chart.id}:atRisk`) ? atRiskElements(chart, model.atRisk, plot.x, plot.x - labelOffset(ya) - Y_TICK_LABEL_GAP) : []),
     ...legendElements(chart, layout, (it, w) => {

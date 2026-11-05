@@ -4,7 +4,7 @@ import { AppProvider, useApp } from './state/AppContext';
 import { PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile } from './state/projectFile';
 import { Navigator } from './ui/navigator/Navigator';
 import { Splitter } from './ui/components/Splitter';
-import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIcon } from './ui/components/icons';
+import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIcon, FitWindowIcon } from './ui/components/icons';
 import { setProjectName } from './state/commands';
 import { InfoDialog } from './ui/dialogs/InfoDialog';
 import { SettingsDialog } from './ui/dialogs/SettingsDialog';
@@ -265,9 +265,11 @@ function Shell() {
                 if (chart) requestFit();
               }}
               disabled={!chart && activeZoom === 1}
-              title="Fit to the window (100%)"
+              title={chart ? 'Fit the graph to the window (100%)' : 'Back to 100%'}
+              aria-label={chart ? 'Fit the graph to the window (100%)' : 'Back to 100%'}
             >
-              Fit
+              <FitWindowIcon />
+              100%
             </button>
           </span>
         )}

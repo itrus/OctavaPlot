@@ -5,6 +5,9 @@ import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { legendEntries } from '../../model/graph/legendEntries';
 import { resolveSummary } from '../../model/graph/summary';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
+import { groupRowTitle } from '../../model/table/rows';
+import { volcanoClass, volcanoY } from '../../model/options/volcanoOptions';
+import { buildPointLabels, labelWarnings, type PointLabelModel } from '../shared/parts/labels';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
 import type { AxisBinding, Chart, ChartStyle, DataTable, FitSettings, Id, LayerStyle } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
@@ -42,6 +45,8 @@ export interface XyPoint {
   stats: GroupStats | null;
   /** Bubbles: the diameter of the symbol in pt (its area follows the size in the table); absent: the series' symbol size. */
   diameterPt?: number;
+  /** Volcano plots: what the point is, from its fold change and significance. */
+  cls?: 'up' | 'down' | 'ns';
 }
 
 /** One replicate of a row, drawn on its own (the individual-values layer). */
@@ -135,6 +140,10 @@ export interface XyModel {
   offsetNote?: string;
   /** Bubble charts: the size legend, a row under the plot; absent when the chart has none (see Chart.sizeLegend). */
   sizeKey?: SizeKey;
+  /** Volcano plots: the labels of the points that carry one (the up and down ones, when asked for); absent for the other types. */
+  labels?: PointLabelModel;
+  /** Volcano plots: how many points are up, down and not significant. */
+  volcanoCounts?: { up: number; down: number; ns: number };
   /** The curve fit drawn, with its settings (none when the chart has no curve fit). */
   fit: FitSettings;
   /** How many series wait for a fit that is being made off the main thread: they are drawn without curve, band and numbers until it is done. */
@@ -206,6 +215,8 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   const xCfg = timeX && chart.xAxis.scale !== 'linear' ? { ...chart.xAxis, scale: 'linear' as const } : chart.xAxis;
   if (timeX && xCfg !== chart.xAxis) warnings.push('A date, time or duration X axis is linear: the log scale is not applied.');
   const isBubble = chart.type === 'xyBubble';
+  const isVolcano = chart.type === 'xyVolcano';
+  let badP = 0;
   const fromBaseline = chart.type === 'xySpikes' || chart.type === 'xyArea' || chart.type === 'xyBars';
   const isBars = chart.type === 'xyBars';
   const xs = table.groups[0].observations.map((o) => o.value);
@@ -267,6 +278,12 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
           meaning = supplied.meaning;
           if (stats.interval.status !== 'ok') noError++;
         }
+      }
+      // A volcano plot: the Y column holds p-values, plotted as -log10 of them; one outside (0, 1] is not drawn.
+      if (isVolcano && y !== null) {
+        const vy = volcanoY(chart.volcano, y);
+        if (vy === null) badP++;
+        y = vy;
       }
       if (x === null || y === null) {
         // A row with an X or a value that cannot be drawn is reported; a wholly empty row is just empty.
@@ -434,7 +451,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     const drawn = r.pts.filter((p) => onAxis(xAxis, p.x) && onAxis(yA, p.y) && sizedOk(p));
     offAxis += r.pts.length - drawn.length;
     // A value inside a gap of a broken axis has no place on it: it is not drawn, and the line is cut at the gap's edge.
-    const points: XyPoint[] = drawn.filter((p) => !inBreak(xAxis, p.x) && !inBreak(yA, p.y)).map(({ size, xErr: _xErr, ...p }) => ({ ...p, px: xScale(p.x), py: yS(p.y), ...(isBubble && sized && validSize(size) && largest > 0 ? { diameterPt: r.style.symbolSizePt * Math.sqrt(size / largest) } : {}) }));
+    const points: XyPoint[] = drawn.filter((p) => !inBreak(xAxis, p.x) && !inBreak(yA, p.y)).map(({ size, xErr: _xErr, ...p }) => ({ ...p, px: xScale(p.x), py: yS(p.y), ...(isVolcano ? { cls: volcanoClass(chart.volcano, p.x, p.y) } : {}), ...(isBubble && sized && validSize(size) && largest > 0 ? { diameterPt: r.style.symbolSizePt * Math.sqrt(size / largest) } : {}) }));
     // Individual values are placed like the points: none where a log axis or a break gives them no position.
     const rawOnAxis = r.rawObs.filter((o) => onAxis(xAxis, o.x) && onAxis(yA, o.y));
     const rawPoints: XyRawPoint[] = rawOnAxis.filter((o) => !inBreak(xAxis, o.x) && !inBreak(yA, o.y)).map((o) => ({ ...o, px: xScale(o.x), py: yS(o.y) }));
@@ -550,7 +567,36 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     if (![x, y1, y2].every(Number.isFinite) || inBreak(xAxis, p.at) || inBreak(yA, p.low) || inBreak(yA, p.high)) return [];
     return [{ id: p.bracket.id, label: p.bracket.label, x, y1, y2, tick: Math.max(6, p.bracket.fontSizePt * 0.4), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
   });
-  const model: XyModel = { widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, y2: y2Axis, y2Scale, series, brackets, legendSeries, ...(offsetNote ? { offsetNote } : {}), ...(sizeKey ? { sizeKey } : {}), warnings: [...new Set(warnings)], fit, fitsPending: series.filter((q) => q.fit?.pending).length, layers: layerList };
+  // Volcano plots: the counts of the three classes, and the labels of the up and down points when asked for (placed like the labels of a column chart).
+  let volcanoCounts: XyModel['volcanoCounts'];
+  let volcanoLabels: PointLabelModel | undefined;
+  if (isVolcano) {
+    volcanoCounts = { up: 0, down: 0, ns: 0 };
+    if (layout.kind !== 'single') warnings.push('A volcano plot is made from a table with one value for each row: the p-values in the Y column. With replicates or an error, each point is the mean of them.');
+    for (const s of series) for (const p of s.points) volcanoCounts[p.cls ?? 'ns']++;
+    if (badP > 0) warnings.push(`${badP} row${badP === 1 ? ' has' : 's have'} a p-value that is not between 0 and 1${chart.volcano.yInput === 'p' ? '' : ' (or a value that is not a number)'} and ${badP === 1 ? 'is' : 'are'} not drawn.`);
+    if (chart.volcano.labels === 'significant') {
+      volcanoLabels = buildPointLabels({
+        type: chart.type,
+        groups: series.map((s, si) => ({
+          groupId: s.groupId,
+          points: s.points.map((p) => ({
+            id: p.id,
+            cx: p.px,
+            cy: p.py,
+            size: s.style.symbolSizePt,
+            value: p.y,
+            rowTitle: groupRowTitle(table, raw[si].s.columns[0], p.row),
+            style: { ...s.style, showSymbols: true, showPointLabels: p.cls !== 'ns', pointLabelFontSizePt: s.style.pointLabelFontSizePt * 0.6, pointLabelCollision: 'repel' as const, pointLabelLeader: true, pointLabelPlacement: 'above-right' as const, pointLabelSource: 'rowTitle' as const },
+          })),
+        })),
+        plot: layoutOut.plot,
+        chart: { width: W, height: H },
+      });
+      warnings.push(...labelWarnings(volcanoLabels.report));
+    }
+  }
+  const model: XyModel = { ...(volcanoCounts ? { volcanoCounts } : {}), ...(volcanoLabels ? { labels: volcanoLabels } : {}), widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, y2: y2Axis, y2Scale, series, brackets, legendSeries, ...(offsetNote ? { offsetNote } : {}), ...(sizeKey ? { sizeKey } : {}), warnings: [...new Set(warnings)], fit, fitsPending: series.filter((q) => q.fit?.pending).length, layers: layerList };
   attachLazyScene(chart, model);
   return model;
 }

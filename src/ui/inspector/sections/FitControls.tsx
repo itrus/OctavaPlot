@@ -35,7 +35,7 @@ export function FitSection({ chart, table, model }: { chart: Chart; table: DataT
   return (
     <GroupBox title="Fitted curve">
       <Field label="Curve fit" hint="The model is chosen in the curve fit of the Results; each data set is fitted on its own, using every replicate value">
-        <SelectInput<string>
+        <SelectInput<string> dropdown
           value={chosen?.id ?? ''}
           options={[{ value: '', label: 'None' }, ...fits.map((a) => ({ value: a.id, label: a.name }))]}
           onChange={(v) => set('Fitted curve', { analysisId: v === '' ? null : v })}

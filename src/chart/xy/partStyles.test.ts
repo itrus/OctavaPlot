@@ -9,10 +9,13 @@ import { buildSurvivalModel } from '../survival/survivalModel';
 import { buildXyModel } from './xyModel';
 
 const table = createXyTable('XY', true, { kind: 'replicates', n: 3 });
-const base: Chart = (() => {
+const styled0: Chart = (() => {
   const c = createChart(table.id, undefined, 'xyLineSymbols');
-  return { ...c, layers: c.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showErrorBars: true, showRawPoints: true } } : l)) };
+  return { ...c, layers: c.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showErrorBars: true } } : l)) };
 })();
+/** The centres with their symbols; the same chart showing the individual values instead. */
+const base: Chart = styled0;
+const withValues: Chart = { ...styled0, layers: styled0.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showRawPoints: true } } : l)) };
 const project = (chart: Chart): Project => ({ id: 'p', name: 'p', dataTables: [table], charts: [chart] });
 const chartOf = (p: Project): Chart => p.charts[0];
 const layerId = (kind: string, series = 0): Id => layersOf(base, table).filter((l) => l.kind === kind)[series].id;
@@ -38,10 +41,11 @@ describe('a part of a series in a look of its own', () => {
     const point = pathOf(chart, layerId('points'))[0];
     expect([point.fill, point.stroke, point.strokeWidth, point.fillOpacity]).toEqual(['#0000ff', '#0000ff', 0, 0.4]);
     expect(point.d).not.toBe(pathOf(base, layerId('points'))[0].d);
-    chart = withPart(chart, layerId('rawPoints'), { shape: 'star' });
-    expect(pathOf(chart, layerId('rawPoints'))[0].d).not.toBe(pathOf(base, layerId('rawPoints'))[0].d);
     // The points of the series are still as they were.
     expect(pathOf(chart, layerId('points', 1))).toEqual(pathOf(base, layerId('points', 1)));
+    // The individual values replace the points of the centres, so they are drawn in a look of their own in a chart that shows them.
+    const values = withPart(withValues, layerId('rawPoints'), { shape: 'star' });
+    expect(pathOf(values, layerId('rawPoints'))[0].d).not.toBe(pathOf(withValues, layerId('rawPoints'))[0].d);
   });
 
   it('changes nothing in the numbers, the axes or the legend', () => {

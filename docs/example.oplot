@@ -113,6 +113,16 @@
         "lineOrder": "auto",
         "lineConnect": "table",
         "traceOffset": null,
+        "volcano": {
+          "yInput": "p",
+          "fcThreshold": 1,
+          "pThreshold": 0.05,
+          "upColor": "#d62728",
+          "downColor": "#1f77b4",
+          "nsColor": "#9e9e9e",
+          "labels": "none",
+          "lineIds": []
+        },
         "groupedBy": "category",
         "origin": {
           "x": null,
@@ -145,7 +155,8 @@
           "bandwidth": null,
           "trim": "sample",
           "normalisation": "width",
-          "showQuartiles": true
+          "showQuartiles": true,
+          "notched": false
         },
         "pairs": {
           "bridge": false,
@@ -319,7 +330,8 @@
         "jitter": {
           "enabled": true,
           "widthFraction": 0.4,
-          "bySubject": false
+          "bySubject": false,
+          "swarm": false
         },
         "defaults": {
           "showBars": true,

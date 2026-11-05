@@ -61,6 +61,16 @@ describe('the mean layer and the individual values of an XY chart', () => {
     expect(chartOf(single).layers[0].style.showRawPoints).not.toBe(true);
   });
 
+  it('shows the means or the individual values as symbols, never both', () => {
+    const visible = (kind: string, patch: (c: Chart) => Chart) => {
+      const q = project('replicates', patch);
+      return layersOf(chartOf(q), tableOf(q)).filter((l) => l.kind === kind).every((l) => l.visible);
+    };
+    expect(visible('points', meanOnly)).toBe(true);
+    expect(visible('points', (c) => rawOn(meanOnly(c)))).toBe(false);
+    expect(visible('rawPoints', (c) => rawOn(meanOnly(c)))).toBe(true);
+  });
+
   it('names the points layer for the centre it shows', () => {
     const p = project('replicates', meanOnly);
     const label = (q: Project) => layerRows(chartOf(q), tableOf(q)).find((r) => r.layer.kind === 'points')!.label;
@@ -103,7 +113,8 @@ describe('the mean layer and the individual values of an XY chart', () => {
     const before = calcStats.computed;
     const hidden = { ...on, charts: on.charts.map((c) => (c.id === 'c' ? { ...c, hiddenLayerIds: ids } : c)) };
     expect(render(hidden)).not.toBe(full);
-    expect(paths(render(hidden))).toBe(paths(render(p)));
+    // The individual values stand in for the symbols of the means, so with them hidden there are neither.
+    expect(paths(render(hidden))).toBeLessThan(paths(render(p)));
     expect(calcStats.computed).toBe(before);
   });
 });

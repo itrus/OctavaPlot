@@ -221,7 +221,8 @@ describe('every chart type draws and exports', () => {
     expect(any.family).toBe(chartFamily(type));
     const svg = chartToSvgString(chartOf(p), tableOf(p));
     expect(svg).toMatch(/^<\?xml/);
-    expect(svg).not.toContain('data-');
+    // The group of the reference lines (a volcano plot starts with three) carries a marker of its own; nothing of the editor does.
+    expect(svg.replace(/data-reference-lines/g, '')).not.toContain('data-');
     expect(svg).toContain('<rect');
   });
 

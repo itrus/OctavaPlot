@@ -68,10 +68,10 @@ test('the Direction control turns a forest plot and turns it back, with its diam
   const svg = await openForest(page, 'difference');
   await page.getByLabel('Summary row: Pooled').check();
   const horizontal = await geometry(svg);
-  await page.getByLabel('Columns run').selectOption('vertical');
+  await page.getByLabel('Columns run').getByRole('button', { name: 'Vertical' }).click();
   expect(await geometry(svg)).not.toEqual(horizontal);
   expect(await diamonds(svg)).toBe(1);
-  await page.getByLabel('Columns run').selectOption('horizontal');
+  await page.getByLabel('Columns run').getByRole('button', { name: 'Horizontal' }).click();
   expect(await geometry(svg)).toEqual(horizontal);
   expect(errors).toEqual([]);
 });

@@ -6,6 +6,7 @@ import { sanitizeHeatmap } from '../options/heatmapOptions';
 import { sanitizeFit } from '../options/fitOptions';
 import { sanitizeHistogram } from '../options/histogramOptions';
 import { sanitizePie } from '../options/pieOptions';
+import { sanitizeVolcano } from '../options/volcanoOptions';
 import { bool, clamp, hex, numberOrNull, oneOf, optionalHex, record, valuesOf } from '../sanitize';
 import type { Chart, ChartOrientation, FrameStyle, GridStyle, GroupedBy, LegendKeyShape, LineConnect, LineOrder, LineStyle, SymbolShape } from '../types';
 
@@ -104,7 +105,7 @@ export const linePattern = (s: { lineStyle: LineStyle; lineWidthPt: number }) =>
 /** Width of the colour key in the legend, pt: 36 for a rectangle, 20 for a square (its height is 20). */
 export const legendKeyWidthPt = (shape: LegendKeyShape): number => (shape === 'square' ? 20 : 36);
 
-type Look = Pick<Chart, 'summaryRows' | 'sizeLegend' | 'origin' | 'orientation' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'groupedBy' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
+type Look = Pick<Chart, 'summaryRows' | 'sizeLegend' | 'origin' | 'orientation' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'volcano' | 'groupedBy' | 'bars' | 'barLabels' | 'distribution' | 'pairs' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'grid' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>;
 
 /** The ids of the summary rows of a file or a patch: the texts in an array, once each, or undefined when there are none. */
 const summaryRowIds = (raw: unknown): string[] | undefined => {
@@ -144,6 +145,7 @@ export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
     // The size legend of a bubble chart: present = shown (an empty list of sizes means the round values below the largest).
     sizeLegend: 'sizeLegend' in c ? sizeLegendOf(c.sizeLegend) : base.sizeLegend,
     // The offset between traces: any finite number (0 = none, below 0 = downward), or null for the automatic one.
+    volcano: sanitizeVolcano(c.volcano, base.volcano),
     traceOffset: 'traceOffset' in c ? (c.traceOffset === null ? null : typeof c.traceOffset === 'number' && Number.isFinite(c.traceOffset) ? c.traceOffset : base.traceOffset) : base.traceOffset,
     origin: { x: numberOrNull(record(c.origin).x, base.origin.x), y: numberOrNull(record(c.origin).y, base.origin.y) },
     bars: sanitizeBars(c.bars, base.bars),

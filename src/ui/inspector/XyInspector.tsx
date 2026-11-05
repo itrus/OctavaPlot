@@ -32,6 +32,8 @@ import { DataSetPicker } from './sections/DataSetPicker';
 import { DataSetReset } from './sections/DataSetReset';
 import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
 import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput, TextInput } from './common/controls';
+import { DotPlacementControls } from './sections/DotPlacementControls';
+import { VolcanoControls } from './sections/VolcanoControls';
 import { SymbolPicker } from './common/SymbolPicker';
 import { ExtraTicksControls } from './sections/ExtraTicksControls';
 import { TimeField, timeLimitChecks } from './common/TimeField';
@@ -151,6 +153,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
     const l = scope === 'all' ? { ...layer, groupOverrides: {}, objectOverrides: {} } : layer;
     return resolveStyle(chart, l, { id: sample.id, paletteIndex: seriesPaletteIndex(chart, series, sampleIndex) });
   }, [chart, layer, sample, sampleIndex, scope]);
+  /** The symbols are on when the centres or, in a table of replicates, the individual values have them. */
+  const symbolsOn = st.showSymbols || (family === 'xy' && layout.kind === 'replicates' && st.showRawPoints);
   const bindingUi = bindingSelectState(chart.type, st);
   const inScopeBindings = (xyModel?.series ?? []).filter((x) => scopeIds.includes(x.groupId)).map((x) => bindingOf(x.style));
   const mixedBinding = inScopeBindings.some((b) => b !== inScopeBindings[0]);
@@ -312,20 +316,21 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 </GroupBox>
               )}
 
+              {chart.type === 'xyVolcano' && <VolcanoControls chart={chart} counts={xyModel?.volcanoCounts} />}
               {(!barChart || ((chart.type === 'groupedBar' || chart.type === 'groupedFloating' || distChart) && layout.kind === 'replicates')) && (
-              <GroupBox title={family === 'survival' ? 'Censor marks' : distChart ? 'Points' : barChart ? 'Individual values' : 'Symbols'} checked={st.showSymbols} onCheckedChange={(v) => setStyle({ showSymbols: v })} overridden={ov('showSymbols')}>
+              <GroupBox title={family === 'survival' ? 'Censor marks' : distChart ? 'Points' : barChart ? 'Individual values' : 'Symbols'} checked={symbolsOn} onCheckedChange={(v) => setStyle(v ? { showSymbols: true } : { showSymbols: false, showRawPoints: false })} overridden={ov('showSymbols')}>
                 {family === 'survival' && (
                   <Field label="Also at every event" hint="A symbol where the curve drops, as well as at the censored subjects">
-                    <Check checked={chart.survival.eventSymbols} disabled={!st.showSymbols} onChange={(v) => run('Symbols at events', patchSurvival(chart.id, { eventSymbols: v }))} />
+                    <Check checked={chart.survival.eventSymbols} disabled={!symbolsOn} onChange={(v) => run('Symbols at events', patchSurvival(chart.id, { eventSymbols: v }))} />
                   </Field>
                 )}
-                <Field label="Color" overridden={ov('symbolColor')}>
-                  <ColorInput value={st.symbolColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolColor: v, symbolBorderColor: v })} />
+                <Field label="Color" overridden={ov('symbolColor')} note={chart.type === 'xyVolcano' ? 'A volcano plot is coloured by up, down and not significant (see above).' : null}>
+                  <ColorInput value={st.symbolColor} disabled={!symbolsOn || chart.type === 'xyVolcano'} onChange={(v) => setStyle({ symbolColor: v, symbolBorderColor: v })} />
                 </Field>
                 <Field label="Shape" overridden={ov('symbolShape')}>
-                  <SymbolPicker shape={st.symbolShape} fillOpacity={st.symbolFillOpacity} disabled={!st.showSymbols} onChange={setStyle} />
+                  <SymbolPicker shape={st.symbolShape} fillOpacity={st.symbolFillOpacity} disabled={!symbolsOn} onChange={setStyle} />
                 </Field>
-                <NumField {...SLIDERS.symbol} label={chart.type === 'xyBubble' ? 'Largest bubble' : 'Size'} unit="pt" value={st.symbolSizePt} min={2} max={60} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} {...(chart.type === 'xyBubble' ? { hint: 'The diameter of the largest bubble of the chart; the area of the others follows their size.' } : {})} onCommit={(v) => setStyle({ symbolSizePt: v })} />
+                <NumField {...SLIDERS.symbol} label={chart.type === 'xyBubble' ? 'Largest bubble' : 'Size'} unit="pt" value={st.symbolSizePt} min={2} max={60} disabled={!symbolsOn} overridden={ov('symbolSizePt')} {...(chart.type === 'xyBubble' ? { hint: 'The diameter of the largest bubble of the chart; the area of the others follows their size.' } : {})} onCommit={(v) => setStyle({ symbolSizePt: v })} />
                 {chart.type === 'xyBubble' && layout.kind === 'sized' && (
                   <>
                     <Field label="Size legend" hint="Circles of chosen sizes under the plot, on the scale of the bubbles, so a reader can tell what a size means.">
@@ -336,17 +341,18 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                     )}
                   </>
                 )}
-                <NumField {...SLIDERS.fraction} label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
+                <NumField {...SLIDERS.fraction} label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!symbolsOn} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
                 <Field label="Border color" overridden={ov('symbolBorderColor')}>
-                  <ColorInput value={st.symbolBorderColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolBorderColor: v })} />
+                  <ColorInput value={st.symbolBorderColor} disabled={!symbolsOn || chart.type === 'xyVolcano'} onChange={(v) => setStyle({ symbolBorderColor: v })} />
                 </Field>
-                <NumField {...SLIDERS.line} label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={20} disabled={!st.showSymbols} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
-                <NumField {...SLIDERS.fraction} label="Border opacity" value={st.symbolBorderOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolBorderOpacity')} onCommit={(v) => setStyle({ symbolBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
+                <NumField {...SLIDERS.line} label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={20} disabled={!symbolsOn} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
+                <NumField {...SLIDERS.fraction} label="Border opacity" value={st.symbolBorderOpacity} min={0} max={1} disabled={!symbolsOn} overridden={ov('symbolBorderOpacity')} onCommit={(v) => setStyle({ symbolBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
                 {family === 'xy' && layout.kind === 'replicates' && (
-                  <Field label="Individual values" overridden={ov('showRawPoints')} hint="Every replicate as a small symbol behind the mean or median; they are part of the axis range while shown">
-                    <Check checked={st.showRawPoints} onChange={(v) => setStyle({ showRawPoints: v })} />
+                  <Field label="Symbols show" overridden={ov('showRawPoints')} hint="The mean (or median) of each row, or every replicate as a small symbol; never both. The individual values are part of the axis range while shown">
+                    <SelectInput<'centre' | 'values'> value={st.showRawPoints ? 'values' : 'centre'} options={[{ value: 'centre', label: 'Mean' }, { value: 'values', label: 'Individual values' }]} onChange={(v) => setStyle({ showRawPoints: v === 'values', showSymbols: true })} />
                   </Field>
                 )}
+                {(chart.type === 'groupedBar' || chart.type === 'groupedFloating' || distChart) && layout.kind === 'replicates' && <DotPlacementControls chart={chart} disabled={!symbolsOn} />}
               </GroupBox>
 
               )}

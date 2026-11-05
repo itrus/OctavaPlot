@@ -313,7 +313,7 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
             )}
             {groups.length > 0 && l.slope === undefined && (
               <Field label="Value from" hint="Bind the line to a result of a data set, so that it follows the data. Choosing Typed value keeps the line where it is.">
-                <SelectInput<string>
+                <SelectInput<string> dropdown
                   value={l.valueFrom?.stat ?? 'typed'}
                   options={[{ value: 'typed', label: 'Typed value' }, ...RESULT_STATS.map((s) => ({ value: s.id, label: s.label }))]}
                   onChange={(v) => {
@@ -327,7 +327,7 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
             )}
             {l.valueFrom && (
               <Field label="Of data set">
-                <SelectInput<string>
+                <SelectInput<string> dropdown
                   value={l.valueFrom.groupId}
                   options={groups.some((g) => g.id === l.valueFrom?.groupId) ? groups.map((g) => ({ value: g.id, label: displayName(chart, g.id, g.name) })) : [...groups.map((g) => ({ value: g.id, label: displayName(chart, g.id, g.name) })), { value: l.valueFrom.groupId, label: '(not on this graph)' }]}
                   onChange={(v) => l.valueFrom && set('Bind reference line', { valueFrom: { stat: l.valueFrom.stat, groupId: v } })}
@@ -425,19 +425,19 @@ function BracketsSection({ chart }: { chart: Chart }) {
         return (
           <div key={b.id} className="annotation-card selected">
             <Field label={`From (bracket ${i + 1})`}>
-              <SelectInput<string> value={b.from} options={optionsFor(b.from)} onChange={(v) => set('Bracket start', { from: v })} />
+              <SelectInput<string> dropdown value={b.from} options={optionsFor(b.from)} onChange={(v) => set('Bracket start', { from: v })} />
             </Field>
             {kind === 'grouped' && (
               <Field label="Category of From">
-                <SelectInput<string> value={String(row)} options={rowOptionsFor(row)} onChange={(v) => set('Bracket category', { row: Number(v) })} />
+                <SelectInput<string> dropdown value={String(row)} options={rowOptionsFor(row)} onChange={(v) => set('Bracket category', { row: Number(v) })} />
               </Field>
             )}
             <Field label="To">
-              <SelectInput<string> value={b.to} options={optionsFor(b.to)} onChange={(v) => set('Bracket end', { to: v })} />
+              <SelectInput<string> dropdown value={b.to} options={optionsFor(b.to)} onChange={(v) => set('Bracket end', { to: v })} />
             </Field>
             {kind === 'grouped' && (
               <Field label="Category of To" hint="The same category as From, or another one to join two categories.">
-                <SelectInput<string> value={String(b.toRow ?? row)} options={rowOptionsFor(b.toRow ?? row)} onChange={(v) => set('Bracket end category', { row, toRow: Number(v) })} />
+                <SelectInput<string> dropdown value={String(b.toRow ?? row)} options={rowOptionsFor(b.toRow ?? row)} onChange={(v) => set('Bracket end category', { row, toRow: Number(v) })} />
               </Field>
             )}
             {kind === 'xy' && <NumField label="At X" value={b.at ?? 0} onCommit={(v) => set('Bracket X', { at: v }, 'at')} hint="Both series must have a point at this X." />}

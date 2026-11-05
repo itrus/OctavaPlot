@@ -141,3 +141,47 @@ describe('box and violin settings', () => {
     expect(edited.charts[0].distribution).toEqual(p.charts[0].distribution);
   });
 });
+
+describe('notched box plot', () => {
+  const notched = (columns: Array<Array<number | null>>) => {
+    const { p, table } = setup(columns, 'box');
+    const chart = p.charts[0];
+    return buildColumnModel(patchDistribution(chart.id, { notched: true })(p).charts[0], table);
+  };
+
+  it('is a plain box until asked for notches, and an outline then, narrowing at the median', () => {
+    const { table, chart } = setup([plain], 'box');
+    const m0 = buildColumnModel(chart, table);
+    expect(m0.groups[0].dist!.outline).toBeNull();
+    expect(m0.groups[0].bar).not.toBeNull();
+    const m = notched([plain]);
+    const g = m.groups[0];
+    expect(g.dist!.outline).toMatch(/^M.*Z$/);
+    expect(g.dist!.rect).toBeNull();
+    expect(g.bar).toBeNull();
+    // Whiskers and median stay; the median line is as wide as the notch.
+    expect(g.dist!.lines.some((l) => l.id.endsWith(':median'))).toBe(true);
+    expect(g.dist!.lines.filter((l) => l.id.includes('whisker')).length).toBe(2);
+  });
+
+  it('puts the notch at median ± 1.58 × IQR / √n and cuts it at a quartile, saying so', () => {
+    const s = boxSummary(plain, 'minmax')!;
+    const m = notched([plain]);
+    const h = (1.58 * (s.q3 - s.q1)) / Math.sqrt(s.n);
+    const ys = [...m.groups[0].dist!.outline!.matchAll(/L(-?[\d.]+),(-?[\d.]+)/g)].map((x) => Number(x[2]));
+    expect(ys).toContainEqual(expect.closeTo(m.yScale(Math.min(s.median + h, s.q3)), 1));
+    expect(ys).toContainEqual(expect.closeTo(m.yScale(Math.max(s.median - h, s.q1)), 1));
+    // Four values: the notch is wider than the box.
+    const few = notched([[1, 2, 3, 40]]);
+    expect(few.groups[0].dist!.note).toMatch(/cut at a quartile/);
+  });
+
+  it('survives a save and an open, and a file without the option has none', () => {
+    const { p } = setup([plain], 'box');
+    const on = patchDistribution(p.charts[0].id, { notched: true })(p);
+    expect(parseProject(stringifyProject(on)).charts[0].distribution.notched).toBe(true);
+    const raw = JSON.parse(stringifyProject(p)) as { project: { charts: Array<{ distribution: Record<string, unknown> }> } };
+    delete raw.project.charts[0].distribution.notched;
+    expect(parseProject(JSON.stringify(raw)).charts[0].distribution.notched).toBe(false);
+  });
+});

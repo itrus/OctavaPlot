@@ -15,6 +15,8 @@ export interface ChartVariant {
   survival?: Partial<SurvivalOptions>;
   /** A dot plot made with (true) or without (false) sideways spreading of the dots. */
   jitter?: boolean;
+  /** Dots placed as a beeswarm instead of by chance. */
+  swarm?: boolean;
   /** Grouped bars made with the columns grouped by series (separated: each series has its own group of columns). */
   separated?: boolean;
   /** Grouped bars made with the values of each subject joined across the series inside each category. */
@@ -57,6 +59,7 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
     next.yAxis = { ...chart.yAxis, title: variant.forest === 'ratio' ? 'Ratio (log scale)' : 'Effect and interval', ...(variant.forest === 'ratio' ? { scale: 'log10' as const } : {}) };
   }
   if (variant.jitter !== undefined && chart.type === 'scatter') next.jitter = { ...chart.jitter, enabled: variant.jitter };
+  if (variant.swarm !== undefined && chart.type === 'scatter') next.jitter = { ...next.jitter, enabled: true, swarm: variant.swarm };
   if (variant.bySubject !== undefined && chart.type === 'scatter') next.jitter = { ...next.jitter, bySubject: variant.bySubject };
   if (variant.separated && chart.type === 'groupedBar') next.groupedBy = 'series';
   if (variant.subjectLines !== undefined && chart.type === 'groupedBar') next.pairs = { ...next.pairs, bySubject: variant.subjectLines };

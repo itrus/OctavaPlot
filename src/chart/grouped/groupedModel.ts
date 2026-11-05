@@ -26,7 +26,7 @@ import type { ChromeScene } from '../shared/scene/scene';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import type { Orientation } from '../shared/parts/orientation';
 import { displayName } from '../shared/parts/names';
-import { hash01 } from '../shared/parts/jitter';
+import { dotOffsets } from '../shared/parts/jitter';
 import { suppliedStats } from '../../model/table/suppliedStats';
 import { compileGroupedScene } from './groupedChrome';
 import type { BracketGeom } from '../shared/parts/brackets';
@@ -459,13 +459,19 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         // With no density the values themselves are the picture of a violin.
         const showAll = chart.type === 'groupedViolin' && dist?.shape === 'points';
         const dotWidth = dist?.kind === 'box' ? bw * opts.boxWidth : bw * opts.violinWidth;
+        const sideways = new Map<string, number>();
+        {
+          const shown = cell.reps.filter((rep) => onAxis(yAxis, rep.value) && (showAll || wantDot(rep.value)) && !inBreak(yAxis, rep.value));
+          const xs = dotOffsets(chart.jitter, shown.map((rep) => rep.id), shown.map((rep) => yScale(rep.value)), r.style.symbolSizePt, chart.jitter.widthFraction * dotWidth);
+          shown.forEach((rep, k) => sideways.set(rep.id, xs[k]));
+        }
         for (const rep of cell.reps) {
           if (!onAxis(yAxis, rep.value) || (!showAll && !wantDot(rep.value))) continue;
           if (inBreak(yAxis, rep.value)) {
             inGap++;
             continue;
           }
-          dots.push({ id: rep.id, row: cell.row, px: centerX + (chart.jitter.enabled ? (hash01(rep.id) - 0.5) * chart.jitter.widthFraction * dotWidth : 0), py: yScale(rep.value), value: rep.value, stats: null });
+          dots.push({ id: rep.id, row: cell.row, px: centerX + (sideways.get(rep.id) ?? 0), py: yScale(rep.value), value: rep.value, stats: null });
         }
         if (opts.showMean && summary && Number.isFinite(toYDraw(summary.mean))) dots.push({ id: `${id}:mean`, row: cell.row, px: centerX, py: toYDraw(summary.mean), value: summary.mean, stats: null, shape: 'plus' });
         if (dist?.note) warnings.push(`${r.label}, ${categories[cell.ci].label}: ${dist.note}.`);
@@ -514,10 +520,11 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       }
       bars.push(gbar);
       if (showDots(r.style)) {
-        // Spread across the bar's width by a fixed hash of the observation, so the picture is the same every time.
+        // Spread across the bar's width (a swarm, or a fixed hash of the observation, so the picture is the same every time).
         // The dots of a chart that joins the subjects stay on the line of their series, or a subject's line would not meet them.
-        const spread = chart.jitter.enabled && !subjectLines ? bw * chart.jitter.widthFraction : 0;
-        for (const rep of cell.reps) if (placeable(yAxis, rep.value)) dots.push({ id: rep.id, row: cell.row, px: x + bw / 2 + (hash01(rep.id) - 0.5) * spread, py: yScale(rep.value), value: rep.value, stats: null });
+        const shown = cell.reps.filter((rep) => placeable(yAxis, rep.value));
+        const xs = dotOffsets({ enabled: chart.jitter.enabled && !subjectLines, swarm: chart.jitter.swarm }, shown.map((rep) => rep.id), shown.map((rep) => yScale(rep.value)), r.style.symbolSizePt, bw * chart.jitter.widthFraction);
+        shown.forEach((rep, k) => dots.push({ id: rep.id, row: cell.row, px: x + bw / 2 + xs[k], py: yScale(rep.value), value: rep.value, stats: null }));
       }
       let errTop: number | null = null;
       let errBottom: number | null = null;

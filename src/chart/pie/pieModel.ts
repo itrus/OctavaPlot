@@ -172,13 +172,22 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   // Room for the labels round the pie when they are written outside it: the widest one that can occur, and one line.
   const biggest = Math.max(1, ...shown.flatMap((p) => p.g.observations.map((o) => (o.value !== null && Number.isFinite(o.value) ? o.value : 0))));
   const widest = Math.max(0, ...shown.map((p) => measureText(sliceLabelText(opts.labels, p.label, biggest, 1, opts.percentDigits) ?? '', labelPt, false, false, chart.fontFamily)));
-  const roomX = opts.labels === 'none' ? 12 : 16 + widest;
-  const roomY = opts.labels === 'none' ? 12 : 16 + labelPt * 1.2;
-  const { cols, rows: rowsDown, diameter } = pieGrid(Math.max(1, rows.length), plot.width, plot.height, roomX, roomY, titleBand);
+  const bars = chart.type === 'slices';
+  const dots = chart.type === 'dotGrid';
+  // The dots carry no text beside them, and the bars write theirs under each bar: only a circle wants room round it for its labels.
+  const roomX = dots || bars || opts.labels === 'none' ? 12 : 16 + widest;
+  const roomY = dots || opts.labels === 'none' ? 12 : 16 + labelPt * 1.2;
+  // A bar of slices runs across the chart, one under the other; the others are placed in a grid of as many as fit.
+  const barLine = bars ? labelPt * 1.4 : 0;
+  const { cols, rows: rowsDown, diameter } = bars
+    ? { cols: 1, rows: Math.max(1, rows.length), diameter: Math.min(plot.width * 0.92, Math.max(0, plot.height / Math.max(1, rows.length) - titleBand - barLine) * 5) }
+    : pieGrid(Math.max(1, rows.length), plot.width, plot.height, roomX, roomY, titleBand);
   const cellW = plot.width / cols;
   const cellH = plot.height / rowsDown;
   const r = diameter / 2;
-  if (rows.length > 0 && r < 12) warnings.push('The chart is too small for its pies; enlarge the chart, use fewer rows, or switch the labels off.');
+  // The height of a bar: a fifth of its length, as long as the row has room for it, its title and its labels.
+  const barH = bars ? Math.min(diameter / 5, Math.max(0, cellH - titleBand - barLine)) : 0;
+  if (rows.length > 0 && (bars ? barH < 8 : r < 12)) warnings.push(bars ? 'The chart is too small for its bars; enlarge the chart or use fewer rows.' : 'The chart is too small for its pies; enlarge the chart, use fewer rows, or switch the labels off.');
   const rInner = chart.type === 'doughnut' ? r * opts.hole : 0;
   const dir = opts.direction === 'clockwise' ? 1 : -1;
   const start = (opts.startAngle * Math.PI) / 180;
@@ -203,6 +212,9 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
       return;
     }
     let angle = start;
+    const dotCounts = dots ? dotAllocation(weights) : [];
+    let dotAt = 0;
+    let cumulative = 0;
     const slices: PieSlice[] = shown.map((p, i) => {
       const w = weights[i];
       const fraction = w / total;
@@ -212,6 +224,22 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
       const id = `${p.g.id}:slice:${row}`;
       const obsId = p.g.observations[row]?.id;
       if (!(w > 0)) return { id, obsId, groupId: p.g.id, label: p.label, value: w, fraction, path: '', style: p.style, text: null };
+      if (bars) {
+        // A bar of slices: the segment of the whole bar that is its share, with its text under it (left out where it would not fit).
+        const x0 = cx - diameter / 2 + cumulative * diameter;
+        cumulative += fraction;
+        const width = fraction * diameter;
+        const content = sliceLabelText(opts.labels, p.label, w, fraction, opts.percentDigits);
+        const text = content !== null && measureText(content, labelPt, false, false, chart.fontFamily) <= width ? { x: x0 + width / 2, y: cy + barH / 2 + labelPt * 1.1, anchor: 'middle' as const, content } : null;
+        return { id, obsId, groupId: p.g.id, label: p.label, value: w, fraction, path: `M${n2(x0)},${n2(cy - barH / 2)}H${n2(x0 + width)}V${n2(cy + barH / 2)}H${n2(x0)}Z`, style: p.style, text };
+      }
+      if (dots) {
+        // The 100 dots of a 10 by 10 grid, filled row by row from the top left: this part's dots are the next ones.
+        const count = dotCounts[i];
+        const from = dotAt;
+        dotAt += count;
+        return { id, obsId, groupId: p.g.id, label: p.label, value: w, fraction, path: dotsPath(cx, cy, diameter, from, from + count), style: p.style, text: null };
+      }
       const mid = (a0 + a1) / 2;
       const content = sliceLabelText(opts.labels, p.label, w, fraction, opts.percentDigits);
       // The text sits outside the circle, on the side of its slice.
@@ -230,8 +258,8 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
       rInner,
       total,
       slices,
-      titleAt: { x: cx, y: cy - r - roomY - fontPt * 0.4 },
-      totalAt: { x: cx, y: cy + r + roomY + fontPt * 0.8 },
+      titleAt: bars ? { x: cx, y: cy - barH / 2 - fontPt * 0.6 } : { x: cx, y: cy - r - roomY - fontPt * 0.4 },
+      totalAt: bars ? { x: cx, y: cy + barH / 2 + barLine + fontPt * 1.6 } : { x: cx, y: cy + r + roomY + fontPt * 0.8 },
       totalText,
       totalInHole: totalText !== null && rInner > 0 && measureText(totalText, fontPt, false, false, chart.fontFamily) <= rInner * 1.7,
     });
@@ -252,4 +280,33 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   let marks: SceneElement[] | undefined;
   Object.defineProperty(model, 'marks', { enumerable: false, configurable: true, get: () => (marks ??= compilePieMarks(chart, model)) });
   return model;
+}
+
+/**
+ * How many of the 100 dots of a grid each part gets: its share of 100, rounded down, and the dots that are left go to the parts with the
+ * largest remainders (the earlier part first on a tie), so that the 100 are always used and a part with a weight is never made smaller
+ * by another's rounding. Parts with no weight get none; with no weight at all, none get any.
+ */
+export function dotAllocation(weights: readonly number[]): number[] {
+  const total = weights.reduce((a, b) => a + b, 0);
+  if (!(total > 0)) return weights.map(() => 0);
+  const exact = weights.map((w) => (w / total) * 100);
+  const counts = exact.map(Math.floor);
+  let left = 100 - counts.reduce((a, b) => a + b, 0);
+  const order = exact.map((e, i) => ({ i, rest: e - Math.floor(e) })).filter((o) => weights[o.i] > 0).sort((a, b) => b.rest - a.rest || a.i - b.i);
+  for (let k = 0; left > 0 && order.length > 0; k = (k + 1) % order.length, left--) counts[order[k].i]++;
+  return counts;
+}
+
+/** The circles of the dots `from` to `to` (0 to 99, row by row from the top left) of a 10 by 10 grid of the given side centred on (cx, cy), as one path. */
+export function dotsPath(cx: number, cy: number, side: number, from: number, to: number): string {
+  const pitch = side / 10;
+  const radius = pitch * 0.4;
+  let d = '';
+  for (let k = from; k < to; k++) {
+    const x = cx - side / 2 + (k % 10 + 0.5) * pitch;
+    const y = cy - side / 2 + (Math.floor(k / 10) + 0.5) * pitch;
+    d += `M${n2(x - radius)},${n2(y)}a${n2(radius)},${n2(radius)} 0 1 0 ${n2(2 * radius)},0a${n2(radius)},${n2(radius)} 0 1 0 ${n2(-2 * radius)},0Z`;
+  }
+  return d;
 }

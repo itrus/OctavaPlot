@@ -10,7 +10,7 @@ import { buildXyModel } from './xyModel';
 const table = createXyTable('XY', true, { kind: 'replicates', n: 3 });
 const make = (patch: Partial<Chart> = {}): Chart => {
   const c = createChart(table.id, undefined, 'xyLineSymbols');
-  return { ...c, ...patch, layers: c.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showErrorBars: true, showRawPoints: true } } : l)) };
+  return { ...c, ...patch, layers: c.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showErrorBars: true } } : l)) };
 };
 const project = (chart: Chart): Project => ({ id: 'p', name: 'p', dataTables: [table], charts: [chart] });
 const chartOf = (p: Project) => p.charts[0];
@@ -31,10 +31,12 @@ describe('putting the data layers in another order', () => {
     const pointsId = idOf(chart, 'points');
     const before = sceneOrder(chart);
     const z = (c: Chart, id: Id) => layersOf(c, table).find((l) => l.id === id)!.z;
-    const down = chartOf(move(project(chart), pointsId, -1));
+    // The individual values (one layer for each series), which are not drawn while the means have symbols, lie right under the points: three places down puts them under an error bar layer.
+    const steps = (p: Project, step: 1 | -1, n: number): Project => (n === 0 ? p : steps(project(chartOf(move(p, pointsId, step))), step, n - 1));
+    const down = chartOf(steps(project(chart), -1, 3));
     expect(z(down, pointsId)).toBeLessThan(z(chart, pointsId));
     expect(sceneOrder(down).indexOf(pointsId)).toBeLessThan(before.indexOf(pointsId));
-    const back = chartOf(move(project(down), pointsId, 1));
+    const back = chartOf(steps(project(down), 1, 3));
     expect(sceneOrder(back)).toEqual(before);
   });
 

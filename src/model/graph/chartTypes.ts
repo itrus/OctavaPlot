@@ -70,6 +70,7 @@ export const CHART_TYPES: readonly ChartTypeInfo[] = [
   { type: 'xyLineSymbols', tableKind: 'xy', label: 'Line with symbols', description: 'Points joined in table order, each marked.' },
   { type: 'xyOffset', tableKind: 'xy', label: 'Offset traces', description: 'The series one above the other, each lifted by a fixed step, with a scale bar in place of the Y axis.' },
   { type: 'xyBubble', tableKind: 'xy', label: 'Bubbles', description: 'Symbols whose area follows a second column (Y and size); the largest bubble is the symbol size.' },
+  { type: 'xyVolcano', tableKind: 'xy', label: 'Volcano plot', description: 'Fold change (X, log2) against significance (Y, from the p-value): the points past both thresholds are coloured up or down, with the thresholds drawn as lines.' },
   { type: 'xyBars', tableKind: 'xy', label: 'Bars at numeric X', description: 'Bars placed at X values, from a baseline up to Y; several series stand side by side.' },
   { type: 'xySpikes', tableKind: 'xy', label: 'Spikes', description: 'Thin lines from the baseline up to each point.' },
   { type: 'xyArea', tableKind: 'xy', label: 'Area under the curve', description: 'The area between the baseline and the line through the points.' },
@@ -82,6 +83,8 @@ export const CHART_TYPES: readonly ChartTypeInfo[] = [
   { type: 'groupedLine', tableKind: 'grouped', label: 'Lines over categories', description: 'One line per series joining its means across the categories.' },
   { type: 'pie', tableKind: 'contingency', label: 'Pie charts', description: 'The outcomes of each row as parts of a circle.' },
   { type: 'doughnut', tableKind: 'contingency', label: 'Doughnut charts', description: 'Pie charts with a hole, and the total of each row in it.' },
+  { type: 'slices', tableKind: 'contingency', label: 'Slices', description: 'The outcomes of each row as parts of one bar, as wide as their share.' },
+  { type: 'dotGrid', tableKind: 'contingency', label: '10 × 10 dot plot', description: 'The outcomes of each row as parts of 100 dots in a grid of 10 by 10, one dot for each percent.' },
   { type: 'contingencyBars', tableKind: 'contingency', label: 'Side-by-side bars', description: 'Counts: one bar per outcome within each row.' },
   { type: 'contingencyStacked', tableKind: 'contingency', label: 'Stacked bars', description: 'Counts: the outcomes stacked in one bar per row.' },
   { type: 'contingencyPercent', tableKind: 'contingency', label: '100% stacked bars', description: 'Each row\'s outcomes as a share of its own total.' },
@@ -109,6 +112,7 @@ export function chartFamily(type: ChartType): ChartFamily {
     case 'xyArea':
     case 'xyBars':
     case 'xyBubble':
+    case 'xyVolcano':
     case 'xyOffset':
       return 'xy';
     case 'groupedBar':
@@ -124,6 +128,8 @@ export function chartFamily(type: ChartType): ChartFamily {
     case 'survival':
     case 'cumulativeEvent':
       return 'survival';
+    case 'slices':
+    case 'dotGrid':
     case 'pie':
     case 'doughnut':
       return 'pie';

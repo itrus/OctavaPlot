@@ -76,9 +76,11 @@ export function layersOf(chart: Chart, table: DataTable): LayerSpec[] {
   const survival = chartFamily(chart.type) === 'survival';
   const kmRef = (id: Id): CalcRef => ({ kind: 'survival', seriesId: id });
   const no = () => false;
-  const points = ofKind('points', (st) => st.showSymbols, yes, survival ? kmRef : summaryRef);
-  // Every replicate of a row, behind the centres; only a table of replicates has them, and they are off until asked for.
-  const raw = !survival && layoutOf(table).kind === 'replicates' ? ofKind('rawPoints', (st) => st.showRawPoints, (st) => st.showRawPoints) : [];
+  const hasRaw = !survival && layoutOf(table).kind === 'replicates';
+  // The symbols show the centres or the individual values, never both: while the individual values are shown, the centres have no symbol.
+  const points = ofKind('points', (st) => st.showSymbols && !(hasRaw && st.showRawPoints), yes, survival ? kmRef : summaryRef);
+  // Every replicate of a row; only a table of replicates has them, and they are off until asked for.
+  const raw = hasRaw ? ofKind('rawPoints', (st) => st.showRawPoints, (st) => st.showRawPoints) : [];
   const parts = survival ? [
     // The survival axes are fixed (time from 0, fraction 0 to 1), so the band and the error bars never feed them.
     ...ofKind('band', () => chart.survival.band, no, kmRef),
@@ -339,6 +341,7 @@ function dataRangeKindsOf(type: ChartType): ReadonlyArray<LayerKind> {
     case 'xyArea':
     case 'xyBars':
     case 'xyBubble':
+    case 'xyVolcano':
     case 'xyOffset':
       return ['points', 'rawPoints', 'errorBars', 'xErrorBars', 'fitCurve'];
     case 'bar':

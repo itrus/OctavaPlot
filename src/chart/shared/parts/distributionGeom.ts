@@ -62,6 +62,24 @@ export function buildBox(c: Common & { width: number; summary: BoxSummary | null
     lines.push({ id: `${id}:whisker-hi`, d: vline(centerX, q3, hi) + cap(s.whiskerHigh), color: lineColor, strokeWidth: lineWidthPt, opacity: lineOpacity });
     lines.push({ id: `${id}:whisker-lo`, d: vline(centerX, q1, lo) + cap(s.whiskerLow), color: lineColor, strokeWidth: lineWidthPt, opacity: lineOpacity });
     if (opts.showMedian) lines.push({ id: `${id}:median`, d: hline(centerX - half, centerX + half, med), color: lineColor, strokeWidth: lineWidthPt, opacity: lineOpacity });
+    if (opts.notched && s.n > 0) {
+      // Notches: the body narrows at the median to the interval of its 95 % confidence, median ± 1.58 × IQR / √n. A notch that would go past a
+      // quartile (few values) is cut at the quartile, so that the box never folds over itself; it is said in a notice.
+      const h = (1.58 * (s.q3 - s.q1)) / Math.sqrt(s.n);
+      const nHi = toY(Math.min(s.median + h, s.q3));
+      const nLo = toY(Math.max(s.median - h, s.q1));
+      if (finite(nHi, nLo)) {
+        const l = centerX - half;
+        const r = centerX + half;
+        const inL = centerX - half * 0.5;
+        const inR = centerX + half * 0.5;
+        const p = (x: number, y: number) => `${n2(x)},${n2(y)}`;
+        const outline = `M${p(l, q3)}L${p(r, q3)}L${p(r, nHi)}L${p(inR, med)}L${p(r, nLo)}L${p(r, q1)}L${p(l, q1)}L${p(l, nLo)}L${p(inL, med)}L${p(l, nHi)}Z`;
+            const cut = s.median + h > s.q3 || s.median - h < s.q1;
+        const medianLine = opts.showMedian ? [{ id: `${id}:median`, d: hline(inL, inR, med), color: lineColor, strokeWidth: lineWidthPt, opacity: lineOpacity }] : [];
+        return { kind: 'box', rect: null, outline, lines: [...lines.filter((l2) => !l2.id.endsWith(':median')), ...medianLine], shape: 'box', note: cut ? 'the notch of the median is cut at a quartile (too few values for a full notch)' : null };
+      }
+    }
     return { kind: 'box', rect: { x: centerX - half, y: Math.min(q1, q3), width: c.width, height: Math.abs(q1 - q3) }, outline: null, lines, shape: 'box', note: null };
   }
   // Fewer than 4 values: the range as a line with caps, and the median across it.

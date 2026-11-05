@@ -161,16 +161,16 @@ export const NotesPageIcon = () => (
   </Icon>
 );
 
-/** A small chevron for menus. */
-export const ChevronDownIcon = () => (
-  <Icon>
-    <path d="M4 6.2l4 4 4-4" />
-  </Icon>
-);
-
 /** The cross of a close button: larger than the other icons and drawn with a heavier line, so that it is easy to see and to hit. */
 export const CloseIcon = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
     <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
   </svg>
+);
+
+/** Four corners pointing outwards: fit to the window (100%). */
+export const FitWindowIcon = () => (
+  <Icon>
+    <path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" />
+  </Icon>
 );

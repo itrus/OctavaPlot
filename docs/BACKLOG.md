@@ -265,3 +265,18 @@ From `npm run perf` (see the performance table in [ROADMAP.md](ROADMAP.md)); siz
 - Silent downsampling of exports, and any claim of Prism parity in packing, violins or splines.
 - ANOVA, post-hoc and model-selection workflows (roadmap: out of scope).
 - Replacing zero by a tiny value before a log axis.
+
+## 5 November 2026: dot placement, one symbol kind, buttons, status bar
+
+- **Beeswarm (built, tested in code, not tried in a browser).** The dots of a scatter dot plot, a bar, box or violin chart of grouped data and the box and violin charts can be Aligned, Jitter or Swarm (`jitter.swarm`, saved; a file without it has false). A swarm places the dots from the lowest up at the free place nearest the middle, so that none touches another and no height changes; `widthFraction` is the widest it may be (a wider swarm is held to it and its dots then overlap). `swarmOffsets` and `dotOffsets` are in `chart/shared/parts/jitter.ts`. Not done: the dots of nested charts (grouped by subject) keep their own clusters, a paired plot keeps its dots on the line, the size of a dot given its own look is not taken into account, and a swarm is made per column, not across columns.
+- **One symbol kind in XY charts of replicates (built, tested in code).** The symbols show the mean or median of each row or every replicate, never both: while the individual values are shown, the points layer of the centres is not drawn. The Symbols box has a "Symbols show" choice. A graph that had both now shows the individual values only.
+- **Short lists as buttons (built, tested in code; two e2e specs changed).** A choice of two or three short entries is shown as buttons like the export format; project-driven lists (graphs, data sets, results) stay drop-downs.
+- **Graph page and status bar.** The Delete button of the Graph page is gone (the navigator's Delete does the same); the status bar's Fit button is an icon with "100%".
+
+## 5 November 2026 (later): notched box, volcano plot, slices and the 10 × 10 dot plot
+
+Built and tested in code; drawn to SVG and looked at in Chrome (not tried in the app itself, so the inspector sections are not tried).
+
+- **Notched box (`distribution.notched`, saved; false in a file without it).** The box narrows at the median to median ± 1.58 × IQR / √n. The body is an outline (the same shape as a violin), so a pattern fill does not apply to it; with few values a notch would pass a quartile and is cut there, which is noted. Box plots of columns and of grouped data.
+- **Volcano plot (`xyVolcano`, `volcano` saved).** An XY table of one Y: X the log2 fold change, Y the p-value (or its −log10), the row titles the names. A p-value outside (0, 1] is not drawn and counted. Points past both thresholds are up (red) or down (blue), the others grey; the three threshold lines are ordinary reference lines that follow the thresholds until deleted; the up and down points can carry their row titles (placed apart, with leaders). Not done: the legend (off from the start) does not list the three classes, the labels cannot be edited or dragged one by one, the right axis and curve fits are not meant for it, and the threshold lines do not come back when a chart is changed into a volcano plot (only a new one has them).
+- **Slices (`slices`) and 10 × 10 dot plot (`dotGrid`).** Parts of a whole, from the same table as a pie. Slices: one bar for each row, a segment as wide as each share, its text under it (left out where it would not fit). Dot plot: 100 dots in a grid for each row, filled row by row from the top left, shares rounded to whole dots by the largest remainders. Not done: the dot plot has no text beside it (the legend names the parts), and slices and dots are not selectable by part beyond the legend.

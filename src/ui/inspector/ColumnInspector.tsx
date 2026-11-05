@@ -73,6 +73,7 @@ import { CalculationOptions,IntervalFields, LineAtField } from './sections/Summa
 import { displayName } from '../../chart/shared/parts/names';
 import type { InspectorPage } from '../../state/inspectorNav';
 import { SLIDERS } from './common/sliderRanges';
+import { DotPlacementControls } from './sections/DotPlacementControls';
 
 /** The formatting panel of the charts over the columns of a table (bar, dots, mean, box, floating, paired, violin). */
 function DatasetSwatchChip({ style }: { style: ChartStyle }) {
@@ -388,10 +389,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             <NumField {...SLIDERS.fraction} label="Border opacity" value={st.symbolBorderOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolBorderOpacity')} onCommit={(v) => setStyle({ symbolBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
             {chart.type !== 'mean' && (
               <>
-                <Field label="Horizontal jitter" note={st.showSymbols ? null : 'Jitter moves symbols. Turn on symbols to use it.'}>
-                  <Check checked={chart.jitter.enabled} disabled={!st.showSymbols} onChange={(v) => run('Jitter', patchJitter(chart.id, { enabled: v }))} />
-                </Field>
-                <NumField {...SLIDERS.fraction} label="Jitter width" value={chart.jitter.widthFraction} min={0} max={1} disabled={!st.showSymbols || !chart.jitter.enabled} hint="Fraction of the group slot; deterministic, never moves values vertically" onCommit={(v) => run('Jitter width', patchJitter(chart.id, { widthFraction: v }), 'jitter:w')} />
+                <DotPlacementControls chart={chart} disabled={!st.showSymbols} />
                 {chart.type === 'scatter' && (
                   <Field label="Group dots by subject" note="The dots of each subject sit together with a marker at their mean; the mean line and error bar are of the subjects. Name subjects in the data table (Subject…).">
                     <Check checked={chart.jitter.bySubject === true} disabled={!st.showSymbols} onChange={(v) => run('Group dots by subject', patchJitter(chart.id, { bySubject: v }))} />

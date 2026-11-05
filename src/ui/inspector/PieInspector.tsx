@@ -26,6 +26,9 @@ export function PieInspector({ chart, table }: { chart: Chart; table: DataTable 
   const d = chart.pie;
   const set = (label: string, patch: Partial<PieOptions>, key?: string) => run(label, patchLook(chart.id, { pie: { ...d, ...patch } }), key);
   const doughnut = chart.type === 'doughnut';
+  // Only a circle has a start and a direction; the dots of a grid have no text beside them (the legend names the parts).
+  const circle = chart.type === 'pie' || doughnut;
+  const dotGrid = chart.type === 'dotGrid';
   const selectedGroup = selection.kind === 'group' ? selection.groupId : null;
   // The first column of a contingency table is a part like the others (a part is an outcome).
   const parts = table.groups.map((g, i) => ({ g, style: resolveStyle(chart, layer, { id: g.id, paletteIndex: g.paletteIndex ?? i }), label: displayName(chart, g.id, g.name) }));
@@ -43,24 +46,29 @@ export function PieInspector({ chart, table }: { chart: Chart; table: DataTable 
               </GroupBox>
               <LayersSection chart={chart} table={table} />
 
-              <GroupBox title={doughnut ? 'Doughnut' : 'Pie'}>
-                <NumField label="First part starts at" unit="°" hint="Degrees from the top, clockwise" value={d.startAngle} min={PIE_LIMITS.startAngle.min} max={PIE_LIMITS.startAngle.max} onCommit={(v) => set('Pie start angle', { startAngle: v }, 'pie:start')} />
-                <Field label="Direction">
-                  <SelectInput<PieOptions['direction']>
-                    value={d.direction}
-                    options={[
-                      { value: 'clockwise', label: 'Clockwise' },
-                      { value: 'counterclockwise', label: 'Counterclockwise' },
-                    ]}
-                    onChange={(v) => set('Pie direction', { direction: v })}
-                  />
-                </Field>
+              <GroupBox title={doughnut ? 'Doughnut' : chart.type === 'slices' ? 'Slices' : dotGrid ? '10 × 10 dot plot' : 'Pie'}>
+                {circle && <NumField label="First part starts at" unit="°" hint="Degrees from the top, clockwise" value={d.startAngle} min={PIE_LIMITS.startAngle.min} max={PIE_LIMITS.startAngle.max} onCommit={(v) => set('Pie start angle', { startAngle: v }, 'pie:start')} />}
+                {circle && (
+                  <Field label="Direction">
+                    <SelectInput<PieOptions['direction']>
+                      value={d.direction}
+                      options={[
+                        { value: 'clockwise', label: 'Clockwise' },
+                        { value: 'counterclockwise', label: 'Counterclockwise' },
+                      ]}
+                      onChange={(v) => set('Pie direction', { direction: v })}
+                    />
+                  </Field>
+                )}
+                {dotGrid && <div className="muted small">One dot for each percent of a row, filled row by row from the top left. The shares are rounded to whole dots so that there are always 100; the legend names the parts.</div>}
                 {doughnut && <NumField {...SLIDERS.fraction} label="Hole" hint="Fraction of the radius" value={d.hole} min={PIE_LIMITS.hole.min} max={PIE_LIMITS.hole.max} onCommit={(v) => set('Doughnut hole', { hole: v }, 'pie:hole')} />}
+                {!dotGrid && (
                 <Field label="Labels">
                   <SelectInput<PieLabelMode> value={d.labels} options={PIE_LABEL_MODES.map((m) => ({ value: m.value, label: m.label }))} onChange={(v) => set('Pie labels', { labels: v })} />
                 </Field>
-                <NumField label="Percent decimals" value={d.percentDigits} min={PIE_LIMITS.percentDigits.min} max={PIE_LIMITS.percentDigits.max} slider={false} disabled={d.labels === 'none' || d.labels === 'name' || d.labels === 'value'} onCommit={(v) => set('Percent decimals', { percentDigits: Math.round(v) }, 'pie:digits')} />
-                <Field label="Show the total" hint={doughnut ? 'In the hole of each doughnut' : 'Under each pie'}>
+                )}
+                {!dotGrid && <NumField label="Percent decimals" value={d.percentDigits} min={PIE_LIMITS.percentDigits.min} max={PIE_LIMITS.percentDigits.max} slider={false} disabled={d.labels === 'none' || d.labels === 'name' || d.labels === 'value'} onCommit={(v) => set('Percent decimals', { percentDigits: Math.round(v) }, 'pie:digits')} />}
+                <Field label="Show the total" hint={doughnut ? 'In the hole of each doughnut' : chart.type === 'slices' ? 'Under each bar' : 'Under each pie'}>
                   <Check checked={d.showTotal} onChange={(v) => set('Show total', { showTotal: v })} />
                 </Field>
                 <Field label="Total text">

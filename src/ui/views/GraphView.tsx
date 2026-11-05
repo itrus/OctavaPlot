@@ -11,9 +11,9 @@ import { hitFromTarget, type HitTarget, pointerToChartPt } from '../../chart/sha
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
 import type { PreparedChart } from '../../model/table/preparedChart';
 import { useApp } from '../../state/AppContext';
-import { composeCommands, patchAnnotation, patchBracket, patchPointStyle, removeChart, resetAllDataSets } from '../../state/commands';
+import { composeCommands, patchAnnotation, patchBracket, patchPointStyle, resetAllDataSets } from '../../state/commands';
 import { annotationPlacer, drawnFractions, nudgePatches, patchForMove } from '../../chart/shared/scene/annotationPlace';
-import { DeleteIcon, ResetIcon } from '../components/icons';
+import { ResetIcon } from '../components/icons';
 import { inspectorTargetFor } from '../inspector/common/nav';
 import type { Box } from '../../chart/shared/parts/labels';
 
@@ -280,17 +280,6 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
         >
           <ResetIcon />
           Reset
-        </button>
-        <button
-          className="icon-text"
-          onClick={() => {
-            run('Delete graph', removeChart(chart.id));
-            setStatus(`Deleted ${chart.name}. Undo (Ctrl+Z) restores it.`);
-          }}
-          title="Delete this graph (the data stay; it is also removed from layouts; can be undone)"
-        >
-          <DeleteIcon />
-          Delete
         </button>
         {fitsPending > 0 && <span className="toolbar-info export-status" role="status">Fitting the curve…</span>}
       </div>

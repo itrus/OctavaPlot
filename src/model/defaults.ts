@@ -1,5 +1,6 @@
 import { newId } from './ids';
 import { DEFAULT_CUSTOM_COLOURS } from './options/heatmapOptions';
+import { DEFAULT_VOLCANO, withVolcanoLines } from './options/volcanoOptions';
 import { DEFAULT_PALETTE_ID } from './graph/palettes';
 import { chartFamily } from './graph/chartTypes';
 import { defaultSeriesName, subLabels, summaryFormatInfo } from './table/tableLayout';
@@ -42,11 +43,13 @@ export const BAR_PALETTE = ['#d9d9d9', '#a6a6a6', '#737373', '#f2f2f2', '#595959
 
 /** The layer style a chart of this type starts with: its preset, and for survival curves a plus sign as the censor mark. */
 const initialLayerStyle = (type: ChartType): Partial<ChartStyle> =>
-  type === 'survival' || type === 'cumulativeEvent' ? { ...TYPE_PRESETS[type], symbolShape: 'plus', symbolSizePt: 18, symbolBorderWidthPt: 4 } : { ...TYPE_PRESETS[type] };
+  type === 'survival' || type === 'cumulativeEvent' ? { ...TYPE_PRESETS[type], symbolShape: 'plus', symbolSizePt: 18, symbolBorderWidthPt: 4 } : type === 'xyVolcano' ? { ...TYPE_PRESETS[type], symbolSizePt: 8 } : { ...TYPE_PRESETS[type] };
 
 /** Axis titles a new chart of this type starts with. */
 function axisTitlesFor(type: ChartType): { x: string; y: string } {
   switch (type) {
+    case 'xyVolcano':
+      return { x: 'log2 fold change', y: '−log10 p-value' };
     case 'xyScatter':
     case 'xyLine':
     case 'xyLineSymbols':
@@ -82,7 +85,7 @@ const defaultSummaryFor = (type: ChartType): SummarySpec =>
 
 export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, method: 'loglog', atRisk: false, eventSymbols: false, errorBars: false };
 
-const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4, bySubject: false };
+const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4, bySubject: false, swarm: false };
 
 /** Line weight shared by the axes, bar borders, error bars and connecting lines, so they read as one family. */
 const AXIS_LINE_PT = 4;
@@ -100,6 +103,7 @@ const DEFAULT_DISTRIBUTION: DistributionOptions = {
   trim: 'sample',
   normalisation: 'width',
   showQuartiles: true,
+  notched: false,
 };
 /** Heat maps (spec 13.1): a single gradient, the range of the values, nothing normalised, no numbers in the cells. */
 const DEFAULT_HEATMAP: HeatmapOptions = { palette: 'bs-blue', reverse: false, min: null, max: null, centre: null, normalise: 'none', method: 'zscore', summary: 'mean', showValues: false, decimals: null, cellGapPt: 0, transpose: false, colourbar: true, missingColour: '#d9d9d9', steps: null, breaks: [], missingMark: 'none', excludedColour: null, excludedMark: 'none', outsideColour: null, outsideMark: 'none', cellWidthPt: null, cellHeightPt: null, rowGroupSize: null, colGroupSize: null, groupGapPt: 6, rowLabelEvery: 1, colLabelEvery: 1, barWidthPt: 24, barLengthPct: 100, barTicks: 5, barTitle: null, customColours: DEFAULT_CUSTOM_COLOURS };
@@ -204,6 +208,8 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
   xyBars: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   // Bubbles: the symbols, sized by the second column of each series.
   xyBubble: { showBars: false, showSymbols: true, showLines: false, showMeanLine: false },
+  // Volcano plot: the symbols, coloured by up, down and not significant.
+  xyVolcano: { showBars: false, showSymbols: true, showLines: false, showMeanLine: false },
   // Offset traces: lines, one above the other; the symbols are off until asked for.
   xyOffset: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   groupedBar: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
@@ -215,6 +221,9 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
   groupedLine: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
   pie: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   doughnut: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
+  // Slices (one bar for each row) and the 10 by 10 dot plot are the parts of a whole as the pie is: the fill of each part is the bar fill.
+  slices: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
+  dotGrid: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   contingencyBars: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   contingencyStacked: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   contingencyPercent: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
@@ -265,7 +274,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     summary: { ...defaultSummaryFor(type) },
     groupSummary: {},
   };
-  return {
+  const chart: Chart = {
     id: newId('chart'),
     name: 'Graph 1',
     dataTableId,
@@ -295,6 +304,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     lineOrder: 'auto',
     lineConnect: 'table',
     traceOffset: null,
+    volcano: { ...DEFAULT_VOLCANO, lineIds: [] },
     groupedBy: 'category',
     origin: { x: null, y: null },
     bars: { ...DEFAULT_BARS },
@@ -324,6 +334,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     layerOrder: [],
     layerStyles: {},
   };
+  return type === 'xyVolcano' ? withVolcanoLines(chart) : chart;
 }
 
 const EXAMPLE_DATA: Array<[string, number[]]> = [

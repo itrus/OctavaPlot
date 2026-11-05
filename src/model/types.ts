@@ -109,6 +109,7 @@ export type ChartType =
   | 'xyBars'
   | 'xyBubble'
   | 'xyOffset'
+  | 'xyVolcano'
   | 'xyArea'
   | 'groupedBar'
   | 'groupedLine'
@@ -120,6 +121,8 @@ export type ChartType =
   | 'contingencyBars'
   | 'pie'
   | 'doughnut'
+  | 'slices'
+  | 'dotGrid'
   | 'contingencyStacked'
   | 'contingencyPercent'
   | 'survival'
@@ -333,6 +336,8 @@ export interface DistributionOptions {
   trim: 'sample' | 'tails';
   normalisation: ViolinNormalisationKind;
   showQuartiles: boolean;
+  /** Box: notches at the median, as wide as its 95 % confidence interval (median ± 1.58 × IQR / √n); the body is then an outline, with no pattern fill. */
+  notched: boolean;
 }
 
 /** Paired plots: the rows of a column table are subjects, joined by a line across the columns (spec 7.2, 8.3). */
@@ -632,6 +637,8 @@ export interface JitterConfig {
   enabled: boolean;
   /** Fraction of the category slot width, 0..1. */
   widthFraction: number;
+  /** Beeswarm instead of jitter: the dots are placed sideways, by their heights, so that none touches another. Only with `enabled`; `widthFraction` is then the widest the swarm may be. */
+  swarm: boolean;
   /**
    * Dot plots only: the dots of each subject (see `Observation.subject`) sit side by side in a cluster of their own, each subject
    * has a marker at its mean, and the mean line and the error bar are calculated from those unit means (n = the subjects).
@@ -804,6 +811,8 @@ export interface Chart {
   lineConnect: LineConnect;
   /** Offset traces (chart type `xyOffset`): trace i is lifted by i times this, in Y units; null = automatic (see model/table/offset.ts). */
   traceOffset: number | null;
+  /** Volcano plot (chart type `xyVolcano`): what the Y column holds, the thresholds, the colours, which points are labelled, and the reference lines made at the thresholds. */
+  volcano: VolcanoOptions;
   /** Grouped bars of side-by-side series: the columns grouped by category (the usual layout) or by series (separated: each series has its own group of columns). */
   groupedBy: GroupedBy;
   /**
@@ -980,3 +989,19 @@ export type FolderKey = 'tables' | 'results' | 'graphs' | 'layouts';
 
 /** A page of the project, or the overview of a folder (all its pages as thumbnails). */
 export type ViewRef = { kind: 'table'; id: Id } | { kind: 'chart'; id: Id } | { kind: 'analysis'; id: Id } | { kind: 'layout'; id: Id } | { kind: 'folder'; id: FolderKey };
+
+/** Volcano plots: X is a log2 fold change; Y is a p-value, or its -log10 when `yInput` says so. Up: X at or above the fold threshold and p below the threshold; down: the same on the negative side. */
+export interface VolcanoOptions {
+  yInput: 'p' | 'neglog10';
+  /** Of |X|: a point needs at least this fold change to count as up or down. */
+  fcThreshold: number;
+  /** A point needs a p-value below this to count as up or down. */
+  pThreshold: number;
+  upColor: string;
+  downColor: string;
+  nsColor: string;
+  /** Which points carry the title of their row: none, or the up and down ones. */
+  labels: 'none' | 'significant';
+  /** The reference lines made at the thresholds (the two fold lines and the p line); they move with the thresholds for as long as they exist. */
+  lineIds: Id[];
+}

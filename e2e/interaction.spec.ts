@@ -90,7 +90,7 @@ test.describe('annotations', () => {
     await openGraph(page);
     await page.getByRole('tab', { name: 'Notes' }).click();
     await page.getByRole('button', { name: '+ Add text annotation' }).click();
-    await page.getByLabel('Anchor').selectOption('data');
+    await page.getByLabel('Anchor').getByRole('button', { name: 'Data values' }).click();
     const yValue = page.getByRole('textbox', { name: 'Y value', exact: true });
     await yValue.fill('1');
     await yValue.press('Enter');
