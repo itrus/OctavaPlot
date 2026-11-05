@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../../../model/defaults';
-import { applyVariant } from '../../../model/graph/chartVariant';
-import { layersOf } from '../../../model/graph/layers';
-import type { Project } from '../../../model/types';
-import { addChart, addDataTable, patchLayerStyle, patchStyle } from '../../../state/commands';
-import { chartToSvgString } from '../../export/export';
+import { createExampleProject } from '../../model/defaults';
+import { applyVariant } from '../../model/graph/chartVariant';
+import { layersOf } from '../../model/graph/layers';
+import type { Project } from '../../model/types';
+import { addChart, addDataTable, patchLayerStyle, patchStyle } from '../../state/commands';
+import { chartToSvgString } from '../export/export';
 
 const chartOf = (p: Project) => p.charts.find((c) => c.id === 'c')!;
 const tableOf = (p: Project) => p.dataTables.find((t) => t.id === 't')!;

@@ -715,6 +715,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   if (!horizontal && anyLabelsRequested(chart)) {
     labels = buildPointLabels({
       type: chart.type,
+      fontFamily: chart.fontFamily,
       groups: groups.map((g) => {
         const group = table.groups.find((t) => t.id === g.groupId);
         return {

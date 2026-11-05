@@ -4,7 +4,7 @@
  */
 
 import type { HeatmapOptions } from '../model/types';
-import { meanOf } from './moments';
+import { meanOf, sdOf } from './moments';
 import { summarize } from './summary';
 
 export type Matrix = Array<Array<number | null>>;
@@ -18,15 +18,16 @@ function normaliseLine(values: ReadonlyArray<number | null>, method: NormaliseMe
   const xs = values.filter(finite);
   const n = xs.length;
   if (n === 0) return { out: values.map(() => null), undefinedCount: 0 };
-  const mean = xs.reduce((a, b) => a + b, 0) / n;
+  const mean = meanOf(xs);
   if (method === 'centre') return { out: values.map((v) => (finite(v) ? v - mean : null)), undefinedCount: 0 };
   let transform: (v: number) => number;
   if (method === 'zscore') {
-    const sd = n > 1 ? Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0;
+    const sd = n > 1 ? sdOf(xs, mean) : 0;
     if (!(sd > 0)) return { out: values.map(() => null), undefinedCount: n };
     transform = (v) => (v - mean) / sd;
   } else {
-    const [lo, hi] = [Math.min(...xs), Math.max(...xs)];
+    const lo = xs.reduce((a, b) => Math.min(a, b), Infinity);
+    const hi = xs.reduce((a, b) => Math.max(a, b), -Infinity);
     if (!(hi > lo)) return { out: values.map(() => null), undefinedCount: n };
     transform = (v) => (v - lo) / (hi - lo);
   }

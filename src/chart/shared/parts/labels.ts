@@ -599,6 +599,8 @@ interface LabelGroupInput {
 
 interface BuildPointLabelsInput {
   type: ChartType;
+  /** The family the labels are drawn in (the chart's); their boxes, overlaps and shortening are measured in it. */
+  fontFamily?: string;
   groups: readonly LabelGroupInput[];
   plot: { x: number; y: number; width: number; height: number };
   chart: { width: number; height: number };
@@ -680,7 +682,7 @@ export function buildPointLabels(input: BuildPointLabelsInput): PointLabelModel 
     symbols,
     measure: (text, a) => {
       const f = fonts.get(a.id);
-      return measureText(text, a.fontSizePt, f?.bold ?? false, f?.italic ?? false);
+      return measureText(text, a.fontSizePt, f?.bold ?? false, f?.italic ?? false, input.fontFamily);
     },
   });
   for (const it of model.items) {

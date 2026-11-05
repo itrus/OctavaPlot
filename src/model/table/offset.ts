@@ -1,4 +1,5 @@
 import type { DataTable, Group, Observation } from '../types';
+import { extent } from '../units';
 import { layoutOf, summaryFormatInfo, xySeries } from './tableLayout';
 
 /**
@@ -25,7 +26,10 @@ export function autoOffsetStep(table: DataTable): number {
   let span = 0;
   for (const s of xySeries(table)) {
     const values = movingColumns(table, s.columns).flatMap((c) => c.observations.flatMap((o) => (o.value !== null && o.excluded !== true && Number.isFinite(o.value) ? [o.value] : [])));
-    if (values.length > 1) span = Math.max(span, Math.max(...values) - Math.min(...values));
+    if (values.length > 1) {
+      const [lo, hi] = extent(values);
+      span = Math.max(span, hi - lo);
+    }
   }
   if (!(span > 0)) return 1;
   const want = span * 1.1;

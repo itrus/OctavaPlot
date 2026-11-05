@@ -118,7 +118,7 @@ const MAY_IMPORT: Record<string, string[]> = {
   state: [...upTo('state'), 'chart'], // the project in memory uses the charts' models
   chart: upTo('chart').filter((l) => l !== 'state'), // a chart does not know the project's state
   testing: ['testing', 'model', 'state', 'chart', 'stats', 'util'],
-  ui: [...upTo('ui'), 'testing'],
+  ui: upTo('ui'),
   app: ['app', ...LAYER_ORDER],
 };
 

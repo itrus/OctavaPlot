@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Observation, SummarySpec } from '../model/types';
+import { quantile6 } from './distribution';
 import {
   SPREADS_BY_CENTRE,
   SUMMARY_ALGORITHM_VERSION,
@@ -7,7 +8,6 @@ import {
   effectiveSpreadOf,
   errorValue,
   formatPercent,
-  quantileType6,
   statsFor,
   summarize,
 } from './summary';
@@ -122,20 +122,20 @@ describe('computeGroupStats mean', () => {
   });
 });
 
-describe('quantileType6 and the IQR', () => {
+describe('quantile6 and the IQR', () => {
   it('gives Q1 = 2.25, median = 4.5, Q3 = 6.75 for 1..8 (spec 22.1)', () => {
     const xs = upTo(8);
-    expect(quantileType6(xs, 0.25)).toBe(2.25);
-    expect(quantileType6(xs, 0.5)).toBe(4.5);
-    expect(quantileType6(xs, 0.75)).toBe(6.75);
+    expect(quantile6(xs, 0.25)).toBe(2.25);
+    expect(quantile6(xs, 0.5)).toBe(4.5);
+    expect(quantile6(xs, 0.75)).toBe(6.75);
     const s = computeGroupStats(xs, spec({ centre: 'median', spread: 'iqr' }));
     expect([s.interval.lower, s.centre, s.interval.upper]).toEqual([2.25, 4.5, 6.75]);
   });
 
   it('clamps quantiles for small n and needs n >= 4 for an IQR', () => {
-    expect(quantileType6([5], 0.25)).toBe(5);
-    expect(quantileType6([1, 2, 3], 0.25)).toBe(1);
-    expect(quantileType6([1, 2, 3], 0.75)).toBe(3);
+    expect(quantile6([5], 0.25)).toBe(5);
+    expect(quantile6([1, 2, 3], 0.25)).toBe(1);
+    expect(quantile6([1, 2, 3], 0.75)).toBe(3);
     const three = computeGroupStats([1, 2, 3], spec({ centre: 'median', spread: 'iqr' }));
     expect(three.interval.code).toBe('n-too-small');
     expect(computeGroupStats([1, 2, 3, 4], spec({ centre: 'median', spread: 'iqr' })).interval.status).toBe('ok');

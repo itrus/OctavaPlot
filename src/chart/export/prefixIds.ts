@@ -1,3 +1,6 @@
+/** Text made safe to write inside an SVG element or a double-quoted attribute. */
+export const escapeXml = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 /** Gives every id in a drawing a prefix, so drawings placed in one page cannot take each other's clip paths and patterns; the references follow. */
 export function prefixIds(markup: string, prefix: string): string {
   const ids = new Set<string>();

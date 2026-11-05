@@ -185,8 +185,8 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
   let lo = o.min ?? range?.[0] ?? 0;
   let hi = o.max ?? range?.[1] ?? 1;
   if (!(hi > lo)) {
-    // A limit set by hand can collide with the other, automatic, end: the whole resolved range must be valid.
-    warnings.push('The colour range limits conflict with the data (the minimum is not below the maximum); using the automatic range.');
+    // A limit set by hand can collide with the other, automatic, end: the whole resolved range must be valid. Data of one value only is widened, without a warning.
+    if (o.min !== null || o.max !== null) warnings.push('The colour range limits conflict with the data (the minimum is not below the maximum); using the automatic range.');
     lo = range?.[0] ?? 0;
     hi = range?.[1] ?? 1;
     if (!(hi > lo)) [lo, hi] = [lo - 0.5, lo + 0.5];

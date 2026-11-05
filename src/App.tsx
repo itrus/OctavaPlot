@@ -235,7 +235,8 @@ function Shell() {
       {chart && inspectorOpen && <Splitter side="insp" width={inspW} min={260} max={640} onWidth={setInspW} label="Resize the inspector" />}
       <main className="workspace">
         <Suspense fallback={<div className="empty">Loading…</div>}>
-          {table && <DataTableView table={table} />}
+          {/* Keyed: the selection, the open dialog and the message of one table do not carry over to the next. */}
+          {table && <DataTableView key={table.id} table={table} />}
           {chart && prepared && <GraphView prepared={prepared} />}
           {view.kind === 'analysis' && <AnalysisView analysisId={view.id} />}
           {view.kind === 'layout' && <LayoutView layoutId={view.id} />}
@@ -245,7 +246,7 @@ function Shell() {
       </main>
       {chart && prepared && (
         <Suspense fallback={<aside className="inspector" aria-busy="true" />}>
-          <Inspector chart={chart} table={prepared.table} />
+          <Inspector key={chart.id} chart={chart} table={prepared.table} />
         </Suspense>
       )}
       <footer className="statusbar">

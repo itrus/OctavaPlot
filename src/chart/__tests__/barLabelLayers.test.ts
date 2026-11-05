@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createGroupedTable, DEFAULT_BAR_LABELS } from '../../../model/defaults';
-import { layersOf } from '../../../model/graph/layers';
-import type { Chart, ChartType, DataTable } from '../../../model/types';
-import { chartToSvgString } from '../../export/export';
+import { createChart, createColumnTable, createGroupedTable, DEFAULT_BAR_LABELS } from '../../model/defaults';
+import { layersOf } from '../../model/graph/layers';
+import type { Chart, ChartType, DataTable } from '../../model/types';
+import { chartToSvgString } from '../export/export';
 
 const labelled = (table: DataTable, type: ChartType, patch: Partial<Chart['barLabels']> = {}): Chart => ({ ...createChart(table.id, undefined, type), barLabels: { ...DEFAULT_BAR_LABELS, show: 'value', ...patch } });
 const ids = (svg: string) => [...svg.matchAll(/id="([^"]*-labels-[^"]*)"/g)].map((m) => m[1]);

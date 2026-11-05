@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Chart, DataTable, FitSettings } from '../../model/types';
 import { buildAnyModel, ChartCanvas } from '../anyModel';
-import { canvasToPngBlob } from './pngDpi';
-import { prefixIds as prefixIdsWith } from './prefixIds';
+import { plainText } from '../../util/richText';
+import { svgToPngBlob } from './pngDpi';
+import { escapeXml, prefixIds as prefixIdsWith } from './prefixIds';
 import { svgToPdf } from './svgPdf';
 
 /**
@@ -21,7 +22,6 @@ export function chartToSvgString(chart: Chart, table: DataTable, fit?: FitSettin
   return `<?xml version="1.0" encoding="UTF-8"?>\n${described}\n`;
 }
 
-const escapeXml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const safeId = (id: string) => `octp-${id.replace(/[^A-Za-z0-9_-]/g, '')}`;
 
 /**
@@ -36,7 +36,8 @@ function prefixIds(markup: string, chartId: string): string {
 function describeSvg(markup: string, chart: Chart, table: DataTable, notices: readonly string[]): string {
   const end = markup.indexOf('>');
   if (!markup.startsWith('<svg') || end < 0) return markup;
-  const title = (chart.showTitle && chart.title.trim() !== '' ? chart.title : chart.name).trim() || 'Chart';
+  // The title as it reads, without its markup (H_{2}O is announced as H2O).
+  const title = (chart.showTitle && chart.title.trim() !== '' ? plainText(chart.title) : chart.name).trim() || 'Chart';
   const desc = `${chart.type} chart of the table "${table.name}"${notices.length > 0 ? `. Notices: ${notices.join(' ')}` : ''}`;
   const base = safeId(chart.id);
   const head = `${markup.slice(0, end).replace('<svg', '<svg role="img"')} aria-labelledby="${base}-title ${base}-desc">`;
@@ -45,8 +46,10 @@ function describeSvg(markup: string, chart: Chart, table: DataTable, notices: re
 
 /** Rasterise at `dpi` dots per inch (96 is the chart's own size in CSS pixels); the resolution is written into the file. */
 export async function chartToPngBlob(chart: Chart, table: DataTable, dpi: number, fit?: FitSettings): Promise<Blob> {
-  const canvas = await chartToCanvas(chart, table, dpi / 96, fit);
-  return canvasToPngBlob(canvas, dpi);
+  const scale = dpi / 96;
+  const width = Math.max(1, Math.round(chart.widthPx * scale));
+  const height = Math.max(1, Math.round(chart.heightPx * scale));
+  return svgToPngBlob(chartToSvgString(chart, table, fit), width, height, dpi);
 }
 
 /**
@@ -56,31 +59,4 @@ export async function chartToPngBlob(chart: Chart, table: DataTable, dpi: number
 export async function chartToPdf(chart: Chart, table: DataTable, fit?: FitSettings): Promise<{ blob: Blob; notes: string[] }> {
   const { bytes, notes } = await svgToPdf(chartToSvgString(chart, table, fit), { title: chart.name });
   return { blob: new Blob([bytes as BlobPart], { type: 'application/pdf' }), notes };
-}
-
-export async function chartToPdfBlob(chart: Chart, table: DataTable, fit?: FitSettings): Promise<Blob> {
-  return (await chartToPdf(chart, table, fit)).blob;
-}
-
-async function chartToCanvas(chart: Chart, table: DataTable, scale: number, fit?: FitSettings): Promise<HTMLCanvasElement> {
-  const svg = chartToSvgString(chart, table, fit);
-  const width = Math.max(1, Math.round(chart.widthPx * scale));
-  const height = Math.max(1, Math.round(chart.heightPx * scale));
-  const img = new Image();
-  const loaded = new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error('The browser could not rasterise the SVG.'));
-  });
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  await loaded;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas 2D context is unavailable.');
-  // The page colour is part of the SVG; with none chosen the PNG stays transparent.
-  ctx.clearRect(0, 0, width, height);
-  ctx.drawImage(img, 0, 0, width, height);
-  return canvas;
 }

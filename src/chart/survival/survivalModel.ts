@@ -211,7 +211,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
     let d = `M${n2(xScale(Math.max(0, x0)))},${n2(yScale(level(1)))}`;
     for (const st of r.km.steps) d += `H${n2(xScale(st.time))}V${n2(yScale(level(st.survival)))}`;
     // Hold the last estimate to the last observed time (an event or a censoring), not across the whole axis.
-    const lastTime = Math.max(0, ...r.km.steps.map((x) => x.time), ...r.km.marks.map((m) => m.time));
+    const lastTime = [...r.km.steps, ...r.km.marks].reduce((t, x) => Math.max(t, x.time), 0);
     d += `H${n2(xScale(lastTime))}`;
     // On a broken axis a drop whose time lies in an omitted range is not drawn at the edge of the gap: the line is cut there instead.
     const corners: Array<{ x: number; y: number }> = [{ x: Math.max(0, x0), y: level(1) }];

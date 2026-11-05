@@ -20,7 +20,8 @@ export function exportFileName(base: string, ext: string, stamped: boolean, now:
   return `${safe}${stamped && !hasStamp ? `_${fileStamp(now)}` : ''}.${ext}`;
 }
 
-const safeFileName = (name: string): string => name.replace(/[^\w.-]+/g, '_') || 'chart';
+// Letters and digits of any script are kept (a graph named "Überleben" stays so); anything else, the characters Windows forbids included, becomes _.
+const safeFileName = (name: string): string => name.replace(/[^\p{L}\p{M}\p{N}_.-]+/gu, '_') || 'chart';
 
 /**
  * Copy text to the clipboard. Uses the async Clipboard API where the page may (secure context, user gesture),

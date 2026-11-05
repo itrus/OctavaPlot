@@ -214,3 +214,11 @@ describe('the look of a single layer', () => {
     expect(read.notes.join(' ')).toContain('layerStyles');
   });
 });
+
+describe('layer styles of a hand-edited file', () => {
+  it('drop keys that name an inherited property, not a layer kind, instead of throwing', () => {
+    const raw = JSON.parse('{"s:constructor":{"lineWidthPt":2},"s:toString":{"lineWidthPt":2},"__proto__":{"lineWidthPt":2}}');
+    expect(() => sanitizeLayerStyles(raw)).not.toThrow();
+    expect(Object.keys(sanitizeLayerStyles(raw).styles)).toEqual([]);
+  });
+});

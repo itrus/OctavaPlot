@@ -3,6 +3,7 @@
  * the other models, with the uncertainty of the curve from the parameter covariance. Pure and independent of drawing.
  */
 
+import { meanOf } from './moments';
 import { studentTQuantileUpper } from './special';
 
 /** Raise when the numbers a fit gives change, so that no cached result of the old algorithm is shown. */
@@ -714,7 +715,8 @@ export function solveFit(points: ReadonlyArray<{ x: number; y: number }>, option
   const n = xs.length;
   const df = n - p;
   const sigma = df > 0 ? Math.sqrt(rss / df) : null;
-  const my = mean(ys);
+  // The exact mean (see meanOf): Y all equal gives a total sum of squares of 0, so no R², not a rounding residue of 1.
+  const my = meanOf(ys);
   const tss = ys.reduce((s, v) => s + (v - my) ** 2, 0);
   const rSquared = tss > 0 ? 1 - rss / tss : null;
 

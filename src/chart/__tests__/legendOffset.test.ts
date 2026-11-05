@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../../../model/defaults';
-import { legendOffset, sanitizeLegendLayout } from '../../../model/graph/legendEntries';
-import type { Project } from '../../../model/types';
-import { patchLegend, setLegendOffset } from '../../../state/commands';
-import { parseProject, stringifyProject } from '../../../state/serialize';
-import { buildColumnModel } from '../../column/columnModel';
+import { createExampleProject } from '../../model/defaults';
+import { legendOffset, sanitizeLegendLayout } from '../../model/graph/legendEntries';
+import type { Project } from '../../model/types';
+import { patchLegend, setLegendOffset } from '../../state/commands';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { buildColumnModel } from '../column/columnModel';
 
 const withLegend = (patch: Parameters<typeof patchLegend>[1]): Project => {
   const p0 = createExampleProject();

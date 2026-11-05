@@ -26,11 +26,23 @@ export async function deflate(bytes: Uint8Array): Promise<{ data: Uint8Array; co
   return { data: new Uint8Array(await new Response(stream).arrayBuffer()), compressed: true };
 }
 
+/**
+ * A PDF text string (for the document information): printable ASCII as a literal string, anything else as UTF-16BE with
+ * its byte-order mark in hex, so a title such as "Überleben" reads as itself in a viewer. Empty for an empty text.
+ */
+export function pdfTextString(text: string): string {
+  if (text === '') return '';
+  if (/^[\x20-\x7e]*$/.test(text)) return `(${text.replace(/([\\()])/g, '\\$1')})`;
+  let hex = 'FEFF';
+  for (let i = 0; i < text.length; i++) hex += text.charCodeAt(i).toString(16).toUpperCase().padStart(4, '0');
+  return `<${hex}>`;
+}
+
 /** The bytes of a one-page PDF of `widthPt` × `heightPt` with this content stream (compressed or not) and these resources. */
 export function buildVectorPdf(options: { widthPt: number; heightPt: number; content: Uint8Array; compressed: boolean; fonts: readonly PdfFont[]; alphas: readonly PdfAlpha[]; title?: string }): Uint8Array {
   const { widthPt, heightPt, content, compressed, fonts, alphas } = options;
   const num = (v: number) => String(Math.round(v * 100) / 100);
-  const title = (options.title ?? '').replace(/[^\x20-\x7e]/g, '?').replace(/([\\()])/g, '\\$1');
+  const title = pdfTextString(options.title ?? '');
   const chunks: Uint8Array[] = [];
   const offsets: number[] = [];
   let length = 0;
@@ -62,7 +74,7 @@ export function buildVectorPdf(options: { widthPt: number; heightPt: number; con
   object(2, '<</Type/Pages/Kids[3 0 R]/Count 1>>');
   object(3, `<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${num(widthPt)} ${num(heightPt)}]/Resources${resources}/Contents 4 0 R>>`);
   object(4, `<<${compressed ? '/Filter/FlateDecode' : ''}>>`, content);
-  object(5, `<</Producer(OctavaPlot)${title ? `/Title(${title})` : ''}>>`);
+  object(5, `<</Producer(OctavaPlot)${title ? `/Title${title}` : ''}>>`);
   fonts.forEach((f, i) => object(FIRST_FONT + i, `<</Type/Font/Subtype/Type1/BaseFont/${f.base}${f.winAnsi ? '/Encoding/WinAnsiEncoding' : ''}>>`));
   alphas.forEach((a, i) => object(FIRST_ALPHA + i, `<</Type/ExtGState/ca ${a.fill}/CA ${a.stroke}>>`));
   const xref = length;

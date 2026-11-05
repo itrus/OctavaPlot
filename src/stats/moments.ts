@@ -18,6 +18,9 @@ export function neumaierSum(xs: ReadonlyArray<number>): number {
 
 /** Arithmetic mean (xs not empty); scales the values when the plain sum would overflow. */
 export function meanOf(xs: ReadonlyArray<number>): number {
+  // Values all equal have that value as their mean exactly: a rounded sum can miss it by an ulp, and then a spread of about 1e-16 would show.
+  const first = xs[0];
+  if (xs.every((x) => x === first)) return first;
   const s = neumaierSum(xs);
   if (Number.isFinite(s)) return s / xs.length;
   return neumaierSum(xs.map((x) => x / xs.length));

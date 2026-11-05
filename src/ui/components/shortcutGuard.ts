@@ -19,3 +19,9 @@ export function isTextEntryTarget(target: unknown): boolean {
   const type = typeof t.type === 'string' && t.type !== '' ? t.type.toLowerCase() : 'text';
   return TEXT_INPUT_TYPES.has(type);
 }
+
+/**
+ * Whether a key press in a text box is Enter that finishes the entry: not the Enter that closes the composition of a character
+ * in an input method (Japanese, Chinese, Korean), which the browser reports as composing or with key code 229.
+ */
+export const isCommitEnter = (e: { key: string; keyCode: number; nativeEvent: { isComposing: boolean } }): boolean => e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229;

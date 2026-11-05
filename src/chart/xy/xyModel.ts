@@ -308,7 +308,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   // Bars at numeric X: the slot of an X is the smallest distance between two X values of the chart (one X: a fifth of its size, or 1);
   // the bars of the series fill the slot less the gap, side by side, and the axis holds their edges.
   const distinctX = [...new Set(raw.flatMap((r) => r.pts.map((p) => p.x)))].sort((a, b) => a - b);
-  const slot = distinctX.length > 1 ? Math.min(...distinctX.slice(1).map((x, i) => x - distinctX[i])) : Math.abs(distinctX[0] ?? 0) * 0.2 || 1;
+  const slot = distinctX.length > 1 ? distinctX.reduce((least, x, i) => (i === 0 ? least : Math.min(least, x - distinctX[i - 1])), Infinity) : Math.abs(distinctX[0] ?? 0) * 0.2 || 1;
   // The space between bars is a percent of a bar's width, as for the columns: the bars fill the slot less that space.
   const barsWidth = slot / (1 + (chart.bars.gapPct ?? AUTO_BAR_GAP_PCT) / 100);
   const barWidth = barsWidth / Math.max(1, raw.length);
@@ -387,7 +387,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   // Bubbles: the area of a bubble follows its size, so the diameter follows the square root of the size; the largest bubble of the chart is
   // the symbol size of its series. A point with no size (empty, 0 or less, not a number) is not a bubble and is not drawn, and counted.
   const validSize = (v: number | null): v is number => v !== null && Number.isFinite(v) && v > 0;
-  const largest = isBubble ? Math.max(0, ...raw.flatMap((r) => r.pts.map((p) => p.size).filter(validSize))) : 0;
+  const largest = isBubble ? raw.reduce((m, r) => r.pts.reduce((mm, p) => (validSize(p.size) ? Math.max(mm, p.size) : mm), m), 0) : 0;
   // The size legend is a row under the plot: the layout reserves it. Its circles are on the scale of the first series (the symbol size is a setting of each series).
   const sizeKey = isBubble && layout.kind === 'sized' && chart.sizeLegend
     ? sizeKeyOf({ chosen: chart.sizeLegend.values, largest, symbolSizePt: raw[0]?.style.symbolSizePt ?? 0, title: raw[0]?.s.columns[1]?.name ?? '', fontSizePt: chart.legend.fontSizePt })
@@ -467,7 +467,11 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
       for (const p of drawn) {
         const subject = column[p.row]?.subject ?? '';
         if (subject === '') loose++;
-        else bySubject.set(subject, [...(bySubject.get(subject) ?? []), p]);
+        else {
+          const list = bySubject.get(subject);
+          if (list) list.push(p);
+          else bySubject.set(subject, [p]);
+        }
       }
       for (const list of bySubject.values()) {
         seq.push(null);
@@ -578,6 +582,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     if (chart.volcano.labels === 'significant') {
       volcanoLabels = buildPointLabels({
         type: chart.type,
+        fontFamily: chart.fontFamily,
         groups: series.map((s, si) => ({
           groupId: s.groupId,
           points: s.points.map((p) => ({

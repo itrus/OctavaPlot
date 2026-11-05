@@ -72,9 +72,10 @@ export function useApp(): AppApi {
  * the saved settings. A project that comes from the autosave was never saved as a file, and is said to be so.
  */
 const initialProject = (): { project: Project; recovered: boolean } => {
+  // Backed up even when it cannot be read (a file of a newer version, a damaged one): the first edit would otherwise overwrite the only copy.
+  backupAutosave();
   const recovered = loadAutosave();
   if (recovered) {
-    backupAutosave();
     return { project: recovered, recovered: true };
   }
   const s = loadSettings();

@@ -143,3 +143,31 @@ describe('tab lists', () => {
     expect([...html.matchAll(/tabindex="(-?\d)"/g)].map((m) => m[1])).toEqual(['0', '-1', '-1']);
   });
 });
+
+describe('Field note', () => {
+  it('renders a note under the control', () => {
+    const out = renderToStaticMarkup(<Field label="Fill" note="Bars are hidden.">x</Field>);
+    expect(out).toContain('class="field-note"');
+    expect(out).toContain('Bars are hidden.');
+  });
+  it('renders nothing without a note', () => {
+    expect(renderToStaticMarkup(<Field label="Fill" note={null}>x</Field>)).not.toContain('field-note');
+  });
+  it('NumField passes its note through', () => {
+    const out = renderToStaticMarkup(<NumField label="Opacity" value={1} onCommit={() => undefined} note="No effect." />);
+    expect(out).toContain('No effect.');
+  });
+});
+
+describe('Check and ColorInput accessibility', () => {
+  it('sets aria-label and title', () => {
+    const c = renderToStaticMarkup(<Check checked onChange={() => undefined} ariaLabel="Fill with a pattern" title="Pattern" />);
+    expect(c).toContain('aria-label="Fill with a pattern"');
+    expect(c).toContain('title="Pattern"');
+    const k = renderToStaticMarkup(<ColorInput value="#000000" onChange={() => undefined} ariaLabel="Pattern color" />);
+    expect(k).toContain('aria-label="Pattern color"');
+  });
+  it('omits the attributes when not given', () => {
+    expect(renderToStaticMarkup(<Check checked={false} onChange={() => undefined} />)).not.toContain('aria-label');
+  });
+});

@@ -672,7 +672,7 @@ export const hasPartLooks = (type: ChartType): boolean => (Object.keys(STYLABLE_
 
 export const layerKindOf = (layerId: Id): LayerKind | null => {
   const kind = layerId.slice(layerId.lastIndexOf(':') + 1);
-  return kind in LAYER_NAMES ? (kind as LayerKind) : null;
+  return Object.hasOwn(LAYER_NAMES, kind) ? (kind as LayerKind) : null;
 };
 
 /** Layer styles from a file or a patch: only the settings the layer's kind takes, each valid; the number of settings dropped. */

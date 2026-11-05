@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { isCommitEnter } from '../components/shortcutGuard';
 import { createPortal } from 'react-dom';
 import { newId } from '../../model/ids';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
@@ -160,7 +161,7 @@ export function Navigator() {
           onFocus={(e) => e.target.select()}
           onBlur={(e) => finishRename(ref, e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
+            if (isCommitEnter(e)) e.currentTarget.blur();
             else if (e.key === 'Escape') setRenaming(null);
           }}
         />

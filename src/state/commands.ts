@@ -77,10 +77,14 @@ const mapTable = (p: Project, tableId: Id, fn: (t: DataTable) => DataTable): Pro
 /** Run several commands in order as one command, so they form one undo step. */
 export const composeCommands = (...commands: Command[]): Command => (p) => commands.reduce((acc, c) => c(acc), p);
 
-const mapChart = (p: Project, chartId: Id, fn: (c: Chart) => Chart): Project => ({
-  ...p,
-  charts: p.charts.map((c) => (c.id === chartId ? fn(c) : c)),
-});
+/** Apply fn to one chart; the same project when nothing changed (so no empty undo step is made). */
+const mapChart = (p: Project, chartId: Id, fn: (c: Chart) => Chart): Project => {
+  const chart = p.charts.find((c) => c.id === chartId);
+  if (!chart) return p;
+  const next = fn(chart);
+  if (next === chart) return p;
+  return { ...p, charts: p.charts.map((c) => (c === chart ? next : c)) };
+};
 
 /** Apply fn to the first layer only; the same project when nothing changed. */
 const mapLayer0 = (p: Project, chartId: Id, fn: (l: ChartLayer) => ChartLayer): Project => {
@@ -695,7 +699,8 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
         observations: fresh.observations.map((o, r) => {
           const ex = data.excluded?.[r]?.[i];
           const subject = data.subjects?.[r]?.[i] ?? '';
-          return { ...o, value: data.values[r]?.[i] ?? null, ...(subject !== '' ? { subject } : {}), ...(ex ? { excluded: true as const, ...(ex.reason !== '' ? { excludedReason: ex.reason } : {}) } : {}) };
+          // Named after the group's kept ID (as a new group's are), so the file writes them without IDs and overrides of the old cells still apply.
+          return { ...o, id: canonicalObservationId(old?.id ?? fresh.id, r), value: data.values[r]?.[i] ?? null, ...(subject !== '' ? { subject } : {}), ...(ex ? { excluded: true as const, ...(ex.reason !== '' ? { excludedReason: ex.reason } : {}) } : {}) };
         }),
       };
     });
@@ -935,7 +940,12 @@ export const addLayout = (id: Id, over: Parameters<typeof defaultLayout>[2] = {}
   return { ...p, layouts: [...existing, layout] };
 };
 
-const mapLayout = (p: Project, id: Id, fn: (l: Layout) => Layout): Project => ({ ...p, layouts: (p.layouts ?? []).map((l) => (l.id === id ? fn(l) : l)) });
+const mapLayout = (p: Project, id: Id, fn: (l: Layout) => Layout): Project => {
+  const layout = p.layouts?.find((l) => l.id === id);
+  if (!layout) return p;
+  const next = fn(layout);
+  return next === layout ? p : { ...p, layouts: p.layouts!.map((l) => (l === layout ? next : l)) };
+};
 
 /** Change the settings of a layout (page, arrangement, scaling, labels). A new arrangement keeps the graphs of the slots that remain. */
 export const patchLayout = (id: Id, patch: Partial<Omit<Layout, 'id' | 'panels'>>): Command => (p) =>

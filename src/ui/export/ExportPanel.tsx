@@ -47,20 +47,25 @@ export function ExportPanel({ chart, table }: { chart: Chart; table: DataTable }
   const fitsPending = fitsPendingOf(any);
   const format = settings.exportFormat;
   const dpi = settings.pngDpi;
-  const report = buildExportReport({
-    name: chart.name,
-    widthPx: chart.widthPx,
-    heightPx: chart.heightPx,
-    format,
-    dpi,
-    fontFamilies: [chart.fontFamily],
-    texts: chartTexts(chart, any),
-    warnings: any.model.warnings,
-    printWidthMm: chart.printWidthMm ?? null,
-    printWarnings: printSizeWarnings(chart),
-    isFontAvailable: browserFontAvailable,
-    hasGlyph: browserHasGlyph,
-  });
+  // Rebuilding the report draws the graph again (chartTexts): only when the graph or the format changes, not on each key of the file name.
+  const report = useMemo(
+    () =>
+      buildExportReport({
+        name: chart.name,
+        widthPx: chart.widthPx,
+        heightPx: chart.heightPx,
+        format,
+        dpi,
+        fontFamilies: [chart.fontFamily],
+        texts: chartTexts(chart, any),
+        warnings: any.model.warnings,
+        printWidthMm: chart.printWidthMm ?? null,
+        printWarnings: printSizeWarnings(chart),
+        isFontAvailable: browserFontAvailable,
+        hasGlyph: browserHasGlyph,
+      }),
+    [chart, any, format, dpi],
+  );
   const tooBig = report.raster?.exceedsCanvasLimit === true;
   const blocked = job.busy || fitsPending > 0 || tooBig;
   const base = fileName.trim() === '' ? chart.name : fileName.trim();

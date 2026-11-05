@@ -222,7 +222,7 @@ Dates are counted with integer calendar arithmetic. `Date` and the machine's tim
 
 **Not built (29 October 2026):** a type on Y columns, survival times, histogram values and the other tables; a date as the axis of a category chart; a major tick interval in calendar units (every 2 weeks); minor ticks on dates; local time zones and daylight saving; locale date forms; week numbers; Fill series, annotations, brackets and vector steps in dates (they take numbers in the stored unit); the Results sheet and a fit on dates.
 
-Fixtures: section 15 (dates to days, offsets, zones, ticks). The tests are `src/util/timeColumn.test.ts`, `src/chart/shared/axes/timeAxis.test.ts`, `src/chart/xy/xyTime.test.ts` and `src/ui/data/timeColumns.test.ts`; the reference values are Unix times and day numbers known from outside the code.
+Fixtures: section 15 (dates to days, offsets, zones, ticks). The tests are `src/util/timeColumn.test.ts`, `src/chart/shared/axes/timeAxis.test.ts`, `src/chart/xy/xyTime.test.ts` and `src/ui/data/timeCells.test.ts`; the reference values are Unix times and day numbers known from outside the code.
 
 ## 18. Guides and results in text (XY and others)
 

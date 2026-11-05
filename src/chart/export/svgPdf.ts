@@ -673,7 +673,7 @@ export function svgToContent(svg: string): DrawingContent {
         return;
       }
       default: {
-        if (shapeOps(n) === null && !['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(n.tag)) return skip(`<${n.tag}>`);
+        if (!['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(n.tag)) return skip(`<${n.tag}>`);
         const s = styleOf(parent, n.attrs);
         const m = parseTransform(n.attrs.transform);
         const clip = clipOps(n.attrs['clip-path']);

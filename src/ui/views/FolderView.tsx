@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { isCommitEnter } from '../components/shortcutGuard';
 import { runBatch, type BatchFormat, type BatchPlan } from '../../chart/export/batchExport';
 import { fitsCanvas } from '../../chart/export/pngDpi';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
 import { newId } from '../../model/ids';
 import { FOLDER_NOUN, FOLDER_TITLE } from '../../model/project/folderItems';
-import type { FolderKey, Id, ViewRef } from '../../model/types';
+import type { Chart, DataTable, FitSettings, FolderKey, Id, ViewRef } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { duplicateItems, moveItems, nudgeItems, removeItems, renameItem, sortItemsByName } from '../../state/commands';
 import { Thumb, type ThumbItem } from './FolderThumbs';
-import { NOTHING_PICKED, pick, pickAll, pickedInOrder, prune, type PickState } from '../navigator/folderSelection';
+import { NOTHING_PICKED, pick, pickAll, pickedInOrder, prune, type PickState } from './folderSelection';
 import { DeleteIcon, ExportIcon } from '../components/icons';
 import { downloadBlob, exportFileName } from '../../util/download';
 import { BatchExportDialog } from '../export/BatchExportDialog';
@@ -68,18 +69,26 @@ export function FolderView({ folder }: { folder: FolderKey }) {
       tooBigMessage: `A graph of the batch needs more pixels at ${dpi} dpi than the browser can make. Choose a lower resolution, or SVG.`,
       work: async (phase) => {
         // The renderer behind export (react-dom/server) is loaded on first use, not at startup.
-        const { chartToSvgString, chartToPngBlob, chartToPdfBlob } = await import('../../chart/export/export');
+        const { chartToSvgString, chartToPngBlob, chartToPdf } = await import('../../chart/export/export');
         phase('rasterizing');
+        // What a PDF could not write as it is (a character outside its fonts, ...), once per note with the graphs it concerns, as a single export says it.
+        const pdfNotes = new Map<string, string[]>();
+        const pdf = async (c: Chart, t: DataTable, f: FitSettings | undefined) => {
+          const { blob, notes } = await chartToPdf(c, t, f);
+          for (const note of notes) pdfNotes.set(note, [...(pdfNotes.get(note) ?? []), c.name]);
+          return blob;
+        };
         const blob = await runBatch(
           plan,
           format,
           dpi,
-          { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: (c, t, d, f) => chartToPngBlob(c, t, d, f), pdf: (c, t, f) => chartToPdfBlob(c, t, f) },
+          { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: (c, t, d, f) => chartToPngBlob(c, t, d, f), pdf },
           (i, n, name) => setStatus(`Drawing ${i} of ${n}: ${name}…`),
         );
         phase('encoding');
         downloadBlob(blob, exportFileName(`${project.name}_graphs`, 'zip', settings.timestampExports));
-        return `Exported ${plan.items.length} graph${plan.items.length === 1 ? '' : 's'} as ${format.toUpperCase()} in one ZIP file.`;
+        const notes = [...pdfNotes].map(([note, names]) => `${note} (${names.join(', ')})`);
+        return `Exported ${plan.items.length} graph${plan.items.length === 1 ? '' : 's'} as ${format.toUpperCase()} in one ZIP file.${notes.length > 0 ? ` ${notes.join(' ')}` : ''}`;
       },
     });
   };
@@ -204,7 +213,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
                       onFocus={(ev) => ev.target.select()}
                       onBlur={(ev) => finishRename(e.id, ev.target.value)}
                       onKeyDown={(ev) => {
-                        if (ev.key === 'Enter') ev.currentTarget.blur();
+                        if (isCommitEnter(ev)) ev.currentTarget.blur();
                         else if (ev.key === 'Escape') setRenaming(null);
                         ev.stopPropagation();
                       }}

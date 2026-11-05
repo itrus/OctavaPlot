@@ -1,4 +1,4 @@
-import { createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
+import { CHART_PX_MAX, createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
 import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../chart/shared/parts/labels';
 import { CHART_TYPES, chartTypeInfo, defaultChartTypeFor } from '../model/graph/chartTypes';
 import { BRACKET_LIFT_LIMIT, leadingColumns } from '../model/graph/chartTypes';
@@ -184,7 +184,7 @@ function parseTable(raw: unknown, path: string): DataTable {
       id,
       name: str(g.name, `${gp}.name`),
       title: typeof g.title === 'string' ? g.title : '',
-      paletteIndex: typeof g.paletteIndex === 'number' ? g.paletteIndex : gi,
+      paletteIndex: Number.isInteger(g.paletteIndex) && (g.paletteIndex as number) >= 0 ? (g.paletteIndex as number) : gi,
       ...(typeof g.factor === 'string' && g.factor.trim() !== '' ? { factor: g.factor.trim() } : {}),
       ...(g.time !== undefined ? { time: parseTime(g.time, `${gp}.time`) } : {}),
       observations,
@@ -552,8 +552,9 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
   const chart: Chart = {
     ...base,
     ...(c as Partial<Chart>),
-    widthPx: typeof c.widthPx === 'number' ? c.widthPx : base.widthPx,
-    heightPx: typeof c.heightPx === 'number' ? c.heightPx : base.heightPx,
+    // No larger than the editor allows: a huge size from a hand-edited file would make an export fail or hang.
+    widthPx: typeof c.widthPx === 'number' ? Math.min(CHART_PX_MAX, c.widthPx) : base.widthPx,
+    heightPx: typeof c.heightPx === 'number' ? Math.min(CHART_PX_MAX, c.heightPx) : base.heightPx,
     printWidthMm: sanitizePrintWidthMm(c.printWidthMm),
     groupOrder: sanitizeOrder(c.groupOrder),
     hiddenGroupIds: Array.isArray(c.hiddenGroupIds) ? c.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],

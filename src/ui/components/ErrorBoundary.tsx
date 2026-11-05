@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { downloadBlob } from '../../util/download';
 import { AUTOSAVE_BACKUP_KEY, AUTOSAVE_KEY } from '../../state/serialize';
 
 /** The most recent copy of the project kept in the browser, for the recovery download; null when there is none. */
@@ -32,12 +33,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   private download = () => {
     const text = storedProject();
     if (!text) return;
-    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'octavaplot-recovered.oplot';
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(new Blob([text], { type: 'application/json' }), 'octavaplot-recovered.oplot');
   };
 
   render(): ReactNode {

@@ -10,8 +10,8 @@ import { el } from '../shared/scene/sceneElement';
 import { SceneElements } from '../shared/scene/SceneElements';
 import { richPieces } from '../shared/scene/richSvg';
 import { layoutMasterLegend, legendEntriesOf, mergeLegendEntries, type LegendEntry, type MasterLegendLayout } from './masterLegend';
-import { canvasToPngBlob } from './pngDpi';
-import { prefixIds } from './prefixIds';
+import { svgToPngBlob } from './pngDpi';
+import { escapeXml, prefixIds } from './prefixIds';
 import { svgToPdf } from './svgPdf';
 
 /**
@@ -19,8 +19,6 @@ import { svgToPdf } from './svgPdf';
  * export (nested <svg>, scaled by one factor so that equal factors give equal fonts and lines), with its panel label.
  * The preview of the Layouts page and every export come from this one function, so they cannot differ.
  */
-const escapeXml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
 interface LayoutDrawing {
   svg: string;
   arranged: Arranged;
@@ -156,30 +154,10 @@ export function layoutPngSize(layout: Layout, dpi: number): { width: number; hei
   return { width: Math.round((frame.widthPt / 72) * dpi), height: Math.round((frame.heightPt / 72) * dpi) };
 }
 
-/** The page drawn on a canvas at a resolution (a transparent page stays transparent). */
-async function layoutToCanvas(layout: Layout, project: Project, dpi: number): Promise<HTMLCanvasElement> {
-  const { width, height } = layoutPngSize(layout, dpi);
-  const svg = layoutToSvgString(layout, project);
-  const img = new Image();
-  const loaded = new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error('The browser could not rasterise the SVG.'));
-  });
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  await loaded;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas 2D context is unavailable.');
-  ctx.clearRect(0, 0, width, height);
-  ctx.drawImage(img, 0, 0, width, height);
-  return canvas;
-}
-
+/** The page as a PNG at a resolution (a transparent page stays transparent). */
 export async function layoutToPngBlob(layout: Layout, project: Project, dpi: number): Promise<Blob> {
-  const canvas = await layoutToCanvas(layout, project, dpi);
-  return canvasToPngBlob(canvas, dpi);
+  const { width, height } = layoutPngSize(layout, dpi);
+  return svgToPngBlob(layoutToSvgString(layout, project), width, height, dpi);
 }
 
 /** A one-page PDF of the page, at A4 size, written from the same SVG as the SVG export: vector shapes and text, no picture. `notes` says what could not be written as it is. */

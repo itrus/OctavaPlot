@@ -208,17 +208,21 @@ export function compileColumnPointLabels(chart: Chart, model: ColumnModel): Scen
 
 /** The editor's own marks of a column chart: the ring round the selected point, the frame of its label and the band of the selected data set. Never in an export. */
 export function compileColumnSelection(model: ColumnModel, selectedGroups: readonly string[], selectedPoints: readonly string[]): SceneElement[] {
-  const { plot } = model.layout;
+  // The points and the slots are in the vertical (virtual) drawing: a horizontal chart turns them as compileColumnMarks does.
+  const { orient } = model;
+  const plot = orient.virtual;
   const dashed = [['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '6 4'], ['pointer-events', 'none']] as const;
+  const bands = model.groups.filter((g) => selectedGroups.includes(g.groupId)).map((g) => el('rect', [['data-editor-only', 'true'], ['x', n2(g.slotX)], ['y', n2(plot.y)], ['width', n2(g.slotWidth)], ['height', n2(plot.height)], ['fill', SELECT_COLOR], ['fill-opacity', 0.07], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '8 6'], ['pointer-events', 'none']], { editorOnly: true }));
   return [
     ...(selectedPoints.length === 0
       ? []
       : [
-          ...model.groups.flatMap((g) => g.points.filter((p) => selectedPoints.includes(p.id))).map((p) => el('circle', [['data-editor-only', 'true'], ['cx', n2(p.cx)], ['cy', n2(p.cy)], ['r', n2(p.size / 2 + 6)], ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2.4], ['pointer-events', 'none']], { editorOnly: true })),
+          ...model.groups
+            .flatMap((g) => g.points.filter((p) => selectedPoints.includes(p.id)))
+            .map((p) => ({ p, at: orient.toScreen(p.cx, p.cy) }))
+            .map(({ p, at }) => el('circle', [['data-editor-only', 'true'], ['cx', n2(at.x)], ['cy', n2(at.y)], ['r', n2(p.size / 2 + 6)], ['fill', 'none'], ['stroke', SELECT_COLOR], ['stroke-width', 2.4], ['pointer-events', 'none']], { editorOnly: true })),
           ...model.labels.items.filter((it) => selectedPoints.includes(it.id)).map((it) => el('rect', [['data-editor-only', 'true'], ['x', n2(it.box.x0 - 4)], ['y', n2(it.box.y0 - 4)], ['width', n2(it.box.x1 - it.box.x0 + 8)], ['height', n2(it.box.y1 - it.box.y0 + 8)], ...dashed], { editorOnly: true })),
         ]),
-    ...(selectedGroups.length === 0
-      ? []
-      : model.groups.filter((g) => selectedGroups.includes(g.groupId)).map((g) => el('rect', [['data-editor-only', 'true'], ['x', n2(g.slotX)], ['y', n2(plot.y)], ['width', n2(g.slotWidth)], ['height', n2(plot.height)], ['fill', SELECT_COLOR], ['fill-opacity', 0.07], ['stroke', SELECT_COLOR], ['stroke-width', 2], ['stroke-dasharray', '8 6'], ['pointer-events', 'none']], { editorOnly: true }))),
+    ...(bands.length > 0 && orient.matrix ? [el('g', [['data-editor-only', 'true'], ['transform', orient.matrix]], { children: bands, editorOnly: true })] : bands),
   ];
 }

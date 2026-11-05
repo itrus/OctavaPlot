@@ -144,7 +144,7 @@ export function ecdfSteps(values: ReadonlyArray<number | null | undefined>, dire
     let j = i;
     while (j < n && s[j] === s[i]) j++;
     const atOrBelow = j / n;
-    steps.push({ x: s[i], f: direction === 'atOrBelow' ? atOrBelow : 1 - atOrBelow, ties: j - i });
+    steps.push({ x: s[i], f: direction === 'atOrBelow' ? atOrBelow : (n - j) / n, ties: j - i });
     i = j;
   }
   return { steps, n };

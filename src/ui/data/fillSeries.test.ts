@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import type { DataTable } from '../../model/types';
 import { setCells, setRowTitles } from '../../state/commands';
-import { planFill } from './fill';
+import { planFill } from './fillSeries';
 
 /** A table whose cell (row, col) holds 10 * row + col, and whose row titles are "R<row>". */
 const tableOf = (): DataTable => {
@@ -67,7 +67,7 @@ describe('planFill', () => {
   });
 });
 
-import { planSeries, suggestSeries } from './fill';
+import { planSeries, suggestSeries } from './fillSeries';
 import { gridJump } from './gridKeys';
 
 describe('planSeries', () => {

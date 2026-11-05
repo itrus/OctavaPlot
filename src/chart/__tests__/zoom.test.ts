@@ -1,11 +1,11 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { createExampleProject } from '../../../model/defaults';
-import type { ChartType, Project, TableKind } from '../../../model/types';
-import { addAnnotation, addChart, addDataTable } from '../../../state/commands';
-import { buildAnyModel, ChartCanvas } from '../../anyModel';
-import { chartToSvgString } from '../../export/export';
+import { createExampleProject } from '../../model/defaults';
+import type { ChartType, Project, TableKind } from '../../model/types';
+import { addAnnotation, addChart, addDataTable } from '../../state/commands';
+import { buildAnyModel, ChartCanvas } from '../anyModel';
+import { chartToSvgString } from '../export/export';
 
 /** One chart of each family the drawing is made for, with an annotation (which every family draws the same way). */
 const FAMILIES: ReadonlyArray<readonly [string, TableKind, ChartType]> = [

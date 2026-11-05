@@ -6,6 +6,7 @@ import { Field, SelectInput, SubHeading } from '../inspector/common/controls';
 import { Modal } from '../dialogs/NewItemDialogs';
 import { browserFontAvailable, browserHasGlyph } from './browserFonts';
 import { exportStatusText, type ExportOutcome, type ExportState } from './exportJob';
+import { copyText } from '../../util/download';
 
 /** What the dialog says about: the drawing, the fonts it asks for and what its model warned about. The format and resolution are the dialog's own. */
 type ExportSubject = Omit<ExportReportInput, 'format' | 'dpi' | 'isFontAvailable' | 'hasGlyph'>;
@@ -67,7 +68,7 @@ export function ReportBody({ report }: { report: ExportReport }) {
           Picture: {raster.width} × {raster.height} px at {report.dpi} dpi ({raster.megapixels} megapixels)
         </div>
       ) : (
-        <div className="muted small">SVG is vector: it has no pixels and no resolution.</div>
+        <div className="muted small">{report.format === 'pdf' ? 'PDF' : 'SVG'} is vector: it has no pixels and no resolution.</div>
       )}
       <SubHeading>Fonts</SubHeading>
       {report.fonts.length === 0 && <div className="muted small">No font is asked for.</div>}
@@ -121,12 +122,7 @@ export function ExportDialog({ kind, subject, state, onExport, onClose }: Props)
   const reason = tooBig ? `${report.raster?.width} × ${report.raster?.height} px is more than the browser can make. Lower the resolution, make the graph smaller, or choose SVG.` : null;
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
-      setCopied('Report copied.');
-    } catch {
-      setCopied('The browser did not allow copying.');
-    }
+    setCopied((await copyText(JSON.stringify(report, null, 2))) ? 'Report copied.' : 'The browser did not allow copying.');
   };
 
   return (

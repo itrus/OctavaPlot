@@ -35,3 +35,16 @@ describe('one SD for Results and chart summaries', () => {
     expect(rel(describeValues([1.5e308, 1.5e308, 1.5e308]).mean!, 1.5e308)).toBeLessThan(1e-12);
   });
 });
+
+describe('values all equal', () => {
+  // A plain sum of 18 copies of this value, divided by 18, misses it by an ulp; the spread must still be exactly none.
+  const v = 7.2569036747300375;
+  it('have that value as their mean, no SD and no skewness or kurtosis', () => {
+    const d = describeValues(Array.from({ length: 18 }, () => v));
+    expect(d.mean).toBe(v);
+    expect(d.sd).toBe(0);
+    expect(d.skewness).toBeNull();
+    expect(d.kurtosis).toBeNull();
+    expect(summarize(Array.from({ length: 18 }, () => v)).sd).toBe(0);
+  });
+});

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
-import { formatNum, sliderStep, snapToStep } from '../../data/numberFormat';
+import { isCommitEnter } from '../../components/shortcutGuard';
+import { formatNum, sliderStep, snapToStep } from './numberFormat';
 import { WheelRange } from '../../components/WheelRange';
 import { useRoving } from './roving';
 
@@ -305,7 +306,7 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
+            if (isCommitEnter(e)) e.currentTarget.blur();
             else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !disabled) {
               // Arrow keys step the value (Shift: ten steps), clamped to the allowed range.
               e.preventDefault();
@@ -372,7 +373,7 @@ export function OptionalNumField({ label, value, onCommit, validate, hint, autoV
           }}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          onKeyDown={(e) => isCommitEnter(e) && e.currentTarget.blur()}
         />
         <AutoCheck
           id={id}

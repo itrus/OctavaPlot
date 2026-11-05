@@ -1,6 +1,6 @@
 import { meanOf, neumaierSum, scaledMoments, sdOf } from './moments';
 import { medianCiRank, studentTQuantileUpper } from './special';
-import { quantileType6 } from './summary';
+import { quantile6 } from './distribution';
 
 /** An interval, or null when it cannot be computed. */
 interface Interval {
@@ -102,13 +102,13 @@ export function describeValues(values: ReadonlyArray<number | null | undefined>,
   return {
     ...none,
     min: sorted[0],
-    q1: quantileType6(sorted, 0.25),
-    median: quantileType6(sorted, 0.5),
-    q3: quantileType6(sorted, 0.75),
+    q1: quantile6(sorted, 0.25),
+    median: quantile6(sorted, 0.5),
+    q3: quantile6(sorted, 0.75),
     max: sorted[n - 1],
     range: sorted[n - 1] - sorted[0],
-    p10: quantileType6(sorted, 0.1),
-    p90: quantileType6(sorted, 0.9),
+    p10: quantile6(sorted, 0.1),
+    p90: quantile6(sorted, 0.9),
     medianCi,
     medianCoverage,
     mean,

@@ -12,6 +12,12 @@ describe('export file names', () => {
     expect(exportFileName('Graph 1', 'png', true, when)).toBe('Graph_1_261022_1405.png');
     expect(exportFileName('Graph 1', 'png', false, when)).toBe('Graph_1.png');
   });
+  it('keeps letters of any script and replaces the characters a file name cannot hold', () => {
+    expect(exportFileName('Überleben α-Synuclein', 'png', false, when)).toBe('Überleben_α-Synuclein.png');
+    expect(exportFileName('细胞', 'svg', false, when)).toBe('细胞.svg');
+    expect(exportFileName('a/b:c*?"<>|', 'pdf', false, when)).toBe('a_b_c_.pdf');
+    expect(exportFileName('???', 'pdf', false, when)).toBe('_.pdf');
+  });
   it('puts the creation stamp in a new project name and does not stamp the file name twice', () => {
     const name = untitledProjectName(when);
     expect(name).toBe('Untitled_project_261022_1405');

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createXyTable } from '../../../model/defaults';
-import type { Chart, ExtraTick, Project } from '../../../model/types';
-import { parseProject, stringifyProject } from '../../../state/serialize';
-import { patchAxis } from '../../../state/commands';
-import { chartToSvgString } from '../../export/export';
-import { buildColumnModel } from '../../column/columnModel';
-import { buildXyModel } from '../../xy/xyModel';
+import { createChart, createColumnTable, createXyTable } from '../../model/defaults';
+import type { Chart, ExtraTick, Project } from '../../model/types';
+import { parseProject, stringifyProject } from '../../state/serialize';
+import { patchAxis } from '../../state/commands';
+import { chartToSvgString } from '../export/export';
+import { buildColumnModel } from '../column/columnModel';
+import { buildXyModel } from '../xy/xyModel';
 
 const projectOf = (kind: 'column' | 'xy', type: Chart['type']): Project => {
   const table = kind === 'column' ? createColumnTable('C', true, 3) : createXyTable('X', true);

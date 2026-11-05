@@ -13,7 +13,8 @@ export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') latest.current.onClose();
-      else if (e.key === 'Enter' && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLButtonElement && e.target.getAttribute('role') !== 'radio')) {
+      // Enter that ends the composition of a character (an input method for Japanese, Chinese, ...) is not a confirmation.
+      else if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLButtonElement && e.target.getAttribute('role') !== 'radio')) {
         // A card is a radio button: Enter on it confirms the choice instead of selecting it again.
         e.preventDefault();
         // Enter does what the confirm button does: nothing while that is disabled.

@@ -170,7 +170,7 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   const titleH = fontPt * 1.8;
   const titleBand = titleH + (opts.showTotal ? fontPt * 1.4 : 0);
   // Room for the labels round the pie when they are written outside it: the widest one that can occur, and one line.
-  const biggest = Math.max(1, ...shown.flatMap((p) => p.g.observations.map((o) => (o.value !== null && Number.isFinite(o.value) ? o.value : 0))));
+  const biggest = shown.reduce((m, p) => p.g.observations.reduce((mm, o) => (o.value !== null && Number.isFinite(o.value) ? Math.max(mm, o.value) : mm), m), 1);
   const widest = Math.max(0, ...shown.map((p) => measureText(sliceLabelText(opts.labels, p.label, biggest, 1, opts.percentDigits) ?? '', labelPt, false, false, chart.fontFamily)));
   const bars = chart.type === 'slices';
   const dots = chart.type === 'dotGrid';

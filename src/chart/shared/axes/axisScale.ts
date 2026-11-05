@@ -109,12 +109,12 @@ function resolveLogAxis(input: YAxisInput, cfg: AxisScaleSettings, base: number)
     hi = base ** Math.ceil(logb(pHi) - EPS);
     if (!(hi > lo)) hi = lo * base;
   }
+  const [autoLo, autoHi] = [lo, hi];
   lo = min ?? lo;
   hi = max ?? hi;
   if (!(hi > lo)) {
     warnings.push('A manual limit conflicts with the data range; using automatic limits.');
-    lo = base ** Math.floor(logb(lo));
-    hi = lo * base;
+    [lo, hi] = [autoLo, autoHi];
   }
   lo = clean(lo);
   hi = clean(hi);

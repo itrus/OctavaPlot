@@ -5,6 +5,7 @@
 
 import type { CentreKind, Observation, SpreadKind, SummarySpec } from '../model/types';
 import { cachedCalc } from './calcCache';
+import { quantile6 } from './distribution';
 import { meanOf, sdOf } from './moments';
 import { medianCiRank, studentTQuantileUpper } from './special';
 
@@ -140,16 +141,6 @@ export function formatPercent(level: number): string {
   return `${Number((level * 100).toPrecision(12))}%`;
 }
 
-/** Type-6 quantile of ascending values (spec 10.1 L704): position p(n+1), clamped to the ends. */
-export function quantileType6(sorted: ReadonlyArray<number>, p: number): number {
-  const n = sorted.length;
-  const h = p * (n + 1);
-  if (h <= 1) return sorted[0];
-  if (h >= n) return sorted[n - 1];
-  const lo = Math.floor(h);
-  return sorted[lo - 1] + (h - lo) * (sorted[lo] - sorted[lo - 1]);
-}
-
 export function isValidConfidence(level: number): boolean {
   return typeof level === 'number' && level > 0 && level < 1;
 }
@@ -240,7 +231,7 @@ export function computeGroupStats(
   const centre = geometric
     ? Math.exp(logMean)
     : spec.centre === 'median'
-      ? quantileType6(sorted, 0.5)
+      ? quantile6(sorted, 0.5)
       : meanOf(xs);
   if (!Number.isFinite(centre)) {
     notices.push({
@@ -309,8 +300,8 @@ export function computeGroupStats(
       centreBased = false;
       break;
     case 'iqr':
-      lower = quantileType6(sorted, 0.25);
-      upper = quantileType6(sorted, 0.75);
+      lower = quantile6(sorted, 0.25);
+      upper = quantile6(sorted, 0.75);
       centreBased = false;
       break;
     default: {

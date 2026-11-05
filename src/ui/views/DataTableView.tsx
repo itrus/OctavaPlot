@@ -1,4 +1,5 @@
 import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { isCommitEnter } from '../components/shortcutGuard';
 import type { DataTable, DecimalSeparator, TableKind } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
@@ -21,7 +22,7 @@ import { RowsMenu } from './RowsMenu';
 import { leadingColumns, usesSeriesBlocks } from '../../model/graph/chartTypes';
 import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../../model/table/tableLayout';
 import { blockToText, formatCellFor, parseCellFor, planPaste, selectionStrings } from '../data/cellText';
-import { planFill, planSeries, suggestSeries } from '../data/fill';
+import { planFill, planSeries, suggestSeries } from '../data/fillSeries';
 import { gridJump } from '../data/gridKeys';
 
 // Sizes at 100% zoom, in px; the table multiplies them by its zoom.
@@ -303,7 +304,7 @@ export function DataTableView({ table }: { table: DataTable }) {
       if (e.button !== 0) return;
       if (editRef.current && editRef.current.col >= 0 && (editRef.current.row !== row || editRef.current.col !== col)) {
         // Clicking elsewhere commits (or rejects) the current edit first. Title edits have nothing to reject.
-        const parsed = parseCellFor(editRef.current.text, settings.decimalSeparator, tableRef.current.groups[editRef.current.col]?.time);
+        const parsed = parseCellFor(editRef.current.text, separatorRef.current, tableRef.current.groups[editRef.current.col]?.time);
         if (!parsed.ok) {
           e.preventDefault();
           return;
@@ -517,6 +518,11 @@ export function DataTableView({ table }: { table: DataTable }) {
     clearSelection();
   };
   const pasteText = (text: string) => {
+    // An empty clipboard (an image, a file) pastes nothing: it must not clear the selected cells.
+    if (text === '') {
+      setMessage({ kind: 'info', text: 'The clipboard holds no text to paste.' });
+      return;
+    }
     const plan = planPaste(text, bounds(sel), settings.decimalSeparator, table.groups.map((g) => g.time));
     if (!plan.ok) {
       setMessage({ kind: 'error', text: plan.message });
@@ -790,7 +796,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                             setMessage(null);
                             run('Rename series', renameSeries(table.id, series.id, v));
                           }}
-                          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                          onKeyDown={(e) => isCommitEnter(e) && e.currentTarget.blur()}
                         />
                         <button className="icon-btn" title={`Remove ${series.name}`} aria-label={`Remove ${series.name}`} onClick={() => run('Remove series', removeSeries(table.id, series.id))} disabled={seriesList.length <= 1}><CloseIcon size={14} /></button>
                       </div>
@@ -809,7 +815,7 @@ export function DataTableView({ table }: { table: DataTable }) {
                     defaultValue={g.name}
                     aria-label={c < lead ? kindText.leadName : kindText.columnName}
                     onBlur={(e) => commitName(g.id, e.currentTarget, g.name)}
-                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                    onKeyDown={(e) => isCommitEnter(e) && e.currentTarget.blur()}
                   />
                   <button
                     className="icon-btn"

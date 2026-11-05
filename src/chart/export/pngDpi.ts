@@ -48,6 +48,26 @@ export function withPngDpi(png: Uint8Array, dpi: number): Uint8Array {
   return result;
 }
 
+/** An SVG drawn by the browser onto a canvas of `width` × `height` pixels, then a PNG at `dpi`: every PNG export (graph and layout) goes through here. */
+export async function svgToPngBlob(svg: string, width: number, height: number, dpi: number): Promise<Blob> {
+  const img = new Image();
+  const loaded = new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('The browser could not rasterise the SVG.'));
+  });
+  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  await loaded;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D context is unavailable.');
+  // The page colour is part of the SVG; with none chosen the PNG stays transparent.
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+  return canvasToPngBlob(canvas, dpi);
+}
+
 /** A canvas as a PNG file with its resolution written in; the one encode-and-patch step of every PNG export. */
 export function canvasToPngBlob(canvas: HTMLCanvasElement, dpi: number): Promise<Blob> {
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encoding failed.'))), 'image/png')).then(

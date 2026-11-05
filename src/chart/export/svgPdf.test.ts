@@ -4,7 +4,7 @@ import { GALLERY } from '../../model/graph/chartGallery';
 import { defaultLayout } from '../../model/project/layout';
 import type { Project, TableKind } from '../../model/types';
 import { addAnnotation, addBracket, addChart, addDataTable, patchLook } from '../../state/commands';
-import { buildVectorPdf } from './pdf';
+import { buildVectorPdf, pdfTextString } from './pdf';
 import { chartToPdf, chartToSvgString } from './export';
 import { layoutToPdf } from './layoutExport';
 import { familyOf, parseColour, parseTransform, parseXml, pathOps, svgToContent, svgToPdf } from './svgPdf';
@@ -244,6 +244,13 @@ describe('the PDF file', () => {
     const text = new TextDecoder('latin1').decode(bytes);
     expect(text).toContain('/ExtGState<</GS1 6 0 R>>');
     expect(text).toContain('/Type/ExtGState/ca 0.5/CA 1');
+  });
+  it('writes the title as itself: plain ASCII literally, anything else as UTF-16BE', () => {
+    const titled = (title: string) => new TextDecoder('latin1').decode(buildVectorPdf({ widthPt: 10, heightPt: 10, content: new Uint8Array(), compressed: false, fonts: [], alphas: [], title }));
+    expect(titled('Fig (a) \\ 1')).toContain('/Title(Fig \\(a\\) \\\\ 1)');
+    expect(titled('Über')).toContain('/Title<FEFF00DC006200650072>');
+    expect(titled('')).not.toContain('/Title');
+    expect(pdfTextString('α')).toBe('<FEFF03B1>');
   });
 });
 
