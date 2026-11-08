@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { announced, cell, navItem, openApp, openGraph, openTable } from './helpers';
+import { announced, cell, navItem, openApp, openGraph, openTable, railPage } from './helpers';
 
 const activeCell = (page: Page) => page.getByRole('grid', { name: 'Data table' }).getAttribute('aria-activedescendant');
 
@@ -53,6 +53,7 @@ test.describe('the chart', () => {
   test('arrow keys select data sets and points, Escape returns, and the selection is read out', async ({ page }) => {
     await openApp(page);
     await openGraph(page);
+    await railPage(page, 'Plot');
     await page.locator('.chart-surface').click({ position: { x: 8, y: 8 } });
     await expect(announced(page)).toHaveText('Whole chart');
     await page.keyboard.press('ArrowRight');
@@ -101,6 +102,7 @@ test.describe('the chart', () => {
     await page.keyboard.press('Shift+ArrowRight');
     await page.keyboard.press('Shift+ArrowRight');
     await expect(announced(page)).toHaveText(/^Group [A-D], Group [A-D], Group [A-D]: 3 data sets edited together$/);
+    await railPage(page, 'Plot');
     await expect(page.locator('select[aria-label="Data set"]')).toContainText('3 data sets together');
   });
 });

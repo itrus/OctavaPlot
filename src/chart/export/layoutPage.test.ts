@@ -65,8 +65,6 @@ describe('the texts of a page, by font', () => {
       textGroups: layoutTextGroups(layout, georgia, 'Arial, sans-serif'),
       hasGlyph: (family) => family !== 'Arial', // only Arial lacks the Greek letter
       warnings: [],
-      printWidthMm: null,
-      printWarnings: [],
     });
     expect(report.glyphs).toBeNull();
     expect(report.glyphGroups.map((g) => [g.font, g.missing.map((m) => m.codePoint)])).toEqual([['Arial', ['U+03B1']], ['Georgia', []]]);

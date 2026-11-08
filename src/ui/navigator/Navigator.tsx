@@ -7,6 +7,7 @@ import { FOLDER_TITLE } from '../../model/project/folderItems';
 import type { AnalysisKind, ChartType, FolderKey, Id, TableKind, ViewRef } from '../../model/types';
 import type { ChartVariant } from '../../model/graph/chartVariant';
 import { useApp } from '../../state/AppContext';
+import { newChartStart } from '../../state/settings';
 import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, unlinkChart, removeAnalysis, type NewTableOptions } from '../../state/commands';
 import { DeleteIcon } from '../components/icons';
 import { navFold, navStep } from './navKeys';
@@ -85,7 +86,7 @@ export function Navigator() {
   };
   const createGraph = (tableId: Id, type: ChartType, variant?: ChartVariant) => {
     const id = newId('chart');
-    run('New graph', addChart(id, tableId, { widthPx: settings.defaultChartWidthPx, heightPx: settings.defaultChartHeightPx }, type, variant));
+    run('New graph', addChart(id, tableId, newChartStart(settings), type, variant));
     setView({ kind: 'chart', id });
     setDialog(null);
   };

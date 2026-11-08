@@ -3,7 +3,7 @@ import { CloseIcon } from '../../components/icons';
 import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../../model/graph/aspect';
 import { graphSources, type GraphSource } from '../../../model/table/chartTable';
 import { AXIS_LIMITS } from '../../../model/graph/axis';
-import { FONT_FAMILIES, PRINT_WIDTH_MM } from '../../../model/graph/look';
+import { FONT_FAMILIES } from '../../../model/graph/look';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../../model/defaults';
 import { newId } from '../../../model/ids';
 import { type AnnotationPlacer, changeAnchor, nudgePatches } from '../../../chart/shared/scene/annotationPlace';
@@ -158,10 +158,6 @@ export function TextSections({ chart, groups, yName, dual, axes = true }: { char
 
 export function DimensionsSection({ chart }: { chart: Chart }) {
   const setChart = useChartSetter(chart);
-  // Custom is a choice of its own, also while the width happens to equal a preset.
-  const [customPrint, setCustomPrint] = useState(false);
-  const print = chart.printWidthMm;
-  const printChoice = print === undefined ? 'none' : customPrint || !(PRINT_WIDTH_MM.presets as readonly number[]).includes(print) ? 'custom' : String(print);
   return (
     <GroupBox title="Size">
       <Field label="Shape" hint="Free keeps width and height independent; 4:3, 3:4 and Square move one when you change the other">
@@ -197,20 +193,6 @@ export function DimensionsSection({ chart }: { chart: Chart }) {
       </Field>
       <NumField label="Chart width" unit="px" value={chart.widthPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => setChart('Chart width', resizeChart(chart, chart.aspect, 'width', v), 'chart:w')} />
       <NumField label="Chart height" unit="px" value={chart.heightPx} min={CHART_PX_MIN} max={CHART_PX_MAX} onCommit={(v) => setChart('Chart height', resizeChart(chart, chart.aspect, 'height', v), 'chart:h')} />
-      <Field label="Print width" hint="The width the graph will be printed at. The export dialog then warns about text and lines that would print too small. Nothing is resized.">
-        <SelectInput<string>
-          value={printChoice}
-          options={[{ value: 'none', label: 'None' }, ...PRINT_WIDTH_MM.presets.map((mm) => ({ value: String(mm), label: `${mm} mm` })), { value: 'custom', label: 'Custom' }]}
-          onChange={(v) => {
-            setCustomPrint(v === 'custom');
-            setChart('Print width', { printWidthMm: v === 'none' ? undefined : v === 'custom' ? (print ?? 100) : Number(v) });
-          }}
-        />
-      </Field>
-      {printChoice === 'custom' && (
-        <NumField label="Custom print width" unit="mm" step={1} slider={false} value={print ?? 100} min={PRINT_WIDTH_MM.min} max={PRINT_WIDTH_MM.max} onCommit={(v) => setChart('Print width', { printWidthMm: v }, 'chart:pw')} />
-      )}
-      <div className="muted small">Sizes are in pixels. The default for new charts is set in Settings.</div>
     </GroupBox>
   );
 }
@@ -556,14 +538,14 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
                   <>
                     {placer.numericX && <NumField label="X value" value={a.x ?? 0} min={-1e15} max={1e15} slider={false} hint="In the units of the X axis; the left edge of the text" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { x: v }), `ann:${a.id}:x`)} />}
                     <NumField label="Y value" value={a.y ?? 0} min={-1e15} max={1e15} slider={false} hint="In the units of the value axis; the top edge of the text" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { y: v }), `ann:${a.id}:y`)} />
-                    {placer.acrossPage === 'x' && <NumField label="Left" unit="% of chart width" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Across the categories the position stays a place on the page" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:xf`)} />}
-                    {placer.acrossPage === 'y' && <NumField label="Top" unit="% of chart height" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Across the categories the position stays a place on the page" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:yf`)} />}
+                    {placer.acrossPage === 'x' && <NumField label="Left" unit="%" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Percent of the chart width. Across the categories the position stays a place on the page" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:xf`)} />}
+                    {placer.acrossPage === 'y' && <NumField label="Top" unit="%" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Percent of the chart height. Across the categories the position stays a place on the page" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:yf`)} />}
                     {placer.skipped([a]).length > 0 && <div className="field-note">These values are outside the axis range, so the text is not drawn.</div>}
                   </>
                 ) : (
                   <>
-                    <NumField label="Left" unit="% of chart width" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Position of the left edge of the text; arrow keys nudge a selected annotation (Shift 5%, Alt 0.1%)" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:x`)} />
-                    <NumField label="Top" unit="% of chart height" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:y`)} />
+                    <NumField label="Left" unit="%" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Percent of the chart width: the position of the left edge of the text; arrow keys nudge a selected annotation (Shift 5%, Alt 0.1%)" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:x`)} />
+                    <NumField label="Top" unit="%" hint="Percent of the chart height: the position of the top of the text" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:y`)} />
                   </>
                 )}
                 <NumField {...SLIDERS.font} label="Size" unit="pt" value={a.fontSizePt} min={8} max={40} onCommit={(v) => run('Annotation size', patchAnnotation(chart.id, a.id, { fontSizePt: v }), `ann:${a.id}:size`)} />

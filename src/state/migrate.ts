@@ -66,6 +66,20 @@ export const SHAPE_STEPS: readonly ShapeStep[] = [
       });
     },
   },
+  {
+    id: 'pair-lines-one-colour',
+    label: 'The lines of a before-and-after graph once had one colour; they now have a colour for each subject unless the graph asks for one colour (pairs.lineColour). A graph whose lines were given a colour asks for one colour, so it keeps it.',
+    run: (project) => {
+      for (const c of Array.isArray(project.charts) ? project.charts : []) {
+        if (!isObj(c) || c.type !== 'paired') continue;
+        const pairs = isObj(c.pairs) ? c.pairs : {};
+        if (pairs.lineColour !== undefined) continue;
+        const given = (style: unknown): boolean => isObj(style) && style.lineColor !== undefined;
+        const own = (Array.isArray(c.layers) ? c.layers : []).some((l) => isObj(l) && (given(l.style) || (isObj(l.groupOverrides) && Object.values(l.groupOverrides).some(given))));
+        if (own) c.pairs = { ...pairs, lineColour: 'one' };
+      }
+    },
+  },
 ];
 
 /** The part of a read project the steps after reading need. */

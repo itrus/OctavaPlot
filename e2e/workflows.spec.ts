@@ -100,29 +100,43 @@ test.describe('files', () => {
     await expect(cell(page, 0, 0)).toHaveText('7.77');
   });
 
-  test('a PNG export has the size and the resolution the dialog states', async ({ page }) => {
+  test('a PNG export has the size the panel states, and no resolution to choose', async ({ page }) => {
     await openApp(page);
     await openGraph(page);
     await expect(page.getByRole('navigation', { name: 'Graph settings pages' })).toBeVisible();
     await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' }).click();
     const panel = page.locator('.export-panel');
     await expect(panel).toBeVisible();
-    const text = (await panel.getByText(/^Picture: /).textContent()) ?? '';
-    const [, w, h, dpi] = /Picture: (\d+) × (\d+) px at (\d+) dpi/.exec(text) ?? [];
+    // The size is a list of three lines (px, pt, mm); a graph's PNG has the pixels of the first, so there is no Picture line.
+    const sizes = panel.locator('.report-sizes li');
+    await expect(sizes).toHaveCount(3);
+    await expect(sizes.nth(1)).toHaveText(/ pt$/);
+    await expect(sizes.nth(2)).toHaveText(/ mm$/);
+    const [, w, h] = /^(\d+) × (\d+) px$/.exec((await sizes.first().textContent()) ?? '') ?? [];
     expect(Number(w)).toBeGreaterThan(0);
+    await expect(panel.getByText(/^Picture: /)).toHaveCount(0);
+    // There is no filename to type and no resolution to choose: only a layout page has a resolution.
+    await expect(panel.getByText('Filename')).toHaveCount(0);
+    await expect(panel.getByRole('combobox', { name: /Resolution/ })).toHaveCount(0);
 
     const download = page.waitForEvent('download');
-    await panel.getByRole('button', { name: 'Export .png' }).click();
+    // The button names the file it writes: the name of the graph, the date and time of Settings, the extension.
+    const button = panel.getByRole('button', { name: /^Export .+\.png$/ });
+    await expect(button).toHaveText(/^Export Graph_1_\d{6}_\d{4}\.png$/);
+    const label = ((await button.textContent()) ?? '').replace(/^Export /, '');
+    await button.click();
     const file = await download;
-    expect(file.suggestedFilename()).toMatch(/\.png$/);
+    expect(file.suggestedFilename()).toBe(label);
+    // The file is named after the graph (Graph 1), then the date and time of Settings.
+    expect(file.suggestedFilename()).toMatch(/^Graph_1.*\.png$/);
     const bytes = await (await import('node:fs/promises')).readFile(await file.path());
     // The PNG signature, then the IHDR chunk with the width and the height.
     expect([...bytes.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     expect(bytes.readUInt32BE(16)).toBe(Number(w));
     expect(bytes.readUInt32BE(20)).toBe(Number(h));
-    // The resolution is written into the file (pHYs, pixels per metre).
+    // The size on screen, 96 dpi, is written into the file (pHYs, pixels per metre).
     const phys = bytes.indexOf(Buffer.from('pHYs'));
     expect(phys).toBeGreaterThan(0);
-    expect(Math.round(bytes.readUInt32BE(phys + 4) * 0.0254)).toBe(Number(dpi));
+    expect(Math.round(bytes.readUInt32BE(phys + 4) * 0.0254)).toBe(96);
   });
 });

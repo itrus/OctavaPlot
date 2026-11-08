@@ -34,7 +34,7 @@ describe('checkGlyphs', () => {
 });
 
 describe('the glyphs in the export report', () => {
-  const base = { name: 'g', widthPx: 100, heightPx: 100, format: 'svg' as const, dpi: 96, fontFamilies: ['Arial, sans-serif'], isFontAvailable: () => true, warnings: [], printWidthMm: null, printWarnings: [] };
+  const base = { name: 'g', widthPx: 100, heightPx: 100, format: 'svg' as const, dpi: 96, fontFamilies: ['Arial, sans-serif'], isFontAvailable: () => true, warnings: [] };
   it('are checked in the font in use, and null when the texts are not known', () => {
     expect(buildExportReport(base).glyphs).toBeNull();
     const r = buildExportReport({ ...base, texts: ['α'], hasGlyph: (f) => f !== 'Arial' });

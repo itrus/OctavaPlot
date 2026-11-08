@@ -160,7 +160,8 @@
         },
         "pairs": {
           "bridge": false,
-          "bySubject": false
+          "bySubject": false,
+          "lineColour": "subject"
         },
         "heatmap": {
           "palette": "bs-blue",

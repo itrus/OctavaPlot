@@ -42,29 +42,31 @@ describe('planning a batch', () => {
   it('lists the graphs in the order picked, each with its safe file name, and two graphs of one name get two files', () => {
     const p = three();
     const [a, b, c] = p.charts;
-    const plan = planBatch(p, [c.id, a.id, b.id], 'svg', 96, false);
+    const plan = planBatch(p, [c.id, a.id, b.id], 'svg', false);
     expect(plan.items.map((i) => i.file)).toEqual(['Fig_1.svg', `${a.name.replace(/[^\w.-]+/g, '_')}.svg`, 'Fig_1_2.svg']);
     expect(plan.items.map((i) => i.chart.id)).toEqual([c.id, a.id, b.id]);
     expect(plan.items.every((i) => i.pixels === null)).toBe(true);
   });
   it('adds the date and time to every name when asked, and ignores ids that are not graphs', () => {
     const p = three();
-    const plan = planBatch(p, [p.charts[1].id, 'nothing', p.dataTables[0].id], 'png', 300, true, WHEN);
+    const plan = planBatch(p, [p.charts[1].id, 'nothing', p.dataTables[0].id], 'png', true, WHEN);
     expect(plan.items.map((i) => i.file)).toEqual(['Fig_1_261029_1436.png']);
   });
-  it('gives the pixels of each picture at the resolution, and names a graph larger than the browser can make', () => {
+  it('gives the pixels of each picture at the size of its graph, and names a graph larger than the browser can make', () => {
     const p = three();
-    const big = { ...p, charts: p.charts.map((c, i) => (i === 1 ? { ...c, widthPx: 6000, heightPx: 400 } : c)) };
-    const plan = planBatch(big, big.charts.map((c) => c.id), 'png', 300, false);
-    expect(plan.items[1].pixels).toEqual({ width: 18750, height: 1250 });
-    expect(plan.tooBig).toEqual(['Fig 1 (18750 × 1250 px)']);
-    expect(planBatch(big, big.charts.map((c) => c.id), 'png', 96, false).tooBig).toEqual([]);
-    expect(planBatch(big, big.charts.map((c) => c.id), 'svg', 600, false).tooBig).toEqual([]);
+    const wide = (widthPx: number) => ({ ...p, charts: p.charts.map((c, i) => (i === 1 ? { ...c, widthPx, heightPx: 400 } : c)) });
+    const fits = planBatch(wide(6000), wide(6000).charts.map((c) => c.id), 'png', false);
+    expect(fits.items[1].pixels).toEqual({ width: 6000, height: 400 });
+    expect(fits.tooBig).toEqual([]);
+    const big = wide(17000);
+    const ids = big.charts.map((c) => c.id);
+    expect(planBatch(big, ids, 'png', false).tooBig).toEqual(['Fig 1 (17000 × 400 px)']);
+    expect(planBatch(big, ids, 'svg', false).tooBig).toEqual([]);
   });
   it('leaves out a graph whose data table is gone, and says which', () => {
     const p = three();
     const broken = { ...p, charts: p.charts.map((c, i) => (i === 1 ? { ...c, dataTableId: 'gone' } : c)) };
-    const plan = planBatch(broken, broken.charts.map((c) => c.id), 'svg', 96, false);
+    const plan = planBatch(broken, broken.charts.map((c) => c.id), 'svg', false);
     expect(plan.skipped).toEqual(['Fig 1']);
     expect(plan.items).toHaveLength(2);
   });
@@ -74,8 +76,8 @@ describe('running a batch', () => {
   it('writes the same SVG as the export of the single graph into the ZIP, in order, with its own CRC', async () => {
     const p = three();
     const renderers: BatchRenderers = { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: () => Promise.reject(new Error('unused')), pdf: () => Promise.reject(new Error('unused')) };
-    const plan = planBatch(p, [p.charts[0].id, p.charts[2].id], 'svg', 96, false);
-    const files = unzip(await bytesOf(await runBatch(plan, 'svg', 96, renderers, undefined, WHEN)));
+    const plan = planBatch(p, [p.charts[0].id, p.charts[2].id], 'svg', false);
+    const files = unzip(await bytesOf(await runBatch(plan, 'svg', renderers, undefined, WHEN)));
     expect(files.map((f) => f.name)).toEqual(plan.items.map((i) => i.file));
     files.forEach((f, i) => {
       const alone = chartToSvgString(plan.items[i].chart, plan.items[i].table, plan.items[i].fit, { metadata: true });
@@ -83,20 +85,20 @@ describe('running a batch', () => {
       expect(f.crc).toBe(crc32(f.data));
     });
   });
-  it('passes the resolution to the PNG renderer and stores the bytes it returns', async () => {
+  it('asks the PNG renderer for each graph and stores the bytes it returns', async () => {
     const p = three();
     const seen: string[] = [];
     const renderers: BatchRenderers = {
       svg: () => '',
-      raster: async (chart, _t, dpi) => {
-        seen.push(`png:${chart.id}:${dpi}`);
+      raster: async (chart) => {
+        seen.push(`png:${chart.id}`);
         return new Blob([new Uint8Array([137, 80, 78, 71, 1])]);
       },
       pdf: () => Promise.reject(new Error('unused')),
     };
-    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id], 'png', 150, false);
-    const files = unzip(await bytesOf(await runBatch(plan, 'png', 150, renderers, undefined, WHEN)));
-    expect(seen).toEqual([`png:${p.charts[0].id}:150`, `png:${p.charts[1].id}:150`]);
+    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id], 'png', false);
+    const files = unzip(await bytesOf(await runBatch(plan, 'png', renderers, undefined, WHEN)));
+    expect(seen).toEqual([`png:${p.charts[0].id}`, `png:${p.charts[1].id}`]);
     expect([...files[0].data]).toEqual([137, 80, 78, 71, 1]);
   });
   it('asks the PDF renderer for a PDF, with no resolution and no canvas to fit', async () => {
@@ -110,16 +112,16 @@ describe('running a batch', () => {
         return new Blob([new Uint8Array([37, 80, 68, 70])]);
       },
     };
-    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id], 'pdf', 600, false);
+    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id], 'pdf', false);
     expect(plan.items.every((i) => i.pixels === null)).toBe(true);
     expect(plan.tooBig).toEqual([]);
-    const files = unzip(await bytesOf(await runBatch(plan, 'pdf', 600, renderers, undefined, WHEN)));
+    const files = unzip(await bytesOf(await runBatch(plan, 'pdf', renderers, undefined, WHEN)));
     expect(seen).toEqual([p.charts[0].id, p.charts[1].id]);
     expect([...files[0].data]).toEqual([37, 80, 68, 70]);
   });
   it('draws the graphs of the project it was planned from, even when the project is edited while it runs', async () => {
     const p = three();
-    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id], 'svg', 96, false);
+    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id], 'svg', false);
     const drawn: string[] = [];
     let edited: Project = p;
     const renderers: BatchRenderers = {
@@ -133,7 +135,7 @@ describe('running a batch', () => {
     const progress = (i: number) => {
       if (i === 2) edited = renameItem('chart', p.charts[1].id, 'Renamed')(p);
     };
-    await runBatch(plan, 'svg', 96, renderers, progress, WHEN);
+    await runBatch(plan, 'svg', renderers, progress, WHEN);
     expect(edited.charts[1].name).toBe('Renamed');
     expect(drawn).toEqual([p.charts[0].name, 'Fig 1']);
   });
@@ -147,12 +149,12 @@ describe('running a batch', () => {
       },
       raster: () => Promise.reject(new Error('unused')), pdf: () => Promise.reject(new Error('unused')),
     };
-    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id, p.charts[2].id], 'svg', 96, false);
-    await expect(runBatch(plan, 'svg', 96, renderers, (i, n, name) => steps.push([i, n, name]), WHEN)).rejects.toThrow('Fig 1: boom');
+    const plan = planBatch(p, [p.charts[0].id, p.charts[1].id, p.charts[2].id], 'svg', false);
+    await expect(runBatch(plan, 'svg', renderers, (i, n, name) => steps.push([i, n, name]), WHEN)).rejects.toThrow('Fig 1: boom');
     expect(steps).toEqual([[1, 3, p.charts[0].name], [2, 3, 'Fig 1']]);
   });
   it('makes an empty ZIP of an empty plan', async () => {
-    const zip = await bytesOf(await runBatch({ items: [], skipped: [], tooBig: [] }, 'svg', 96, { svg: () => '', raster: () => Promise.reject(new Error('unused')), pdf: () => Promise.reject(new Error('unused')) }, undefined, WHEN));
+    const zip = await bytesOf(await runBatch({ items: [], skipped: [], tooBig: [] }, 'svg', { svg: () => '', raster: () => Promise.reject(new Error('unused')), pdf: () => Promise.reject(new Error('unused')) }, undefined, WHEN));
     expect(zip.length).toBe(22);
   });
 });

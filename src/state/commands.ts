@@ -5,7 +5,7 @@ import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLook } from '../model/graph/look';
 import { sanitizeLegendLayout, withoutLegendColumns, withoutLegendOffset, withoutLegendOrder } from '../model/graph/legendEntries';
 import { sanitizeOrder } from '../model/table/groupOrder';
-import { createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createGroup, createXyTable, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
+import { type ChartStart, createChart, createColumnTable, createContingencyTable, createGroupedTable, createSurvivalTable, createGroup, createXyTable, defaultSummaryFor, nextGroupName, PRESET_KEYS, TYPE_PRESETS } from '../model/defaults';
 import { kindChangeEffects } from '../model/table/tableKind';
 import { analysisKindApplies, analysisTypeInfo } from '../model/project/analysis';
 import { sanitizeDegree } from '../model/options/fitOptions';
@@ -478,6 +478,9 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
       }
       return out;
     };
+    // A type made to show error bars (a mean with error bars, XY charts, grouped bars and lines) starts with the SD, as a new chart of it
+    // does, when the graph had no spread: otherwise "Mean with error bars" would draw none. A spread already chosen is kept.
+    const startSpread = defaultSummaryFor(type).spread;
     const next: Chart = {
       ...c,
       type,
@@ -485,6 +488,7 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
       layers: c.layers.map((l) => ({
         ...l,
         style: { ...l.style, ...TYPE_PRESETS[type] },
+        summary: l.summary.spread === 'none' && startSpread !== 'none' ? { ...l.summary, spread: startSpread } : l.summary,
         groupOverrides: strip(l.groupOverrides),
         objectOverrides: strip(l.objectOverrides),
       })),
@@ -734,7 +738,7 @@ export const removeAnalysis = (id: Id): Command => (p) => ({
 export const setProjectName = (name: string): Command => (p) => (p.name === name ? p : { ...p, name });
 
 /** New graph of a data table; named after the table, like the original's linked graph. */
-export const addChart = (chartId: Id, tableId: Id, size?: { widthPx: number; heightPx: number }, type?: ChartType, variant?: ChartVariant): Command => (p) => {
+export const addChart = (chartId: Id, tableId: Id, size?: ChartStart, type?: ChartType, variant?: ChartVariant): Command => (p) => {
   const table = p.dataTables.find((t) => t.id === tableId);
   if (!table) return p;
   // A type that does not suit the table's type is ignored: the table's default chart type is used.

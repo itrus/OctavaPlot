@@ -2,8 +2,7 @@ import { useMemo } from 'react';
 import { planBatch, type BatchFormat, type BatchPlan } from '../../chart/export/batchExport';
 import type { Id, Project } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { PNG_DPI_CHOICES, type PngDpi } from '../../state/settings';
-import { Field, SelectInput, SubHeading } from '../inspector/common/controls';
+import { Field, SubHeading } from '../inspector/common/controls';
 import { Modal } from '../dialogs/NewItemDialogs';
 import { exportStatusText, isBusy, type ExportOutcome, type ExportState } from './exportJob';
 
@@ -20,35 +19,33 @@ interface Props {
   ids: readonly Id[];
   /** The state of the export controller of the view that opened the dialog. */
   state: ExportState;
-  /** Runs the export of the plan shown, with the format and resolution shown. */
-  onExport: (plan: BatchPlan, format: BatchFormat, dpi: number) => Promise<ExportOutcome | void>;
+  /** Runs the export of the plan shown, with the format shown. */
+  onExport: (plan: BatchPlan, format: BatchFormat) => Promise<ExportOutcome | void>;
   onClose: () => void;
 }
 
 /**
- * Exports the picked graphs as one ZIP: format and resolution (the settings of the single export), the files that will be in it,
- * and what cannot be exported. The warnings, fonts and print-size checks of the report of a single graph are not repeated here: open a
- * graph and its Export to see them.
+ * Exports the picked graphs as one ZIP: the format (the setting of the single export), the files that will be in it, and what
+ * cannot be exported. A PNG is at the size of its graph. The warnings and fonts of the report of a single graph are not repeated
+ * here: open a graph and its Export to see them.
  */
 export function BatchExportDialog({ project, ids, state, onExport, onClose }: Props) {
   const { settings, updateSettings } = useApp();
   const format: BatchFormat = settings.exportFormat;
-  // A graph's PNG has its own resolution (96 dpi is its size on screen); a PDF or an SVG has none.
-  const dpi = settings.pngDpi;
-  const plan = useMemo(() => planBatch(project, ids, format, dpi, settings.timestampExports), [project, ids, format, dpi, settings.timestampExports]);
+  const plan = useMemo(() => planBatch(project, ids, format, settings.timestampExports), [project, ids, format, settings.timestampExports]);
   const busy = isBusy(state);
-  const reason = plan.tooBig.length > 0 ? `More than the browser can make at ${dpi} dpi: ${plan.tooBig.join('; ')}. Lower the resolution, make those graphs smaller, or choose SVG.` : plan.items.length === 0 ? 'There is no graph to export.' : null;
+  const reason = plan.tooBig.length > 0 ? `More than the browser can make: ${plan.tooBig.join('; ')}. Make those graphs smaller, or choose SVG.` : plan.items.length === 0 ? 'There is no graph to export.' : null;
 
   return (
     <Modal
       title={`Export ${ids.length === 1 ? '1 graph' : `${ids.length} graphs`}`}
       confirmLabel="Export ZIP"
       confirmDisabled={busy || reason !== null}
-      onConfirm={() => void onExport(plan, format, dpi).then((outcome) => outcome && outcome.kind === 'ran' && onClose())}
+      onConfirm={() => void onExport(plan, format).then((outcome) => outcome && outcome.kind === 'ran' && onClose())}
       onClose={onClose}
       wide
     >
-      <Field label="Format" hint="One file for each graph, all in one ZIP file.">
+      <Field label="Format" hint="One file for each graph, all in one ZIP file. A PNG is at the size of its graph on screen.">
         <span className="switch-group" role="group" aria-label="Export format">
           {FORMATS.map(([value, label]) => (
             <button key={value} className={`switch${format === value ? ' on' : ''}`} aria-pressed={format === value} onClick={() => updateSettings({ exportFormat: value })}>
@@ -56,14 +53,6 @@ export function BatchExportDialog({ project, ids, state, onExport, onClose }: Pr
             </button>
           ))}
         </span>
-      </Field>
-      <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : format === 'pdf' ? 'PDF has no resolution: it holds shapes and text, not a picture.' : undefined}>
-        <SelectInput<string>
-          value={String(dpi)}
-          disabled={format !== 'png'}
-          options={PNG_DPI_CHOICES.map((d) => ({ value: String(d), label: `${d} dpi` }))}
-          onChange={(v) => updateSettings({ pngDpi: Number(v) as PngDpi })}
-        />
       </Field>
       <SubHeading>Files</SubHeading>
       <ul className="muted small">

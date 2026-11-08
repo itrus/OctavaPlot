@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { Chart, DataTable, FitSettings } from '../../model/types';
 import { buildAnyModel, ChartCanvas } from '../anyModel';
 import { plainText } from '../../util/richText';
-import { svgToPngBlob } from './pngDpi';
+import { exportPixels, GRAPH_PNG_DPI, svgToPngBlob } from './pngDpi';
 import { escapeXml, prefixIds as prefixIdsWith } from './prefixIds';
 import { svgToPdf } from './svgPdf';
 
@@ -44,12 +44,10 @@ function describeSvg(markup: string, chart: Chart, table: DataTable, notices: re
   return `${head}<title id="${base}-title">${escapeXml(title)}</title><desc id="${base}-desc">${escapeXml(desc)}</desc>${markup.slice(end + 1)}`;
 }
 
-/** Rasterise at `dpi` dots per inch (96 is the chart's own size in CSS pixels); the resolution is written into the file. */
-export async function chartToPngBlob(chart: Chart, table: DataTable, dpi: number, fit?: FitSettings): Promise<Blob> {
-  const scale = dpi / 96;
-  const width = Math.max(1, Math.round(chart.widthPx * scale));
-  const height = Math.max(1, Math.round(chart.heightPx * scale));
-  return svgToPngBlob(chartToSvgString(chart, table, fit), width, height, dpi);
+/** Rasterise at the chart's own size, one pixel for each CSS pixel (GRAPH_PNG_DPI); the resolution is written into the file. */
+export async function chartToPngBlob(chart: Chart, table: DataTable, fit?: FitSettings): Promise<Blob> {
+  const { width, height } = exportPixels(chart, GRAPH_PNG_DPI);
+  return svgToPngBlob(chartToSvgString(chart, table, fit), width, height, GRAPH_PNG_DPI);
 }
 
 /**

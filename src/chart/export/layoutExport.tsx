@@ -19,7 +19,7 @@ import { svgToPdf } from './svgPdf';
  * export (nested <svg>, scaled by one factor so that equal factors give equal fonts and lines), with its panel label.
  * The preview of the Layouts page and every export come from this one function, so they cannot differ.
  */
-interface LayoutDrawing {
+export interface LayoutDrawing {
   svg: string;
   arranged: Arranged;
   widthPt: number;

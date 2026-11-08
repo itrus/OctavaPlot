@@ -108,7 +108,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('grp.stackedH', 'Horizontal stacked bars', 'Stacked bars turned on their side.', 'groupedStacked', 'category.stacked', { orientation: 'horizontal' }),
         item('grp.forest', 'Forest plot', 'Estimates with their intervals, one row for each study, as typed (nothing is pooled): make the table with "Mean (or median), Upper/Lower limits". A dashed line marks no effect at 0.', 'groupedLine', 'special.forest', { forest: 'difference' }),
         item('grp.forestRatio', 'Forest plot, ratios', 'The same for ratios (odds, risk or hazard ratios): a log axis, and the dashed line marks no effect at 1.', 'groupedLine', 'special.forest', { forest: 'ratio' }),
-        item('grp.floating', 'Floating bars', 'A bar from the smallest to the largest value of each series, with a line at the mean or median.', 'groupedFloating', 'category.range'),
+        item('grp.floating', 'Floating bars (min to max)', 'A bar from the smallest to the largest value of each series, with a line at the mean or median.', 'groupedFloating', 'category.range'),
       ],
     },
     {

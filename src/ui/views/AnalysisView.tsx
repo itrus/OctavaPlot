@@ -7,6 +7,7 @@ import type { Analysis } from '../../model/types';
 import { describeValues, descriptiveRows, formatResult } from '../../stats/descriptive';
 import { FIT_MODELS, fitModelById, type FitModelId } from '../../stats/fit';
 import { useApp } from '../../state/AppContext';
+import { newChartStart } from '../../state/settings';
 import { addChart, composeCommands, patchAnalysis, patchLook, removeAnalysis } from '../../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../../util/download';
 import { NumField } from '../inspector/common/controls';
@@ -69,7 +70,7 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
   // A graph of the table that draws this curve fit.
   const makeGraph = () => {
     const id = newId('chart');
-    run('New graph', composeCommands(addChart(id, table.id, { widthPx: settings.defaultChartWidthPx, heightPx: settings.defaultChartHeightPx }, 'xyScatter'), patchLook(id, { fit: { analysisId: analysis.id, band: 'confidence', extend: false, showParameters: false } })));
+    run('New graph', composeCommands(addChart(id, table.id, newChartStart(settings), 'xyScatter'), patchLook(id, { fit: { analysisId: analysis.id, band: 'confidence', extend: false, showParameters: false } })));
     setView({ kind: 'chart', id });
   };
 

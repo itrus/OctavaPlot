@@ -15,7 +15,7 @@ describe('changeTableKind', () => {
     expect(table(q).kind).toBe('column');
     expect(table(q).layout).toBeUndefined();
     expect(table(q).groups.map((g) => g.observations.map((o) => o.value))).toEqual(columns);
-    expect(chart(q).type).toBe('bar');
+    expect(chart(q).type).toBe('scatter');
   });
 
   it('removes the calculations that do not apply to the new type', () => {
@@ -23,7 +23,7 @@ describe('changeTableKind', () => {
     expect((p.analyses ?? []).some((a) => a.id === 'a1')).toBe(true);
     const q = changeTableKind('t1', 'contingency')(p);
     expect((q.analyses ?? []).some((a) => a.id === 'a1')).toBe(false);
-    expect(chart(q).type).toBe('pie');
+    expect(chart(q).type).toBe('contingencyBars');
   });
 
   it('keeps a graph whose type belongs to the new kind, and does nothing for the same kind or a missing table', () => {

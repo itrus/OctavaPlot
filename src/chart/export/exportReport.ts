@@ -1,7 +1,7 @@
 import { chartPx2Pt } from '../../model/units';
 import { checkFonts, type FontCheck } from './fontCheck';
 import { checkGlyphs, type GlyphCheck } from './glyphCheck';
-import { exportPixels, fitsCanvas } from './pngDpi';
+import { exportPixels, fitsCanvas, GRAPH_PNG_DPI } from './pngDpi';
 
 type ReportFormat = 'svg' | 'png' | 'pdf';
 
@@ -18,8 +18,8 @@ export interface ExportReportInput {
   widthPx: number;
   heightPx: number;
   format: ReportFormat;
-  /** Resolution of a PNG; ignored for SVG and PDF, which have none. */
-  dpi: number;
+  /** Resolution of a PNG (a page layout's); ignored for SVG and PDF, which have none. Absent: a graph's PNG, at its own size (96 dpi) with no resolution to choose. */
+  dpi?: number;
   /** The font-family lists the drawing asks for (CSS syntax); each is checked once. */
   fontFamilies: readonly string[];
   isFontAvailable: (family: string) => boolean;
@@ -31,9 +31,6 @@ export interface ExportReportInput {
   hasGlyph?: (family: string, char: string) => boolean;
   /** What the model says it could not draw or clipped, as it words it. */
   warnings: readonly string[];
-  /** The print width the graph is checked against, mm; null = none. */
-  printWidthMm: number | null;
-  printWarnings: readonly string[];
 }
 
 interface Size {
@@ -45,7 +42,7 @@ interface Size {
 export interface ExportReport {
   name: string;
   format: ReportFormat;
-  /** Null for SVG and PDF, which have no resolution. */
+  /** Null for SVG and PDF, which have no resolution, and for a graph's PNG, which has none to choose. */
   dpi: number | null;
   size: { px: Size; pt: Size; mm: Size };
   /** The pixels of the PNG; null for SVG and PDF. */
@@ -56,8 +53,6 @@ export interface ExportReport {
   /** The same check for each font of a page (one entry for each font-family list that writes texts); empty for a graph. */
   glyphGroups: GlyphCheck[];
   warnings: string[];
-  printWidthMm: number | null;
-  printWarnings: string[];
   limits: string[];
 }
 
@@ -68,11 +63,11 @@ export function buildExportReport(input: ExportReportInput): ExportReport {
   const mm = (px: number) => round((px * 25.4) / 96, 2);
   const fonts = [...new Set(input.fontFamilies)].map((list) => checkFonts(list, input.isFontAvailable));
   const groups = input.textGroups ?? [];
-  const pixels = input.format === 'png' ? exportPixels({ widthPx, heightPx }, input.dpi) : null;
+  const pixels = input.format === 'png' ? exportPixels({ widthPx, heightPx }, input.dpi ?? GRAPH_PNG_DPI) : null;
   return {
     name: input.name,
     format: input.format,
-    dpi: pixels ? input.dpi : null,
+    dpi: pixels && input.dpi !== undefined ? input.dpi : null,
     size: {
       px: { width: round(widthPx, 2), height: round(heightPx, 2) },
       pt: { width: round(chartPx2Pt(widthPx), 2), height: round(chartPx2Pt(heightPx), 2) },
@@ -84,8 +79,6 @@ export function buildExportReport(input: ExportReportInput): ExportReport {
     glyphs: input.texts && input.hasGlyph ? checkGlyphs(input.texts, fonts[0]?.used ?? null, input.hasGlyph) : null,
     glyphGroups: input.hasGlyph ? groups.map((g) => checkGlyphs(g.texts, checkFonts(g.fontFamily, input.isFontAvailable).used, input.hasGlyph!)) : [],
     warnings: [...input.warnings],
-    printWidthMm: input.printWidthMm,
-    printWarnings: [...input.printWarnings],
     limits: [...EXPORT_LIMITS],
   };
 }

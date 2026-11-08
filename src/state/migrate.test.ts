@@ -93,7 +93,32 @@ describe('old files', () => {
 
 describe('the shape chain', () => {
   it('has steps with their own ids, in the order they run', () => {
-    expect(SHAPE_STEPS.map((s) => s.id)).toEqual(['one-layer']);
+    expect(SHAPE_STEPS.map((s) => s.id)).toEqual(['one-layer', 'pair-lines-one-colour']);
+  });
+
+  describe('pair-lines-one-colour', () => {
+    const step = SHAPE_STEPS.find((s) => s.id === 'pair-lines-one-colour')!;
+    const chart = (over: Record<string, unknown>) => ({ type: 'paired', layers: [{ style: {}, groupOverrides: {} }], ...over });
+    const run = (c: Record<string, unknown>): Record<string, any> => {
+      const project = { charts: [c] };
+      const notes: string[] = [];
+      step.run(project, notes);
+      expect(notes).toEqual([]);
+      return project.charts[0] as Record<string, any>;
+    };
+
+    it('leaves a graph whose lines were never given a colour alone: it takes the default, a colour for each subject', () => {
+      expect(run(chart({})).pairs).toBeUndefined();
+      expect(run(chart({ pairs: { bridge: true } })).pairs).toEqual({ bridge: true });
+    });
+    it('makes the lines of a graph that was given a line colour one colour, whether set for the graph or for a data set', () => {
+      expect(run(chart({ layers: [{ style: { lineColor: '#cc0000' }, groupOverrides: {} }] })).pairs).toEqual({ lineColour: 'one' });
+      expect(run(chart({ pairs: { bridge: true }, layers: [{ style: {}, groupOverrides: { g1: { lineColor: '#00cc00' } } }] })).pairs).toEqual({ bridge: true, lineColour: 'one' });
+    });
+    it('keeps a choice already made, and leaves graphs of other types alone', () => {
+      expect(run(chart({ pairs: { lineColour: 'subject' }, layers: [{ style: { lineColor: '#cc0000' }, groupOverrides: {} }] })).pairs).toEqual({ lineColour: 'subject' });
+      expect(run(chart({ type: 'scatter', layers: [{ style: { lineColor: '#cc0000' }, groupOverrides: {} }] })).pairs).toBeUndefined();
+    });
   });
 
   it('does nothing to a file of the present shape', () => {

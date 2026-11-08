@@ -51,3 +51,7 @@ export const status = (page: Page): Locator => page.locator('.statusbar-message'
 /** Opens a project from its file text through the file input (the same route as Open project). */
 export const openProject = (page: Page, json: string, name = 'test.oplot'): Promise<void> =>
   page.locator('input[type="file"][accept*="oplot"]').setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(json) });
+
+/** Opens a page of the inspector's icon rail (the inspector starts on Graph). */
+export const railPage = (page: Page, name: 'Graph' | 'Plot' | 'Axes' | 'Legend' | 'Analysis' | 'Notes'): Promise<void> =>
+  page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name }).click();

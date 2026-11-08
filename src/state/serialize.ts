@@ -9,7 +9,7 @@ import { analysisTypeInfo } from '../model/project/analysis';
 import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLegendLayout, withoutLegendLayout } from '../model/graph/legendEntries';
-import { sanitizeLook, sanitizePrintWidthMm, SYMBOL_SHAPES } from '../model/graph/look';
+import { sanitizeLook, SYMBOL_SHAPES } from '../model/graph/look';
 import { sanitizeOrder } from '../model/table/groupOrder';
 import { canonicalObservationId, canonicalRowId, MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
@@ -542,6 +542,8 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
   const base = createChart(dataTableId, undefined, c0.type as ChartType);
   // Styles and layers have their own checks below.
   const c = conform(c0, base as unknown as Obj, path, notes, new Set(['defaults', 'layers']));
+  // The print width of earlier builds (docs/FILE_FORMAT.md): not read, and not written back.
+  delete c.printWidthMm;
   // Merged over the defaults: a value that is missing or not valid takes the default.
   const defaults = cleanStyle(c.defaults, `${path}.defaults`, notes);
   // A graph has one data layer (see dataLayer in model/graph/style.ts); migrate.ts cut a file's others, with a note.
@@ -555,7 +557,6 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
     // No larger than the editor allows: a huge size from a hand-edited file would make an export fail or hang.
     widthPx: typeof c.widthPx === 'number' ? Math.min(CHART_PX_MAX, c.widthPx) : base.widthPx,
     heightPx: typeof c.heightPx === 'number' ? Math.min(CHART_PX_MAX, c.heightPx) : base.heightPx,
-    printWidthMm: sanitizePrintWidthMm(c.printWidthMm),
     groupOrder: sanitizeOrder(c.groupOrder),
     hiddenGroupIds: Array.isArray(c.hiddenGroupIds) ? c.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
     survival: parseSurvival(c.survival),

@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createEmptyProject } from '../src/model/defaults';
 import { addChart, addDataTable, replaceTableData } from '../src/state/commands';
 import { stringifyProject } from '../src/state/serialize';
-import { openApp, openProject } from './helpers';
+import { openApp, openProject, railPage } from './helpers';
 
 /** A forest plot of typed estimates and limits ("Mean (or median), Upper/Lower limits"), made as the gallery makes it, opened in the browser. */
 function forestProject(kind: 'difference' | 'ratio'): string {
@@ -30,6 +30,7 @@ async function openForest(page: Page, kind: 'difference' | 'ratio'): Promise<Loc
   await page.locator('.nav-item').filter({ hasText: 'Forest graph' }).click();
   const svg = page.locator('.chart-surface svg');
   await expect(svg).toBeVisible();
+  await railPage(page, 'Plot');
   return svg;
 }
 

@@ -42,7 +42,7 @@ function PanelIcon({ side }: { side: 'left' | 'right' }) {
 }
 
 function Shell() {
-  const { project, view, run, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, recoveryText, recoveryConflict, keepThisTab, loadOtherTab, zoom, setZoom, tableZoom, setTableZoom, settings, requestFit, inspectorNav } = useApp();
+  const { project, view, run, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, recoveryText, recoveryConflict, keepThisTab, loadOtherTab, zoom, setZoom, tableZoom, setTableZoom, layoutZoom, setLayoutZoom, settings, requestFit, inspectorNav } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   // Panels are only hidden (never unmounted), so their selections and edits survive a collapse.
   const [navOpen, setNavOpen] = useState(true);
@@ -162,11 +162,14 @@ function Shell() {
 
   const table = view.kind === 'table' ? project.dataTables.find((t) => t.id === view.id) : undefined;
   const chart = view.kind === 'chart' ? project.charts.find((c) => c.id === view.id) : undefined;
-  // The zoom control belongs to the page on screen: the graph or the data table.
-  const activeZoom = chart ? zoom : tableZoom;
-  const setActiveZoom = chart ? setZoom : setTableZoom;
-  // A graph is not zoomed beyond 200%; a data table can be 400%.
-  const maxZoom = chart ? 2 : 4;
+  // A graph and a page layout have an inspector, the right panel (a layout draws its own, into this one's place: see LayoutView).
+  const hasInspector = chart !== undefined || view.kind === 'layout';
+  // The zoom control belongs to the page on screen: the graph, the layout page or the data table.
+  const onLayout = view.kind === 'layout';
+  const activeZoom = chart ? zoom : onLayout ? layoutZoom : tableZoom;
+  const setActiveZoom = chart ? setZoom : onLayout ? setLayoutZoom : setTableZoom;
+  // A graph and a layout page are not zoomed beyond 200%; a data table can be 400%.
+  const maxZoom = chart || onLayout ? 2 : 4;
   // The chart draws the data sets that are on it, which may include some from other tables.
   const prepared = useMemo(() => (chart ? prepareChartInput(project, chart) : undefined), [project, chart]);
 
@@ -174,8 +177,8 @@ function Shell() {
     <div
       className="app"
       data-nav={navOpen ? 'open' : 'closed'}
-      data-insp={chart && inspectorOpen ? 'open' : 'closed'}
-      style={{ '--nav-w': navOpen ? `${navW}px` : '0px', '--insp-w': chart && inspectorOpen ? `${inspW}px` : '0px', '--nav-px': `${navW}px`, '--insp-px': `${inspW}px` } as CSSProperties}
+      data-insp={hasInspector && inspectorOpen ? 'open' : 'closed'}
+      style={{ '--nav-w': navOpen ? `${navW}px` : '0px', '--insp-w': hasInspector && inspectorOpen ? `${inspW}px` : '0px', '--nav-px': `${navW}px`, '--insp-px': `${inspW}px` } as CSSProperties}
     >
       <header className="topbar">
         <button
@@ -223,16 +226,16 @@ function Shell() {
           className="icon-only"
           onClick={() => setInspectorOpen(!inspectorOpen)}
           aria-pressed={inspectorOpen}
-          disabled={!chart}
+          disabled={!hasInspector}
           aria-label={inspectorOpen ? 'Hide inspector' : 'Show inspector'}
-          title={!chart ? 'The inspector is available on a graph' : inspectorOpen ? 'Hide inspector' : 'Show inspector'}
+          title={!hasInspector ? 'The inspector is available on a graph and a layout' : inspectorOpen ? 'Hide inspector' : 'Show inspector'}
         >
           <PanelIcon side="right" />
         </button>
       </header>
       <Navigator />
       {navOpen && <Splitter side="nav" width={navW} min={180} max={480} onWidth={setNavW} label="Resize the navigation panel" />}
-      {chart && inspectorOpen && <Splitter side="insp" width={inspW} min={260} max={640} onWidth={setInspW} label="Resize the inspector" />}
+      {hasInspector && inspectorOpen && <Splitter side="insp" width={inspW} min={260} max={640} onWidth={setInspW} label="Resize the inspector" />}
       <main className="workspace">
         <Suspense fallback={<div className="empty">Loading…</div>}>
           {/* Keyed: the selection, the open dialog and the message of one table do not carry over to the next. */}
@@ -253,7 +256,7 @@ function Shell() {
         <span className="statusbar-message" role="status">{status}</span>
         {repairs && <button className="icon-text" onClick={() => setRepairsOpen(true)} title="List every value that was reset, with its place in the file">Details ({repairs.notes.length})</button>}
         {recoveryText.text !== '' && <span className={recoveryText.warning ? 'statusbar-warning' : 'muted'} role={recoveryText.warning ? 'alert' : 'status'} style={recoveryText.warning ? undefined : { whiteSpace: 'nowrap' }}>{recoveryText.text}</span>}
-        {(chart || table) && (
+        {(chart || table || onLayout) && (
           <span className="zoom">
             <button className="icon-btn" aria-label="Zoom out" onClick={() => setActiveZoom(Math.max(0.25, Math.round((activeZoom - 0.25) * 100) / 100))}>−</button>
             <WheelRange min={25} max={maxZoom * 100} step={5} value={Math.round(activeZoom * 100)} ariaLabel="Zoom" onValue={(v) => setActiveZoom(v / 100)} />
@@ -266,8 +269,8 @@ function Shell() {
                 if (chart) requestFit();
               }}
               disabled={!chart && activeZoom === 1}
-              title={chart ? 'Fit the graph to the window (100%)' : 'Back to 100%'}
-              aria-label={chart ? 'Fit the graph to the window (100%)' : 'Back to 100%'}
+              title={chart ? 'Fit the graph to the window (100%)' : onLayout ? 'Fit the page to the window (100%)' : 'Back to 100%'}
+              aria-label={chart ? 'Fit the graph to the window (100%)' : onLayout ? 'Fit the page to the window (100%)' : 'Back to 100%'}
             >
               <FitWindowIcon />
               100%

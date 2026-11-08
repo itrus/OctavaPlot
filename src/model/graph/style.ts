@@ -33,6 +33,10 @@ export function resolveStyle(
     palette.symbolBorderColor = palette.barFill;
     palette.lineColor = palette.barFill;
     palette.errorColor = palette.barFill;
+  } else if (chart.type === 'paired' && palette.barFill) {
+    // Before and after: each column's dots have the colour of the column; the lines that join a subject's values stay one colour.
+    palette.symbolColor = palette.barFill;
+    palette.symbolBorderColor = palette.barFill;
   }
   return {
     ...chart.defaults,

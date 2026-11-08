@@ -8,8 +8,8 @@ import { affectsRecovery, flushDecision, isConflict, protectionOf, recoveryStatu
 import { currentSignature, newEditorId, writeRecovery } from './recoveryStore';
 import { backupAutosave, loadAutosave } from './serialize';
 import { statusAfter, type StatusMemo } from './statusLine';
-import { loadSettings, saveSettings, sanitizeSettings, type Settings } from './settings';
-import type { InspectorTarget } from './inspectorNav';
+import { loadSettings, newChartStart, saveSettings, sanitizeSettings, type Settings } from './settings';
+import { forgetPlaces, type InspectorTarget } from './inspectorNav';
 
 interface AppApi {
   project: Project;
@@ -51,6 +51,9 @@ interface AppApi {
   /** Data table zoom, 0.25–4 (1 = 100%); kept apart from the graph zoom. */
   tableZoom: number;
   setTableZoom: (z: number) => void;
+  /** Layout page zoom, 0.25–2 (1 = the whole page fits the window); kept apart from the others. */
+  layoutZoom: number;
+  setLayoutZoom: (z: number) => void;
   /** Counts requests to refit the graph to the window (the Fit button). */
   fitRequest: number;
   requestFit: () => void;
@@ -79,7 +82,7 @@ const initialProject = (): { project: Project; recovered: boolean } => {
     return { project: recovered, recovered: true };
   }
   const s = loadSettings();
-  const size = { widthPx: s.defaultChartWidthPx, heightPx: s.defaultChartHeightPx };
+  const size = newChartStart(s);
   return { project: s.newProjectSample ? createExampleProject(size) : createEmptyProject(size), recovered: false };
 };
 
@@ -93,6 +96,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [autosaveOk, setAutosaveOk] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [tableZoom, setTableZoom] = useState(1);
+  const [layoutZoom, setLayoutZoom] = useState(1);
   const [fitRequest, setFitRequest] = useState(0);
   const requestFit = useCallback(() => setFitRequest((n) => n + 1), []);
   const [inspectorNav, setInspectorNav] = useState<{ target: InspectorTarget | null; n: number }>({ target: null, n: 0 });
@@ -128,6 +132,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const replaceProject = useCallback((p: Project) => {
     cleanProject.current = p;
     dispatch({ type: 'replace', project: p });
+    forgetPlaces();
     setSelection({ kind: 'chart' });
     setView({ kind: 'table', id: p.dataTables[0].id });
   }, []);
@@ -136,9 +141,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   settingsRef.current = settings;
   const newProject = useCallback(() => {
     const s = settingsRef.current;
-    const size = { widthPx: s.defaultChartWidthPx, heightPx: s.defaultChartHeightPx };
+    const size = newChartStart(s);
     replaceProject(s.newProjectSample ? createExampleProject(size) : createEmptyProject(size));
     setZoom(1);
+    setLayoutZoom(1);
     setStatus('New project.');
   }, [replaceProject]);
 
@@ -300,12 +306,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setZoom,
       tableZoom,
       setTableZoom,
+      layoutZoom,
+      setLayoutZoom,
       fitRequest,
       requestFit,
       inspectorNav,
       navigateInspector,
     }),
-    [project, view, selection, run, undo, redo, history.past.length, history.future.length, replaceProject, newProject, hasUnsavedChanges, markSaved, status, autosaveOk, recoveryText, recoveryConflict, keepThisTab, loadOtherTab, settings, updateSettings, zoom, tableZoom, fitRequest, requestFit, inspectorNav, navigateInspector],
+    [project, view, selection, run, undo, redo, history.past.length, history.future.length, replaceProject, newProject, hasUnsavedChanges, markSaved, status, autosaveOk, recoveryText, recoveryConflict, keepThisTab, loadOtherTab, settings, updateSettings, zoom, tableZoom, layoutZoom, fitRequest, requestFit, inspectorNav, navigateInspector],
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

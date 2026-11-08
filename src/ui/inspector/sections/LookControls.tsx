@@ -9,14 +9,14 @@ import { patchBarLabels, patchBars, patchBothAxes } from '../../../state/command
 import { Check, ColorInput, Field, NumField, OptionalNumField, Section, SelectInput, TextInput } from '../common/controls';
 import { SLIDERS } from '../common/sliderRanges';
 
-/** A colour that can also be "none": the colour box is greyed out while it is. */
-function OptionalColour({ label, value, fallback, onChange }: { label: string; value: string | null; fallback: string; onChange: (v: string | null) => void }) {
+/** A colour that can also be transparent: the colour box is greyed out while it is. */
+function OptionalColour({ label, value, fallback, onChange, hint }: { label: string; value: string | null; fallback: string; onChange: (v: string | null) => void; hint?: string }) {
   return (
-    <Field label={label}>
+    <Field label={label} hint={hint}>
       <span className="inline-controls">
         <ColorInput value={value ?? fallback} disabled={value === null} ariaLabel={label} onChange={onChange} />
         <label className="inline-check">
-          <Check checked={value === null} onChange={(none) => onChange(none ? null : fallback)} ariaLabel={`${label}: none`} /> None
+          <Check checked={value === null} onChange={(none) => onChange(none ? null : fallback)} ariaLabel={`${label}: transparent`} /> Transparent
         </label>
       </span>
     </Field>
@@ -36,8 +36,7 @@ function FrameAndColours({ chart }: { chart: Chart }) {
       </Field>
       <NumField {...SLIDERS.fraction} label="Axis opacity" value={chart.axisOpacity} min={0} max={1} onCommit={(v) => run('Axis opacity', patchLook(chart.id, { axisOpacity: v }), 'axis:opacity')} hint="Axis lines, ticks and the frame; 0 = transparent, 1 = opaque" />
       <OptionalColour label="Plotting area" value={chart.plotColor} fallback="#ffffff" onChange={(v) => run('Plotting area colour', patchLook(chart.id, { plotColor: v }))} />
-      <OptionalColour label="Page background" value={chart.pageColor} fallback="#ffffff" onChange={(v) => run('Page background colour', patchLook(chart.id, { pageColor: v }))} />
-      <div className="muted small">With no page background a PNG export is transparent.</div>
+      <OptionalColour label="Page background" value={chart.pageColor} fallback="#ffffff" onChange={(v) => run('Page background colour', patchLook(chart.id, { pageColor: v }))} hint="Transparent: an SVG or PNG export has no background colour (a PDF shows the white of the paper). The default for new graphs is in Settings." />
     </Section>
   );
 }

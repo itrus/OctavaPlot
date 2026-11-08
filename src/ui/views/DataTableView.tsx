@@ -6,7 +6,7 @@ import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import { newId } from '../../model/ids';
 import { addAnalysis, addGroup, changeTableKind, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setColumnTime, setExcluded, setFactor, setSubject, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../../util/download';
-import { AddColumnIcon, AddManyRowsIcon, CloseIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon } from '../components/icons';
+import { AddColumnIcon, AddManyRowsIcon, CloseIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon, TableTypeIcon } from '../components/icons';
 import { isCsvFile, tableToCsv, type CsvExportMode } from '../data/csv';
 import { excludedCount } from '../../model/table/exclusion';
 import { ChangeTableTypeDialog } from '../dialogs/ChangeTableTypeDialog';
@@ -663,8 +663,8 @@ export function DataTableView({ table }: { table: DataTable }) {
   return (
     <div className="table-view">
       <div className="toolbar">
-        <button className="icon-text" onClick={() => setDialog('kind')} title="Change the type of this table, or how its series are entered (single values, replicates, values already calculated): its data stay, and the choice decides what the columns mean and which graphs it can have">
-          {kindText.label}…
+        <button className="icon-text" onClick={() => setDialog('kind')} title={`Table type: ${kindText.label}. Change the type of this table, or how its series are entered (single values, replicates, values already calculated): its data stay, and the choice decides what the columns mean and which graphs it can have`}>
+          <TableTypeIcon /> Table type
         </button>
         <span className="sep" />
         <button className="icon-text" onClick={() => run(kindText.add.replace('+ ', ''), addGroup(table.id))} title={kindText.add.replace('+ ', '')}>

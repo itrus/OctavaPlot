@@ -10,8 +10,6 @@ const input = (patch: Partial<ExportReportInput> = {}): ExportReportInput => ({
   fontFamilies: ['Arial, Helvetica, sans-serif'],
   isFontAvailable: () => true,
   warnings: [],
-  printWidthMm: null,
-  printWarnings: [],
   ...patch,
 });
 
@@ -25,6 +23,11 @@ describe('buildExportReport', () => {
   });
   it('has the chart pixels at 96 dpi', () => {
     expect(buildExportReport(input({ dpi: 96 })).raster).toEqual({ width: 640, height: 480, megapixels: 0.31, exceedsCanvasLimit: false });
+  });
+  it('has the chart pixels and no resolution for the PNG of a graph, which is given none', () => {
+    const r = buildExportReport(input({ dpi: undefined }));
+    expect(r.raster).toEqual({ width: 640, height: 480, megapixels: 0.31, exceedsCanvasLimit: false });
+    expect(r.dpi).toBeNull();
   });
   it('has no raster and no resolution for an SVG', () => {
     const r = buildExportReport(input({ format: 'svg', widthPx: 100000 }));
@@ -50,11 +53,9 @@ describe('buildExportReport', () => {
     expect(r.fonts[0]).toMatchObject({ used: 'Times', missing: ['Times New Roman'], replacedBy: 'Times' });
     expect(r.fonts[1]).toMatchObject({ used: 'Arial', missing: [], replacedBy: null });
   });
-  it('passes the model warnings and the print-size warnings through in their order', () => {
-    const r = buildExportReport(input({ warnings: ['b', 'a', 'b'], printWidthMm: 90, printWarnings: ['Tick labels would print at 4.6 pt at 90 mm wide (smaller than 6 pt)'] }));
+  it('passes the model warnings through in their order', () => {
+    const r = buildExportReport(input({ warnings: ['b', 'a', 'b'] }));
     expect(r.warnings).toEqual(['b', 'a', 'b']);
-    expect(r.printWidthMm).toBe(90);
-    expect(r.printWarnings).toEqual(['Tick labels would print at 4.6 pt at 90 mm wide (smaller than 6 pt)']);
   });
   it('always lists the known limits', () => {
     const r = buildExportReport(input());
@@ -64,12 +65,12 @@ describe('buildExportReport', () => {
     expect(r.limits.join(' ')).toMatch(/PNG.*resolution/);
   });
   it('keeps its keys in a fixed order and survives a JSON round trip', () => {
-    const r = buildExportReport(input({ warnings: ['w'], printWidthMm: 140 }));
-    expect(Object.keys(r)).toEqual(['name', 'format', 'dpi', 'size', 'raster', 'fonts', 'glyphs', 'glyphGroups', 'warnings', 'printWidthMm', 'printWarnings', 'limits']);
+    const r = buildExportReport(input({ warnings: ['w'] }));
+    expect(Object.keys(r)).toEqual(['name', 'format', 'dpi', 'size', 'raster', 'fonts', 'glyphs', 'glyphGroups', 'warnings', 'limits']);
     expect(Object.keys(r.size)).toEqual(['px', 'pt', 'mm']);
     expect(Object.keys(r.raster!)).toEqual(['width', 'height', 'megapixels', 'exceedsCanvasLimit']);
     expect(Object.keys(r.fonts[0])).toEqual(['requested', 'families', 'used', 'missing', 'replacedBy']);
     expect(JSON.parse(JSON.stringify(r))).toEqual(r);
-    expect(JSON.stringify(buildExportReport(input({ warnings: ['w'], printWidthMm: 140 })))).toBe(JSON.stringify(r));
+    expect(JSON.stringify(buildExportReport(input({ warnings: ['w'] })))).toBe(JSON.stringify(r));
   });
 });

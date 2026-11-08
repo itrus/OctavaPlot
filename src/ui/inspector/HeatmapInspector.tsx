@@ -35,7 +35,7 @@ const PAGES: InspectorPage[] = ['graph', 'plot', 'notes', 'export'];
 /** The formatting panel of heat maps of a grouped table. */
 export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run } = useApp();
-  const nav = useInspectorNav(PAGES, ['datasets', 'frame', 'legend']);
+  const nav = useInspectorNav(chart.id, PAGES, ['datasets', 'frame', 'legend']);
   const { shows } = nav;
   const o = chart.heatmap;
   const set = (label: string, patch: Partial<HeatmapOptions>, key?: string) => run(label, patchLook(chart.id, { heatmap: { ...o, ...patch } }), key);

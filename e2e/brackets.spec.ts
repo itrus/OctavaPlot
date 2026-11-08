@@ -6,7 +6,7 @@ import { applyVariant } from '../src/model/graph/chartVariant';
 import type { Project } from '../src/model/types';
 import { addBracket, addChart, addDataTable, replaceTableData } from '../src/state/commands';
 import { stringifyProject } from '../src/state/serialize';
-import { openApp, openProject } from './helpers';
+import { openApp, openProject, railPage } from './helpers';
 
 /** A bar chart with a comparison bracket, and a bubble chart made as the gallery makes it, opened in the browser. */
 function project(): string {
@@ -86,6 +86,7 @@ test.describe('the size legend of a bubble chart', () => {
     await expect(circles).toHaveCount(3);
     await expect(page.locator('.chart-surface svg text[id^="size-legend-label"]')).toHaveText(['20', '50', '100']);
 
+    await railPage(page, 'Plot');
     const sizes = page.getByRole('textbox', { name: 'Sizes shown', exact: true });
     await sizes.fill('5, 50');
     await sizes.press('Enter');
@@ -113,7 +114,7 @@ test.describe('PDF', () => {
     // A PDF has no resolution.
     await expect(panel.getByRole('combobox', { name: /Resolution/ })).toHaveCount(0);
     const download = page.waitForEvent('download');
-    await panel.getByRole('button', { name: 'Export .pdf' }).click();
+    await panel.getByRole('button', { name: /^Export .+\.pdf$/ }).click();
     const file = await download;
     expect(file.suggestedFilename()).toMatch(/\.pdf$/);
     const bytes = await readFile(await file.path());

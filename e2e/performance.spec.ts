@@ -135,7 +135,7 @@ test('exporting a normal figure as PNG', async ({ page }) => {
   const panel = page.locator('.export-panel');
   const wait = page.waitForEvent('download');
   const t0 = Date.now();
-  await panel.getByRole('button', { name: 'Export .png' }).click();
+  await panel.getByRole('button', { name: /^Export .+\.png$/ }).click();
   await wait;
   note('export a normal figure as PNG: until the file is made', Date.now() - t0, 'under 2000');
 });

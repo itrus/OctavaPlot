@@ -2,7 +2,7 @@ import { prepareChartInput } from '../../model/table/preparedChart';
 import type { Chart, DataTable, FitSettings, Id, Project } from '../../model/types';
 import { exportFileName } from '../../util/download';
 import { zipStore, type ZipFile } from '../../util/zip';
-import { exportPixels, fitsCanvas } from './pngDpi';
+import { exportPixels, fitsCanvas, GRAPH_PNG_DPI } from './pngDpi';
 
 /**
  * Batch export: several graphs of one project written as the files of one ZIP. The graphs are read from one project value (an
@@ -12,10 +12,10 @@ import { exportPixels, fitsCanvas } from './pngDpi';
 
 export type BatchFormat = 'png' | 'svg' | 'pdf';
 
-/** The drawing of one graph: SVG text, the bytes of a PNG at a resolution, or the bytes of a PDF (vector, with no resolution). The browser ones are in export.tsx; tests pass their own. */
+/** The drawing of one graph: SVG text, the bytes of a PNG at the graph's own size, or the bytes of a PDF (vector, with no resolution). The browser ones are in export.tsx; tests pass their own. */
 export interface BatchRenderers {
   svg: (chart: Chart, table: DataTable, fit: FitSettings | undefined) => string;
-  raster: (chart: Chart, table: DataTable, dpi: number, fit: FitSettings | undefined) => Promise<Blob>;
+  raster: (chart: Chart, table: DataTable, fit: FitSettings | undefined) => Promise<Blob>;
   pdf: (chart: Chart, table: DataTable, fit: FitSettings | undefined) => Promise<Blob>;
 }
 
@@ -33,7 +33,7 @@ export interface BatchPlan {
   items: BatchItem[];
   /** Graphs that cannot be exported (their data table is gone), by name. */
   skipped: string[];
-  /** The graphs whose picture is larger than a browser can make at the resolution, by name with their size. */
+  /** The graphs whose picture is larger than a browser can make, by name with their size. */
   tooBig: string[];
 }
 
@@ -52,9 +52,9 @@ export function uniqueFileNames(files: readonly string[]): string[] {
 
 /**
  * What a batch would write: the graphs picked (ids that are not graphs of the project are ignored), in the order given, each with
- * the name of its file. The resolution is that of the format (a PNG has its own, see settings).
+ * the name of its file. A PNG is at the size of its graph (GRAPH_PNG_DPI); an SVG and a PDF have no pixels.
  */
-export function planBatch(project: Project, ids: readonly Id[], format: BatchFormat, dpi: number, stamped: boolean, now: Date = new Date()): BatchPlan {
+export function planBatch(project: Project, ids: readonly Id[], format: BatchFormat, stamped: boolean, now: Date = new Date()): BatchPlan {
   const skipped: string[] = [];
   const found: Array<{ chart: Chart; table: DataTable; fit: FitSettings | undefined }> = [];
   for (const id of ids) {
@@ -65,7 +65,7 @@ export function planBatch(project: Project, ids: readonly Id[], format: BatchFor
     else skipped.push(chart.name);
   }
   const files = uniqueFileNames(found.map((f) => exportFileName(f.chart.name, format, stamped, now)));
-  const items = found.map((f, i): BatchItem => ({ ...f, file: files[i], pixels: format === 'png' ? exportPixels(f.chart, dpi) : null }));
+  const items = found.map((f, i): BatchItem => ({ ...f, file: files[i], pixels: format === 'png' ? exportPixels(f.chart, GRAPH_PNG_DPI) : null }));
   const tooBig = items.flatMap((it) => (it.pixels && !fitsCanvas(it.pixels.width, it.pixels.height) ? [`${it.chart.name} (${it.pixels.width} × ${it.pixels.height} px)`] : []));
   return { items, skipped, tooBig };
 }
@@ -74,12 +74,12 @@ export function planBatch(project: Project, ids: readonly Id[], format: BatchFor
  * Draws every graph of a plan and returns the ZIP. `step` is told which graph is being drawn (1-based) before each one. A graph that
  * fails to draw stops the batch with its name in the message: a ZIP missing a graph is not made.
  */
-export async function runBatch(plan: BatchPlan, format: BatchFormat, dpi: number, render: BatchRenderers, step: (index: number, count: number, name: string) => void = () => {}, now: Date = new Date()): Promise<Blob> {
+export async function runBatch(plan: BatchPlan, format: BatchFormat, render: BatchRenderers, step: (index: number, count: number, name: string) => void = () => {}, now: Date = new Date()): Promise<Blob> {
   const files: ZipFile[] = [];
   for (const [i, item] of plan.items.entries()) {
     step(i + 1, plan.items.length, item.chart.name);
     try {
-      const data = format === 'svg' ? new TextEncoder().encode(render.svg(item.chart, item.table, item.fit)) : new Uint8Array(await (await (format === 'png' ? render.raster(item.chart, item.table, dpi, item.fit) : render.pdf(item.chart, item.table, item.fit))).arrayBuffer());
+      const data = format === 'svg' ? new TextEncoder().encode(render.svg(item.chart, item.table, item.fit)) : new Uint8Array(await (await (format === 'png' ? render.raster(item.chart, item.table, item.fit) : render.pdf(item.chart, item.table, item.fit))).arrayBuffer());
       files.push({ name: item.file, data });
     } catch (err) {
       throw new Error(`${item.chart.name}: ${err instanceof Error ? err.message : String(err)}`);

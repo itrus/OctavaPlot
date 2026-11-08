@@ -106,7 +106,7 @@ const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'analysis', '
 
 export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { project, selection, setSelection, run } = useApp();
-  const nav = useInspectorNav(PAGES);
+  const nav = useInspectorNav(chart.id, PAGES);
   const { shows } = nav;
 
   const layer = dataLayer(chart);
@@ -379,7 +379,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                     <SelectInput value={st.errorCap} options={[{ value: 'bar', label: 'Bar' }, { value: 'none', label: 'None' }]} onChange={(v) => setStyle({ errorCap: v })} />
                   </Field>
                   <NumField {...SLIDERS.cap} label="Cap width" unit="pt" value={st.errorCapWidthPt} min={0} max={40} disabled={st.errorCap === 'none'} overridden={ov('errorCapWidthPt')} onCommit={(v) => setStyle({ errorCapWidthPt: v })} />
-                  <Field label="Dir." overridden={ov('errorDirection')} hint={DIRECTION_HINT}>
+                  <Field label="Direction" overridden={ov('errorDirection')} hint={DIRECTION_HINT}>
                     <SelectInput value={st.errorDirection} options={[{ value: 'both', label: 'Both' }, { value: 'positive', label: 'Above' }, { value: 'negative', label: 'Below' }]} onChange={(v) => setStyle({ errorDirection: v })} />
                   </Field>
                   <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={20} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />

@@ -1,5 +1,8 @@
 import { crc32 } from '../../util/zip';
 
+/** The resolution of the PNG of a graph: its own size in CSS pixels, one pixel for each (1 px = 0.75 pt). Only a page layout has a resolution to choose. */
+export const GRAPH_PNG_DPI = 96;
+
 /** The pixels of a chart exported at a resolution: 96 dpi is the chart's own size in CSS pixels (1 px = 0.75 pt). */
 export const exportPixels = (chart: { widthPx: number; heightPx: number }, dpi: number): { width: number; height: number } => ({
   width: Math.max(1, Math.round((chart.widthPx * dpi) / 96)),

@@ -23,7 +23,7 @@ const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'notes', 'exp
 /** The formatting panel of histograms and cumulative distributions of a column table. */
 export function HistogramInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run } = useApp();
-  const nav = useInspectorNav(PAGES);
+  const nav = useInspectorNav(chart.id, PAGES);
   const { shows } = nav;
   const model = useMemo(() => buildHistogramModel(chart, table), [chart, table]);
   const layer = dataLayer(chart);

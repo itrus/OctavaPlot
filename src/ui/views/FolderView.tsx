@@ -61,12 +61,12 @@ export function FolderView({ folder }: { folder: FolderKey }) {
   const open = (id: Id) => setView({ kind: KIND[folder], id } as ViewRef);
   const everyTable = folder === 'tables' && count > 0 && count >= project.dataTables.length;
 
-  const exportPicked = (plan: BatchPlan, format: BatchFormat, dpi: number) => {
+  const exportPicked = (plan: BatchPlan, format: BatchFormat) => {
     const tooBig = plan.items.find((it) => it.pixels && !fitsCanvas(it.pixels.width, it.pixels.height))?.pixels ?? null;
     return exportJob.start({
       label: `${format.toUpperCase()} ZIP`,
       pixels: tooBig,
-      tooBigMessage: `A graph of the batch needs more pixels at ${dpi} dpi than the browser can make. Choose a lower resolution, or SVG.`,
+      tooBigMessage: 'A graph of the batch needs more pixels than the browser can make. Make it smaller, or choose SVG.',
       work: async (phase) => {
         // The renderer behind export (react-dom/server) is loaded on first use, not at startup.
         const { chartToSvgString, chartToPngBlob, chartToPdf } = await import('../../chart/export/export');
@@ -81,8 +81,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
         const blob = await runBatch(
           plan,
           format,
-          dpi,
-          { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: (c, t, d, f) => chartToPngBlob(c, t, d, f), pdf },
+          { svg: (c, t, f) => chartToSvgString(c, t, f, { metadata: true }), raster: chartToPngBlob, pdf },
           (i, n, name) => setStatus(`Drawing ${i} of ${n}: ${name}…`),
         );
         phase('encoding');
@@ -168,7 +167,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
         <button onClick={() => setRenaming(chosen[0])} disabled={count !== 1} title="Rename (F2)">Rename</button>
         <button onClick={duplicate} disabled={count === 0}>Duplicate</button>
         {folder === 'graphs' && (
-          <button onClick={() => setExportOpen(true)} disabled={count === 0 || exportJob.busy} title="Export the selected graphs as one ZIP file: format and resolution are shown first">
+          <button onClick={() => setExportOpen(true)} disabled={count === 0 || exportJob.busy} title="Export the selected graphs as one ZIP file: the format and the files are shown first">
             <ExportIcon /> Export{count > 1 ? ` ${count}` : ''}…
           </button>
         )}

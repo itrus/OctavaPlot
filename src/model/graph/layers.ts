@@ -1,6 +1,7 @@
 import { SYMBOL_SHAPES } from './look';
 import { bracketKindOf, chartFamily, leadingColumns } from './chartTypes';
 import { centreLower } from '../../stats/summary';
+import { paletteById } from './palettes';
 import { resolveStyle, dataLayer } from './style';
 import { resolveSummary } from './summary';
 import { layoutOf, xySeries } from '../table/tableLayout';
@@ -597,6 +598,13 @@ export function partStyle(chart: Chart, layerId: Id, style: ChartStyle): ChartSt
   for (const [setting, value] of Object.entries(own)) for (const key of keys[setting as keyof LayerStyle] ?? []) out[key] = value;
   return out as unknown as ChartStyle;
 }
+
+/**
+ * Whether the lines of a paired plot have a colour for each subject (a colour of the palette): the chart asks for it, there is a palette
+ * (with colours set by hand there is none), and the lines were not given a colour of their own in the layers. Otherwise they have one colour.
+ */
+export const pairLinesBySubject = (chart: Chart): boolean =>
+  chart.pairs.lineColour === 'subject' && paletteById(chart.paletteId) !== undefined && chart.layerStyles[`${chart.id}:pairLines`]?.color === undefined;
 
 /**
  * The look a legend key is drawn in: the look of the series with what its line and its points were given of their own (the layers of

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHART_TYPES, chartFamily, chartTypesFor } from '../../model/graph/chartTypes';
+import { CHART_TYPES, chartFamily, chartTypesFor, defaultChartTypeFor } from '../../model/graph/chartTypes';
 import { createChart, createExampleProject } from '../../model/defaults';
 import { xySeries } from '../../model/table/tableLayout';
 import type { ChartType, Project, TableKind } from '../../model/types';
@@ -247,10 +247,10 @@ describe('creating and saving the new tables', () => {
     expect(p.dataTables.find((t) => t.id === 'k')!.groups.map((g) => g.name)).toEqual(['Cured', 'Not cured', 'Outcome 3']);
   });
 
-  it('a graph made from a table takes that table\'s first chart type', () => {
+  it('a graph made from a table takes that table\'s first graph of the New Graph gallery', () => {
     for (const kind of ['grouped', 'contingency', 'survival'] as const) {
       const p = addChart('c', 't')(addDataTable('t', kind)(createExampleProject()));
-      expect(chartOf(p).type).toBe(chartTypesFor(kind)[0].type);
+      expect(chartOf(p).type).toBe(defaultChartTypeFor(kind));
     }
   });
 

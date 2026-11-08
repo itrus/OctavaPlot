@@ -42,8 +42,6 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
   const portable: Chart = {
     ...fresh,
     aspect: source.aspect,
-    // With the size: both describe the figure's place on the page.
-    ...(source.printWidthMm === undefined ? {} : { printWidthMm: source.printWidthMm }),
     showTitle: source.showTitle,
     titleFontSizePt: source.titleFontSizePt,
     titleBold: source.titleBold,

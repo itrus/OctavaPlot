@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
-import type { GalleryItem } from '../../model/graph/chartGallery';
+import { GALLERY, galleryItems, type GalleryItem } from '../../model/graph/chartGallery';
+import type { ChartType, TableKind } from '../../model/types';
 import { HEAT_GRADIENTS } from '../../model/options/heatGradients';
 import { SKETCH_AXIS, sketchColour as col } from './sketchColours';
 import { ChartSketch } from './NewItemDialogs';
@@ -104,4 +105,15 @@ export function GallerySketch({ item }: { item: GalleryItem }): ReactNode {
   if (item.type && !SKETCHES[item.id]) return <ChartSketch type={item.type} />;
   const draw = SKETCHES[item.id];
   return <svg {...SVG}>{draw ? draw() : <Axes />}</svg>;
+}
+
+/**
+ * The drawing of a chart type, the same as the one the New Graph gallery shows for it: the gallery's plain entry of the type, or, for a type
+ * the gallery offers only in looks of its own (a heat map in its colours, bubbles), the first of those that is not turned on its side.
+ * Types that have no drawing of their own in either (the XY types made of points and a line) get the one of `ChartSketch`.
+ */
+export function TypeSketch({ type }: { type: ChartType }): ReactNode {
+  const items = (Object.keys(GALLERY) as TableKind[]).flatMap((k) => galleryItems(k)).filter((i) => i.type === type);
+  const item = items.find((i) => !i.variant) ?? items.find((i) => SKETCHES[i.id] && i.variant?.orientation !== 'horizontal');
+  return item ? <GallerySketch item={item} /> : <ChartSketch type={type} />;
 }

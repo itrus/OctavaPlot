@@ -1,3 +1,4 @@
+import { availableItems } from './chartGallery';
 import type { ChartType, TableKind } from '../types';
 
 /**
@@ -65,16 +66,16 @@ export const CHART_TYPES: readonly ChartTypeInfo[] = [
   { type: 'histogram', tableKind: 'column', label: 'Histogram', description: 'How many values fall in each bin of the value axis.' },
   { type: 'ecdf', tableKind: 'column', label: 'Cumulative distribution', description: 'The share of the values at or below each value, as steps.' },
   { type: 'violin', tableKind: 'column', label: 'Violin plot', description: 'The distribution of each column as a smoothed density.' },
-  { type: 'xyScatter', tableKind: 'xy', label: 'XY scatter', description: 'Symbols at (X, Y); no connecting line.' },
-  { type: 'xyLine', tableKind: 'xy', label: 'Line', description: 'Points joined in table order; no symbols.' },
-  { type: 'xyLineSymbols', tableKind: 'xy', label: 'Line with symbols', description: 'Points joined in table order, each marked.' },
+  { type: 'xyScatter', tableKind: 'xy', label: 'Points only', description: 'Symbols at (X, Y); no connecting line.' },
+  { type: 'xyLine', tableKind: 'xy', label: 'Connecting line', description: 'Points joined in table order; no symbols.' },
+  { type: 'xyLineSymbols', tableKind: 'xy', label: 'Points and connecting line', description: 'Points joined in table order, each marked.' },
   { type: 'xyOffset', tableKind: 'xy', label: 'Offset traces', description: 'The series one above the other, each lifted by a fixed step, with a scale bar in place of the Y axis.' },
   { type: 'xyBubble', tableKind: 'xy', label: 'Bubbles', description: 'Symbols whose area follows a second column (Y and size); the largest bubble is the symbol size.' },
   { type: 'xyVolcano', tableKind: 'xy', label: 'Volcano plot', description: 'Fold change (X, log2) against significance (Y, from the p-value): the points past both thresholds are coloured up or down, with the thresholds drawn as lines.' },
   { type: 'xyBars', tableKind: 'xy', label: 'Bars at numeric X', description: 'Bars placed at X values, from a baseline up to Y; several series stand side by side.' },
   { type: 'xySpikes', tableKind: 'xy', label: 'Spikes', description: 'Thin lines from the baseline up to each point.' },
   { type: 'xyArea', tableKind: 'xy', label: 'Area under the curve', description: 'The area between the baseline and the line through the points.' },
-  { type: 'groupedBar', tableKind: 'grouped', label: 'Grouped bars', description: 'Bars side by side within each category, with error bars.' },
+  { type: 'groupedBar', tableKind: 'grouped', label: 'Interleaved bars', description: 'Bars side by side within each category, with error bars.' },
   { type: 'groupedStacked', tableKind: 'grouped', label: 'Stacked bars', description: 'The series stacked in one bar per category: the value of each is its own height.' },
   { type: 'groupedFloating', tableKind: 'grouped', label: 'Floating bars (min to max)', description: 'A bar from the smallest to the largest value of each series in each category, with a line at the mean or median.' },
   { type: 'groupedBox', tableKind: 'grouped', label: 'Grouped box and whiskers', description: 'A box plot for every series in each category.' },
@@ -94,7 +95,8 @@ export const CHART_TYPES: readonly ChartTypeInfo[] = [
 
 export const chartTypeInfo = (type: ChartType): ChartTypeInfo | undefined => CHART_TYPES.find((c) => c.type === type);
 export const chartTypesFor = (kind: TableKind): ChartTypeInfo[] => CHART_TYPES.filter((c) => c.tableKind === kind);
-export const defaultChartTypeFor = (kind: TableKind): ChartType => chartTypesFor(kind)[0].type;
+/** The graph a new one of a table type starts as: the first of the New Graph gallery, so that the dialog and the program agree on what "the default" is. */
+export const defaultChartTypeFor = (kind: TableKind): ChartType => availableItems(kind)[0].type as ChartType;
 export const tableTypeInfo = (kind: TableKind): TableTypeInfo => TABLE_TYPES.find((t) => t.kind === kind) ?? TABLE_TYPES[0];
 
 /** How a chart type is drawn: which model and drawing it uses, and so which inspector. */

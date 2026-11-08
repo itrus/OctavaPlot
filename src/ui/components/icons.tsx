@@ -84,6 +84,14 @@ export const AddColumnIcon = () => (
   </Icon>
 );
 
+/** A small table with a header row: the type of a data table. */
+export const TableTypeIcon = () => (
+  <Icon>
+    <rect x="2" y="2.5" width="12" height="11" rx="1" />
+    <path d="M2 6.2h12M6 6.2v7.3M10 6.2v7.3" />
+  </Icon>
+);
+
 /** An eye, crossed out: leave the selected values out of charts and calculations. */
 export const ExcludeIcon = () => (
   <Icon>
@@ -122,6 +130,22 @@ export const GraphPageIcon = () => (
   <Icon>
     <rect x="2" y="2.5" width="12" height="11" rx="1.2" />
     <path d="M2 5.6h12M5.4 5.6v7.9" />
+  </Icon>
+);
+
+/** The pages of a layout's inspector: the sheet, and the boxes on it. */
+export const SheetPageIcon = () => (
+  <Icon>
+    <path d="M3.6 1.8h6.6l2.4 2.4v10H3.6z" />
+    <path d="M10.2 1.8v2.4h2.4" />
+  </Icon>
+);
+
+export const PanelsPageIcon = () => (
+  <Icon>
+    <rect x="2.2" y="2.2" width="5" height="5" rx=".8" />
+    <rect x="8.8" y="2.2" width="5" height="5" rx=".8" />
+    <rect x="2.2" y="8.8" width="11.6" height="5" rx=".8" />
   </Icon>
 );
 

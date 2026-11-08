@@ -114,6 +114,22 @@ describe('style hierarchy and chart model', () => {
     expect(back.groups[0].bar).not.toBeNull();
   });
 
+  it('changing a graph to "Mean with error bars" draws error bars, and keeps a spread that was chosen', () => {
+    const p = setChartType(chart0.id, 'mean')(project);
+    expect(p.charts[0].layers[0].summary.spread).toBe('sd');
+    expect(buildColumnModel(p.charts[0], p.dataTables[0]).groups[0].errorBar).not.toBeNull();
+    const sem = setChartType(chart0.id, 'mean')(patchSummary(chart0.id, 'all', { spread: 'sem' })(project));
+    expect(sem.charts[0].layers[0].summary.spread).toBe('sem');
+  });
+
+  it('a before-and-after plot draws the dots of each column in its own colour', () => {
+    const p = setChartType(chart0.id, 'paired')(project);
+    const c = p.charts[0];
+    const colours = table.groups.slice(0, 2).map((g) => resolveStyle(c, c.layers[0], g).symbolColor);
+    expect(colours[0]).not.toBe(colours[1]);
+    expect(colours[0]).toBe(resolveStyle(c, c.layers[0], table.groups[0]).barFill);
+  });
+
   it('changing presentation settings does not change summaries', () => {
     const a = buildColumnModel(chart0, table);
     const p = patchStyle(chart0.id, 'all', { symbolSizePt: 20, barFill: '#00ff00' })(project);

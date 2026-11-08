@@ -1,15 +1,24 @@
 import { createContext, useContext, useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { recallSection, rememberSection } from '../../../state/inspectorNav';
 import { isCommitEnter } from '../../components/shortcutGuard';
 import { formatNum, sliderStep, snapToStep } from './numberFormat';
 import { WheelRange } from '../../components/WheelRange';
 import { useRoving } from './roving';
 
+/** Which graph's inspector, and which page and tab of it, a Section is on: it is then open or shut as it was left (state/inspectorMemory.ts). Absent elsewhere. */
+export const PlaceContext = createContext<{ graphId: string; page: string } | null>(null);
+
 export function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
-  const [openState, setOpen] = useState(defaultOpen);
-  const open = openState;
+  const place = useContext(PlaceContext);
+  const key = place ? `${place.page}/${title}` : null;
+  const [open, setOpen] = useState(() => (place && key ? recallSection(place.graphId, key) : undefined) ?? defaultOpen);
+  const toggle = () => {
+    setOpen(!open);
+    if (place && key) rememberSection(place.graphId, key, !open);
+  };
   return (
     <section className="insp-section">
-      <button className="insp-section-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+      <button className="insp-section-head" onClick={toggle} aria-expanded={open}>
         <span className="chev">{open ? '▾' : '▸'}</span>
         {title}
       </button>
@@ -239,6 +248,21 @@ interface NumProps {
   slider?: boolean;
 }
 
+/** Characters a number box shows without scrolling when nothing bounds the value above. */
+const NUM_CHARS_DEFAULT = 6;
+
+/**
+ * The width of a number box, in characters: the longest the field allows (its limits, and the decimals of its step), so that a field of
+ * 0 to 100 is narrower than one of pixels, and the room goes to the slider and the label. A field without an upper limit gets six.
+ */
+function numChars(min: number | undefined, max: number | undefined, step: number): number {
+  const len = (n: number | undefined) => (n === undefined || !Number.isFinite(n) ? 0 : formatNum(n).length);
+  const stepText = String(step);
+  const decimals = stepText.includes('.') && !stepText.includes('e') ? stepText.length - stepText.indexOf('.') - 1 : 0;
+  const widest = max === undefined ? NUM_CHARS_DEFAULT : Math.max(len(max), len(min));
+  return Math.min(8, Math.max(3, widest + (decimals > 0 ? decimals + 1 : 0)));
+}
+
 /** Numeric field: edits stay local until valid; invalid input shows a message and never reaches the chart. */
 export function NumField({ value, onCommit, min, max, disabled, unit, validate, label, hint, overridden, note, step, sliderMin, sliderMax, slider = true }: NumProps) {
   const [text, setText] = useState(formatNum(value));
@@ -296,6 +320,7 @@ export function NumField({ value, onCommit, min, max, disabled, unit, validate, 
           inputMode="decimal"
           ariaLabel={label}
           className={error ? 'invalid' : ''}
+          style={{ width: `calc(${Math.max(numChars(min, max, stepSize), mixedShown ? 5 : 0)}ch + 16px)` }}
           value={mixedShown ? '' : text}
           placeholder={mixedShown ? 'Mixed' : undefined}
           disabled={disabled}

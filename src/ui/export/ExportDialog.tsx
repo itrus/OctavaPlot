@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { buildExportReport, type ExportReport, type ExportReportInput } from '../../chart/export/exportReport';
 import { useApp } from '../../state/AppContext';
-import { EXPORT_DPI_CHOICES, PNG_DPI_CHOICES, type ExportDpi, type ExportFormat, type PngDpi } from '../../state/settings';
+import { EXPORT_DPI_CHOICES, type ExportDpi, type ExportFormat } from '../../state/settings';
 import { Field, SelectInput, SubHeading } from '../inspector/common/controls';
 import { Modal } from '../dialogs/NewItemDialogs';
 import { browserFontAvailable, browserHasGlyph } from './browserFonts';
@@ -12,8 +12,6 @@ import { copyText } from '../../util/download';
 type ExportSubject = Omit<ExportReportInput, 'format' | 'dpi' | 'isFontAvailable' | 'hasGlyph'>;
 
 interface Props {
-  /** A graph is PNG at its own resolution; the PNG of a layout page is at the layout one. A PDF has none. */
-  kind: 'graph' | 'layout';
   subject: ExportSubject;
   /** The state of the export controller of the view that opened the dialog. */
   state: ExportState;
@@ -54,21 +52,26 @@ const glyphBodies = (report: ExportReport): ExportReport['glyphs'][] => {
 };
 
 /** The report in plain language. Separate from the dialog's controls so that it reads as the document it is. */
-export function ReportBody({ report }: { report: ExportReport }) {
+export function ReportBody({ report, page }: { report: ExportReport; page?: string }) {
   const { px, pt, mm } = report.size;
   const { raster } = report;
+  // The pixels of a PNG are those of the picture, so they follow the resolution of a page layout; the other sizes do not change with it.
+  const pixels = raster ?? px;
   return (
     <div>
       <SubHeading>Size</SubHeading>
-      <div>
-        {px.width} × {px.height} px · {pt.width} × {pt.height} pt · {mmText(mm.width)} × {mmText(mm.height)} mm
-      </div>
-      {raster ? (
-        <div>
-          Picture: {raster.width} × {raster.height} px at {report.dpi} dpi ({raster.megapixels} megapixels)
-        </div>
+      {page !== undefined && raster === null ? (
+        // A vector page keeps the size of its paper whatever is exported: its name and its size in mm are all there is to say.
+        <div>{page} · {mmText(mm.width)} × {mmText(mm.height)} mm</div>
       ) : (
-        <div className="muted small">{report.format === 'pdf' ? 'PDF' : 'SVG'} is vector: it has no pixels and no resolution.</div>
+        <>
+          <ul className="report-sizes">
+            <li>{pixels.width} × {pixels.height} px</li>
+            <li>{pt.width} × {pt.height} pt</li>
+            <li>{page !== undefined && `${page} · `}{mmText(mm.width)} × {mmText(mm.height)} mm</li>
+          </ul>
+          {raster === null && <div className="muted small">{report.format === 'pdf' ? 'PDF' : 'SVG'} is vector: it has no pixels and no resolution.</div>}
+        </>
       )}
       <SubHeading>Fonts</SubHeading>
       {report.fonts.length === 0 && <div className="muted small">No font is asked for.</div>}
@@ -87,12 +90,6 @@ export function ReportBody({ report }: { report: ExportReport }) {
       ))}
       <SubHeading>Characters</SubHeading>
       {glyphBodies(report).map((g, i) => <GlyphsBody key={i} glyphs={g} />)}
-      {report.printWidthMm !== null && (
-        <>
-          <SubHeading>Print width {report.printWidthMm} mm</SubHeading>
-          {report.printWarnings.length === 0 ? <div className="muted small">No text or line would print too small.</div> : <ul className="warnings">{report.printWarnings.map((w) => <li key={w}>⚠ {w}</li>)}</ul>}
-        </>
-      )}
       {report.warnings.length > 0 && (
         <>
           <SubHeading>Warnings of the graph</SubHeading>
@@ -106,20 +103,19 @@ export function ReportBody({ report }: { report: ExportReport }) {
 }
 
 /**
- * What an export will make and what may go wrong with it, with the format and resolution (the same settings as in Settings)
- * and the Export button. The report is also what Copy report puts on the clipboard, as JSON.
+ * The export of a layout page: what it will make and what may go wrong with it, with the format and the resolution of a PNG (the one
+ * place a resolution is chosen; both are remembered in Settings) and the Export button. The report is also what Copy report puts on
+ * the clipboard, as JSON.
  */
-export function ExportDialog({ kind, subject, state, onExport, onClose }: Props) {
+export function ExportDialog({ subject, state, onExport, onClose }: Props) {
   const { settings, updateSettings } = useApp();
   const [copied, setCopied] = useState<string | null>(null);
   const format = settings.exportFormat;
-  // A graph's PNG has its own resolution (96 dpi is its size on screen); the PNG of a layout page uses the other one.
-  const ownPng = kind === 'graph' && format === 'png';
-  const dpi = ownPng ? settings.pngDpi : settings.exportDpi;
+  const dpi = settings.exportDpi;
   const report = buildExportReport({ ...subject, format, dpi, isFontAvailable: browserFontAvailable, hasGlyph: browserHasGlyph });
   const tooBig = report.raster?.exceedsCanvasLimit === true;
   const busy = state.phase === 'preparing' || state.phase === 'rasterizing' || state.phase === 'encoding';
-  const reason = tooBig ? `${report.raster?.width} × ${report.raster?.height} px is more than the browser can make. Lower the resolution, make the graph smaller, or choose SVG.` : null;
+  const reason = tooBig ? `${report.raster?.width} × ${report.raster?.height} px is more than the browser can make. Lower the resolution, or choose SVG.` : null;
 
   const copy = async () => {
     setCopied((await copyText(JSON.stringify(report, null, 2))) ? 'Report copied.' : 'The browser did not allow copying.');
@@ -143,12 +139,12 @@ export function ExportDialog({ kind, subject, state, onExport, onClose }: Props)
           ))}
         </span>
       </Field>
-      <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : format === 'pdf' ? 'PDF has no resolution: it holds shapes and text, not a picture.' : undefined}>
+      <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : format === 'pdf' ? 'PDF has no resolution: it holds shapes and text, not a picture.' : 'Dots per inch of the A4 page. 600 dpi takes a few seconds.'}>
         <SelectInput<string>
           value={String(dpi)}
           disabled={format !== 'png'}
-          options={(ownPng ? PNG_DPI_CHOICES : EXPORT_DPI_CHOICES).map((d) => ({ value: String(d), label: `${d} dpi` }))}
-          onChange={(v) => updateSettings(ownPng ? { pngDpi: Number(v) as PngDpi } : { exportDpi: Number(v) as ExportDpi })}
+          options={EXPORT_DPI_CHOICES.map((d) => ({ value: String(d), label: `${d} dpi` }))}
+          onChange={(v) => updateSettings({ exportDpi: Number(v) as ExportDpi })}
         />
       </Field>
       <ReportBody report={report} />

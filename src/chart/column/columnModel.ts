@@ -1,7 +1,7 @@
 import { scaleLinear, scaleLog } from 'd3';
 import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { BAR_PALETTE } from '../../model/defaults';
-import { paletteById } from '../../model/graph/palettes';
+import { paletteById, paletteColor } from '../../model/graph/palettes';
 import { legendEntries } from '../../model/graph/legendEntries';
 import { isPatternInvisible, resolveBarFill } from '../../model/graph/fill';
 import { groupRowTitle } from '../../model/table/rows';
@@ -27,7 +27,7 @@ import { boxNeeds, floatingNeeds, unplacedMarkNote } from '../shared/parts/distr
 import { columnLayout } from './columnLayout';
 import { axisMapper, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
-import { layersOf, partStyle, type LayerKind, type LayerSpec } from '../../model/graph/layers';
+import { layersOf, pairLinesBySubject, partStyle, type LayerKind, type LayerSpec } from '../../model/graph/layers';
 import { compileColumnMarks } from './columnMarks';
 import type { ChromeScene } from '../shared/scene/scene';
 import type { SceneElement } from '../shared/scene/sceneElement';
@@ -645,6 +645,8 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     const rowsSeen = new Set<number>();
     for (const values of pairValues) for (const row of values.keys()) rowsSeen.add(row);
     const first = groups[0] ? partStyle(chart, `${chart.id}:pairLines`, groups[0].style) : undefined;
+    // A colour for each subject: the palette's colours after those of the data sets (pairLinesBySubject says when).
+    const palette = pairLinesBySubject(chart) ? paletteById(chart.paletteId) : undefined;
     const sharedAxis = groups.every((g) => g.axis === groups[0].axis);
     for (const row of [...rowsSeen].sort((x, y) => x - y)) {
       // The subject's values in data units, cut where the line crosses an omitted range (never drawn through it). With
@@ -661,7 +663,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
         seq.push(sharedAxis ? v : { x: v.x, y: axisOf(groups[gi].axis).toY(v.y) });
       }
       const d = pathOfRuns(polylinesThroughBreaks(seq, { log: null, reverse: false }, sharedAxis ? axisOf(groups[0].axis).scale : { log: null, reverse: false }), sharedAxis ? axisOf(groups[0].axis).toY : (v) => v, n2);
-      if (d !== '' && first) pairLines.push({ id: `pair:${row}`, obsId: anchor, row, d, color: first.lineColor, strokeWidth: first.lineWidthPt, opacity: first.lineOpacity });
+      if (d !== '' && first) pairLines.push({ id: `pair:${row}`, obsId: anchor, row, d, color: palette ? paletteColor(palette, table.groups.length + row) : first.lineColor, strokeWidth: first.lineWidthPt, opacity: first.lineOpacity });
     }
   }
 

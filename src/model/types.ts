@@ -346,6 +346,12 @@ interface PairOptions {
   bridge: boolean;
   /** Grouped bars of replicates: join the values of each subject (see `Observation.subject`) across the series, inside each category. */
   bySubject: boolean;
+  /**
+   * Paired plot: the colour of the lines. `subject`: each row has a colour of the chart's palette (the colours after those of the data
+   * sets, so a line is not the colour of a column), unless the lines were given a colour of their own; `one`: every line has the one
+   * colour of the lines setting.
+   */
+  lineColour: 'subject' | 'one';
 }
 
 /** Colour scales of a heat map (spec 13.1). */
@@ -767,8 +773,6 @@ export interface Chart {
   /** Chart size in CSS pixels (1 px = 0.75 pt). */
   widthPx: number;
   heightPx: number;
-  /** The width in mm the graph is meant to be printed at, 20 to 400; absent = none. Only the export report uses it (warnings for small text and thin lines). */
-  printWidthMm?: number;
   /** Data sets of the chart's own table that are switched off on this graph. */
   hiddenGroupIds: Id[];
   /** Order of the data sets on the graph (column charts): those listed come first, in this order. */

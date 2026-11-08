@@ -1,16 +1,33 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { drawLayout, layoutPngSize, layoutTextGroups, layoutToPdf, layoutToPngBlob, layoutToSvgString } from '../../chart/export/layoutExport';
-import { FONT_FAMILY } from '../../model/defaults';
+import { createPortal } from 'react-dom';
+import { drawLayout } from '../../chart/export/layoutExport';
 import { clampFrame, FREE_MAX, GAP_MM_MAX, GRID_MAX, LABEL_PT_MAX, LEGEND_PT_MAX, LEGEND_PT_MIN, LABEL_PT_MIN, MARGIN_MM_MAX, pageMm, PERCENT_MAX, PERCENT_MIN, standardArrangements, sameArrangement } from '../../model/project/layout';
 import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, LayoutScaling, PanelLabelStyle } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { addFreePanel, freeLayout, patchLayout, removeFreePanel, removeLayout, setFrame, setLayoutPanel } from '../../state/commands';
-import { downloadBlob, exportFileName } from '../../util/download';
-import { exportStatusText } from '../export/exportJob';
-import { ExportDialog } from '../export/ExportDialog';
-import { useExportJob } from '../export/useExportJob';
-import { DeleteIcon, ExportIcon } from '../components/icons';
+import { addFreePanel, freeLayout, patchLayout, removeFreePanel, setFrame, setLayoutPanel } from '../../state/commands';
+import { ArrangementSketch, FreeSketch } from '../components/ArrangementSketch';
+import { ExportIcon, GraphPageIcon, LegendPageIcon, PanelsPageIcon, SheetPageIcon } from '../components/icons';
+import { LayoutExportPanel } from '../export/LayoutExportPanel';
+import { InspectorShell, type InspectorKit } from '../inspector/common/InspectorShell';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, TextInput } from '../inspector/common/controls';
+
+type LayoutInspectorPage = 'page' | 'panels' | 'graphs' | 'legend' | 'export';
+const LAYOUT_PAGES: readonly LayoutInspectorPage[] = ['page', 'panels', 'graphs', 'legend', 'export'];
+/** The rail of the inspector of a layout, as the graph has one: the sheet, the boxes on it, the master legend, and Export at the foot. */
+const LAYOUT_KIT: InspectorKit<LayoutInspectorPage> = {
+  name: 'Layout',
+  pages: [
+    { id: 'page', label: 'Page', title: 'Page: orientation, background, title, margin and panel labels', heading: 'Format Page' },
+    { id: 'panels', label: 'Panels', title: 'Panels: how the graphs are arranged on the page', heading: 'Format Panels' },
+    { id: 'graphs', label: 'Graphs', title: 'Graphs: the graph in each panel and the size of the graphs', heading: 'Format Graphs' },
+    { id: 'legend', label: 'Legend', title: 'Legend of the page', heading: 'Format Legend' },
+    { id: 'export', label: 'Export', title: 'Export this page as a picture or a vector file', heading: 'Export Layout' },
+  ],
+  icons: { page: SheetPageIcon, panels: PanelsPageIcon, graphs: GraphPageIcon, legend: LegendPageIcon, export: ExportIcon },
+};
+
+/** What choosing Array starts with; the numbers across and down are then typed. */
+const ARRAY_START: LayoutArrangement = { kind: 'grid', cols: 3, rows: 2 };
 
 const CANVAS_PAD = 24;
 const SCROLLBAR_ROOM = 17;
@@ -37,7 +54,6 @@ const SCALING_NOTE: Record<LayoutScaling['mode'], string | null> = {
   percent: null,
 };
 
-const arrangementKey = (a: LayoutArrangement): string => (a.kind === 'inset' ? 'inset' : a.kind === 'free' ? 'free' : `${a.cols}x${a.rows}`);
 
 type Handle = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 interface Drag {
@@ -84,11 +100,16 @@ const intersect = (a: FrameMm, b: FrameMm): FrameMm => {
 };
 
 function LayoutPage({ layout }: { layout: Layout }) {
-  const { project, run, setStatus, settings } = useApp();
+  const { project, run, layoutZoom, setLayoutZoom } = useApp();
   const drawing = useMemo(() => drawLayout(layout, project), [layout, project]);
-  const dpi = settings.exportDpi;
   const [selected, setSelected] = useState(0);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [inspPage, setInspPage] = useState<LayoutInspectorPage>('page');
+
+  // The inspector is the right panel of the app, the one a graph has: it is drawn into the app's own grid (a portal), because its
+  // settings and the export belong to this page's state (the selected panel, the drawing).
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => setHost(document.querySelector('.app')), []);
 
   // The page is shown whole, as large as the window allows.
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -102,7 +123,11 @@ function LayoutPage({ layout }: { layout: Layout }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const scale = avail.w > 0 && avail.h > 0 ? Math.max(0.05, Math.min((avail.w - 2 * CANVAS_PAD) / drawing.widthPt, (avail.h - 2 * CANVAS_PAD) / drawing.heightPt)) : 0.5;
+  // Zoom 100% means the whole page fits the window; the slider in the status bar zooms relative to that, as it does for a graph.
+  const fit = avail.w > 0 && avail.h > 0 ? Math.max(0.05, Math.min((avail.w - 2 * CANVAS_PAD) / drawing.widthPt, (avail.h - 2 * CANVAS_PAD) / drawing.heightPt)) : 0.5;
+  const scale = fit * layoutZoom;
+  // A page opens at "fit", and goes back to it when it is turned.
+  useEffect(() => setLayoutZoom(1), [layout.id, layout.orientation, setLayoutZoom]);
   const pageW = drawing.widthPt * scale;
   const pageH = drawing.heightPt * scale;
   const mm = pageMm(layout.orientation);
@@ -147,55 +172,10 @@ function LayoutPage({ layout }: { layout: Layout }) {
     setDrag(null);
   };
 
-  // One export at a time: while one runs the Export button is disabled, and a second start is ignored.
-  const exportJob = useExportJob(setStatus);
-  const [exportOpen, setExportOpen] = useState(false);
-  // The texts of the page, by font, for the check of characters: made only while the export dialog is open.
-  const textGroups = useMemo(() => (exportOpen ? layoutTextGroups(layout, project, FONT_FAMILY) : undefined), [exportOpen, layout, project]);
-  const exportSvg = () =>
-    exportJob.start({
-      label: 'SVG',
-      pixels: null,
-      tooBigMessage: '',
-      work: async (phase) => {
-        phase('encoding');
-        downloadBlob(new Blob([layoutToSvgString(layout, project)], { type: 'image/svg+xml' }), exportFileName(layout.name, 'svg', settings.timestampExports));
-        return 'Exported SVG.';
-      },
-    });
-  // A PDF is vector shapes and text: it has no resolution and no canvas limit.
-  const exportPdf = () =>
-    exportJob.start({
-      label: 'PDF',
-      pixels: null,
-      tooBigMessage: '',
-      work: async (phase) => {
-        phase('encoding');
-        const { blob, notes } = await layoutToPdf(layout, project);
-        downloadBlob(blob, exportFileName(layout.name, 'pdf', settings.timestampExports));
-        return notes.length > 0 ? `Exported PDF. ${notes.join(' ')}` : 'Exported PDF.';
-      },
-    });
-  const exportRaster = () => {
-    const kind = 'png';
-    const { width, height } = layoutPngSize(layout, dpi);
-    const name = kind.toUpperCase();
-    return exportJob.start({
-      label: name,
-      pixels: { width, height },
-      tooBigMessage: `${name} export at ${dpi} dpi needs ${width} × ${height} px, more than the browser can make. Choose a lower resolution, or export SVG.`,
-      work: async (phase) => {
-        phase('rasterizing');
-        const blob = await layoutToPngBlob(layout, project, dpi);
-        phase('encoding');
-        downloadBlob(blob, exportFileName(layout.name, kind, settings.timestampExports));
-        return `Exported ${name}, ${width} × ${height} px (${dpi} dpi).`;
-      },
-    });
-  };
-
   const standards = standardArrangements(layout.orientation);
   const standard = standards.some((s) => sameArrangement(s.arrangement, a));
+  // An array is a grid that is none of the standard ones.
+  const isArray = a.kind === 'grid' && !standard;
   const percent = layout.scaling.mode === 'percent' ? layout.scaling.percent : Math.round((drawing.arranged.commonFactor ?? 1) * 100);
   const box = (f: FrameMm) => ({ left: `${(f.x / mm.width) * 100}%`, top: `${(f.y / mm.height) * 100}%`, width: `${(f.w / mm.width) * 100}%`, height: `${(f.h / mm.height) * 100}%` });
   const current = a.kind === 'free' ? (drag && drag.slot === slot ? drag.now : shown(slot)) : null;
@@ -212,49 +192,6 @@ function LayoutPage({ layout }: { layout: Layout }) {
 
   return (
     <div className="graph-view layout-view">
-      <div className="toolbar">
-        <button
-          className="icon-text"
-          onClick={() => {
-            run('Delete layout', removeLayout(layout.id));
-            setStatus(`Deleted ${layout.name}. Undo (Ctrl+Z) restores it.`);
-          }}
-          title="Delete this layout (the graphs stay; can be undone)"
-        >
-          <DeleteIcon />
-          Delete
-        </button>
-        <span className="toolbar-info">{layout.orientation === 'landscape' ? 'A4 landscape, 297 × 210 mm' : 'A4 portrait, 210 × 297 mm'}</span>
-        <button
-          className="icon-text toolbar-end"
-          disabled={exportJob.busy}
-          onClick={() => setExportOpen(true)}
-          title="Export the page: format, resolution, size, fonts and notices are shown first"
-        >
-          <ExportIcon />
-          Export
-        </button>
-        {exportJob.busy && <span className="toolbar-info export-status" role="status">{exportStatusText(exportJob.state)}</span>}
-      </div>
-      {exportOpen && (
-        <ExportDialog
-          kind="layout"
-          subject={{
-            name: layout.name,
-            widthPx: (drawing.widthPt * 96) / 72,
-            heightPx: (drawing.heightPt * 96) / 72,
-            // The page's own font (labels and title), then those of the graphs on it.
-            fontFamilies: [FONT_FAMILY, ...layout.panels.flatMap((id) => project.charts.find((c) => c.id === id)?.fontFamily ?? [])],
-            textGroups,
-            warnings: drawing.notices,
-            printWidthMm: null,
-            printWarnings: [],
-          }}
-          state={exportJob.state}
-          onExport={() => (settings.exportFormat === 'svg' ? exportSvg() : settings.exportFormat === 'pdf' ? exportPdf() : exportRaster())}
-          onClose={() => setExportOpen(false)}
-        />
-      )}
       <div className="layout-body">
         <div className="chart-scroller" ref={scrollerRef}>
           <div className="chart-wrap" style={{ width: pageW }}>
@@ -283,7 +220,11 @@ function LayoutPage({ layout }: { layout: Layout }) {
             )}
           </div>
         </div>
-        <aside className="layout-panel" aria-label="Layout settings">
+        {host && createPortal(
+          <div className="inspector-host">
+            <InspectorShell kit={LAYOUT_KIT} nav={{ page: inspPage, setPage: setInspPage, pages: LAYOUT_PAGES, parts: [], setPart: () => {} }}>
+              {inspPage === 'page' && (
+                <>
           <Section title="Page">
             <Field label="Orientation">
               <span className="switch-group" role="group" aria-label="Orientation">
@@ -312,29 +253,41 @@ function LayoutPage({ layout }: { layout: Layout }) {
             )}
             <NumField label="Margin" unit="mm" step={1} min={0} max={MARGIN_MM_MAX} value={layout.marginMm} disabled={a.kind === 'free'} note={a.kind === 'free' ? 'Free placement ignores the margin: place the boxes where you want them.' : null} onCommit={(v) => set('Page margin', { marginMm: v })} />
           </Section>
-          <Section title="Arrangement">
-            <Field label="Panels">
-              <SelectInput<string> dropdown
-                value={a.kind === 'free' ? 'free' : standard ? arrangementKey(a) : 'array'}
-                options={[
-                  ...standards.map((s) => ({ value: arrangementKey(s.arrangement), label: s.label })),
-                  ...(!standard && a.kind === 'grid' ? [{ value: 'array', label: `Array ${a.cols} × ${a.rows}` }] : []),
-                  { value: 'free', label: 'Free placement' },
-                ]}
-                onChange={(v) => {
-                  if (v === 'free') run('Free placement', freeLayout(layout.id));
-                  else {
-                    const s = standards.find((x) => arrangementKey(x.arrangement) === v);
-                    if (s) set('Arrangement', { arrangement: s.arrangement });
-                  }
-                }}
-              />
+          <Section title="Panel labels">
+            <Field label="Style">
+              <SelectInput<PanelLabelStyle> value={layout.labelStyle} options={[...LABEL_STYLES]} onChange={(v) => set('Panel labels', { labelStyle: v })} />
             </Field>
-            {a.kind !== 'free' && (
+            <NumField label="Size" unit="pt" step={1} min={LABEL_PT_MIN} max={LABEL_PT_MAX} disabled={layout.labelStyle === 'none'} value={layout.labelSizePt} onCommit={(v) => set('Panel label size', { labelSizePt: v })} />
+          </Section>
+                </>
+              )}
+              {inspPage === 'panels' && (
+                <>
+          <Section title="Arrangement of graphs">
+            <div className="chart-type-grid" role="radiogroup" aria-label="Arrangement">
+              {standards.map((s) => {
+                const on = sameArrangement(s.arrangement, a);
+                return (
+                  <button key={s.id} role="radio" aria-checked={on} className={`gallery-item${on ? ' selected' : ''}`} onClick={() => !on && set('Arrangement', { arrangement: s.arrangement })}>
+                    <ArrangementSketch arrangement={s.arrangement} orientation={layout.orientation} />
+                    <span className="gallery-caption">{s.label}</span>
+                  </button>
+                );
+              })}
+              <button role="radio" aria-checked={isArray} className={`gallery-item${isArray ? ' selected' : ''}`} title="Any number of graphs across and down, up to 6 × 6" onClick={() => !isArray && set('Arrangement', { arrangement: ARRAY_START })}>
+                <ArrangementSketch arrangement={isArray ? a : ARRAY_START} orientation={layout.orientation} />
+                <span className="gallery-caption">{isArray && a.kind === 'grid' ? `Array ${a.cols} × ${a.rows}` : 'Array'}</span>
+              </button>
+              <button role="radio" aria-checked={a.kind === 'free'} className={`gallery-item${a.kind === 'free' ? ' selected' : ''}`} title="Boxes you drag and resize on the page, or type in mm" onClick={() => a.kind !== 'free' && run('Free placement', freeLayout(layout.id))}>
+                <FreeSketch orientation={layout.orientation} />
+                <span className="gallery-caption">Free placement</span>
+              </button>
+            </div>
+            {a.kind === 'grid' && (
               <>
-                <NumField label="Graphs across" step={1} min={1} max={GRID_MAX} value={a.kind === 'grid' ? a.cols : 1} disabled={a.kind !== 'grid'} onCommit={(v) => a.kind === 'grid' && set('Arrangement', { arrangement: { kind: 'grid', cols: Math.round(v), rows: a.rows } })} />
-                <NumField label="Graphs down" step={1} min={1} max={GRID_MAX} value={a.kind === 'grid' ? a.rows : 1} disabled={a.kind !== 'grid'} onCommit={(v) => a.kind === 'grid' && set('Arrangement', { arrangement: { kind: 'grid', cols: a.cols, rows: Math.round(v) } })} />
-                <NumField label="Space between" unit="mm" step={1} min={0} max={GAP_MM_MAX} value={layout.gapMm} disabled={a.kind !== 'grid'} onCommit={(v) => set('Space between panels', { gapMm: v })} />
+                <NumField label="Graphs across" step={1} min={1} max={GRID_MAX} value={a.cols} onCommit={(v) => set('Arrangement', { arrangement: { kind: 'grid', cols: Math.round(v), rows: a.rows } })} />
+                <NumField label="Graphs down" step={1} min={1} max={GRID_MAX} value={a.rows} onCommit={(v) => set('Arrangement', { arrangement: { kind: 'grid', cols: a.cols, rows: Math.round(v) } })} />
+                <NumField label="Space between" unit="mm" step={1} min={0} max={GAP_MM_MAX} value={layout.gapMm} onCommit={(v) => set('Space between panels', { gapMm: v })} />
               </>
             )}
             {a.kind === 'free' && current && (
@@ -358,6 +311,10 @@ function LayoutPage({ layout }: { layout: Layout }) {
               </>
             )}
           </Section>
+                </>
+              )}
+              {inspPage === 'graphs' && (
+                <>
           <Section title="Graphs in the panels">
             {layout.panels.map((id, i) => (
               <Field key={i} label={`Panel ${drawing.arranged.placements[i]?.label || i + 1}`}>
@@ -390,6 +347,9 @@ function LayoutPage({ layout }: { layout: Layout }) {
               onCommit={(v) => set('Scaling factor', { scaling: { mode: 'percent', percent: v } })}
             />
           </Section>
+                </>
+              )}
+              {inspPage === 'legend' && (
           <Section title="Legend of the page">
             <Field label="Master legend" hint="One legend for the page, made from the legends of its graphs (the same name and look once). It takes its room from the panels; with free placement, keep the boxes clear of the band along the edge.">
               <Check checked={layout.legend !== undefined} onChange={(v) => set('Page legend', { legend: v ? DEFAULT_PAGE_LEGEND : undefined })} ariaLabel="Master legend" />
@@ -406,13 +366,12 @@ function LayoutPage({ layout }: { layout: Layout }) {
               </>
             )}
           </Section>
-          <Section title="Panel labels">
-            <Field label="Style">
-              <SelectInput<PanelLabelStyle> value={layout.labelStyle} options={[...LABEL_STYLES]} onChange={(v) => set('Panel labels', { labelStyle: v })} />
-            </Field>
-            <NumField label="Size" unit="pt" step={1} min={LABEL_PT_MIN} max={LABEL_PT_MAX} disabled={layout.labelStyle === 'none'} value={layout.labelSizePt} onCommit={(v) => set('Panel label size', { labelSizePt: v })} />
-          </Section>
-        </aside>
+              )}
+              {inspPage === 'export' && <LayoutExportPanel layout={layout} drawing={drawing} />}
+            </InspectorShell>
+          </div>,
+          host,
+        )}
       </div>
     </div>
   );

@@ -23,6 +23,11 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
       </div>
       <p>Scientific data tables and the charts drawn from them, in the browser. Everything stays in your browser; nothing is sent anywhere.</p>
 
+      <h3>Source code</h3>
+      <p>
+        The code, the issue tracker and the releases are on GitHub: {link('https://github.com/itrus/OctavaPlot')}
+      </p>
+
       <h3>Support</h3>
       <p>
         OctavaPlot is free software (GNU GPL v3). If it is useful to you,{' '}

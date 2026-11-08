@@ -249,3 +249,14 @@ describe('table size limits in a file', () => {
     expect(() => parseProject(JSON.stringify(raw))).toThrow(/dataTables\[0\].*20,000,000 cells/);
   });
 });
+
+describe('the print width of earlier builds', () => {
+  it('is not read and not written back: the file opens, and its next save has no printWidthMm', () => {
+    const raw = JSON.parse(stringifyProject(createExampleProject())) as Any;
+    raw.project.charts[0].printWidthMm = 90;
+    const { project, notes } = parseProjectWithNotes(JSON.stringify(raw));
+    expect(notes).toEqual([]);
+    expect('printWidthMm' in project.charts[0]).toBe(false);
+    expect(stringifyProject(project)).not.toContain('printWidthMm');
+  });
+});

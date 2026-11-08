@@ -80,7 +80,7 @@ function axisTitlesFor(type: ChartType): { x: string; y: string } {
 }
 
 /** The summary a new chart of this type starts with: the charts that are made to show error bars (XY charts of replicate values, grouped bars and lines, a mean with error bars) show the SD, as the usual convention. A bar chart draws the individual values as dots, so it starts without error bars; the same holds for the variants that show dots only (see applyVariant). */
-const defaultSummaryFor = (type: ChartType): SummarySpec =>
+export const defaultSummaryFor = (type: ChartType): SummarySpec =>
   chartFamily(type) === 'xy' || type === 'groupedBar' || type === 'groupedLine' || type === 'mean' ? { ...DEFAULT_SUMMARY, spread: 'sd' } : { ...DEFAULT_SUMMARY };
 
 export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, method: 'loglog', atRisk: false, eventSymbols: false, errorBars: false };
@@ -263,7 +263,14 @@ const defaultAxis = (title: string): AxisConfig => ({
   suffix: '',
 });
 
-export function createChart(dataTableId: string, size?: { widthPx: number; heightPx: number }, type: ChartType = 'bar'): Chart {
+/** What a new graph starts with that the settings decide: its size in px, and its page background (a colour, or null for transparent; white when absent). */
+export interface ChartStart {
+  widthPx: number;
+  heightPx: number;
+  pageColor?: string | null;
+}
+
+export function createChart(dataTableId: string, size?: ChartStart, type: ChartType = 'bar'): Chart {
   const titles = axisTitlesFor(type);
   const layer: ChartLayer = {
     id: newId('layer'),
@@ -297,7 +304,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     axisColor: '#000000',
     axisOpacity: 1,
     plotColor: '#ffffff',
-    pageColor: '#ffffff',
+    pageColor: size?.pageColor !== undefined ? size.pageColor : '#ffffff',
     frame: 'none',
     grid: { ...DEFAULT_GRID },
     orientation: 'vertical',
@@ -311,7 +318,7 @@ export function createChart(dataTableId: string, size?: { widthPx: number; heigh
     barLabels: { ...DEFAULT_BAR_LABELS },
     // A violin shows its values from the start: the Points box then switches them off.
     distribution: { ...DEFAULT_DISTRIBUTION, ...(type === 'violin' || type === 'groupedViolin' ? { points: 'all' as const } : {}) },
-    pairs: { bridge: false, bySubject: false },
+    pairs: { bridge: false, bySubject: false, lineColour: 'subject' },
     heatmap: { ...DEFAULT_HEATMAP, breaks: [], customColours: { ...DEFAULT_CUSTOM_COLOURS } },
     histogram: { ...DEFAULT_HISTOGRAM },
     fit: { ...DEFAULT_FIT },
@@ -486,14 +493,14 @@ export function createSurvivalTable(name: string, sample: boolean): DataTable {
 }
 
 /** A blank project: one data table of empty groups and one graph of it. */
-export function createEmptyProject(size?: { widthPx: number; heightPx: number }): Project {
+export function createEmptyProject(size?: ChartStart): Project {
   const groups: Group[] = [];
   for (let i = 0; i < 4; i++) groups.push(createGroup(nextGroupName(groups.map((g) => g.name)), i, INITIAL_ROWS));
   const table: DataTable = { id: newId('table'), name: 'Data 1', kind: 'column', rowCount: INITIAL_ROWS, rows: createRows(INITIAL_ROWS), groups };
   return { id: newId('project'), name: untitledProjectName(), dataTables: [table], charts: [createChart(table.id, size)] };
 }
 
-export function createExampleProject(size?: { widthPx: number; heightPx: number }): Project {
+export function createExampleProject(size?: ChartStart): Project {
   const table = createExampleTable();
   return {
     id: newId('project'),

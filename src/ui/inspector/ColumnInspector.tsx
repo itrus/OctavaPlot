@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { supportsHorizontal } from '../../model/graph/chartTypes';
 import { FILL_PATTERN_OPTIONS, describeBarFillUi } from '../../model/graph/fill';
 import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
+import { pairLinesBySubject } from '../../model/graph/layers';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/graph/summary';
 import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SummarySpec } from '../../model/types';
 import { AXIS_SHORT, AXIS_TAG, bindingOf, bindingSelectState } from '../../chart/shared/axes/axes';
@@ -18,7 +19,6 @@ import {
   describeSummaryControls,
   datasetRowText,
   intervalCaptionLines,
-  summaryCaption,
 } from '../../stats/describe';
 import { useApp } from '../../state/AppContext';
 import {
@@ -91,10 +91,12 @@ function DatasetSwatchChip({ style }: { style: ChartStyle }) {
 const SEVERAL = '__several__';
 
 const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'analysis', 'notes', 'export'];
+/** The centre the bars and dots are drawn at, and its calculation options, are on the Plot page; Analysis stays for the charts that have a distribution to set. */
+const pagesOf = (type: Chart['type']): InspectorPage[] => (type === 'box' || type === 'violin' || type === 'floating' ? PAGES : PAGES.filter((p) => p !== 'analysis'));
 
 export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { selection, setSelection, run, setStatus } = useApp();
-  const nav = useInspectorNav(PAGES);
+  const nav = useInspectorNav(chart.id, pagesOf(chart.type));
   const { shows } = nav;
   const layer = dataLayer(chart);
 
@@ -266,17 +268,22 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             <PaletteField chart={chart} hint="Gives the data sets coordinated colours in order. Per-data-set and all-bar colours below still apply on top." />
           </GroupBox>
           <LayersSection chart={chart} table={table} />
-            </>
-          )}
-
-          {shows('analysis') && (!isDist || chart.type === 'floating') && (
           <GroupBox title="Summary">
             <LineAtField centre={spec.centre} overridden={ovSum('centre')} onChange={setCentre} />
-            <div className="muted small">{summaryCaption(spec, st.showErrorBars)}</div>
             {scopeGroup && centreNoticeLines(scopeGroup.stats).map((line) => (
               <div key={line} className="muted small">{line}</div>
             ))}
+            {!isDist && (
+              <CalculationOptions
+                smallSamplePolicy={spec.smallSamplePolicy}
+                invalidPolicy={spec.invalidPolicy}
+                smallOverridden={ovSum('smallSamplePolicy')}
+                invalidOverridden={ovSum('invalidPolicy')}
+                onChange={(patch) => setSummary(patch, 'Change calculation option')}
+              />
+            )}
           </GroupBox>
+            </>
           )}
 
           {shows('analysis') && isDist && <DistributionControls chart={chart} lineColor={st.lineColor} lineWidthPt={st.lineWidthPt} lineOpacity={st.lineOpacity} onLine={(patch) => setStyle(patch)} />}
@@ -434,7 +441,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               />
             </Field>
             <NumField {...SLIDERS.cap} label="Cap width" unit="pt" value={st.errorCapWidthPt} min={0} max={40} disabled={errorOff || st.errorCap === 'none'} overridden={ov('errorCapWidthPt')} onCommit={(v) => setStyle({ errorCapWidthPt: v })} />
-            <Field label="Dir." overridden={ov('errorDirection')} hint={DIRECTION_HINT}>
+            <Field label="Direction" overridden={ov('errorDirection')} hint={DIRECTION_HINT}>
               <SelectInput
                 value={st.errorDirection}
                 disabled={errorOff}
@@ -455,23 +462,26 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
           </>
           )}
 
-          {shows('analysis') && !isDist && (
-          <CalculationOptions
-            smallSamplePolicy={spec.smallSamplePolicy}
-            invalidPolicy={spec.invalidPolicy}
-            smallOverridden={ovSum('smallSamplePolicy')}
-            invalidOverridden={ovSum('invalidPolicy')}
-            onChange={(patch) => setSummary(patch, 'Change calculation option')}
-          />
-          )}
-
           {shows('style') && (
           <>
 
           {(chart.type === 'mean' || chart.type === 'paired') && (
             <GroupBox title={chart.type === 'paired' ? 'Lines joining the rows' : 'Lines'} checked={st.showLines} onCheckedChange={(v) => setStyle({ showLines: v })} overridden={ov('showLines')}>
+              {chart.type === 'paired' && (
+                <Field label="Color by" hint="Subject: each row's line has a color of the palette, after the colors of the data sets. One color: every line has the color below. Subject needs a palette (not colors set by hand).">
+                  <SelectInput<Chart['pairs']['lineColour']>
+                    value={chart.pairs.lineColour}
+                    disabled={!st.showLines}
+                    options={[
+                      { value: 'subject', label: 'Subject' },
+                      { value: 'one', label: 'One color' },
+                    ]}
+                    onChange={(v) => run('Line colors', patchLook(chart.id, { pairs: { lineColour: v } }))}
+                  />
+                </Field>
+              )}
               <Field label="Color" overridden={ov('lineColor')}>
-                <ColorInput value={st.lineColor} disabled={!st.showLines} onChange={(v) => setStyle({ lineColor: v })} />
+                <ColorInput value={st.lineColor} disabled={!st.showLines || (chart.type === 'paired' && pairLinesBySubject(chart))} onChange={(v) => setStyle({ lineColor: v })} />
               </Field>
               <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={20} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
               <NumField {...SLIDERS.fraction} label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showLines} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />

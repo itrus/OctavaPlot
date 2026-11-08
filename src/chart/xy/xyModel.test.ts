@@ -174,6 +174,6 @@ describe('chart type and table type must agree', () => {
     const q = createExampleProject();
     const f2 = JSON.parse(stringifyProject(q));
     f2.project.charts[0].type = 'xyLine';
-    expect(parseProject(JSON.stringify(f2)).charts[0].type).toBe('bar');
+    expect(parseProject(JSON.stringify(f2)).charts[0].type).toBe('scatter');
   });
 });

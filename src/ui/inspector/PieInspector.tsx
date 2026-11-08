@@ -20,7 +20,7 @@ const PAGES: InspectorPage[] = ['graph', 'plot', 'legend', 'notes', 'export'];
 /** The formatting panel of pie and doughnut charts. */
 export function PieInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run, selection } = useApp();
-  const nav = useInspectorNav(PAGES, ['datasets', 'frame']);
+  const nav = useInspectorNav(chart.id, PAGES, ['datasets', 'frame']);
   const { shows } = nav;
   const layer = dataLayer(chart);
   const d = chart.pie;

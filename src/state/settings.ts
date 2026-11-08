@@ -1,16 +1,11 @@
-import { CHART_PX_MAX, CHART_PX_MIN, DEFAULT_CHART_HEIGHT_PX, DEFAULT_CHART_WIDTH_PX } from '../model/defaults';
+import { type ChartStart, CHART_PX_MAX, CHART_PX_MIN, DEFAULT_CHART_HEIGHT_PX, DEFAULT_CHART_WIDTH_PX } from '../model/defaults';
 import type { DecimalSeparator } from '../model/types';
 
 export type ExportFormat = 'png' | 'svg' | 'pdf';
 
-/** Resolutions offered for the PNG of a layout page. */
+/** Resolutions offered for the PNG of a layout page: the only PNG with a resolution to choose (a graph's PNG is at its own size). */
 export const EXPORT_DPI_CHOICES = [150, 300, 600] as const;
 export type ExportDpi = (typeof EXPORT_DPI_CHOICES)[number];
-
-/** Resolutions offered for the PNG of a graph; 96 is the graph's own size in pixels. */
-export const PNG_DPI_CHOICES = [96, 150, 300, 600] as const;
-export type PngDpi = (typeof PNG_DPI_CHOICES)[number];
-
 
 /** Application preferences. Kept apart from the project: they follow the browser, not the file. */
 export interface Settings {
@@ -20,15 +15,15 @@ export interface Settings {
   /** New projects, and the New Data Table dialog, start with sample data (off: blank tables). */
   newProjectSample: boolean;
   exportFormat: ExportFormat;
-  /** Resolution of the PNG of a layout page, in dots per inch (A4 at 600 dpi is 4960 × 7016 px). */
+  /** Resolution of the PNG of a layout page, in dots per inch. Chosen in the export dialog of a layout, and remembered. */
   exportDpi: ExportDpi;
-  /** Resolution of the PNG of a graph, in dots per inch. */
-  pngDpi: PngDpi;
   /** How numbers typed, pasted or imported into tables are read (see DecimalSeparator). */
   decimalSeparator: DecimalSeparator;
   /** Size of newly created charts, in CSS pixels. */
   defaultChartWidthPx: number;
   defaultChartHeightPx: number;
+  /** The page background of newly created charts: white, or none (transparent in an SVG or PNG). */
+  newGraphBackground: 'white' | 'transparent';
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -37,11 +32,14 @@ export const DEFAULT_SETTINGS: Settings = {
   newProjectSample: true,
   exportFormat: 'png',
   exportDpi: 600,
-  pngDpi: 96,
   decimalSeparator: 'auto',
   defaultChartWidthPx: DEFAULT_CHART_WIDTH_PX,
   defaultChartHeightPx: DEFAULT_CHART_HEIGHT_PX,
+  newGraphBackground: 'white',
 };
+
+/** What a new graph starts with, from the settings: its size and its page background. */
+export const newChartStart = (s: Settings): ChartStart => ({ widthPx: s.defaultChartWidthPx, heightPx: s.defaultChartHeightPx, pageColor: s.newGraphBackground === 'transparent' ? null : '#ffffff' });
 
 /**
  * Only the settings the user changed are stored (v2). A setting never touched follows the defaults in the code, so a
@@ -65,10 +63,10 @@ export function sanitizeSettings(raw: unknown): Settings {
     newProjectSample: typeof r.newProjectSample === 'boolean' ? r.newProjectSample : typeof r.newProjectEmpty === 'boolean' ? !r.newProjectEmpty : d.newProjectSample,
     exportFormat: r.exportFormat === 'svg' || r.exportFormat === 'png' || r.exportFormat === 'pdf' ? r.exportFormat : d.exportFormat,
     exportDpi: EXPORT_DPI_CHOICES.find((v) => v === r.exportDpi) ?? d.exportDpi,
-    pngDpi: PNG_DPI_CHOICES.find((v) => v === r.pngDpi) ?? d.pngDpi,
     decimalSeparator: r.decimalSeparator === 'point' || r.decimalSeparator === 'comma' ? r.decimalSeparator : d.decimalSeparator,
     defaultChartWidthPx: px(r.defaultChartWidthPx, d.defaultChartWidthPx),
     defaultChartHeightPx: px(r.defaultChartHeightPx, d.defaultChartHeightPx),
+    newGraphBackground: r.newGraphBackground === 'transparent' || r.newGraphBackground === 'white' ? r.newGraphBackground : d.newGraphBackground,
   };
 }
 
