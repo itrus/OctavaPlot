@@ -1,4 +1,5 @@
 import type { ChartStyle, ChartType, DataTable, Group, Id, PointLabelPlacement, Selection } from '../../../model/types';
+import { DEFAULT_STYLE } from '../../../model/defaults';
 import { LABEL_OFFSET_LIMITS, type Box, type PlacementCode, type PointLabelModel } from '../../../chart/shared/parts/labels';
 import { LABEL_STYLE_KEYS } from '../../../model/graph/style';
 import { selectedGroupIds, selectionOfGroups } from '../../../model/graph/selection/scope';
@@ -127,7 +128,7 @@ export function seedCustomOffsets(
   }
   const x = Number.isFinite(style.pointLabelOffsetXPt) ? style.pointLabelOffsetXPt : 0;
   const y = Number.isFinite(style.pointLabelOffsetYPt) ? style.pointLabelOffsetYPt : 0;
-  const size = Number.isFinite(style.pointLabelFontSizePt) ? style.pointLabelFontSizePt : 11.2;
+  const size = Number.isFinite(style.pointLabelFontSizePt) ? style.pointLabelFontSizePt : DEFAULT_STYLE.pointLabelFontSizePt;
   return { pointLabelOffsetXPt: clampOffset(x), pointLabelOffsetYPt: clampOffset(-(Math.max(0, y) + size)) };
 }
 

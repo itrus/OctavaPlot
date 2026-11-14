@@ -142,7 +142,7 @@ export function CalculationOptions({
   onChange: (patch: { smallSamplePolicy?: SmallSamplePolicy; invalidPolicy?: InvalidPolicy }) => void;
 }) {
   return (
-    <details className="calc-options">
+    <details>
       <summary>Calculation options</summary>
       <Field
         label="Hide summary when too few values"

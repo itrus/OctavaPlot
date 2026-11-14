@@ -20,8 +20,6 @@ export interface GroupSummary {
   sem: number | null;
 }
 
-type ErrorKind = 'sd' | 'sem';
-
 function validValues(values: ReadonlyArray<number | null | undefined>): number[] {
   const out: number[] = [];
   for (const v of values) {
@@ -40,11 +38,6 @@ export function summarize(values: ReadonlyArray<number | null | undefined>): Gro
 
   const sd = sdOf(xs, mean);
   return { n, mean, sd, sem: sd / Math.sqrt(n) };
-}
-
-/** Error half-length for the chosen kind, or null when unavailable. */
-export function errorValue(s: GroupSummary, kind: ErrorKind): number | null {
-  return kind === 'sd' ? s.sd : s.sem;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +94,8 @@ export interface GroupStats {
   spread: SpreadKind;
   /** The spread actually computed: stored spread when allowed for the centre, else none. */
   effectiveSpread: SpreadKind;
-  confidenceLevel: number;
+  /** The level of the interval; null when the spread is not a confidence interval (so a level edit finds the same cached result). */
+  confidenceLevel: number | null;
   /** The only source of the centre value for drawing. */
   centre: number | null;
   /** The only source of interval endpoints for drawing. */
@@ -190,7 +184,7 @@ export function computeGroupStats(
     centreKind: spec.centre,
     spread: spec.spread,
     effectiveSpread: effective,
-    confidenceLevel: spec.confidenceLevel,
+    confidenceLevel: effective === 'ci' ? spec.confidenceLevel : null,
     centre,
     interval,
     rejected,
@@ -225,7 +219,9 @@ export function computeGroupStats(
     return result(null, NO_INTERVAL);
   }
 
-  const sorted = [...xs].sort((a, b) => a - b);
+  // Only the median, the range and the IQR read the sorted values.
+  const needsSort = spec.centre === 'median' || effective === 'range' || effective === 'iqr';
+  const sorted = needsSort ? sortAscending(xs) : xs;
   const logs = geometric ? xs.map((x) => Math.log(x)) : null;
   const logMean = logs ? meanOf(logs) : 0;
   const centre = geometric
@@ -311,7 +307,7 @@ export function computeGroupStats(
         const rank = medianCiRank(n, level);
         if (!rank.available) {
           if (rank.reason === 'too-large') {
-            return fail('too-large', `The exact median CI is not computed for n = ${n}; no error bar is drawn.`, true);
+            return fail('too-large', `The exact median CI is not computed for n = ${n}; no error bar is drawn.`, false);
           }
           if (rank.reason === 'invalid-level') return fail('level-range', levelMessage, false);
           return fail(
@@ -364,6 +360,24 @@ export function computeGroupStats(
   return result(centre, { status: 'ok', lower, upper, coverage, code: null });
 }
 
+const SMALL_SUMMARY = 64;
+
+/** The values as the cache identity wants them (a missing value as null), made once for each array object. */
+const cacheDataOf = new WeakMap<object, Array<number | null>>();
+function cacheData(values: ReadonlyArray<number | null | undefined>): Array<number | null> {
+  let data = cacheDataOf.get(values);
+  if (!data) {
+    data = values.map((v) => (v === undefined || v === null ? null : v));
+    cacheDataOf.set(values, data);
+  }
+  return data;
+}
+
+/** A sorted copy, through a typed array (a numeric sort without a comparison function call for each pair). */
+function sortAscending(xs: readonly number[]): number[] {
+  return Array.from(Float64Array.from(xs).sort());
+}
+
 /** The settings that affect a summary: the same for every way of asking for one. */
 function summaryParams(spec: SummarySpec): { method: string; params: Array<string | number | null>; level: number | null } {
   const effective = effectiveSpreadOf(spec.centre, spec.spread);
@@ -379,15 +393,22 @@ function summaryParams(spec: SummarySpec): { method: string; params: Array<strin
  * a style edit that rebuilds a chart does not calculate the same summary again. The result is shared: do not change it.
  */
 export function summaryOf(values: ReadonlyArray<number | null | undefined>, spec: SummarySpec): GroupStats {
+  // Below this many values the calculation is quicker than hashing the data for the cache.
+  if (values.length < SMALL_SUMMARY) return computeGroupStats(values, spec);
   const { method, params, level } = summaryParams(spec);
-  const data = values.map((v) => (v === undefined || v === null ? null : v));
+  const data = cacheData(values);
   return cachedCalc({ kind: 'summary', algorithm: SUMMARY_ALGORITHM_VERSION, data, method, params, level }, () => computeGroupStats(values, spec));
 }
 
+/** The values of an observation list, made once for each list object (a cache lookup does not walk the data again). */
+const valuesOf = new WeakMap<ReadonlyArray<Observation>, Array<number | null>>();
+
 /** Cached computeGroupStats keyed by only the settings that affect the result. */
 export function statsFor(observations: ReadonlyArray<Observation>, spec: SummarySpec): GroupStats {
-  return summaryOf(
-    observations.map((o) => o.value),
-    spec,
-  );
+  let values = valuesOf.get(observations);
+  if (!values) {
+    values = observations.map((o) => o.value);
+    valuesOf.set(observations, values);
+  }
+  return summaryOf(values, spec);
 }

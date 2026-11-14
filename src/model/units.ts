@@ -6,10 +6,23 @@
  * chart dimensions.
  */
 const PT_PER_INCH = 72;
-const CSS_PX_PER_INCH = 96;
+/** CSS pixels in an inch (the nominal 96 px/in), which is also the resolution at which a chart's PNG has one pixel for each CSS pixel. */
+export const CSS_PX_PER_INCH = 96;
+const MM_PER_INCH = 25.4;
 
 /** The size of a chart in pt (the SVG viewBox) from its size in CSS pixels. */
 export const chartPx2Pt = (px: number): number => (px * PT_PER_INCH) / CSS_PX_PER_INCH;
+
+/** pt to CSS pixels. */
+export const ptToPx = (pt: number): number => (pt * CSS_PX_PER_INCH) / PT_PER_INCH;
+/** pt to millimetres. */
+export const ptToMm = (pt: number): number => (pt * MM_PER_INCH) / PT_PER_INCH;
+/** pt to inches. */
+export const ptToInch = (pt: number): number => pt / PT_PER_INCH;
+/** Millimetres to pt. */
+export const mmToPt = (mm: number): number => (mm * PT_PER_INCH) / MM_PER_INCH;
+/** CSS pixels to millimetres. */
+export const pxToMm = (px: number): number => (px * MM_PER_INCH) / CSS_PX_PER_INCH;
 
 /** Compact number for SVG attributes (avoids float noise in exported files). */
 export const n2 = (v: number): string => String(Math.round(v * 100) / 100);

@@ -1,5 +1,6 @@
 import { PIE_LABEL_MODES, PIE_LIMITS } from '../../model/options/pieOptions';
-import { composeCommands, patchChart, patchLook, patchStyle } from '../../state/commands';
+import { useRestyle } from './common/useScopedEdits';
+import { patchLook, patchStyle } from '../../state/commands';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { Chart, DataTable, PieLabelMode, PieOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
@@ -32,10 +33,7 @@ export function PieInspector({ chart, table }: { chart: Chart; table: DataTable 
   const selectedGroup = selection.kind === 'group' ? selection.groupId : null;
   // The first column of a contingency table is a part like the others (a part is an outcome).
   const parts = table.groups.map((g, i) => ({ g, style: resolveStyle(chart, layer, { id: g.id, paletteIndex: g.paletteIndex ?? i }), label: displayName(chart, g.id, g.name) }));
-  const recolour = (groupId: string, patch: Parameters<typeof patchStyle>[2]) => {
-    const command = chart.paletteId !== null ? composeCommands(patchStyle(chart.id, groupId, patch), patchChart(chart.id, { paletteId: null })) : patchStyle(chart.id, groupId, patch);
-    run('Change style', command, `style:${groupId}:${Object.keys(patch).join(',')}`);
-  };
+  const recolour = useRestyle(chart);
 
   return (
     <InspectorShell nav={nav}>

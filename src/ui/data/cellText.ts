@@ -3,7 +3,7 @@
 import { MAX_TABLE_ROWS, rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import type { DataTable } from '../../model/types';
 import type { DecimalSeparator } from '../../model/types';
-import { formatTimeCell, parseTimeBatch, parseTimeCell, type TimeColumn } from '../../util/timeColumn';
+import { formatTimeCell, parseTimeBatch, parseTimeCell, type CellParse, type TimeColumn } from '../../util/timeColumn';
 
 const NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 /** A number with a decimal comma, with or without an exponent: 1,5  -2,5e-3 */
@@ -11,18 +11,19 @@ const COMMA_DECIMAL_RE = /^[+-]?(\d+,\d*|,\d+)([eE][+-]?\d+)?$/;
 /** A comma followed by exactly three digits reads as a decimal comma and as a thousands separator alike. */
 const AMBIGUOUS_COMMA_RE = /^[+-]?\d{1,3},\d{3}$/;
 
-type CellParse = { ok: true; value: number | null; offset?: boolean } | { ok: false; message: string };
 
 /**
  * Empty text = missing observation (null). Anything else must be a finite number. There are no thousands separators:
  * a point is the decimal separator unless the setting is comma, and then only a comma is.
  */
 export function parseCell(text: string, separator: DecimalSeparator = 'auto'): CellParse {
-  let t = text.trim();
+  // A true minus sign (U+2212, as a word processor or a journal table writes it) is the minus of a number.
+  let t = text.trim().replace(/−/g, '-');
   if (t === '') return { ok: true, value: null };
   if (separator === 'comma') {
     if (COMMA_DECIMAL_RE.test(t)) t = t.replace(',', '.');
-    else if (t.includes('.')) return { ok: false, message: `"${t}" uses a decimal point, but the decimal separator is set to comma (Settings); thousands separators are not read` };
+    // Only a number that is written with a point gets this message; any other text is not a number, whatever it holds.
+    else if (t.includes('.') && NUMBER_RE.test(t)) return { ok: false, message: `"${t}" uses a decimal point, but the decimal separator is set to comma (Settings); thousands separators are not read` };
   } else if (COMMA_DECIMAL_RE.test(t)) {
     if (separator === 'point') return { ok: false, message: `"${t}" uses a comma: write a decimal point, or set the decimal separator to comma in Settings` };
     // Automatic: 1,5 is 1.5, but 1,234 could be 1.234 or one thousand two hundred thirty-four: it is not guessed.
@@ -43,6 +44,15 @@ export function parseCell(text: string, separator: DecimalSeparator = 'auto'): C
  */
 export function parseCellFor(text: string, separator: DecimalSeparator = 'auto', time?: TimeColumn): CellParse {
   if (!time) return parseCell(text, separator);
+  if (time.kind === 'duration') {
+    // A bare number, or a number with a unit, follows the rules of the decimal separator like any number; the reader then gets it in point form.
+    const quantity = /^\s*([+-]?[\d.,]+(?:[eE][+-]?\d+)?)\s*(s|sec|min|h|hr|d)?\s*$/.exec(text);
+    if (quantity) {
+      const number = parseCell(quantity[1], separator);
+      if (!number.ok) return number;
+      if (number.value !== null) return parseTimeCell(`${number.value}${quantity[2] ? ` ${quantity[2]}` : ''}`, time);
+    }
+  }
   const read = parseTimeCell(text, time);
   if (read.ok || time.kind !== 'duration') return read;
   const plain = parseCell(text, separator);
@@ -173,11 +183,14 @@ export function blockToText(titles: string[] | null, matrix: Array<Array<number 
     const cells = (matrix[r] ?? []).map((v, c) => formatCellFor(v, separator, times[c]));
     lines.push((titles ? [quoteField(titles[r] ?? ''), ...cells] : cells).join('\t'));
   }
-  return lines.join('\n');
+  const text = lines.join('\n');
+  // A last empty line leaves the text ending in the break that separates it from the one before; the reader takes one final break for the
+  // end of the last row (as Excel writes it), so that row would be lost. Write the closing break in that one case.
+  return text.endsWith('\n') ? text + '\n' : text;
 }
 
 /** Inclusive cell range; c0 = -1 includes the Row title column. */
-interface CellBounds {
+export interface CellBounds {
   r0: number;
   r1: number;
   c0: number;
@@ -241,6 +254,9 @@ export function planPaste(text: string, b: CellBounds, separator: DecimalSeparat
     matrix = Array.from({ length: b.r1 - b.r0 + 1 }, () => Array.from({ length: b.c1 - b.c0 + 1 }, () => value));
   }
   const h = titleMode ? titles.length : matrix.length;
+  if (b.r0 + h > MAX_TABLE_ROWS) {
+    return { ok: false, message: `Paste rejected, it would end at row ${(b.r0 + h).toLocaleString('en-US')} and a table holds at most ${MAX_TABLE_ROWS.toLocaleString('en-US')} rows. Nothing was pasted.` };
+  }
   const w = matrix.reduce((m, r) => Math.max(m, r.length), 0);
   const s = (n: number) => (n === 1 ? '' : 's');
   if (!titleMode) {

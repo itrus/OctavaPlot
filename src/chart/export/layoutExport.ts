@@ -1,13 +1,11 @@
-import { renderToStaticMarkup } from 'react-dom/server';
 import { prepareChartInput } from '../../model/table/preparedChart';
 import { arrangeLayout, panelLabel, type Arranged, type LegendBand, type NaturalSize } from '../../model/project/layout';
 import type { Chart, Layout, Project } from '../../model/types';
-import { chartPx2Pt, n2 } from '../../model/units';
+import { chartPx2Pt, n2, ptToInch, ptToMm } from '../../model/units';
 import { plainText } from '../../util/richText';
-import { type AnyModel, buildAnyModelCached, ChartCanvas, chartTexts, drawingOf } from '../anyModel';
-import { SvgIdPrefix } from '../shared/scene/idPrefix';
+import { type AnyModel, buildAnyModelCached, chartTexts, drawingOf } from '../anyModel';
 import { el } from '../shared/scene/sceneElement';
-import { SceneElements } from '../shared/scene/SceneElements';
+import { chartMarkup, elementsMarkup } from './sceneMarkup';
 import { annotationElements } from '../shared/scene/annotations';
 import { drawingElements } from '../shared/scene/drawings';
 import { FONT_FAMILY } from '../../model/defaults';
@@ -87,12 +85,7 @@ function masterLegendMarkup(laid: MasterLegendLayout, band: { x: number; y: numb
   const entries = laid.items.map((it) => {
     const e = it.entry;
     const move = `translate(${n2(x0 + it.x)} ${n2(y0 + it.y)}) scale(${Number(it.scale.toFixed(4))}) translate(${n2(-e.originX)} ${n2(-e.originY)})`;
-    const markup = renderToStaticMarkup(
-      <SvgIdPrefix.Provider value={`p${e.panel}-`}>
-        <SceneElements nodes={[el('g', [['transform', move], ['font-family', e.fontFamily]], { children: e.nodes })]} editor={false} />
-      </SvgIdPrefix.Provider>,
-    );
-    return markup;
+    return elementsMarkup([el('g', [['transform', move], ['font-family', e.fontFamily]], { children: e.nodes })], `p${e.panel}-`);
   });
   return `<g id="master-legend">${entries.join('')}</g>`;
 }
@@ -115,7 +108,7 @@ export function drawLayout(layout: Layout, project: Project, options: { metadata
     if (chart && panel && pl.graph) {
       const { any } = panel;
       // The nested <svg> takes its size from width and height in user units (pt of the page); its viewBox is the graph's own.
-      const markup = renderToStaticMarkup(<ChartCanvas chart={panel.drawn} any={any} cssWidth={n2(pl.graph.w)} cssHeight={n2(pl.graph.h)} />);
+      const markup = chartMarkup(panel.drawn, drawingOf(panel.drawn, any), n2(pl.graph.w), n2(pl.graph.h));
       const g = pl.graph;
       const inner = prefixIds(markup, `p${i}-`).replace('<svg ', `<svg x="${n2(g.x)}" y="${n2(g.y)}" `);
       // Clipped to the panel: a graph made larger than its panel by a chosen percentage does not run over its neighbours.
@@ -141,10 +134,10 @@ export function drawLayout(layout: Layout, project: Project, options: { metadata
   }
   if (frame.legend && master.legend.items.length > 0) parts.push(masterLegendMarkup(master.legend, frame.legend, layout.legend!.position));
   // Shapes and lines placed on the page, over the graphs and under the texts (the editor draws them itself, live: `withoutDrawings`).
-  if (!options.withoutDrawings && layout.drawings && layout.drawings.length > 0) parts.push(renderToStaticMarkup(<SceneElements nodes={drawingElements(layout.drawings, frame.widthPt, frame.heightPt, undefined, FONT_FAMILY)} editor={false} />));
+  if (!options.withoutDrawings && layout.drawings && layout.drawings.length > 0) parts.push(elementsMarkup(drawingElements(layout.drawings, frame.widthPt, frame.heightPt, undefined, FONT_FAMILY)));
   // Texts placed on the page come last, on top of the graphs, drawn by the same code as the texts of a graph.
-  if (layout.annotations && layout.annotations.length > 0) parts.push(renderToStaticMarkup(<SceneElements nodes={annotationElements(layout.annotations, frame.widthPt, frame.heightPt, null, undefined, FONT_FAMILY)} editor={false} />));
-  const mm = { w: n2((frame.widthPt * 25.4) / 72), h: n2((frame.heightPt * 25.4) / 72) };
+  if (layout.annotations && layout.annotations.length > 0) parts.push(elementsMarkup(annotationElements(layout.annotations, frame.widthPt, frame.heightPt, null, undefined, FONT_FAMILY)));
+  const mm = { w: n2(ptToMm(frame.widthPt)), h: n2(ptToMm(frame.heightPt)) };
   const head = options.metadata ? `<title>${escapeXml(layout.name)}</title>` : '';
   const background = layout.background ? `<rect x="0" y="0" width="${n2(frame.widthPt)}" height="${n2(frame.heightPt)}" fill="${layout.background}"/>` : '';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${mm.w}mm" height="${mm.h}mm" viewBox="0 0 ${n2(frame.widthPt)} ${n2(frame.heightPt)}" font-family="Arial, Helvetica, sans-serif">${head}${background}${parts.join('')}</svg>`;
@@ -158,7 +151,7 @@ export function layoutToSvgString(layout: Layout, project: Project): string {
 /** PNG pixels of an A4 page at a resolution; checked against what a browser canvas can hold. */
 export function layoutPngSize(layout: Layout, dpi: number): { width: number; height: number } {
   const { frame } = arrangeLayout(layout, []);
-  return { width: Math.round((frame.widthPt / 72) * dpi), height: Math.round((frame.heightPt / 72) * dpi) };
+  return { width: Math.round(ptToInch(frame.widthPt) * dpi), height: Math.round(ptToInch(frame.heightPt) * dpi) };
 }
 
 /** The page as a PNG at a resolution (a transparent page stays transparent). */

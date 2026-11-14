@@ -115,6 +115,22 @@ describe('the table as written in a file', () => {
     expect(stringifyProject(roundTrip(p))).toBe(text);
   });
 
+  it('writes the same text on a second save (tables kept by object) and follows a table that is replaced', () => {
+    const p = createExampleProject();
+    const first = stringifyProject(p);
+    expect(stringifyProject(p)).toBe(first);
+    const t = p.dataTables[0];
+    const obs = t.groups[0].observations;
+    const changed: Project = {
+      ...p,
+      dataTables: [{ ...t, groups: [{ ...t.groups[0], observations: obs.map((o, i) => (i === 3 ? { ...o, value: 123.5 } : o)) }, ...t.groups.slice(1)] }, ...p.dataTables.slice(1)],
+    };
+    const second = stringifyProject(changed);
+    expect(second).not.toBe(first);
+    expect(parseProject(second).dataTables[0].groups[0].observations[3].value).toBe(123.5);
+    expect(stringifyProject(p)).toBe(first);
+  });
+
   it('keeps the marks of a graph the same through a save and an open (their IDs come from the cells)', () => {
     const p = addChart('c2', createExampleProject().dataTables[0].id, undefined, 'bar')(createExampleProject());
     expect(roundTrip(p)).toEqual(p);

@@ -1,4 +1,4 @@
-import { DialogShell, trapTab } from './DialogShell';
+import { ModalBackdrop } from './DialogShell';
 import { CloseIcon } from '../components/icons';
 import { PALETTE_GROUPS, PALETTE_GROUP_INFO, GGSCI_CITATION, palettesInGroup } from '../../model/graph/palettes';
 
@@ -9,8 +9,7 @@ const link = (href: string) => (
 /** A window with the program's version and credits, and the credits for what it uses; the source of the colour palettes is cited here. */
 export function InfoDialog({ onClose }: { onClose: () => void }) {
   return (
-    <DialogShell>
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onKeyDown={(e) => (e.key === 'Escape' ? onClose() : trapTab(e))}>
+    <ModalBackdrop onClose={onClose}>
       <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Info" tabIndex={-1} ref={(el) => el?.focus()}>
         <div className="modal-head">
           <strong>Info</strong>
@@ -59,7 +58,6 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
           <button className="primary" onClick={onClose}>Close</button>
         </div>
       </div>
-    </div>
-    </DialogShell>
+    </ModalBackdrop>
   );
 }

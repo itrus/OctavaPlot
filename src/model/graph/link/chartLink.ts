@@ -1,6 +1,7 @@
-import { dataSetMap } from './chartFormat';
-import { dataLayer } from './style';
-import type { Chart, DataTable, Id, Project } from '../types';
+import { dataSetMap, layerIdMap } from './chartFormat';
+import { followThresholds } from '../../options/volcanoOptions';
+import { dataLayer } from '../style';
+import type { Chart, DataTable, Id, Project } from '../../types';
 
 /**
  * Linked graphs. A graph made like another (see chartFormat.ts) stays linked to it: when the source's format changes, the
@@ -51,9 +52,9 @@ function merge3(own: unknown, before: unknown, after: unknown): unknown {
 /** Settings of any linked graph: how it looks, whatever its table. */
 const GENERAL: ReadonlyArray<keyof Chart> = ['widthPx', 'heightPx', 'aspect', 'showTitle', 'titleFontSizePt', 'titleBold', 'titleOffsetPt', 'fontFamily', 'textColor', 'axisColor', 'axisOpacity', 'plotColor', 'pageColor', 'frame', 'grid', 'jitter'];
 /** Also followed when the two graphs show tables of the same type. */
-const SAME_TYPE: ReadonlyArray<keyof Chart> = ['paletteId', 'orientation', 'lineOrder', 'lineConnect', 'traceOffset', 'volcano', 'sizeLegend', 'groupedBy', 'bars', 'barLabels', 'distribution', 'pairs', 'heatmap', 'histogram', 'pie', 'survival', 'defaults'];
+const SAME_TYPE: ReadonlyArray<keyof Chart> = ['paletteId', 'orientation', 'lineOrder', 'lineConnect', 'traceOffset', 'sizeLegend', 'groupedBy', 'bars', 'barLabels', 'distribution', 'pairs', 'heatmap', 'histogram', 'pie', 'survival', 'defaults'];
 /** Parts of an axis, the legend and the fit that belong to the data and are never inherited. */
-const AXIS_OWN = ['title', 'min', 'max', 'majorInterval', 'breaks', 'scale', 'reverse'] as const;
+const AXIS_OWN = ['title', 'min', 'max', 'majorInterval', 'breaks', 'scale', 'reverse', 'extraTicks'] as const;
 const LEGEND_OWN = ['hiddenGroupIds', 'order'] as const;
 const FIT_OWN = ['analysisId'] as const;
 
@@ -80,16 +81,38 @@ function followSource(child: Chart, before: Chart, after: Chart, sourceTable: Da
   set('legend', mergeApart(c.legend, b.legend, a.legend, LEGEND_OWN));
   if (sourceTable.kind === table.kind) {
     for (const k of SAME_TYPE) set(k, merge3(c[k], b[k], a[k]));
+    // The thresholds of a volcano plot are followed; the ids of the lines that belong to each graph are not, and the lines move with the thresholds.
+    set('volcano', mergeApart(c.volcano, b.volcano, a.volcano, ['lineIds']));
+    if (out.volcano !== undefined && out.volcano !== c.volcano) out.referenceLines = followThresholds(child.referenceLines, out.volcano as Chart['volcano']);
     set('fit', mergeApart(c.fit, b.fit, a.fit, FIT_OWN));
     // The style of each data set follows the data set in the same position of the source's table.
     const to = dataSetMap(sourceTable, table);
     const translate = (rec: Record<Id, unknown>): Record<Id, unknown> => Object.fromEntries(Object.entries(rec).flatMap(([k, v]) => (to.has(k) ? [[to.get(k)!, v] as const] : [])));
+    // The parts the source hid, and the looks it gave to parts, follow too, on the parts of the same data sets (and the whole-graph parts) of this graph.
+    const mapPart = layerIdMap(before.id, child.id, to);
+    const parts = (ids: readonly Id[]): Id[] => ids.flatMap((l) => mapPart(l) ?? []);
+    const looks = (rec: Record<Id, unknown>): Record<Id, unknown> => Object.fromEntries(Object.entries(rec).flatMap(([k, v]) => { const m = mapPart(k); return m ? [[m, v] as const] : []; }));
+    set('hiddenLayerIds', merge3(c.hiddenLayerIds, parts(before.hiddenLayerIds), parts(after.hiddenLayerIds)));
+    set('rangeExcludedLayerIds', merge3(c.rangeExcludedLayerIds, parts(before.rangeExcludedLayerIds), parts(after.rangeExcludedLayerIds)));
+    set('layerStyles', merge3(c.layerStyles, looks(before.layerStyles), looks(after.layerStyles)));
     const [own0, before0, after0] = [dataLayer(child), dataLayer(before), dataLayer(after)];
     if (own0 && before0 && after0) {
-      const style = merge3(own0.style, before0.style, after0.style);
+      let style = merge3(own0.style, before0.style, after0.style);
+      // The type is the graph's own and is not followed, so neither are the four switches that a type sets (a bar chart with no bars).
+      if (before.type !== after.type) {
+        const restored: Record<string, unknown> = { ...(style as object) };
+        for (const k of ['showBars', 'showSymbols', 'showLines', 'showMeanLine'] as const) {
+          if (own0.style[k] === undefined) delete restored[k];
+          else restored[k] = own0.style[k];
+        }
+        style = equal(restored, own0.style) ? own0.style : (restored as typeof style);
+      }
       const groupOverrides = merge3(own0.groupOverrides, translate(before0.groupOverrides), translate(after0.groupOverrides));
-      if (style !== own0.style || groupOverrides !== own0.groupOverrides) {
-        out.layers = [{ ...own0, style, groupOverrides }];
+      // What the summary of the data (the kind of error bar, the centre) is set to follows too, for the whole graph and for the data sets.
+      const summary = merge3(own0.summary, before0.summary, after0.summary);
+      const groupSummary = merge3(own0.groupSummary, translate(before0.groupSummary), translate(after0.groupSummary));
+      if (style !== own0.style || groupOverrides !== own0.groupOverrides || summary !== own0.summary || groupSummary !== own0.groupSummary) {
+        out.layers = [{ ...own0, style, groupOverrides, summary, groupSummary }];
       }
     }
   }

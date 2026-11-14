@@ -4,7 +4,6 @@ import type { DataRow, DataTable, Group } from '../types';
 /** Longest stored row title, in code points (P). */
 export const MAX_ROW_TITLE_CHARS = 200;
 
-/** Fresh rows with empty titles. */
 /**
  * The ID a row has when it was made at its place and nothing has moved it since. A file stores the ID of a row only when it
  * is another one (state/tableCodec.ts), so a table that was made, filled and saved keeps every ID without writing them.

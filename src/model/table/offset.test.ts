@@ -17,6 +17,8 @@ describe('offset traces: the step', () => {
     expect(autoOffsetStep(table([[1, 0, 5], [2, 10, 8]], ['X', 'A', 'B']))).toBe(11);
     // A range of 7.3 is 8.03 with the 10%, so 8.1.
     expect(autoOffsetStep(table([[1, 0, 1], [2, 7.3, 2]], ['X', 'A', 'B']))).toBe(8.1);
+    // A range that overflows when widened is not a step of NaN.
+    expect(autoOffsetStep(table([[1, -1.7e308, 1], [2, 1.7e308, 2]], ['X', 'A', 'B']))).toBe(1);
     expect(autoOffsetStep(table([[1, 0, 0.001], [2, 0.0073, 0.002]], ['X', 'A', 'B']))).toBeCloseTo(0.0081, 12);
   });
   it('is 1 when there is nothing to measure, and is the chart\'s own step when it has one', () => {

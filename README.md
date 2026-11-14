@@ -105,7 +105,7 @@ Each family of chart has a folder with its model (the geometry), its marks and c
 | `pie/` | Pies, doughnuts, slices and the 10 × 10 dot plot (`pieModel.ts`, `pieMarks.ts`, `pieDrawing.ts`) |
 | `heatmap/` | Heat maps and their colour scales (`heatmapModel.ts`, `heatMarks.ts`, `heatDrawing.ts`) |
 | `export/` | SVG, PNG and PDF export of a graph and of a page layout (the vector PDF: `svgPdf.ts` reads the SVG, `pdf.ts` writes the file); the master legend of a page (`masterLegend.ts`); the batch export of several graphs into one ZIP (`batchExport.ts`); the golden exports (`__snapshots__/`) |
-| `shared/axes/` | Value axes: domain and ticks (linear, log, reversed, minor, broken), axis binding, calendar ticks of dates and times (`timeAxis.ts`), extra ticks (`extraTicks.ts`), placement of comparison brackets (`bracketPlacement.ts`) |
+| `shared/axes/` | Value axes: domain and ticks (linear, log, reversed, minor, broken), axis binding, calendar ticks of dates and times (`timeAxis.ts`), extra ticks (`extraTicks.ts`) |
 | `shared/scene/` | The scene of a chart (shapes in pt, in drawing order) from which the screen, the export and the editor's hit testing are made: `scene.ts`, `sceneElement.ts`, `SceneChart.tsx` (the one renderer of every family), the chrome (backgrounds, grids, axes, titles, legend), ids, reference lines, the writing of long lists of shapes in runs that React skips when unchanged (`sceneRuns.ts`), the simplified preview above 100 000 dots (`denseDots.ts`) |
 | `shared/parts/` | Pieces that several families draw with: layout, text, symbols, fill patterns, error bars, bar labels, point labels, box and violin geometry, orientation, dot placement (`jitter.ts`), the reuse of unchanged dot lists (`stable.ts`) |
 | `__tests__/` | Tests that cross families (draw order, the series of every family, the look settings) |
@@ -136,49 +136,49 @@ A table has a **type**, chosen when it is created (Navigator → New Data Table�
 
 A series with subcolumns is one block of columns under a shared series name; `src/model/table/tableLayout.ts` defines the layouts.
 
-**New Graph…** shows a gallery for each table family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. The gallery has 60 entries (34 chart types, some offered as several presets); all of them can be made. It always shows every entry, and an entry planned but not built would be shown locked, with its thumbnail and preset ID. The catalogue is `src/model/graph/chartGallery.ts`; to make a planned graph available, give its entry a `type`. The chart types are catalogued in `src/model/graph/chartTypes.ts`: adding a chart type means adding it there, a preset in `defaults.ts`, and its drawing.
+**New Graph…** shows a gallery for each table family (XY, Column, Grouped, Contingency, Survival), in tabs where a family has several kinds of graph (for example Column: Individual values, Box and violin, Mean/median & error), with a live preview drawn from the table's own data. The gallery has 57 entries (34 chart types, some offered as several presets); all of them can be made. It always shows every entry, and an entry planned but not built would be shown locked, with its thumbnail and preset ID. The catalogue is `src/model/graph/chartGallery.ts`; to make a planned graph available, give its entry a `type`. The chart types are catalogued in `src/model/graph/chartTypes.ts`: adding a chart type means adding it there, a preset in `defaults.ts`, and its drawing.
 
 ### What each chart type can do
 
 The table below is generated from the capability registry (`src/model/graph/capabilities.ts`) and checked against it by a test, so it cannot drift from the code: a control that a drawing does not honour is not offered.
 
 <!-- capabilities:start -->
-| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options | Look per part | Keep out of range |
-|---|---|---|---|---|---|---|---|---|
-| Bar chart | yes | Y | yes | – | – | – | yes | yes |
-| Scatter dot plot | yes | Y | yes | – | – | – | yes | yes |
-| Mean with error bars | yes | Y | yes | – | – | – | yes | yes |
-| Box and whiskers | yes | Y | – | – | – | – | – | yes |
-| Floating bars (min to max) | yes | Y | – | – | – | – | – | yes |
-| Before and after | yes | Y | – | – | – | – | yes | yes |
-| Histogram | – | X and Y | – | – | – | – | – | yes |
-| Cumulative distribution | – | X and Y | – | – | – | – | yes | yes |
-| Violin plot | yes | Y | – | – | – | – | – | yes |
-| Points only | – | X and Y | yes | yes | yes | – | yes | yes |
-| Connecting line | – | X and Y | yes | yes | yes | – | yes | yes |
-| Points and connecting line | – | X and Y | yes | yes | yes | – | yes | yes |
-| Offset traces | – | X and Y | – | yes | yes | – | yes | yes |
-| Bubbles | – | X and Y | yes | yes | – | – | yes | yes |
-| Volcano plot | – | X and Y | – | yes | – | – | yes | yes |
-| Bars at numeric X | – | X and Y | yes | yes | – | – | yes | yes |
-| Spikes | – | X and Y | yes | yes | – | – | yes | yes |
-| Area under the curve | – | X and Y | yes | yes | yes | – | yes | yes |
-| Interleaved bars | yes | Y | – | – | – | – | yes | yes |
-| Stacked bars | yes | Y | – | – | – | – | – | – |
-| Floating bars (min to max) | yes | Y | – | – | – | – | yes | yes |
-| Grouped box and whiskers | yes | Y | – | – | – | – | yes | yes |
-| Grouped violin | yes | Y | – | – | – | – | yes | yes |
-| Heat map | – | – | – | – | – | – | – | – |
-| Lines over categories | yes | Y | – | – | – | – | yes | yes |
-| Pie charts | – | – | – | – | – | – | – | – |
-| Doughnut charts | – | – | – | – | – | – | – | – |
-| Slices | – | – | – | – | – | – | – | – |
-| 10 × 10 dot plot | – | – | – | – | – | – | – | – |
-| Side-by-side bars | yes | Y | – | – | – | – | – | – |
-| Stacked bars | yes | Y | – | – | – | – | – | – |
-| 100% stacked bars | yes | Y | – | – | – | – | – | – |
-| Survival curve | – | X and Y | – | – | – | yes | yes | – |
-| Cumulative events | – | X and Y | – | – | – | yes | yes | – |
+| Chart type | Table | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options | Look per part | Keep out of range |
+|---|---|---|---|---|---|---|---|---|---|
+| Bar chart | Column | yes | Y | yes | – | – | – | yes | yes |
+| Scatter dot plot | Column | yes | Y | yes | – | – | – | yes | yes |
+| Mean with error bars | Column | yes | Y | yes | – | – | – | yes | yes |
+| Box and whiskers | Column | yes | Y | – | – | – | – | – | yes |
+| Floating bars (min to max) | Column | yes | Y | – | – | – | – | – | yes |
+| Before and after | Column | yes | Y | – | – | – | – | yes | yes |
+| Histogram | Column | – | X and Y | – | – | – | – | – | yes |
+| Cumulative distribution | Column | – | X and Y | – | – | – | – | yes | yes |
+| Violin plot | Column | yes | Y | – | – | – | – | – | yes |
+| Points only | XY | – | X and Y | yes | yes | yes | – | yes | yes |
+| Connecting line | XY | – | X and Y | yes | yes | yes | – | yes | yes |
+| Points and connecting line | XY | – | X and Y | yes | yes | yes | – | yes | yes |
+| Offset traces | XY | – | X and Y | – | yes | yes | – | yes | yes |
+| Bubbles | XY | – | X and Y | yes | yes | – | – | yes | yes |
+| Volcano plot | XY | – | X and Y | – | yes | – | – | yes | yes |
+| Bars at numeric X | XY | – | X and Y | yes | yes | – | – | yes | yes |
+| Spikes | XY | – | X and Y | yes | yes | – | – | yes | yes |
+| Area under the curve | XY | – | X and Y | yes | yes | yes | – | yes | yes |
+| Interleaved bars | Grouped | yes | Y | – | – | – | – | yes | yes |
+| Stacked bars | Grouped | yes | Y | – | – | – | – | – | – |
+| Floating bars (min to max) | Grouped | yes | Y | – | – | – | – | yes | yes |
+| Grouped box and whiskers | Grouped | yes | Y | – | – | – | – | yes | yes |
+| Grouped violin | Grouped | yes | Y | – | – | – | – | yes | yes |
+| Heat map | Grouped | – | – | – | – | – | – | – | – |
+| Lines over categories | Grouped | yes | Y | – | – | – | – | yes | yes |
+| Pie charts | Contingency | – | – | – | – | – | – | – | – |
+| Doughnut charts | Contingency | – | – | – | – | – | – | – | – |
+| Slices | Contingency | – | – | – | – | – | – | – | – |
+| 10 × 10 dot plot | Contingency | – | – | – | – | – | – | – | – |
+| Side-by-side bars | Contingency | yes | Y | – | – | – | – | – | – |
+| Stacked bars | Contingency | yes | Y | – | – | – | – | – | – |
+| 100% stacked bars | Contingency | yes | Y | – | – | – | – | – | – |
+| Survival curve | Survival | – | X and Y | – | – | – | yes | yes | – |
+| Cumulative events | Survival | – | X and Y | – | – | – | yes | yes | – |
 <!-- capabilities:end -->
 
 ### Factors
@@ -298,10 +298,11 @@ A new text is as large as the numbers of the axes, in the graph's text colour. C
 
 ### Look and order
 
-- **Symbols:** circle, square, triangle (up and down), diamond, hexagon, star, circle with a dot, plus, cross and asterisk. The inside has its own opacity (Fill opacity: 1 solid, 0 hollow, in between see-through) while the border stays opaque, so hollow symbols are drawn with the border colour and thickness. In XY charts of replicates the symbols show either the centre of each row or every replicate, never both (Symbols box → "Symbols show").
+- **Symbols:** 28 shapes: circle, square, triangle (up, down, left and right), diamond, hexagon, pentagon, octagon, star, the four half circles, a vertical and a horizontal bar, the marks plus, cross, asterisk and hash, a circle with a dot, a plus or a cross inside, a square with a dot, a plus or a cross inside, and a hexagon with a dot. The inside has its own opacity (Fill opacity: 1 solid, 0 hollow, in between see-through) while the border stays opaque, so hollow symbols are drawn with the border colour and thickness. In XY charts of replicates the symbols show either the centre of each row or every replicate, never both (Symbols box → "Symbols show").
 - **Line patterns:** lines (XY, grouped, survival, cumulative distribution and fitted curves) and gridlines can be solid, long dashes, dashes, dots, dash-dot or dash-dot-dot. The dashes scale with the line width, so a thick dotted line keeps its look.
-- **Fill patterns:** bars can be solid, patterned or unfilled (the last only from a file). Patterns: horizontal, vertical, diagonal up, diagonal down, crosshatch, diagonal crosshatch, dots. In pattern mode the bar fill colour is ignored and the pattern background is used (P). Limits (P): spacing 1 to 50 pt, line width or dot diameter 0.1 to 5 pt, and the spacing is never below the mark width. At most 20 000 marks (`MAX_PATTERN_MARKS`) are drawn per bar; beyond that a warning is shown. Opacity applies to the pattern and its background, not to the border. Legend keys use the same pattern.
+- **Fill patterns:** bars can be solid, patterned or unfilled (the last only from a file). Patterns: horizontal, vertical, diagonal up, diagonal down, crosshatch, diagonal crosshatch, dots. In pattern mode the bar fill colour is ignored and the pattern background is used (P). Limits (P): spacing 2 to 100 pt, line width or dot diameter 0.2 to 10 pt, and the spacing is never below the mark width. At most 20 000 marks (`MAX_PATTERN_MARKS`) are drawn per bar; beyond that a warning is shown. Opacity applies to the pattern and its background, not to the border. Legend keys use the same pattern.
 - **Legend:** has its own order of entries (Top, Up, Down, Bottom, Reverse, Reset order) that never moves the marks, a number of columns (1 to 6) and a numeric offset. "Graph like another graph" copies the number of columns but not the order. Keys follow the look of the layers of their series.
+- **Colours stay with their data set:** removing a data set or a series does not move the colours of the others, in every graph (a new one takes the next colour); the same for hiding and reordering.
 - **Order of objects:** the series of XY, grouped, contingency and survival graphs can be put in another order (Data Sets on Graph: first to last, Top / Up / Down / Bottom / Reverse); the last is drawn on top, and each series keeps its colour. Under Layout, "Lines and error bars go" chooses whether lines and error bars are drawn over the symbols and bars (On top), behind them (Underneath), or as the chart type usually does (Auto).
 - **Layers:** every chart is drawn from layers, which can be hidden, reordered, kept out of the axis range and, where the table above says so, given a look of their own.
 
@@ -323,7 +324,7 @@ A new text is as large as the numbers of the axes, in the graph's text colour. C
 - **What is never taken.** The data, the title and axis titles, axis ranges, breaks and scales, reference lines, annotations, hidden data sets, the fitted curve and the styles of single values.
 - **Linking.** By default the new graph is **linked** to the one it was made like (🔗 in the navigator; **Unlink** on the graph's toolbar, or untick the box in the dialog). A linked graph follows later changes to the source's format in every detail it has not changed itself: if you set the font size on the linked graph, that size stays its own and the other details keep following. Setting a detail back to what the source has makes it follow again. Nothing is recorded about what you changed: each setting is compared with the source's value before and after the edit, and the linked graph takes the new value only if it still had the old one. The change and what follows from it are one undo step. Without the link the two graphs share nothing.
 
-Code: `src/model/graph/chartFormat.ts` (the copy) and `src/model/graph/chartLink.ts` (the following).
+Code: `src/model/graph/link/chartFormat.ts` (the copy) and `src/model/graph/link/chartLink.ts` (the following).
 
 ## Layouts and export
 
@@ -337,7 +338,7 @@ Code: `src/model/graph/chartFormat.ts` (the copy) and `src/model/graph/chartLink
 - **Texts on the page.** The layout's toolbar has the same Select and Text tools as a graph: Text places a text where the page is clicked and opens it under Notes (the layout's inspector page for texts). A page text has the same settings as a graph's text (style, scripts, quick texts, font, colour, size, alignment, line spacing); it is dragged on the page, and Delete removes the selected one. It is drawn on top of the graphs in the preview and in every export. A new page text is 12 pt black.
 - **Master legend** (Legend of the page: at the bottom or on the right, a text size, and an option to hide the graphs' own legends) is made from the legends of the graphs, merging entries that have the same name and look. It takes a band from the panel area; with free placement the band is reserved but the boxes are not moved out of it.
 
-The geometry is in `src/model/project/layout.ts`; the drawing, shared with the export, in `src/chart/export/layoutExport.tsx`.
+The geometry is in `src/model/project/layout.ts`; the drawing, shared with the export, in `src/chart/export/layoutExport.ts`.
 
 ### Export
 
@@ -393,20 +394,17 @@ Evidence labels in the documents: **D** = stated in a public source (see `docs/c
 
 The palettes are taken from the **ggsci** R package (Xiao N. *ggsci: Scientific Journal and Sci-Fi Themed Color Palettes for ggplot2*; <https://nanx.me/ggsci/>, <https://github.com/nanxstats/ggsci>; descriptions follow <https://nanx.me/ggsci/articles/ggsci.html>). Science (AAAS) is first and the default; then Nature (NPG), New England Journal of Medicine, The Lancet, JAMA, BMJ, Journal of Clinical Oncology, D3, Gephi, Observable, Primer, Atlassian, iTerm and IGV. The app's own earlier palettes (Vibrant, Pastel, Colorblind-friendly, Monochrome, Black and White) follow them, so saved charts still open.
 
-Notes: Gephi's engine is generative, so it is a seeded port giving ten fixed colours (R gives other ones each run); iTerm is the Rose Pine scheme only (ggsci has 400+); D3 offers category10 and category20; IGV has 48 colours.
+Notes: Gephi's engine is generative, so it is a seeded port giving ten fixed colours (R gives other ones each run); iTerm is the Rose Pine scheme only (ggsci has 400+); D3 offers category10 and category20; IGV has 51 entries (49 of them different: ggsci repeats two).
 
 **Info** (toolbar button, beside Settings) shows the version, the credits and the source of the colour palettes. In the palette field each palette says "Safe for the first N colours": the longest run of leading colours (of the first 6 compared) that stay apart for red-weak, green-weak and blue-weak vision. This is measured by simulation (Machado et al., 2009) in `src/model/graph/colour/colorVision.ts`, not claimed from the palette's name.
 
 ## Compliance note
 
-Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. The Business Associate Agreements in place cover Google Workspace and Microsoft 365 only, not this app or the browser. Do not enter patient identifiers (not verified whether sample identifiers are acceptable). Autosave can be switched off in Settings.
+Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. Autosave can be switched off in Settings; switching it off deletes the copy kept in the browser (after asking). A project saved as a file stays wherever the file is kept.
 
 ## To do
 
-1. **Beta-testing.**
-2. **Statistics taken from R.**
-
-Details, the list of what has not yet been tried in a browser, and the known issues are in [docs/BACKLOG.md](docs/BACKLOG.md); decisions, architecture rules and performance targets are in [docs/ROADMAP.md](docs/ROADMAP.md).
+The to-do list, what has not yet been tried in a browser, the known issues and the change log are in [docs/BACKLOG.md](docs/BACKLOG.md), the one place where the status is kept; decisions, architecture rules and performance targets are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## License
 

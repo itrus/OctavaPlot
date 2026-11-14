@@ -18,7 +18,7 @@ const CRC_TABLE = (() => {
 /** The CRC-32 (the one of ZIP, PNG and gzip) of some bytes, as an unsigned number. */
 export function crc32(bytes: Uint8Array): number {
   let c = 0xffffffff;
-  for (const b of bytes) c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 }
 
@@ -42,7 +42,8 @@ export function zipStore(files: readonly ZipFile[], when: Date = new Date()): Ui
   const names = files.map((f) => new TextEncoder().encode(f.name));
   const { time, date } = dosDateTime(when);
   const total = files.reduce((n, f, i) => n + 30 + names[i].length + f.data.length + 46 + names[i].length, 22);
-  if (total >= LIMIT || files.some((f) => f.data.length >= LIMIT)) throw new Error('The files are too large for one ZIP file (4 GB).');
+  // The total holds every file, so a file of 4 GB or more is caught here too.
+  if (total >= LIMIT) throw new Error('The files are too large for one ZIP file (4 GB).');
   const out = new Uint8Array(total);
   const view = new DataView(out.buffer);
   let at = 0;

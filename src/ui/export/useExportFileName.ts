@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../../state/AppContext';
-import { exportFileName } from '../../util/download';
+import { exportFileName } from '../../util/fileName';
 
 /**
  * The name the file of an export will have: the safe name of what is exported, the date and time when Settings says so, and the

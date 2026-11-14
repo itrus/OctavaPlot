@@ -2,6 +2,7 @@ import { leadingColumns, usesSeriesBlocks } from '../graph/chartTypes';
 import { withoutExcluded } from './exclusion';
 import { applyOrder } from './groupOrder';
 import { tableSeriesWidth, xySeries } from './tableLayout';
+import { factorLayout } from './factors';
 import type { Chart, DataTable, Group, Id, Project } from '../types';
 
 /** One data set a graph can plot, from its own table or from another one. */
@@ -41,9 +42,27 @@ export function graphSources(p: Project, chart: Chart): GraphSource[] {
  * Without hidden or added data sets this is the chart's own table itself.
  */
 export function effectiveTable(p: Project, chart: Chart): DataTable | undefined {
-  const table = effectiveTableWithExcluded(p, chart);
-  return table && withoutExcluded(table);
+  // The result depends only on these parts of the chart and on the tables they point to, so a title or a colour edit (a new chart object that
+  // shares these) finds it again. Stored under the list of hidden data sets, which an edit of the rest of the chart leaves as it is.
+  const tables = [tableById(p, chart.dataTableId), ...chart.extraGroups.map((e) => tableById(p, e.tableId))];
+  const known = effectiveTables.get(chart.hiddenGroupIds);
+  if (
+    known &&
+    known.dataTableId === chart.dataTableId &&
+    known.extraGroups === chart.extraGroups &&
+    known.groupOrder === chart.groupOrder &&
+    known.tables.length === tables.length &&
+    known.tables.every((t, i) => t === tables[i])
+  ) {
+    return known.table;
+  }
+  const own = effectiveTableWithExcluded(p, chart);
+  const table = own && withoutExcluded(own);
+  effectiveTables.set(chart.hiddenGroupIds, { dataTableId: chart.dataTableId, extraGroups: chart.extraGroups, groupOrder: chart.groupOrder, tables, table });
+  return table;
 }
+
+const effectiveTables = new WeakMap<object, { dataTableId: Id; extraGroups: Chart['extraGroups']; groupOrder: Chart['groupOrder']; tables: ReadonlyArray<DataTable | undefined>; table: DataTable | undefined }>();
 
 function effectiveTableWithExcluded(p: Project, chart: Chart): DataTable | undefined {
   const own = tableById(p, chart.dataTableId);
@@ -58,8 +77,10 @@ function effectiveTableWithExcluded(p: Project, chart: Chart): DataTable | undef
   const ownCount = picked.length;
   const extraSlots: number[] = [];
   for (const e of chart.extraGroups) {
-    const g = tableById(p, e.tableId)?.groups.find((x) => x.id === e.groupId);
-    if (g && e.tableId !== chart.dataTableId && !blocks) {
+    const source = tableById(p, e.tableId);
+    const g = source?.groups.find((x) => x.id === e.groupId);
+    // Only a column table lends its data sets (the same rule as graphSources lists them by): after its type changed they are not drawn, and they come back if it is changed back.
+    if (g && source?.kind === 'column' && e.tableId !== chart.dataTableId && !blocks) {
       extraSlots.push(e.slot ?? extraSlots.length);
       // Named with its table, so it cannot be mistaken for a data set of the same name in the graph's own table.
       picked.push({ ...g, name: `${tableById(p, e.tableId)!.name}: ${g.name}`, sourceRowTitles: tableById(p, e.tableId)!.rows.map((r) => r.title) });
@@ -95,13 +116,21 @@ function effectiveTableWithExcluded(p: Project, chart: Chart): DataTable | undef
 function orderSeries(own: DataTable, columns: Group[], order: readonly Id[]): Group[] {
   const lead = leadingColumns(own.kind);
   const width = tableSeriesWidth(own);
-  const slotOf = new Map(xySeries(own).map((s) => [s.id, s.index]));
+  const slotOf = new Map(xySeries(own).map((s) => [s.id, s.columns[0].slot ?? s.index]));
+  // The place of each series in its factor cluster, worked out over all the series of the table in the asked-for order, hidden ones included.
+  const everyone = applyOrder(
+    xySeries(own).map((s) => ({ id: s.id, first: s.columns[0] })),
+    order,
+  );
+  const layout = factorLayout(everyone.map((s) => ({ columns: [s.first] })));
+  const clusterSlotOf = new Map(layout ? everyone.map((s, i) => [s.id, layout.position[i]] as const) : []);
   const blocks: Array<{ id: Id; columns: Group[] }> = [];
   const rest = columns.slice(lead);
   for (let i = 0; i < rest.length; i += width) {
     const block = rest.slice(i, i + width);
     const first = block[0];
-    blocks.push({ id: first.id, columns: [{ ...first, seriesSlot: slotOf.get(first.id) }, ...block.slice(1)] });
+    const clusterSlot = clusterSlotOf.get(first.id);
+    blocks.push({ id: first.id, columns: [{ ...first, seriesSlot: slotOf.get(first.id), ...(clusterSlot === undefined ? {} : { clusterSlot }) }, ...block.slice(1)] });
   }
   return [...columns.slice(0, lead), ...applyOrder(blocks, order).flatMap((b) => b.columns)];
 }

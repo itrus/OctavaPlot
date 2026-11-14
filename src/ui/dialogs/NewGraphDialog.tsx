@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { useRoving } from '../inspector/common/roving';
 import { buildAnyModel, ChartCanvas } from '../../chart/anyModel';
 
-import { applyVariant, previewFit, type ChartVariant } from '../../model/graph/chartVariant';
+import { previewFit, startChart, type ChartVariant } from '../../model/graph/chartVariant';
 import { GALLERY, availableItems, type GalleryItem } from '../../model/graph/chartGallery';
-import { inheritChart } from '../../model/graph/chartFormat';
+import { inheritChart } from '../../model/graph/link/chartFormat';
 import { chartTypeInfo, tableTypeInfo } from '../../model/graph/chartTypes';
 import { createChart } from '../../model/defaults';
 import type { Chart, ChartType, DataTable, Id, TableKind } from '../../model/types';
@@ -19,7 +19,7 @@ const FAMILY_ORDER: TableKind[] = ['xy', 'column', 'grouped', 'contingency', 'su
 function Preview({ table, type, variant }: { table: DataTable; type: ChartType; variant?: ChartVariant }) {
   const drawn = useMemo(() => {
     try {
-      const chart = applyVariant({ ...createChart(table.id, { widthPx: 1024, heightPx: 768 }, type), title: table.name }, variant);
+      const chart = startChart({ ...createChart(table.id, { widthPx: 1024, heightPx: 768 }, type), title: table.name }, table, variant);
       return { chart, any: buildAnyModel(chart, table, previewFit(chart, variant)) };
     } catch {
       return null;

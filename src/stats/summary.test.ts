@@ -6,7 +6,6 @@ import {
   SUMMARY_ALGORITHM_VERSION,
   computeGroupStats,
   effectiveSpreadOf,
-  errorValue,
   formatPercent,
   statsFor,
   summarize,
@@ -45,8 +44,6 @@ describe('summarize', () => {
     expect(s.mean).toBe(7.5);
     expect(s.sd).toBeNull();
     expect(s.sem).toBeNull();
-    expect(errorValue(s, 'sd')).toBeNull();
-    expect(errorValue(s, 'sem')).toBeNull();
   });
 
   it('has nothing drawable when n = 0', () => {
@@ -307,17 +304,20 @@ describe('numerical robustness', () => {
 
 describe('statsFor', () => {
   const obs = (values: number[]): Observation[] => values.map((value, i) => ({ id: `o${i}`, value }));
+  // The cache is used from SMALL_SUMMARY values up; fewer are computed directly, so these tests use a long tail of fixed values.
+  const tail = Array.from({ length: 70 }, (_, i) => 10 + i);
+  const base = [1, 2, 3, 4, ...tail];
 
   it('returns the identical object for the same values and settings, whichever array holds them', () => {
-    const o = obs([1, 2, 3, 4]);
+    const o = obs(base);
     expect(statsFor(o, spec({ spread: 'sd' }))).toBe(statsFor(o, spec({ spread: 'sd' })));
-    expect(statsFor(o, spec({ spread: 'sd' }))).toEqual(computeGroupStats([1, 2, 3, 4], spec({ spread: 'sd' })));
-    expect(statsFor(obs([1, 2, 3, 4]), spec({ spread: 'sd' }))).toBe(statsFor(o, spec({ spread: 'sd' })));
-    expect(statsFor(obs([1, 2, 3, 5]), spec({ spread: 'sd' }))).not.toBe(statsFor(o, spec({ spread: 'sd' })));
+    expect(statsFor(o, spec({ spread: 'sd' }))).toEqual(computeGroupStats(base, spec({ spread: 'sd' })));
+    expect(statsFor(obs(base), spec({ spread: 'sd' }))).toBe(statsFor(o, spec({ spread: 'sd' })));
+    expect(statsFor(obs([1, 2, 3, 5, ...tail]), spec({ spread: 'sd' }))).not.toBe(statsFor(o, spec({ spread: 'sd' })));
   });
 
   it('keys only on settings that matter', () => {
-    const o = obs([1, 2, 3, 4]);
+    const o = obs(base);
     const a = statsFor(o, spec({ spread: 'sd', confidenceLevel: 0.9 }));
     expect(statsFor(o, spec({ spread: 'sd', confidenceLevel: 0.8 }))).toBe(a);
     const none = statsFor(o, spec({ spread: 'none' }));
@@ -330,9 +330,9 @@ describe('statsFor', () => {
   });
 
   it('keeps a bounded number of results, the least recently used going first', () => {
-    const o = obs([1, 2, 3, 4]);
+    const o = obs(base);
     const first = statsFor(o, spec({ spread: 'sd' }));
-    for (let i = 1; i <= 20001; i++) statsFor(obs([i]), spec({ spread: 'sd' }));
+    for (let i = 1; i <= 20001; i++) statsFor(obs([i, ...tail]), spec({ spread: 'sd' }));
     expect(statsFor(o, spec({ spread: 'sd' }))).not.toBe(first);
     expect(SUMMARY_ALGORITHM_VERSION).toBe(1);
   });

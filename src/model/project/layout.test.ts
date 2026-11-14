@@ -4,7 +4,8 @@ import { drawLayout } from '../../chart/export/layoutExport';
 import { addChart, addDataTable, addFreePanel, addLayout, patchChart, setCells, duplicateLayout, freeLayout, patchLayout, removeChart, removeFreePanel, removeLayout, removeTable, renameItem, setFrame, setLayoutPanel } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { createExampleProject } from '../defaults';
-import { arrangeLayout, defaultLayout, mmToPt, pageFrame, panelLabel, sanitizeLayout, slotCount, slotRects, standardArrangements, turnFrames } from './layout';
+import { arrangeLayout, defaultLayout, pageFrame, panelLabel, sanitizeLayout, slotCount, slotRects, standardArrangements, turnFrames } from './layout';
+import { mmToPt } from '../units';
 import type { FrameMm, Layout, Project } from '../types';
 
 const twoCharts = (): Project => {

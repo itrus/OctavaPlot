@@ -215,6 +215,18 @@ interface NumericAxisProps {
   map: (v: number) => number;
 }
 
+/**
+ * The group of one axis: its line (with a transparent twin that makes it easy to hit in the editor) and the parts that go with it (ticks, break
+ * marks), in the stroke of the axis. Its ID is made from the axis' name, and a click on it selects the axis.
+ */
+function axisGroup(chart: Chart, cfg: AxisConfig, name: string, line: string, parts: SceneElement[]): SceneElement {
+  return el('g', [['stroke', chart.axisColor], ['stroke-width', cfg.lineWidthPt], ['stroke-opacity', chart.axisOpacity < 1 ? chart.axisOpacity : undefined], ['fill', 'none'], ['stroke-linecap', 'square']], {
+    hit: { kind: 'axis', objectId: name },
+    id: `${name}-axis`,
+    children: [el('path', [['d', line]]), el('path', [['d', line], ['stroke', 'transparent'], ['stroke-width', 28]], { editorOnly: true }), ...parts],
+  });
+}
+
 /** A numeric axis: its line (in pieces when it is broken), the marks at the gaps, the ticks and the numbers. Nothing for a hidden axis. */
 export function numericAxisElements({ name: given, chart, cfg, scale, along, crossing, plot, pieces, gaps, map }: NumericAxisProps): SceneElement[] {
   if (!cfg.visible) return [];
@@ -224,16 +236,10 @@ export function numericAxisElements({ name: given, chart, cfg, scale, along, cro
   const line = along === 'y' ? axisLineD('y', crossing, plot.y, bottom, pieces) : axisLineD('x', crossing, plot.x, right, pieces);
   const marks = breakMarkElement({ along, fixed: crossing, gaps, mark: cfg.breakMark, color: chart.axisColor, width: cfg.lineWidthPt });
   const ticks = tickPaths(along === 'y' ? 'left' : 'bottom', crossing, cfg, scale.ticks, scale.minorTicks ?? [], map, scale.extraTicks);
-  const axis = el('g', [['stroke', chart.axisColor], ['stroke-width', cfg.lineWidthPt], ['stroke-opacity', chart.axisOpacity < 1 ? chart.axisOpacity : undefined], ['fill', 'none'], ['stroke-linecap', 'square']], {
-    hit: { kind: 'axis', objectId: name },
-    id: `${name}-axis`,
-    children: [
-      el('path', [['d', line]]),
-      el('path', [['d', line], ['stroke', 'transparent'], ['stroke-width', 28]], { editorOnly: true }),
+  const axis = axisGroup(chart, cfg, name, line, [
       ...(marks ? [marks] : []),
       ...ticks.map((p) => el('path', [['d', p.d], ['stroke-linecap', 'butt'], ['stroke-width', p.widthPt]])),
-    ],
-  });
+  ]);
   const labels = scale.ticks.flatMap((t) => {
     const x = scale.extraTicks?.get(t);
     if (x?.showText === false) return [];
@@ -275,15 +281,9 @@ export function categoryAxisElements({ chart, cfg, plot, items, horizontal, cros
   if (!cfg.visible) return [];
   const bottom = plot.y + plot.height;
   const line = horizontal ? `M${n2(crossing)},${n2(plot.y)}V${n2(bottom)}` : `M${n2(plot.x)},${n2(crossing)}H${n2(plot.x + plot.width)}`;
-  const axis = el('g', [['stroke', chart.axisColor], ['stroke-width', cfg.lineWidthPt], ['stroke-opacity', chart.axisOpacity < 1 ? chart.axisOpacity : undefined], ['fill', 'none'], ['stroke-linecap', 'square']], {
-    hit: { kind: 'axis', objectId: 'x' },
-    id: 'x-axis',
-    children: [
-      el('path', [['d', line]]),
-      el('path', [['d', line], ['stroke', 'transparent'], ['stroke-width', 28]], { editorOnly: true }),
+  const axis = axisGroup(chart, cfg, 'x', line, [
       ...items.map((c) => el('path', [['d', horizontal ? tickPath('left', categoryY(c.centerX), crossing, cfg) : tickPath('bottom', c.centerX, crossing, cfg)], ['stroke-linecap', 'butt']])),
-    ],
-  });
+  ]);
   const labels = items.map((c) => {
     if (horizontal) {
       return el('text', [['x', n2(plot.x - labelOffset(cfg) - Y_TICK_LABEL_GAP)], ['y', n2(categoryY(c.centerX))], ['dy', '0.35em'], ['text-anchor', 'end'], ['font-size', cfg.tickFontSizePt], ['font-weight', cfg.tickBold ? 'bold' : undefined], ['fill', chart.textColor]], { hit: { kind: 'axis', objectId: 'x' }, text: c.label });
@@ -302,15 +302,9 @@ export function secondaryAxisElements({ chart, cfg, scale, map, plot }: { chart:
   const bottom = plot.y + plot.height;
   const right = plot.x + plot.width;
   const line = `M${n2(right)},${n2(plot.y)}V${n2(bottom)}`;
-  const axis = el('g', [['stroke', chart.axisColor], ['stroke-width', cfg.lineWidthPt], ['stroke-opacity', chart.axisOpacity < 1 ? chart.axisOpacity : undefined], ['fill', 'none'], ['stroke-linecap', 'square']], {
-    hit: { kind: 'axis', objectId: 'y2' },
-    id: 'y2-axis',
-    children: [
-      el('path', [['d', line]]),
-      el('path', [['d', line], ['stroke', 'transparent'], ['stroke-width', 28]], { editorOnly: true }),
+  const axis = axisGroup(chart, cfg, 'y2', line, [
       ...tickPaths('right', right, cfg, scale.ticks, scale.minorTicks ?? [], map).map((p) => el('path', [['d', p.d], ['stroke-linecap', 'butt']])),
-    ],
-  });
+  ]);
   const labels = scale.ticks.map((t) =>
     el('text', [['x', n2(right + labelOffset(cfg) + Y_TICK_LABEL_GAP)], ['y', n2(map(t))], ['dy', '0.35em'], ['text-anchor', 'start'], ['font-size', cfg.tickFontSizePt], ['font-weight', cfg.tickBold ? 'bold' : undefined], ['fill', chart.textColor]], { hit: { kind: 'axis', objectId: 'y2' }, text: scale.tickLabel(t) }),
   );

@@ -1,7 +1,8 @@
 import type { FitSettings } from '../../model/types';
 import { n2 } from '../../model/units';
 import { cachedFit, deferredFit } from '../../model/project/curveFit';
-import { fitModelById, isFailure, type FitParam, type FitResult } from '../../stats/fit';
+import { confidenceLimits, isFailure, type FitParam, type FitResult } from '../../stats/fit';
+import { fitModelById } from '../../stats/fitModels';
 import { inBreak, onAxis, polylinesThroughBreaks } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
 
@@ -173,7 +174,10 @@ export function fitParametersText(series: ReadonlyArray<{ label: string; fit?: {
 /** The lines written for one fit: "EC50 = 51.2 (95% CI 40.1 to 62.3)" for each parameter, then R². */
 export function fitLines(s: FitSummary, level: number): string[] {
   const pct = `${Number((level * 100).toPrecision(3))}%`;
-  const lines = s.params.map((p) => `${p.name} = ${fitNumber(p.value)}${p.lower !== null && p.upper !== null ? ` (${pct} CI ${fitNumber(p.lower)} to ${fitNumber(p.upper)})` : ''}`);
+  const lines = s.params.map((p) => {
+    const limits = confidenceLimits(p, s.df, level);
+    return `${p.name} = ${fitNumber(p.value)}${limits ? ` (${pct} CI ${fitNumber(limits.lower)} to ${fitNumber(limits.upper)})` : ''}`;
+  });
   if (s.rSquared !== null) lines.push(`R² = ${fitNumber(s.rSquared)}`);
   return lines;
 }

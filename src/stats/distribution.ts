@@ -3,11 +3,12 @@
  * of how anything is drawn.
  */
 
-type WhiskerRule = 'minmax' | 'tukey' | 'p10_90' | 'p5_95' | 'p2_5_97_5' | 'p1_99';
-export type Smoothing = 'light' | 'medium' | 'heavy';
+import type { SmoothingLevel, WhiskerRuleKind } from '../model/types';
+import { meanOf, sdOf } from './moments';
+
 
 /** The whisker rules: the label and, for the percentile rules, the two probabilities. */
-export const WHISKER_RULES: ReadonlyArray<{ value: WhiskerRule; label: string; p?: readonly [number, number] }> = [
+export const WHISKER_RULES: ReadonlyArray<{ value: WhiskerRuleKind; label: string; p?: readonly [number, number] }> = [
   { value: 'minmax', label: 'Minimum to maximum' },
   { value: 'tukey', label: 'Tukey (1.5 × IQR)' },
   { value: 'p10_90', label: '10th to 90th percentile', p: [0.1, 0.9] },
@@ -20,7 +21,8 @@ export const WHISKER_RULES: ReadonlyArray<{ value: WhiskerRule; label: string; p
 export function sortedFinite(values: ReadonlyArray<number | null | undefined>): number[] {
   const out: number[] = [];
   for (const v of values) if (typeof v === 'number' && Number.isFinite(v)) out.push(v);
-  return out.sort((a, b) => a - b);
+  // A typed array sorts numerically without calling a comparison function for each pair.
+  return Array.from(Float64Array.from(out).sort());
 }
 
 /**
@@ -55,7 +57,7 @@ export interface BoxSummary {
 }
 
 /** The numbers of one box. `tukeyK` is the multiplier of the Tukey rule. */
-export function boxSummary(values: ReadonlyArray<number | null | undefined>, rule: WhiskerRule, tukeyK = 1.5): BoxSummary | null {
+export function boxSummary(values: ReadonlyArray<number | null | undefined>, rule: WhiskerRuleKind, tukeyK = 1.5): BoxSummary | null {
   const s = sortedFinite(values);
   const n = s.length;
   if (n === 0) return null;
@@ -82,17 +84,16 @@ export function boxSummary(values: ReadonlyArray<number | null | undefined>, rul
 }
 
 /** Bandwidth multiplier of the three named smoothing levels (spec 10.2 P). */
-export const SMOOTHING_FACTOR: Record<Smoothing, number> = { light: 0.5, medium: 1, heavy: 2 };
+export const SMOOTHING_FACTOR: Record<SmoothingLevel, number> = { light: 0.5, medium: 1, heavy: 2 };
 
 /**
  * Gaussian kernel bandwidth h0 = 0.9 a n^(-1/5) with a = min(SD, IQR/1.34) (the positive one when only one is positive),
  * times the factor of the smoothing level. NaN when the values have no spread: constant data has no density.
  */
-export function densityBandwidth(sorted: readonly number[], smoothing: Smoothing): number {
+export function densityBandwidth(sorted: readonly number[], smoothing: SmoothingLevel): number {
   const n = sorted.length;
   if (n < 2) return NaN;
-  const mean = sorted.reduce((a, b) => a + b, 0) / n;
-  const sd = Math.sqrt(sorted.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));
+  const sd = sdOf(sorted, meanOf(sorted));
   const iqr = (quantile6(sorted, 0.75) - quantile6(sorted, 0.25)) / 1.34;
   const a = sd > 0 && iqr > 0 ? Math.min(sd, iqr) : Math.max(sd, iqr);
   if (!(a > 0)) return NaN;
@@ -100,6 +101,8 @@ export function densityBandwidth(sorted: readonly number[], smoothing: Smoothing
 }
 
 const VIOLIN_GRID = 256;
+/** Bandwidths beyond which the Gaussian kernel is taken as zero (exp(-0.5 * 8.5^2) = 2e-16). */
+const KERNEL_REACH = 8.5;
 
 export interface DensityProfile {
   /** Positions along the value axis, ascending, and the density at each. */
@@ -111,12 +114,11 @@ export interface DensityProfile {
 }
 
 interface DensityOptions {
-  smoothing: Smoothing;
+  smoothing: SmoothingLevel;
   /** A bandwidth set by hand (data units); null = the automatic one of the smoothing level. */
   bandwidth: number | null;
   /** 'sample': the ends are the smallest and largest value; 'tails': the kernel is followed three bandwidths further. */
   trim: 'sample' | 'tails';
-  grid?: number;
 }
 
 /** The smoothed density of the values, or null when it cannot be made (fewer than 3 values, or all equal). */
@@ -128,17 +130,24 @@ export function densityProfile(values: ReadonlyArray<number | null | undefined>,
   if (s[0] === s[n - 1]) return null;
   const h = opts.bandwidth !== null && opts.bandwidth > 0 ? opts.bandwidth : densityBandwidth(s, opts.smoothing);
   if (!(h > 0) || !Number.isFinite(h)) return null;
-  const grid = Math.max(64, Math.round(opts.grid ?? VIOLIN_GRID));
+  const grid = VIOLIN_GRID;
   const lo = opts.trim === 'tails' ? s[0] - 3 * h : s[0];
   const hi = opts.trim === 'tails' ? s[n - 1] + 3 * h : s[n - 1];
   const norm = 1 / (n * h * Math.sqrt(2 * Math.PI));
   const v: number[] = [];
   const f: number[] = [];
   let maxF = 0;
+  // A value more than KERNEL_REACH bandwidths away adds less than 2e-16 of the kernel peak: only the values in that window are summed.
+  // The grid ascends, so both ends of the window only move forward.
+  const reach = KERNEL_REACH * h;
+  let first = 0;
+  let past = 0;
   for (let i = 0; i < grid; i++) {
     const x = lo + ((hi - lo) * i) / (grid - 1);
+    while (first < n && s[first] < x - reach) first++;
+    while (past < n && s[past] <= x + reach) past++;
     let sum = 0;
-    for (const y of s) sum += Math.exp(-0.5 * ((x - y) / h) ** 2);
+    for (let k = first; k < past; k++) sum += Math.exp(-0.5 * ((x - s[k]) / h) ** 2);
     const d = sum * norm;
     v.push(x);
     f.push(d);

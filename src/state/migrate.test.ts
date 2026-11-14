@@ -47,7 +47,8 @@ describe('old files', () => {
     const { project, notes } = parseProjectWithNotes(text('f301af0'));
     const read = project.charts[0];
     expect(read.layers).toHaveLength(1);
-    expect(read.layers[0].id).toBe(c.layers[0].id);
+    // The `id` and `name` that older files gave the layer are not kept.
+    expect('id' in read.layers[0] || 'name' in read.layers[0]).toBe(false);
     expect('groupGaps' in read).toBe(false);
     // The automatic space between columns, increased by half; the arithmetic is written out here.
     expect(read.bars.gapPct).toBe(Math.round(AUTO_BAR_GAP_PCT * 150) / 100);

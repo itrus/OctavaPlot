@@ -1,3 +1,4 @@
+import { turned } from '../shared/parts/orientation';
 import { partStyle, type LayerKind, type LayerSpec } from '../../model/graph/layers';
 import { linePattern } from '../../model/graph/look';
 import type { Chart, ChartStyle } from '../../model/types';
@@ -29,7 +30,6 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
   const hidden = new Set(chart.hiddenLayerIds);
   const seriesOf = new Map(series.map((s) => [s.groupId, s]));
   /** Shapes of the vertical drawing: under the matrix of a horizontal chart, as they are otherwise. */
-  const turned = (children: SceneElement[]): SceneElement[] => (orient.matrix ? [el('g', [['transform', orient.matrix]], { children })] : children);
   const at = (p: { px: number; py: number }) => orient.toScreen(p.px, p.py);
   /** A summary diamond: from the lower to the upper limit along the value axis, `height` across it, its corners put in place like any other point. */
   const diamondPath = (p: { px: number; py: number; diamond: { lowerPy: number; upperPy: number } }, height: number): string =>
@@ -92,7 +92,7 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
   const out: SceneElement[] = [];
   let run: { pass: 'body' | 'lines' | 'points'; items: SceneElement[] } | null = null;
   const flush = () => {
-    if (run) out.push(...(run.pass === 'points' ? run.items : turned(run.items)));
+    if (run) out.push(...(run.pass === 'points' ? run.items : turned(orient, run.items)));
     run = null;
   };
   for (const layer of model.layers) {
@@ -108,6 +108,7 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
 
   // The frame round the bars of the selected series (the editor only).
   const selection = turned(
+    orient,
     series.flatMap((s) =>
       s.bars
         .filter((b) => b.width > 0)

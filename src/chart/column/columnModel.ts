@@ -1,4 +1,5 @@
 import { scaleLinear, scaleLog } from 'd3';
+import { omittedRangeWarnings } from '../shared/axes/axisScale';
 import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { BAR_PALETTE } from '../../model/defaults';
 import { paletteById, paletteColor } from '../../model/graph/palettes';
@@ -15,7 +16,7 @@ import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, errorEndVa
 import { countMarks, patternMarks, type Point, type Rect } from '../shared/parts/hatch';
 import { chartLayout, type Layout } from '../shared/parts/layout';
 import { anyLabelsRequested, buildPointLabels, emptyPointLabelModel, labelWarnings, type PointLabelModel } from '../shared/parts/labels';
-import { memoFor } from '../../stats/memo';
+import { memoFor } from '../../stats/calcCache';
 import { boxSummary, densityProfile, normaliseProfiles, sortedFinite, type BoxSummary, type DensityProfile } from '../../stats/distribution';
 import { supportsHorizontal } from '../../model/graph/chartTypes';
 import { barLabelText, insideLabelText, placeBarLabel, placeInsideBarLabel, type BarLabelGeom, type InsideLabelGeom } from '../shared/parts/barLabels';
@@ -678,8 +679,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   }
   // The statistics always use every value: the axis only decides which marks can be drawn.
   if (offAxis > 0) patternWarnings.push(`${offAxis} value${offAxis === 1 ? ' is' : 's are'} 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn; the statistics include ${offAxis === 1 ? 'it' : 'them'}.`);
-  if (inGap > 0) patternWarnings.push(`${inGap} value${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);
-  if (gapErrorBars > 0) patternWarnings.push(`${gapErrorBars} error bar${gapErrorBars === 1 ? ' has' : 's have'} an end inside an omitted range of the axis and ${gapErrorBars === 1 ? 'is' : 'are'} not drawn.`);
+  patternWarnings.push(...omittedRangeWarnings({ values: inGap, errorBars: gapErrorBars }));
   warnings.splice(patternWarningsAt, 0, ...patternWarnings, ...labelWarnings(labels.report));
 
   // Two-axis setup notices (silent with one axis).

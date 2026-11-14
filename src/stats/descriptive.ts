@@ -1,6 +1,7 @@
 import { meanOf, neumaierSum, scaledMoments, sdOf } from './moments';
 import { medianCiRank, studentTQuantileUpper } from './special';
 import { quantile6 } from './distribution';
+import { cachedCalc } from './calcCache';
 
 /** An interval, or null when it cannot be computed. */
 interface Interval {
@@ -54,6 +55,19 @@ function tInterval(xs: ReadonlyArray<number>, level: number): Interval | null {
   const se = sdOf(xs, m) / Math.sqrt(n);
   const t = studentTQuantileUpper((1 - level) / 2, n - 1);
   return Number.isFinite(t) ? { lower: m - t * se, upper: m + t * se } : null;
+}
+
+/** Raise when the numbers describeValues gives change, so that no cached result of the old algorithm is shown. */
+export const DESCRIPTIVE_ALGORITHM_VERSION = 1;
+
+/**
+ * describeValues kept by its identity (the values and the level), for a caller that asks again and again about the same array of values
+ * (a text of a graph with result tokens is drawn on every edit). The array must not be changed afterwards. Short lists are computed
+ * directly, which is quicker than hashing them. The result is shared: do not change it.
+ */
+export function describeValuesCached(values: ReadonlyArray<number | null>, level = 0.95): Descriptive {
+  if (values.length < 64) return describeValues(values, level);
+  return cachedCalc({ kind: 'descriptive', algorithm: DESCRIPTIVE_ALGORITHM_VERSION, data: values, method: 'describe', level }, () => describeValues(values, level));
 }
 
 /** Descriptive statistics of `values` (nulls are missing), with confidence intervals at `level` (0 < level < 1). */

@@ -1,4 +1,4 @@
-import { sanitizeAxis } from '../model/graph/axis';
+import { MAX_EXTRA_TICKS, sanitizeAxis } from '../model/graph/axis';
 import { sanitizeBarLabels, sanitizeBars } from '../model/options/columnOptions';
 import { sanitizeDistribution } from '../model/options/distributionOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
@@ -9,17 +9,18 @@ import { type ChartStart, createChart, createColumnTable, createContingencyTable
 import { kindChangeEffects } from '../model/table/tableKind';
 import { analysisKindApplies, analysisTypeInfo } from '../model/project/analysis';
 import { sanitizeDegree } from '../model/options/fitOptions';
-import { inheritChart } from '../model/graph/chartFormat';
+import { inheritChart } from '../model/graph/link/chartFormat';
 import { clampFrame, defaultLayout, FREE_MAX, framesOf, newFrame, resizePanels, sanitizeLayout, turnFrames } from '../model/project/layout';
-import type { FitModelId } from '../stats/fit';
+import type { FitModelId } from '../stats/fitModels';
 import { effectiveTable } from '../model/table/chartTable';
-import { defaultSeriesName, layoutOf, seriesWidth, subLabels, tableSeriesWidth, xySeries } from '../model/table/tableLayout';
+import { defaultSeriesName, layoutOf, seriesSlotOf, seriesWidth, subLabels, tableSeriesWidth, withSeriesSlots, xySeries } from '../model/table/tableLayout';
 
 /** Chart types whose series colour is the colour of symbols, lines and error bars (not of filled bars). */
-import { applyVariant, type ChartVariant, showIndividualValues, variantFits } from '../model/graph/chartVariant';
-import { chartTypeInfo, defaultChartTypeFor, isSeriesColourType, leadingColumns, usesSeriesBlocks } from '../model/graph/chartTypes';
+import { startChart, type ChartVariant, variantFits } from '../model/graph/chartVariant';
+import { chartTypeInfo, leadingColumns, usesSeriesBlocks } from '../model/graph/chartTypes';
+import { defaultChartTypeFor } from '../model/graph/chartGallery';
 import { newId } from '../model/ids';
-import { paletteColor, type Palette } from '../model/graph/palettes';
+import { type Palette } from '../model/graph/palettes';
 import { canonicalObservationId, canonicalRowId, createRows, freshId, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { clearGroupSummary, clearGroupSummaryKeys, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/graph/summary';
 import { folderItems, nudge, reorder, sortedByName } from '../model/project/folderItems';
@@ -29,6 +30,7 @@ import type { TimeColumn } from '../util/timeColumn';
 import { followThresholds, sanitizeVolcano, withVolcanoLines } from '../model/options/volcanoOptions';
 import { LABEL_STYLE_KEYS, clearGroupKeys, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
 import type {
+  ImportedTable,
   Drawing,
   LayerStyle,
   Analysis,
@@ -189,6 +191,8 @@ export const pasteMatrix = (
   mapTable(p, tableId, (t0) => {
     const height = Math.max(matrix.length, titles?.length ?? 0);
     const width = matrix.reduce((m, r) => Math.max(m, r.length), 0);
+    // A table that passes the limit could not be opened again from its file.
+    if (row0 + height > MAX_TABLE_ROWS) return t0;
     let t = growRows(t0, Math.max(t0.rowCount, row0 + height));
     if (width > 0 && col0 + width > t.groups.length) {
       const groups = t.groups.slice();
@@ -254,12 +258,32 @@ export const insertRows = (tableId: Id, at: number, count = 1): Command => (p) =
   });
 
 /** Remove rows with everything in them. The last remaining row is never removed: that would leave a table with no rows. */
-export const deleteRows = (tableId: Id, rows: readonly number[]): Command => (p) =>
-  mapTable(p, tableId, (t) => {
-    const gone = new Set(validRows(t, rows));
-    if (gone.size === 0 || gone.size >= t.rowCount) return t;
-    return reshapeRows(t, range(0, t.rowCount).filter((r) => !gone.has(r)));
+export const deleteRows = (tableId: Id, rows: readonly number[]): Command => (p) => {
+  const table = p.dataTables.find((t) => t.id === tableId);
+  if (!table) return p;
+  const gone = new Set(validRows(table, rows));
+  if (gone.size === 0 || gone.size >= table.rowCount) return p;
+  // What the graphs keep by the id of a removed cell or row goes too. A canonical id (a place in the table) is given to the next cell
+  // that is made there, and a style or a summary mark left behind would attach to it.
+  const goneIds = new Set<Id>();
+  gone.forEach((r) => {
+    if (table.rows[r]) goneIds.add(table.rows[r].id);
+    table.groups.forEach((g) => g.observations[r] && goneIds.add(g.observations[r].id));
   });
+  const next = mapTable(p, tableId, (t) => reshapeRows(t, range(0, t.rowCount).filter((r) => !gone.has(r))));
+  return {
+    ...next,
+    charts: next.charts.map((c) => {
+      if (c.dataTableId !== tableId) return c;
+      const summaryRows = c.summaryRows?.filter((id) => !goneIds.has(id));
+      return {
+        ...c,
+        ...(summaryRows ? { summaryRows } : {}),
+        layers: c.layers.map((l) => ({ ...l, objectOverrides: Object.fromEntries(Object.entries(l.objectOverrides).filter(([id]) => !goneIds.has(id))) })),
+      };
+    }),
+  };
+};
 
 /** Copy rows (title, values, exclusions) as one block placed right after the last of them. Refused past MAX_TABLE_ROWS. */
 export const duplicateRows = (tableId: Id, rows: readonly number[]): Command => (p) =>
@@ -292,9 +316,12 @@ function newSeriesColumns(t: DataTable, existing: Group[]): Group[] {
   while (used.has(defaultSeriesName(i, t.kind)) && i < 1000) i++;
   const name = defaultSeriesName(i, t.kind);
   const paletteIndex = Math.max(-1, ...existing.map((x) => x.paletteIndex)) + 1;
+  // The colour of the new series is the next slot after those of the others, whatever their places are now.
+  const slot = Math.max(-1, ...xySeries(current).map((s) => seriesSlotOf(t.kind, s))) + 1;
   return labels.map((label, k) => {
     const g = createGroup(width === 1 ? name : label, paletteIndex + k, t.rowCount);
     if (width > 1 && k === 0) g.title = name;
+    if (k === 0) g.slot = slot;
     return g;
   });
 }
@@ -324,7 +351,8 @@ export const removeSeries = (tableId: Id, seriesId: Id): Command => (p) => {
   const series = t && xySeries(t);
   const target = series?.find((s) => s.id === seriesId);
   if (!t || !series || !target || series.length <= 1) return p;
-  return target.columns.reduce((acc, g) => removeGroup(tableId, g.id)(acc), p);
+  // The slots are written once, before the first column goes: the series that are left keep their colours.
+  return target.columns.reduce((acc, g) => dropGroup(tableId, g.id)(acc), keepSlots(tableId)(p));
 };
 
 /** Rename a Y series: its column when a series is one column, otherwise the title of its first column. */
@@ -334,7 +362,12 @@ export const renameSeries = (tableId: Id, seriesId: Id, name: string): Command =
     return mapGroup(t, seriesId, (g) => (single ? { ...g, name } : { ...g, title: name }));
   });
 
-export const removeGroup = (tableId: Id, groupId: Id): Command => (p) => {
+/** Writes the slot of every series of a table of series on its first column, as it is drawn now (see Group.slot). */
+const keepSlots = (tableId: Id): Command => (p) => mapTable(p, tableId, (t) => (usesSeriesBlocks(t.kind) ? withSeriesSlots(t) : t));
+
+export const removeGroup = (tableId: Id, groupId: Id): Command => (p) => dropGroup(tableId, groupId)(keepSlots(tableId)(p));
+
+const dropGroup = (tableId: Id, groupId: Id): Command => (p) => {
   const removed = p.dataTables.find((t) => t.id === tableId)?.groups.find((g) => g.id === groupId);
   const next = mapTable(p, tableId, (t) => ({ ...t, groups: t.groups.filter((g) => g.id !== groupId) }));
   // Drop style overrides and display names that referenced the group.
@@ -368,7 +401,16 @@ export const patchChart = (chartId: Id, patch: Partial<Chart>): Command => (p) =
 export type AxisKey = 'xAxis' | 'yAxis' | 'y2Axis';
 
 export const patchAxis = (chartId: Id, which: AxisKey, patch: Partial<AxisConfig>): Command => (p) =>
-  mapChart(p, chartId, (c) => ({ ...c, [which]: sanitizeAxis({ ...c[which], ...patch }, c[which]) }));
+  mapChart(p, chartId, (c) => {
+    const wanted = { ...c[which], ...patch };
+    const next = sanitizeAxis(wanted, c[which]);
+    // An edit that would make breaks overlap or ticks repeat is refused as a whole (a file may be repaired by dropping one; an edit
+    // must not delete the entry the user did not touch). An edit that changes nothing is not an edit: no empty undo step.
+    const usableBreaks = wanted.breaks.filter((b) => Number.isFinite(b.from) && Number.isFinite(b.to) && b.from < b.to).length;
+    const usableTicks = (wanted.extraTicks ?? []).filter((t) => Number.isFinite(t.value)).length;
+    if (next.breaks.length < usableBreaks || (next.extraTicks?.length ?? 0) < Math.min(usableTicks, MAX_EXTRA_TICKS)) return c;
+    return JSON.stringify(next) === JSON.stringify(c[which]) ? c : { ...c, [which]: next };
+  });
 
 /** Apply to all axes (shared line width and font size controls). */
 export const patchBothAxes = (chartId: Id, patch: Partial<AxisConfig>): Command => (p) =>
@@ -419,25 +461,33 @@ export const setGroupOnGraph = (chartId: Id, tableId: Id, groupId: Id, on: boole
     return { ...c, extraGroups: extra };
   });
 
-/** Give the data sets the palette's colours in order (bar fill and symbol colour); manual colours are replaced. */
+/**
+ * Give the data sets the palette's colours: the chart takes the palette, and the colours that were set by hand (on the layer, on a data set or on a part)
+ * are taken away, so that every data set is coloured by its own place in the palette, as on a new chart. Colours are not written per data set by
+ * position: a data set hidden when the palette is chosen would be given another one's colour.
+ */
 export const applyPalette = (chartId: Id, palette: Palette): Command => (p) => {
   const chart = p.charts.find((c) => c.id === chartId);
-  const table = chart && effectiveTable(p, chart);
-  if (!chart || !table) return p;
+  if (!chart) return p;
+  const KEYS = ['barFill', 'symbolColor', 'symbolBorderColor', 'lineColor', 'errorColor'] as const;
+  const strip = <T extends Partial<ChartStyle>>(style: T): T => {
+    const out = { ...style };
+    for (const k of KEYS) delete out[k];
+    return out;
+  };
   return mapChart(p, chartId, (c) => ({
     ...c,
     paletteId: palette.id,
     // The palette sets the colour of every series, so a colour that a part was given of its own is replaced like a manual one.
-    layerStyles: clearPartStyles(c.layerStyles, 'all', ['barFill', 'symbolColor', 'symbolBorderColor', 'lineColor', 'errorColor']),
+    layerStyles: clearPartStyles(c.layerStyles, 'all', [...KEYS]),
     layers: c.layers.map((l, i) =>
       i !== 0
         ? l
-        : // An XY table's first column is X, not a data set: the colours go to the Y series (keyed by their first column), in order.
-          (usesSeriesBlocks(table.kind) ? xySeries(table).map((x) => x.columns[0]) : table.groups).reduce((layer, g, gi) => {
-            const color = paletteColor(palette, gi);
-            // Charts of lines and symbols take the series colour everywhere; bar charts colour the bars.
-            return patchGroup(layer, g.id, isSeriesColourType(chart.type) ? { barFill: color, symbolColor: color, symbolBorderColor: color, lineColor: color, errorColor: color } : { barFill: color, symbolColor: color });
-          }, l),
+        : {
+            ...l,
+            style: strip(l.style),
+            groupOverrides: Object.fromEntries(Object.entries(l.groupOverrides).flatMap(([id, o]) => { const s = strip(o); return Object.keys(s).length > 0 ? [[id, s]] : []; })),
+          },
     ),
   }));
 };
@@ -509,6 +559,8 @@ const clearParts = (styles: Record<Id, Partial<LayerStyle>>, scope: StyleScope, 
 export const patchStyle = (chartId: Id, scope: StyleScope, patch: Partial<ChartStyle>): Command => (p) =>
   mapChart(p, chartId, (c) => ({
     ...c,
+    // A line colour chosen for every data set of a before-and-after plot is the colour of the lines that join the rows: they stop taking the palette's colours.
+    ...(c.type === 'paired' && scope === 'all' && patch.lineColor !== undefined && c.pairs.lineColour === 'subject' ? { pairs: { ...c.pairs, lineColour: 'one' as const } } : {}),
     // The latest edit wins: a part (line, error bars, points ...) that was given its own setting takes the series' again.
     layerStyles: clearParts(c.layerStyles, scope, Object.keys(patch) as Array<keyof ChartStyle>),
     layers: c.layers.map((l, i) =>
@@ -554,7 +606,7 @@ export const resetAllDataSets = (chartId: Id): Command => (p) =>
       xAxis: axis('xAxis'),
       yAxis: axis('yAxis'),
       y2Axis: axis('y2Axis'),
-      layers: c.layers.map((l, i) => (i !== 0 ? l : { ...dataLayer(fresh), id: l.id, name: l.name })),
+      layers: c.layers.map((l, i) => (i !== 0 ? l : dataLayer(fresh))),
     };
   });
 
@@ -708,7 +760,7 @@ export const addDataTable = (id: Id, kind: TableKind = 'column', options: NewTab
  * Replace a table's rows and group values (CSV import) as one command. Groups keep their IDs, and so their chart
  * styling, by position; extra groups are added and missing ones dropped. Row titles are kept when the file has none.
  */
-export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>>; excluded?: Array<Array<{ reason: string } | null>>; factors?: string[]; times?: Array<TimeColumn | undefined> }): Command => (p) =>
+export const replaceTableData = (tableId: Id, data: ImportedTable): Command => (p) =>
   mapTable(p, tableId, (t) => {
     const rowCount = Math.max(1, data.values.length);
     const width = usesSeriesBlocks(t.kind) ? tableSeriesWidth(t) : 1;
@@ -726,6 +778,7 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
         name: sub ? (old?.name ?? subs[k]) : name,
         title: sub ? (old?.title ?? (k === 0 ? defaultSeriesName((i - lead) / width, t.kind) : '')) : (old?.title ?? ''),
         paletteIndex: old?.paletteIndex ?? i,
+        ...(old?.slot !== undefined ? { slot: old.slot } : {}),
         // The factor of a series: the file's when it has factor columns, else the one the table had at that place.
         ...((data.factors ? (data.factors[i] ?? '') : (old?.factor ?? '')) !== '' ? { factor: data.factors ? (data.factors[i] ?? '') : old!.factor } : {}),
         // The type of the X column: the one the import chose when it chose, else the one the table had at that place (the numbers it reads are in its unit).
@@ -773,7 +826,7 @@ export const addChart = (chartId: Id, tableId: Id, size?: ChartStart, type?: Cha
   // A type that does not suit the table's type is ignored: the table's default chart type is used.
   const suited = type !== undefined && chartTypeInfo(type)?.tableKind === table.kind ? type : defaultChartTypeFor(table.kind);
   const chart = { ...createChart(tableId, size, suited), id: chartId, name: table.name, title: table.name };
-  const made = applyVariant(showIndividualValues(chart, table), variant);
+  const made = startChart(chart, table, variant);
   if (!variant?.fit || !variantFits(made, variant)) return { ...p, charts: [...p.charts, made] };
   // A chart with a curve fit has its fit in the Results: made here, and the chart points to it.
   const analysisId = `fit-of-${chartId}`;
@@ -798,7 +851,9 @@ export const unlinkChart = (chartId: Id): Command => (p) => (p.charts.some((c) =
 export const patchLook = (chartId: Id, patch: Partial<Pick<Chart, 'summaryRows' | 'sizeLegend' | 'origin' | 'lineOrder' | 'lineConnect' | 'traceOffset' | 'volcano' | 'groupedBy' | 'heatmap' | 'histogram' | 'fit' | 'pie' | 'orientation' | 'bars' | 'axisColor' | 'axisOpacity' | 'plotColor' | 'pageColor' | 'frame' | 'fontFamily' | 'textColor' | 'titleBold' | 'titleOffsetPt'>> & { grid?: Partial<GridStyle>; pairs?: Partial<Chart['pairs']> }): Command => (p) =>
   mapChart(p, chartId, (c) => {
     const { grid, ...rest } = patch;
-    return { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };
+    const next = { ...c, ...sanitizeLook({ ...c, ...rest, grid: { ...c.grid, ...grid } }, c) };
+    // The order of the parts that was set by moving them overrides the drawing order of the type, so a new choice of "Lines and error bars go" starts again from the type's order.
+    return rest.lineOrder !== undefined && rest.lineOrder !== c.lineOrder && next.layerOrder.length > 0 ? { ...next, layerOrder: [] } : next;
   });
 
 /** Column spacing and baseline of a column chart. */
@@ -892,7 +947,7 @@ export const duplicateTable = (tableId: Id, copyId: Id): Command => (p) => {
     name: copyName(t.name, p.dataTables.map((x) => x.name)),
     rows: t.rows.map((r, i) => ({ ...r, id: canonicalRowId(i) })),
     groups: t.groups.map((g) => {
-      const id = newId('group');
+      const id = newId('grp');
       return { ...g, id, observations: g.observations.map((o, i) => ({ ...o, id: canonicalObservationId(id, i) })) };
     }),
   };
@@ -986,7 +1041,9 @@ export const patchLayout = (id: Id, patch: Partial<Omit<Layout, 'id' | 'panels'>
     // Turning the page carries the boxes of a free layout with it.
     const a = l.arrangement;
     const turned = patch.orientation !== undefined && patch.orientation !== l.orientation && a.kind === 'free' && patch.arrangement === undefined;
-    return sanitizeLayout({ ...l, ...patch, ...(turned && a.kind === 'free' ? { arrangement: { kind: 'free' as const, frames: turnFrames(a.frames, l.orientation, patch.orientation!) } } : {}) }, l);
+    const next = sanitizeLayout({ ...l, ...patch, ...(turned && a.kind === 'free' ? { arrangement: { kind: 'free' as const, frames: turnFrames(a.frames, l.orientation, patch.orientation!) } } : {}) }, l);
+    // A patch that changes nothing (the orientation already chosen) is no edit: no undo step, no autosave. A layout is small.
+    return JSON.stringify(next) === JSON.stringify(l) ? l : next;
   });
 
 /** Make the panels free boxes, starting where the arrangement put them. */
@@ -1210,6 +1267,16 @@ function restructureGroups(t: DataTable, kind: TableKind, layout: ReplicateLayou
 }
 
 /**
+ * The slots of the series of a table (see Group.slot) on the series of the same table after a change of type or layout: the nth series keeps the slot of
+ * the nth, so the colours stay; a table that is not one of series has none.
+ */
+function carrySlots(before: DataTable, after: DataTable): DataTable {
+  const slots = usesSeriesBlocks(before.kind) ? xySeries(before).map((s) => seriesSlotOf(before.kind, s)) : [];
+  const firsts = new Map(usesSeriesBlocks(after.kind) ? xySeries(after).map((s, i) => [s.id, slots[i]] as const) : []);
+  return { ...after, groups: after.groups.map((g) => { const { slot: _slot, ...rest } = g; const slot = firsts.get(g.id); return slot === undefined ? rest : { ...rest, slot }; }) };
+}
+
+/**
  * Change the type of a table in place, or the way its series are entered (its subtype: single values, replicates, values already
  * calculated, and for XY tables sizes and errors of X). The rows, columns and values stay; only what they mean changes (see
  * restructureGroups). The graphs of the table whose type does not belong to the new one take the first graph type of it, and the
@@ -1230,7 +1297,7 @@ export const changeTableKind = (tableId: Id, kind: TableKind, layout: ReplicateL
       const { time: _time, ...others } = g;
       return others;
     });
-    return { ...rest, kind, groups, ...(next.kind === 'single' ? {} : { layout: next }) };
+    return carrySlots(t, { ...rest, kind, groups, ...(next.kind === 'single' ? {} : { layout: next }) });
   });
   const fallback = defaultChartTypeFor(kind);
   return composeCommands(...charts.map((c) => setChartType(c.id, fallback)), ...analyses.map((a) => removeAnalysis(a.id)))(changed);

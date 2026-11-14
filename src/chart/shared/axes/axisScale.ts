@@ -371,3 +371,16 @@ export function pathOfRuns(runs: ReadonlyArray<ReadonlyArray<DataPoint>>, toY: (
     .map((run) => run.map((p, i) => `${i === 0 ? 'M' : 'L'}${fmt(p.x)},${fmt(toY(p.y))}`).join(''))
     .join('');
 }
+
+/**
+ * What a chart says about what it did not draw because it lies inside an omitted range (a break) of an axis: values (or `thing`, for example
+ * marks), the error bars with an end there, and the error bars along X. The same words for every chart family.
+ */
+export function omittedRangeWarnings({ values, errorBars = 0, xErrorBars = 0, thing = 'value' }: { values: number; errorBars?: number; xErrorBars?: number; thing?: string }): string[] {
+  const one = (n: number) => n === 1;
+  const out: string[] = [];
+  if (values > 0) out.push(`${values} ${thing}${one(values) ? ' lies' : 's lie'} inside an omitted range of the axis and ${one(values) ? 'is' : 'are'} not drawn.`);
+  if (errorBars > 0) out.push(`${errorBars} error bar${one(errorBars) ? ' has' : 's have'} an end inside an omitted range of the axis and ${one(errorBars) ? 'is' : 'are'} not drawn.`);
+  if (xErrorBars > 0) out.push(`${xErrorBars} error bar${one(xErrorBars) ? ' has' : 's have'} an end inside an omitted range of the X axis and ${one(xErrorBars) ? 'is' : 'are'} not drawn.`);
+  return out;
+}

@@ -59,6 +59,18 @@ interface XySeriesDef {
   index: number;
 }
 
+/**
+ * The palette slot of a series: the one stored on its first column, else its place in the table (what a table nobody has removed a series from
+ * has), else, in a contingency table, the `paletteIndex` its column has, which is what the pie of the same table colours it by.
+ */
+export const seriesSlotOf = (kind: TableKind, s: XySeriesDef): number => s.columns[0].slot ?? (kind === 'contingency' ? s.columns[0].paletteIndex : s.index);
+
+/** The table with the slot of every series written on its first column (and none on the others), as it is drawn now: done before a series is removed, so that the colours of the others stay. */
+export function withSeriesSlots(t: DataTable): DataTable {
+  const firsts = new Map(xySeries(t).map((s) => [s.id, seriesSlotOf(t.kind, s)]));
+  return { ...t, groups: t.groups.map((g) => { const { slot: _slot, ...rest } = g; return firsts.has(g.id) ? { ...rest, slot: firsts.get(g.id)! } : rest; }) };
+}
+
 const letter = (i: number): string => (i < 26 ? String.fromCharCode(65 + i) : String(i + 1));
 
 /** Default name of series number `i` of a table of this kind. */

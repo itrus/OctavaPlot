@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
+import { useRestyle } from './common/useScopedEdits';
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { buildHistogramModel } from '../../chart/histogram/histogramModel';
 import { defaultYTitle, FREQUENCIES, HISTOGRAM_LIMITS } from '../../model/options/histogramOptions';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { Chart, DataTable, HistogramOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import { composeCommands, patchAxis, patchChart, patchLook, patchStyle } from '../../state/commands';
+import { composeCommands, patchAxis, patchLook, patchStyle } from '../../state/commands';
 import { LayersSection } from './sections/LayersSection';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput } from './common/controls';
 import { FrameSection } from './sections/LookControls';
@@ -37,10 +38,7 @@ export function HistogramInspector({ chart, table }: { chart: Chart; table: Data
     const change = patchLook(chart.id, { histogram: next });
     run(label, follow ? composeCommands(change, patchAxis(chart.id, 'yAxis', { title: defaultYTitle(type, next) })) : change, key);
   };
-  const recolour = (groupId: string, patch: Parameters<typeof patchStyle>[2]) => {
-    const command = chart.paletteId !== null ? composeCommands(patchStyle(chart.id, groupId, patch), patchChart(chart.id, { paletteId: null })) : patchStyle(chart.id, groupId, patch);
-    run('Change style', command, `style:${groupId}:${Object.keys(patch).join(',')}`);
-  };
+  const recolour = useRestyle(chart);
   const rows = table.groups.map((g, i) => ({ g, style: resolveStyle(chart, layer, { id: g.id, paletteIndex: g.paletteIndex ?? i }) }));
 
   return (

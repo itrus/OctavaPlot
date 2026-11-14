@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { Check, ColorInput, Field, FieldInput, NumField, OptionalNumField, SectionBar, SelectInput, TabBar, TextInput } from './controls';
+import { Check, ColorInput, Field, FieldInput, NumField, OptionalNumField, SelectInput, TextInput } from './controls';
 
 describe('field accessibility', () => {
   it('ties the label, the note and the error to the control', () => {
@@ -123,24 +123,6 @@ describe('field messages', () => {
     const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
     expect(ids.length).toBeGreaterThan(8);
     expect(new Set(ids).size).toBe(ids.length);
-  });
-});
-
-describe('tab lists', () => {
-  const tabs = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }];
-
-  it('makes only the selected tab a tab stop', () => {
-    const html = renderToStaticMarkup(<TabBar tabs={tabs} value="b" onChange={none} />);
-    expect(html).toContain('role="tablist"');
-    const buttons = [...html.matchAll(/<button\b[^>]*>/g)].map((m) => m[0]);
-    expect(buttons.map((b) => /tabindex="(-?\d)"/.exec(b)![1])).toEqual(['-1', '0', '-1']);
-    expect(buttons.map((b) => /aria-selected="(\w+)"/.exec(b)![1])).toEqual(['false', 'true', 'false']);
-    expect(unnamed(html.replace(/<button\b/g, '<button aria-label="x"'))).toEqual([]);
-  });
-
-  it('does the same for the section bar', () => {
-    const html = renderToStaticMarkup(<SectionBar sections={tabs} value="a" onChange={none} />);
-    expect([...html.matchAll(/tabindex="(-?\d)"/g)].map((m) => m[1])).toEqual(['0', '-1', '-1']);
   });
 });
 

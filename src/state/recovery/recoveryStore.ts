@@ -1,6 +1,6 @@
-import type { Project } from '../model/types';
+import type { Project } from '../../model/types';
 import { AUTOSAVE_META_KEY, isConflict, parseMeta, signatureOf, textHash, type RecoveryMeta } from './recovery';
-import { AUTOSAVE_KEY, stringifyProject } from './serialize';
+import { AUTOSAVE_KEY, stringifyProject } from '../serialize';
 
 /**
  * The browser recovery copy with a writer stamp. The text under AUTOSAVE_KEY is exactly the text of a .oplot file, as

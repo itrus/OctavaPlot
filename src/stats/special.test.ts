@@ -147,6 +147,23 @@ describe('studentTQuantileUpper', () => {
     expect(Math.abs(studentTQuantileUpper(0.025, v) - cf)).toBeLessThan(1e-9);
   });
 
+  it('keeps full precision at df 1e5 and 1e6 (series with the exact normal quantile)', () => {
+    const z = 1.959963984540054;
+    for (const v of [1e5, 1e6]) {
+      const cf =
+        z +
+        (z ** 3 + z) / (4 * v) +
+        (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * v ** 2) +
+        (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * v ** 3);
+      expect(Math.abs(studentTQuantileUpper(0.025, v) - cf)).toBeLessThan(1e-13);
+    }
+    // the two methods meet at the switch (df 1e4)
+    const below = studentTQuantileUpper(0.025, 9999);
+    const above = studentTQuantileUpper(0.025, 1e4);
+    expect(Math.abs(above - below)).toBeLessThan(1e-6);
+    expect(above).toBeLessThan(below);
+  });
+
   it('returns NaN outside 0 < q < 0.5 or for invalid df', () => {
     for (const q of [0, 0.5, 0.7, NaN, -0.1]) expect(studentTQuantileUpper(q, 4)).toBeNaN();
     for (const df of [0, -1, NaN, Infinity]) expect(studentTQuantileUpper(0.025, df)).toBeNaN();

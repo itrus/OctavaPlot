@@ -32,7 +32,7 @@ describe('the layers of a histogram and a cumulative distribution', () => {
   });
 
   it('put the symbols over the steps, or under them when lines go on top', () => {
-    const z = (chart: Chart, kind: string) => layersOf(chart, table).find((l) => l.kind === kind)!.z;
+    const z = (chart: Chart, kind: string) => layersOf(chart, table).findIndex((l) => l.kind === kind);
     expect(z(chartOf('ecdf'), 'points')).toBeGreaterThan(z(chartOf('ecdf'), 'line'));
     expect(z(chartOf('ecdf', { lineOrder: 'onTop' }), 'points')).toBeLessThan(z(chartOf('ecdf', { lineOrder: 'onTop' }), 'line'));
   });

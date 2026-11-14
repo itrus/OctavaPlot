@@ -1,4 +1,4 @@
-import type { FitModelId } from '../../stats/fit';
+import type { FitModelId } from '../../stats/fitModels';
 import { newId } from '../ids';
 import { supportsHorizontal } from './chartTypes';
 import { NO_FIT_SETTINGS } from '../options/fitOptions';
@@ -20,7 +20,6 @@ export interface ChartVariant {
   /** Grouped bars made with the columns grouped by series (separated: each series has its own group of columns). */
   separated?: boolean;
   /** An XY chart made with its points joined as this says (as the rows run, or in ascending X). */
-  lineConnect?: Chart['lineConnect'];
   /** Bubbles made as bubble charts usually are: a large largest bubble, a little see-through so that overlaps can be read. */
   bubbles?: boolean;
   /** Offset traces made as figures usually are: the Y axis hidden and a scale bar in its place. */
@@ -63,7 +62,6 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
     next.sizeLegend = { values: [] };
   }
   if (variant.offsetTraces && chart.type === 'xyOffset') next.yAxis = { ...next.yAxis, visible: false, scaleBar: true };
-  if (variant.lineConnect !== undefined && isXy(chart)) next.lineConnect = variant.lineConnect;
   if (variant.fit?.band && isXy(chart)) next.fit = { ...chart.fit, band: variant.fit.band };
   return next;
 }
@@ -88,3 +86,6 @@ export function previewFit(chart: Chart, variant: ChartVariant | undefined): Fit
   if (!variant?.fit || !isXy(chart)) return NO_FIT_SETTINGS;
   return { ...NO_FIT_SETTINGS, model: variant.fit.model, degree: variant.fit.degree ?? 2, band: variant.fit.band ?? 'none' };
 }
+
+/** What a new graph starts as: the individual values of a table of replicates shown, then the variant. The graph made and its preview both use this. */
+export const startChart = (chart: Chart, table: DataTable, variant: ChartVariant | undefined): Chart => applyVariant(showIndividualValues(chart, table), variant);

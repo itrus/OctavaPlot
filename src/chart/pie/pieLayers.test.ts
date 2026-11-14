@@ -34,7 +34,6 @@ describe('the layers of a pie chart', () => {
     expect(ls.filter((l) => l.kind === 'labels')).toHaveLength(parts);
     expect(ls.filter((l) => l.kind === 'titles')).toHaveLength(1);
     expect(ls.filter((l) => l.kind === 'bars').map((l) => l.binding?.seriesId)).toEqual(tableOf(p).groups.map((g) => g.id));
-    expect(ls.map((l) => l.z)).toEqual(ls.map((_, i) => i));
   });
 
   it('have no reference lines, since a pie has no axes, but have annotations', () => {

@@ -31,8 +31,9 @@ export function autoOffsetStep(table: DataTable): number {
       span = Math.max(span, hi - lo);
     }
   }
-  if (!(span > 0)) return 1;
   const want = span * 1.1;
+  // Nothing to measure, or a range so large that it overflows: the step of a table without traces.
+  if (!(span > 0) || !Number.isFinite(want)) return 1;
   const unit = 10 ** (Math.floor(Math.log10(want)) - 1);
   return Number((Math.ceil(want / unit - 1e-9) * unit).toPrecision(12));
 }

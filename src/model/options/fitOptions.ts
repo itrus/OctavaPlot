@@ -1,10 +1,10 @@
-import { FIT_MODELS } from '../../stats/fit';
+import { FIT_MODELS } from '../../stats/fitModels';
 import { bool, clamp, oneOf, record } from '../sanitize';
 import type { Analysis, ChartFit, FitSettings, Id } from '../types';
 
 /** Settings of fitted curves (spec 17): what a chart shows of a curve fit, and how a curve fit is read from its analysis. */
 
-export const FIT_LIMITS = { degree: { min: 2, max: 6 }, level: { min: 0.5, max: 0.999 } } as const;
+export const FIT_LIMITS = { degree: { min: 2, max: 6 } } as const;
 
 const BANDS: ReadonlyArray<ChartFit['band']> = ['none', 'confidence', 'prediction'];
 export const FIT_MODEL_IDS = FIT_MODELS.map((m) => m.id);

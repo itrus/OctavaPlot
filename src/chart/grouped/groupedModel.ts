@@ -17,7 +17,7 @@ import { boxNeeds, unplacedMarkNote } from '../shared/parts/distributionNotes';
 import { buildErrorBar, clippedEndpointCount, errorEndValues, rangeValuesFor } from '../shared/parts/errorGeometry';
 import { chartLayout, type Layout } from '../shared/parts/layout';
 import { barLabelText, insideLabelText, placeBarLabel, placeInsideBarLabel, type BarLabelGeom, type InsideLabelGeom } from '../shared/parts/barLabels';
-import { axisMapper, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
+import { axisMapper, omittedRangeWarnings, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
 import { layersOf, type LayerKind, type LayerSpec } from '../../model/graph/layers';
 import { compileGroupedMarks } from './groupedMarks';
@@ -278,7 +278,11 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   // 4. Layout with the category labels along the X axis.
   // Factor clusters repeat their series: a series in the same place of two clusters has the same colour, and is listed once when it has the same name too.
   const legendAll = legendEntries(chart.legend, raw.map((r) => r.s.id));
-  const legendSeries = clusters ? withoutRepeats(legendAll, (i) => `${clusters.position[i]}|${raw[i].label}`) : legendAll;
+  const legendSeries = clusters ? withoutRepeats(legendAll, (i) => {
+        const st = raw[i].style;
+        // Name and look, as the comment says: two series that are drawn differently both stay in the legend.
+        return [raw[i].label, st.barFill, st.symbolColor, st.symbolBorderColor, st.lineColor, st.symbolShape].join('|');
+      }) : legendAll;
   const labels = categoryRows.map((r) => rowTitleAt(table, r).trim() || `Row ${r + 1}`);
   // Separated: the labels along the axis are those of every column, so the layout can tell when they have to turn.
   const axisLabels = separated ? raw.flatMap(() => labels) : labels;
@@ -491,7 +495,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         }
       }
       if (arrangement === 'side' && !floating) {
-        const text = barLabelText(chart.barLabels, cell.value, cell.count ?? cell.stats?.n ?? null);
+        const text = barLabelText(chart.barLabels, cell.value, cell.count ?? (cell.stats && cell.stats.n > 0 ? cell.stats.n : null));
         const yBase = yScale(baseline);
         if (text !== null && Number.isFinite(pb) && Number.isFinite(yBase)) {
           const far = pb <= yBase ? (errTop ?? pb) : (errBottom ?? pb);
@@ -510,8 +514,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     return { groupId: r.s.id, label: r.label, style: r.style, bars, points, dots, linePath, errorPath, errorMeaning };
   });
   if (offAxis > 0) warnings.push(`${offAxis} value${offAxis === 1 ? ' is' : 's are'} 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn; the statistics include ${offAxis === 1 ? 'it' : 'them'}.`);
-  if (inGap > 0) warnings.push(`${inGap} value${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);
-  if (gapErrorBars > 0) warnings.push(`${gapErrorBars} error bar${gapErrorBars === 1 ? ' has' : 's have'} an end inside an omitted range of the axis and ${gapErrorBars === 1 ? 'is' : 'are'} not drawn.`);
+  warnings.push(...omittedRangeWarnings({ values: inGap, errorBars: gapErrorBars }));
   if (summaryAsMarker > 0) warnings.push(`${summaryAsMarker} summary row${summaryAsMarker === 1 ? ' has' : 's have'} no interval that can be drawn on this axis, so ${summaryAsMarker === 1 ? 'it is' : 'they are'} drawn as ${summaryAsMarker === 1 ? 'an ordinary marker' : 'ordinary markers'}: enter its upper and lower limits.`);
   if (noSpan > 0) warnings.push(`${noSpan} value${noSpan === 1 ? ' has' : 's have'} no range to draw a floating bar from: enter replicates, or limits as the values already calculated.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);

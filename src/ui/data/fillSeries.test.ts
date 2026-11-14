@@ -68,7 +68,6 @@ describe('planFill', () => {
 });
 
 import { planSeries, suggestSeries } from './fillSeries';
-import { gridJump } from './gridKeys';
 
 describe('planSeries', () => {
   const t = tableOf();
@@ -102,17 +101,13 @@ describe('planSeries', () => {
   });
 });
 
-describe('gridJump', () => {
-  it('Home goes to the Row title column of the row, Ctrl+Home to the first cell', () => {
-    expect(gridJump('Home', false, { r: 7, c: 2 }, 50, 4)).toEqual({ r: 7, c: -1 });
-    expect(gridJump('Home', true, { r: 7, c: 2 }, 50, 4)).toEqual({ r: 0, c: -1 });
-  });
-  it('End goes to the last column of the row, Ctrl+End to the last cell', () => {
-    expect(gridJump('End', false, { r: 7, c: 0 }, 50, 4)).toEqual({ r: 7, c: 3 });
-    expect(gridJump('End', true, { r: 7, c: 0 }, 50, 4)).toEqual({ r: 49, c: 3 });
-    expect(gridJump('End', true, { r: 0, c: 0 }, 0, 0)).toEqual({ r: 0, c: -1 });
-  });
-  it('ignores other keys', () => {
-    expect(gridJump('ArrowDown', false, { r: 0, c: 0 }, 5, 5)).toBeNull();
+describe('planSeries with long numbers', () => {
+  it('does not round away digits the user typed (a time in milliseconds), and still takes the noise off 0.1 + 0.2', () => {
+    const t = tableOf();
+    const long = planSeries(t, { r0: 0, r1: 3, c0: 0, c1: 0 }, 1741084200123, 1, 'down');
+    expect(long.ok && long.edits.map((e) => e.value)).toEqual([1741084200123, 1741084200124, 1741084200125, 1741084200126]);
+    const noise = planSeries(t, { r0: 0, r1: 3, c0: 0, c1: 0 }, 0, 0.1, 'down');
+    expect(noise.ok && noise.edits.map((e) => e.value)).toEqual([0, 0.1, 0.2, 0.3]);
+    expect(planSeries(t, { r0: 0, r1: 3, c0: 0, c1: 0 }, 1e308, 1e308, 'down')).toMatchObject({ ok: false });
   });
 });

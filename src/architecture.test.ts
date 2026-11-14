@@ -190,13 +190,12 @@ describe('the size of the folders', () => {
 
   it('keeps the tests next to what they test: each test file has a source file of the same name beside it, or sits in __tests__', () => {
     const tests = all.filter((f) => /\.test\.tsx?$/.test(f));
-    const names = new Set(all.map((f) => f.replace(/\.(tsx?)$/, '')));
     // Tests of several parts of a family, named after the part they are about, are fine: the rule is only that they are not far away.
     const far = tests.filter((t) => {
       const dir = dirname(t);
       return !dir.endsWith('__tests__') && !all.some((f) => dirname(f) === dir && !/\.test\.tsx?$/.test(f));
     });
     expect(far).toEqual([]);
-    expect(names.size).toBeGreaterThan(0);
+    expect(tests.length).toBeGreaterThan(100);
   });
 });

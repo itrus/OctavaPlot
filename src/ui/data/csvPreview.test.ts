@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DecimalSeparator } from '../../model/types';
-import { detectDelimiter, importCsv, isCsvFile, parseCsv, previewCsv, type CsvDelimiter, type FirstColumn } from './csv';
+import { detectDelimiter, isCsvFile, parseCsv, previewCsv, type CsvDelimiter, type FirstColumn } from './csv';
+import { importCsv } from './csvTestKit';
 
 describe('delimiter detection and the tab delimiter', () => {
   it('picks the delimiter that is most frequent in the header line, outside quotes', () => {
@@ -8,7 +9,7 @@ describe('delimiter detection and the tab delimiter', () => {
     expect(detectDelimiter('A;B;C\n1,5;2;3')).toBe(';');
     expect(detectDelimiter('A\tB\tC\n1,5\t2\t3')).toBe('\t');
     expect(detectDelimiter('"a;b;c",d\n1,2')).toBe(',');
-    expect(detectDelimiter('﻿A;B\n1;2')).toBe(';');
+    expect(detectDelimiter('\uFEFFA;B\n1;2')).toBe(';');
   });
   it('falls back to the default when the header has none, or ties with it', () => {
     expect(detectDelimiter('Only\n1', ';')).toBe(';');
@@ -103,5 +104,14 @@ describe('previewCsv', () => {
       const p = must(previewCsv(`A${d}B\n${cell}${d}${cell}\n`, opts(d, s)));
       expect(p.data?.values[0]).toEqual([expected, expected]);
     }
+  });
+});
+
+describe('a file that is not UTF-8', () => {
+  it('says so when a character could not be read, and is silent for a clean file', () => {
+    const bad = previewCsv('\uFFFDM,\uFFFDC\n1,2', { separator: 'auto', delimiter: ',', firstColumn: 'auto' });
+    expect(bad.ok && bad.notes.some((n) => /not UTF-8/.test(n))).toBe(true);
+    const good = previewCsv('A,B\n1,2', { separator: 'auto', delimiter: ',', firstColumn: 'auto' });
+    expect(good.ok && good.notes).toEqual([]);
   });
 });

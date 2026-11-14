@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { useDismiss } from './useDismiss';
 import { createPortal } from 'react-dom';
 import { drawingGeometry } from '../../chart/shared/scene/drawings';
 import { createDrawing, DRAWING_GROUPS, DRAWING_PRESETS, pointsOfDrag, type DrawingPreset } from '../../model/graph/drawingPresets';
@@ -41,17 +42,7 @@ export function GraphicsMenu({ active, onPick }: { active: string | null; onPick
     const top = below + height <= window.innerHeight - 4 ? below : Math.max(4, b.top - 4 - height);
     setAt({ top, left: Math.max(4, Math.min(b.left, window.innerWidth - width - 4)) });
   }, [menu]);
-  useEffect(() => {
-    if (!menu) return;
-    const away = (e: PointerEvent) => !root.current?.contains(e.target as Node) && !pop.current?.contains(e.target as Node) && setMenu(false);
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setMenu(false);
-    document.addEventListener('pointerdown', away);
-    document.addEventListener('keydown', esc);
-    return () => {
-      document.removeEventListener('pointerdown', away);
-      document.removeEventListener('keydown', esc);
-    };
-  }, [menu]);
+  useDismiss(menu, [root, pop], () => setMenu(false));
   return (
     <span className="graphics-menu" ref={root}>
       <button

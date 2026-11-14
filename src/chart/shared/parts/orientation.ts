@@ -1,3 +1,5 @@
+import type { SceneElement } from '../scene/sceneElement';
+import { el } from '../scene/sceneElement';
 import type { Rect } from './layout';
 
 /**
@@ -14,3 +16,6 @@ export interface Orientation {
   /** The SVG matrix that does the same to a whole group of shapes. */
   matrix: string | null;
 }
+
+/** The elements of the vertical drawing under the matrix that turns them to the real region (the elements as they are in a vertical chart). */
+export const turned = (orient: Orientation, children: SceneElement[]): SceneElement[] => (orient.matrix ? [el('g', [['transform', orient.matrix]], { children })] : children);

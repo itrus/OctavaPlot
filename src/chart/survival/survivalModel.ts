@@ -1,4 +1,5 @@
 import { isSurvivalChartType } from '../../model/graph/chartTypes';
+import { omittedRangeWarnings } from '../shared/axes/axisScale';
 import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { DEFAULT_BAND_OPACITY, layersOf } from '../../model/graph/layers';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
@@ -169,7 +170,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   let noTime = 0;
   const raw = readSurvivalSubjects(table).map((g, i) => {
     const s = g.series;
-    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? i });
+    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? s.columns[0].slot ?? i });
     invalidStatus += g.invalidStatus;
     noTime += g.noTime;
     return { s, style, km: kaplanMeier(g.subjects), label: displayName(chart, s.id, s.name) };
@@ -270,7 +271,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
     }
     return { groupId: r.s.id, label: r.label, style: r.style, points, linePath: r.km.n === 0 ? '' : d, errorPath, errorMeaning: errorPath === '' ? null : 'SE (Greenwood)', bandPath, skipped: 0 };
   });
-  if (inGap > 0) warnings.push(`${inGap} mark${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);
+  warnings.push(...omittedRangeWarnings({ values: inGap, thing: 'mark' }));
   if (allT.length === 0) warnings.push('Enter the times in the first column and a 1 (event) or 0 (censored) in the column of each subject\'s group.');
 
   // 4. The at-risk table: the subjects still under observation at each tick, per group.

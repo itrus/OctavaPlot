@@ -3,7 +3,6 @@ import { recallSection, rememberSection } from '../../../state/inspectorNav';
 import { isCommitEnter } from '../../components/shortcutGuard';
 import { formatNum, sliderStep, snapToStep } from './numberFormat';
 import { WheelRange } from '../../components/WheelRange';
-import { useRoving } from './roving';
 
 /** Which graph's inspector, and which page and tab of it, a Section is on: it is then open or shut as it was left (state/inspectorMemory.ts). Absent elsewhere. */
 export const PlaceContext = createContext<{ graphId: string; page: string } | null>(null);
@@ -499,29 +498,3 @@ export function GroupBox({
   );
 }
 
-export function TabBar<T extends string>({ tabs, value, onChange }: { tabs: Array<{ id: T; label: string }>; value: T; onChange: (t: T) => void }) {
-  const roving = useRoving(tabs.map(() => true), tabs.findIndex((t) => t.id === value), (i) => onChange(tabs[i].id));
-  return (
-    <div className="tab-bar" role="tablist" aria-label="Formatting tabs" {...roving.groupProps}>
-      {tabs.map((t, i) => (
-        <button key={t.id} role="tab" aria-selected={value === t.id} {...roving.itemProps(i)} className={`tab${value === t.id ? ' active' : ''}`} onClick={() => onChange(t.id)}>
-          {t.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** Second-level navigation inside a tab, as a row of small buttons. */
-export function SectionBar<T extends string>({ sections, value, onChange }: { sections: Array<{ id: T; label: string }>; value: T; onChange: (t: T) => void }) {
-  const roving = useRoving(sections.map(() => true), sections.findIndex((t) => t.id === value), (i) => onChange(sections[i].id));
-  return (
-    <div className="section-bar" role="tablist" aria-label="Appearance sections" {...roving.groupProps}>
-      {sections.map((t, i) => (
-        <button key={t.id} role="tab" aria-selected={value === t.id} {...roving.itemProps(i)} className={`section-chip${value === t.id ? ' active' : ''}`} onClick={() => onChange(t.id)}>
-          {t.label}
-        </button>
-      ))}
-    </div>
-  );
-}

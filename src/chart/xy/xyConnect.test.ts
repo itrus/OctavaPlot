@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createChart, createXyTable } from '../../model/defaults';
 import { capabilitiesOf } from '../../model/graph/capabilities';
-import { chartTypeInfo } from '../../model/graph/chartTypes';
+import { galleryItems } from '../../model/graph/chartGallery';
 import type { ChartType, DataTable, Project } from '../../model/types';
 import { patchLook, setCells } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
@@ -75,9 +75,10 @@ describe('XY line connection order', () => {
     for (const t of ['xyLine', 'xyLineSymbols', 'xyArea', 'xyScatter'] as const) expect(capabilitiesOf(t).lineConnect).toBe(true);
     for (const t of ['xySpikes', 'bar', 'survival', 'histogram', 'pie'] as const) expect(capabilitiesOf(t).lineConnect).toBe(false);
   });
-  it('is described as row order in the gallery', () => {
-    expect(chartTypeInfo('xyLine')?.description).toMatch(/table order/i);
-    expect(chartTypeInfo('xyLineSymbols')?.description).toMatch(/table order/i);
+  it('is described as row order in the gallery (what the New Graph dialog shows)', () => {
+    const text = (id: string) => galleryItems('xy').find((i) => i.id === id)?.description;
+    expect(text('xyLine')).toMatch(/table order/i);
+    expect(text('xyLineSymbols')).toMatch(/table order/i);
   });
   it('survives a file, and a bad or missing value in a file means table order', () => {
     const table = tableOf([0, 2, 1], [0, 2, 3]);

@@ -1,11 +1,11 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { downloadBlob } from '../../util/download';
-import { AUTOSAVE_BACKUP_KEY, AUTOSAVE_KEY } from '../../state/serialize';
+import { AUTOSAVE_BACKUP_KEY, AUTOSAVE_KEY, AUTOSAVE_UNREADABLE_KEY } from '../../state/serialize';
 
 /** The most recent copy of the project kept in the browser, for the recovery download; null when there is none. */
 function storedProject(): string | null {
   try {
-    return localStorage.getItem(AUTOSAVE_KEY) ?? localStorage.getItem(AUTOSAVE_BACKUP_KEY);
+    return localStorage.getItem(AUTOSAVE_KEY) ?? localStorage.getItem(AUTOSAVE_BACKUP_KEY) ?? localStorage.getItem(AUTOSAVE_UNREADABLE_KEY);
   } catch {
     return null;
   }

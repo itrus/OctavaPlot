@@ -46,7 +46,7 @@ function resolve(source: string): string {
       continue;
     }
     const name = /^[A-Za-z]+/.exec(source.slice(i + 1))?.[0] ?? '';
-    if (name in NAMES) {
+    if (Object.hasOwn(NAMES, name)) {
       out += NAMES[name];
       i += name.length;
       // An empty pair of braces ends the name, so that a letter can follow it: \mu{}m.

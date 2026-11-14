@@ -1,6 +1,6 @@
-import { CHART_TYPES, chartFamily, isSeriesColourType, supportsHorizontal } from './chartTypes';
+import { CHART_TYPES, chartFamily, supportsHorizontal } from './chartTypes';
 import { hasPartLooks, rangeKindsOf } from './layers';
-import type { ChartType } from '../types';
+import type { ChartType, TableKind } from '../types';
 
 /**
  * What each chart type can do, in one place. The controls of the inspector, the validation of a project and the capability
@@ -20,20 +20,14 @@ interface Capabilities {
   lineConnect: boolean;
   /** Each data set can be plotted against the left or the right Y axis. */
   secondaryAxis: boolean;
-  /** The colour of a series is that of its symbols and lines, not of a filled bar. */
-  seriesColour: boolean;
   /** Survival options: confidence band, at-risk table, event symbols. */
   survivalOptions: boolean;
   /** Some part (the error bars, the dots, a line, the fit curve ...) can be given a look of its own, over that of its data set. */
   partLooks: boolean;
   /** Some part can be kept out of what the axis range is fitted to, without being hidden. */
   rangeSwitch: boolean;
-  /** The chart has numeric axes that can be broken, reversed or put on a log scale. */
-  numericAxes: boolean;
   /** XY charts: an oblique reference line (the identity line, y = a + bx), shaded regions between two values, extra ticks at chosen values, equal-unit scaling of the two axes. */
   guides: boolean;
-  /** XY charts: error bars along X from an error table (layout 'xerror'), a layer of their own with a look and a range switch. */
-  xErrorBars: boolean;
 }
 
 /** Types whose data sets can be bound to the right axis (see bindingUi in chart/shared/axes/axes.ts). */
@@ -62,11 +56,8 @@ export function capabilitiesOf(type: ChartType): Capabilities {
     curveFit: family === 'xy',
     lineConnect: family === 'xy' && type !== 'xySpikes' && type !== 'xyBars' && type !== 'xyBubble' && type !== 'xyVolcano',
     secondaryAxis: SECONDARY_AXIS.has(type),
-    seriesColour: isSeriesColourType(type),
     survivalOptions: family === 'survival',
-    numericAxes: family !== 'pie' && family !== 'heatmap',
     guides: family === 'xy',
-    xErrorBars: family === 'xy',
     partLooks: hasPartLooks(type),
     rangeSwitch: rangeKindsOf(type).length > 0,
   };
@@ -76,6 +67,8 @@ export function capabilitiesOf(type: ChartType): Capabilities {
 export const CAPABILITIES: readonly Capabilities[] = CHART_TYPES.map((c) => capabilitiesOf(c.type));
 
 const yes = (v: boolean) => (v ? 'yes' : '–');
+/** The table type a chart type is drawn from, as the table of the README names it (two chart types of different tables can share a name). */
+const TABLE_NAME: Record<TableKind, string> = { column: 'Column', xy: 'XY', grouped: 'Grouped', contingency: 'Contingency', survival: 'Survival' };
 
 /**
  * The capability table of the README, as Markdown. The README holds it between two marker comments and a test compares the two,
@@ -85,7 +78,7 @@ export function capabilityTable(): string {
   const rows = CHART_TYPES.map((c) => {
     const k = capabilitiesOf(c.type);
     const lines = k.referenceLines === 'xy' ? 'X and Y' : k.referenceLines === 'y' ? 'Y' : '–';
-    return `| ${c.label} | ${yes(k.horizontal)} | ${lines} | ${yes(k.secondaryAxis)} | ${yes(k.curveFit)} | ${yes(k.lineConnect)} | ${yes(k.survivalOptions)} | ${yes(k.partLooks)} | ${yes(k.rangeSwitch)} |`;
+    return `| ${c.label} | ${TABLE_NAME[c.tableKind]} | ${yes(k.horizontal)} | ${lines} | ${yes(k.secondaryAxis)} | ${yes(k.curveFit)} | ${yes(k.lineConnect)} | ${yes(k.survivalOptions)} | ${yes(k.partLooks)} | ${yes(k.rangeSwitch)} |`;
   });
-  return ['| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options | Look per part | Keep out of range |', '|---|---|---|---|---|---|---|---|---|', ...rows].join('\n');
+  return ['| Chart type | Table | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options | Look per part | Keep out of range |', '|---|---|---|---|---|---|---|---|---|---|', ...rows].join('\n');
 }

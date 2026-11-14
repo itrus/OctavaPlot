@@ -385,8 +385,6 @@
         },
         "layers": [
           {
-            "id": "layer-0",
-            "name": "Data",
             "style": {
               "showBars": true,
               "showSymbols": true,

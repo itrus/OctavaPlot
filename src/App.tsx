@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { prepareChartInput } from './model/table/preparedChart';
 import { AppProvider, useApp } from './state/AppContext';
-import { PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile } from './state/projectFile';
+import { openedStatus, PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile, refusedStatus } from './state/projectFile';
 import { Navigator } from './ui/navigator/Navigator';
 import { Splitter } from './ui/components/Splitter';
 import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIcon, FitWindowIcon } from './ui/components/icons';
@@ -10,12 +10,12 @@ import { InfoDialog } from './ui/dialogs/InfoDialog';
 import { SettingsDialog } from './ui/dialogs/SettingsDialog';
 import { RepairNotesDialog } from './ui/dialogs/RepairNotesDialog';
 import { LOAD_OTHER_TAB_WARNING, RecoveryConflictBanner } from './ui/components/RecoveryConflictBanner';
-import { openedStatus, refusedStatus } from './state/openStatus';
 import { UndoRedo } from './ui/components/UndoRedo';
 import { WheelRange } from './ui/components/WheelRange';
 import { isTextEntryTarget } from './ui/components/shortcutGuard';
 import { isSaveShortcut } from './ui/components/saveShortcut';
-import { downloadBlob, exportFileName } from './util/download';
+import { downloadBlob } from './util/download';
+import { exportFileName } from './util/fileName';
 
 /** The browser's save-file dialog (File System Access API; not in every browser). */
 type SaveFilePicker = (options: {

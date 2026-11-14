@@ -3,12 +3,13 @@ import { layoutPngSize, layoutTextGroups, layoutToPdf, layoutToPngBlob, layoutTo
 import { buildExportReport } from '../../chart/export/exportReport';
 import { FONT_FAMILY } from '../../model/defaults';
 import type { Layout } from '../../model/types';
+import { ptToPx } from '../../model/units';
 import { useApp } from '../../state/AppContext';
 import { EXPORT_DPI_CHOICES, type ExportDpi } from '../../state/settings';
-import { copyText, downloadBlob } from '../../util/download';
+import { downloadBlob } from '../../util/download';
 import { Field, SelectInput } from '../inspector/common/controls';
 import { browserFontAvailable, browserHasGlyph } from './browserFonts';
-import { ReportBody } from './ReportBody';
+import { copyReport, ReportBody } from './ReportBody';
 import { exportStatusText } from './exportJob';
 import { ExportButton, FORMATS, Tiles } from './ExportPanel';
 import { useExportFileName } from './useExportFileName';
@@ -34,8 +35,8 @@ export function LayoutExportPanel({ layout, drawing }: { layout: Layout; drawing
     () =>
       buildExportReport({
         name: layout.name,
-        widthPx: (drawing.widthPt * 96) / 72,
-        heightPx: (drawing.heightPt * 96) / 72,
+        widthPx: ptToPx(drawing.widthPt),
+        heightPx: ptToPx(drawing.heightPt),
         // The page's own font (labels and title), then those of the graphs on it.
         fontFamilies: [FONT_FAMILY, ...layout.panels.flatMap((id) => { const c = project.charts.find((x) => x.id === id); return c ? [c.fontFamily, ...c.annotations.flatMap((a) => (a.fontFamily ? [a.fontFamily] : []))] : []; }), ...(layout.annotations ?? []).flatMap((a) => (a.fontFamily ? [a.fontFamily] : []))],
         textGroups,
@@ -90,7 +91,7 @@ export function LayoutExportPanel({ layout, drawing }: { layout: Layout; drawing
     });
   };
   const start = () => void (format === 'svg' ? exportSvg() : format === 'pdf' ? exportPdf() : exportRaster());
-  const copy = async () => setCopied((await copyText(JSON.stringify(report, null, 2))) ? 'Report copied.' : 'The browser did not allow copying.');
+  const copy = async () => setCopied(await copyReport(report));
 
   return (
     <div className="export-panel">

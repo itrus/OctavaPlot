@@ -27,7 +27,7 @@ import type {
   SummarySpec,
   SurvivalOptions,
 } from './types';
-import { untitledProjectName } from '../util/stamp';
+import { untitledProjectName } from '../util/fileName';
 
 export const FONT_FAMILY = 'Arial, Helvetica, sans-serif';
 export const INITIAL_ROWS = 1000;
@@ -121,7 +121,7 @@ export const DEFAULT_BAR_LABELS: BarLabels = { show: 'none', decimals: null, tho
 const DEFAULT_BARS: BarLayout = { gapPct: null, beforePct: null, afterPct: null, baseline: null };
 /** Gridlines: thin and light, and lighter still for the minor ones (P). */
 const DEFAULT_GRID: GridStyle = { color: '#d0d0d0', widthPt: 1, style: 'solid', minorColor: '#e6e6e6', minorWidthPt: 0.5, minorStyle: 'solid', opacity: 1, minorOpacity: 1 };
-/** Major tick length, pt (spec 20.2); the layout constant has the same value. */
+/** Major tick length, pt (spec 20.2). */
 export const TICK_LENGTH_PT = 11.2;
 
 export const DEFAULT_STYLE: ChartStyle = {
@@ -291,8 +291,6 @@ export const PAGE_TEXT_LOOK = { color: '#000000', fontSizePt: 12 } as const;
 export function createChart(dataTableId: string, size?: ChartStart, type: ChartType = 'bar'): Chart {
   const titles = axisTitlesFor(type);
   const layer: ChartLayer = {
-    id: newId('layer'),
-    name: 'Data',
     style: initialLayerStyle(type),
     groupOverrides: {},
     objectOverrides: {},
@@ -458,7 +456,7 @@ export function createXyTable(name: string, example: boolean, layout: ReplicateL
   return layout.kind === 'single' ? table : { ...table, layout };
 }
 
-/** Rows of a grouped or contingency table: categories are few, so it starts with a handful rather than twenty. */
+/** Rows of a grouped or contingency table: categories are few, so it starts with a handful rather than INITIAL_ROWS. */
 const CATEGORY_ROWS = 6;
 
 /**

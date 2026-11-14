@@ -1,11 +1,10 @@
-import { DialogShell, trapTab } from './DialogShell';
+import { ModalBackdrop } from './DialogShell';
 import { CloseIcon } from '../components/icons';
 
 /** Every stored value that was reset to its default when a project file was opened, each with its path in the file. */
 export function RepairNotesDialog({ fileName, notes, onClose }: { fileName: string; notes: string[]; onClose: () => void }) {
   return (
-    <DialogShell>
-      <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onKeyDown={(e) => (e.key === 'Escape' ? onClose() : trapTab(e))}>
+    <ModalBackdrop onClose={onClose}>
         <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Values reset on opening" tabIndex={-1} ref={(el) => el?.focus()}>
           <div className="modal-head">
             <strong>{notes.length} value{notes.length === 1 ? '' : 's'} reset on opening {fileName}</strong>
@@ -23,7 +22,6 @@ export function RepairNotesDialog({ fileName, notes, onClose }: { fileName: stri
             <button onClick={onClose}>Close</button>
           </div>
         </div>
-      </div>
-    </DialogShell>
+    </ModalBackdrop>
   );
 }

@@ -9,7 +9,8 @@
  */
 import { calcKey, peekCalc, storeCalc, type CalcIdentity } from './calcCache';
 import { fitCurve, fitFromSolution, isFailure, type FitFailure, type FitResult } from './fit';
-import { defaultFitEngine, isAbort, type CalculationEngine, type FitProvenance, type FitRequest } from './fitEngine';
+import { defaultFitEngine, isAbort, type CalculationEngine } from './fitEngine';
+import type { FitProvenance, FitRequest } from './fitProtocol';
 
 type Done = FitResult | FitFailure;
 

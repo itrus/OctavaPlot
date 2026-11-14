@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildXyModel } from '../../chart/xy/xyModel';
-import { addAnnotation, addChart, addDataTable, addReferenceLine, patchLayerStyle, setLayerHidden } from '../../state/commands';
-import { parseProject, parseProjectWithNotes, stringifyProject } from '../../state/serialize';
-import { NO_FIT_SETTINGS } from '../options/fitOptions';
-import { CHART_TYPES } from './chartTypes';
-import { createExampleProject } from '../defaults';
-import { BAND_OPACITY } from '../../chart/survival/survivalModel';
-import { DEFAULT_BAND_OPACITY, layerLook, layerRows, layersOf, sanitizeLayerStyles } from './layers';
-import type { Chart, Project } from '../types';
+import { buildXyModel } from '../../../chart/xy/xyModel';
+import { addAnnotation, addChart, addDataTable, addReferenceLine, patchLayerStyle, setLayerHidden } from '../../../state/commands';
+import { parseProject, parseProjectWithNotes, stringifyProject } from '../../../state/serialize';
+import { NO_FIT_SETTINGS } from '../../options/fitOptions';
+import { CHART_TYPES } from '../chartTypes';
+import { createExampleProject } from '../../defaults';
+import { BAND_OPACITY } from '../../../chart/survival/survivalModel';
+import { DEFAULT_BAND_OPACITY, layerLook, layerRows, layersOf, sanitizeLayerStyles } from '.';
+import type { Chart, Project } from '../../types';
 
 const projectWith = (patch: (c: Chart) => Chart = (c) => c): Project => {
   const p = addChart('c', 't', undefined, 'xyLine')(addDataTable('t', 'xy', { sample: true })(createExampleProject()));
@@ -25,13 +25,11 @@ describe('layers of an XY chart', () => {
       const ls = layersOf(chart, p.dataTables.find((t) => t.id === 'k-table')!);
       expect(ls.length, info.type).toBeGreaterThan(0);
       expect(new Set(ls.map((l) => l.id)).size, info.type).toBe(ls.length);
-      expect(ls.map((l) => l.z), info.type).toEqual(ls.map((_, i) => i));
     }
   });
   it('have unique ids and a strictly increasing drawing order', () => {
     const ls = layers(projectWith());
     expect(new Set(ls.map((l) => l.id)).size).toBe(ls.length);
-    expect(ls.map((l) => l.z)).toEqual(ls.map((_, i) => i));
   });
   it('give each series points and a line, bound to its table and series', () => {
     const p = projectWith();
@@ -39,7 +37,6 @@ describe('layers of an XY chart', () => {
     for (const kind of ['points', 'line'] as const) {
       const of = ls.filter((l) => l.kind === kind);
       expect(of.length).toBeGreaterThan(0);
-      for (const l of of) expect(l.binding?.tableId).toBe('t');
     }
   });
   it('keep their ids and order when only the style changes, and when a chart is renamed', () => {
@@ -53,7 +50,6 @@ describe('layers of an XY chart', () => {
     const ls = layers(projectWith(withStyle({ showSymbols: false, showLines: false })));
     for (const l of ls.filter((x) => x.kind === 'points' || x.kind === 'line')) {
       expect(l.visible).toBe(false);
-      expect(l.enabled).toBe(true);
     }
   });
   it('agree with what the model draws', () => {
@@ -77,13 +73,13 @@ describe('layers of an XY chart', () => {
     expect(curve.calc).toEqual({ kind: 'curvefit', analysisId: 'a1' });
     expect(curve.rangeContribution).toBe(true);
     expect(band.rangeContribution).toBe(false);
-    expect(band.z).toBeLessThan(curve.z);
+    expect(ls.indexOf(band)).toBeLessThan(ls.indexOf(curve));
     const noBand = layers(projectWith((c) => ({ ...c, fit: { ...c.fit, analysisId: 'a1', band: 'none' } })));
     expect(noBand.some((l) => l.kind === 'fitBand')).toBe(false);
     expect(noBand.some((l) => l.kind === 'fitCurve')).toBe(true);
   });
   it('draw points over the line parts, or under them when lines go on top', () => {
-    const z = (ls: ReturnType<typeof layers>, kind: string) => ls.find((l) => l.kind === kind)!.z;
+    const z = (ls: ReturnType<typeof layers>, kind: string) => ls.findIndex((l) => l.kind === kind);
     const normal = layers(projectWith());
     expect(z(normal, 'points')).toBeGreaterThan(z(normal, 'line'));
     const top = layers(projectWith((c) => ({ ...c, lineOrder: 'onTop' })));
@@ -100,7 +96,6 @@ describe('layer rows and hiding', () => {
     expect(rows.map((r) => r.label)).toContain('Reference line: Y = 5');
     expect(rows.map((r) => r.label)).toContain('Annotation: A note');
     expect(rows[0].layer.kind).toBe('annotation');
-    expect(rows.map((r) => r.layer.z)).toEqual([...rows.map((r) => r.layer.z)].sort((a, b) => b - a));
     expect(rows.filter((r) => r.layer.kind === 'fitBand').map((r) => r.label)).toEqual(['Fit band: Series B', 'Fit band: Series A']);
   });
   it('list a shaded region, an oblique reference line and the bars along X by what they are', () => {
@@ -111,7 +106,7 @@ describe('layer rows and hiding', () => {
     expect(rows.map((r) => r.label)).toEqual(expect.arrayContaining(['Shaded region: Y from 2 to 5', 'Reference line: identity (Y = X)']));
     // The region is below the reference line in the drawing, and neither takes a look of its own through the layer or takes part in the range.
     const [g, r] = [rows.find((x) => x.layer.kind === 'region')!, rows.find((x) => x.layer.kind === 'referenceLine')!];
-    expect(g.layer.z).toBeLessThan(r.layer.z);
+    expect(rows.indexOf(g)).toBeGreaterThan(rows.indexOf(r)); // the rows run from the top down
     expect([g.takes, g.inRange, r.takes, r.inRange]).toEqual([null, null, null, null]);
   });
   it('collapse white space in an annotation label without touching the letter s', () => {

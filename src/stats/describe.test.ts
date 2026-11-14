@@ -18,7 +18,6 @@ import {
   spreadSelectModel,
   staleSpread,
   staleSpreadNote,
-  summaryCaption,
   summaryTooltipLines,
 } from './describe';
 import { SPREADS_BY_CENTRE, computeGroupStats, effectiveSpreadOf } from './summary';
@@ -203,14 +202,6 @@ describe('describeCounts', () => {
     const s = computeGroupStats([1, 2, null, Number.NaN, 5], spec());
     expect(describeCounts(s)).toBe('3 included, 1 missing, 1 invalid');
     expect(describeCounts(s)).not.toMatch(/exclud/i);
-  });
-});
-
-describe('summaryCaption', () => {
-  it('names the summary only as a caption', () => {
-    expect(summaryCaption(spec({ spread: 'sd' }), true)).toBe('Mean with SD');
-    expect(summaryCaption(spec({ spread: 'sd' }), false)).toBe('Mean with SD (error bars hidden)');
-    expect(summaryCaption(spec(), false)).toBe('Mean');
   });
 });
 

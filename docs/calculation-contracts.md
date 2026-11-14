@@ -106,29 +106,30 @@ Not planned (dropped by decision, 1 November 2026); the section number stays so 
 - A reference identity line is `Y = X`, not a screen diagonal. Reference regions are axis-aware bands, not uncertainty. The editor's alignment grid is never exported.
 - Broken axes: up to two breaks, continuous axes only; split and clamp every primitive at each segment boundary, never bridge. Reversed plus segmented is rejected. Scale bars on nonlinear axes need an explicit endpoint pair or ratio label.
 
-## 13. Comparisons (bracket labels)
+## 13. Comparisons (removed)
 
-- Source: manual text, which may hold a result token (section 18). No test is calculated and no p-value is supplied or adjusted: these are out of scope. Hiding a bracket never changes the room it takes.
-- Stars default: ≤0.05 `*`, ≤0.01 `**`, ≤0.001 `***`, ≤0.0001 `****`; otherwise "ns". Brackets stay attached to stable group IDs. Lane gaps are physical (pt).
+Comparison brackets joined to data sets were removed on 14 November 2026; the section number stays so that the others do not move. A comparison is marked with a bracket of the Graphics menu whose text is the user's (it may hold a result token, section 18): no test is calculated and no p-value is supplied or adjusted, and these are out of scope. The text tool offers ns, `*` to `****` and `#` to `####` as quick texts; applying a cut-off to a p-value is the user's.
 
 ## 14. Theme (P unless noted)
 
+The sizes are the defaults of `src/model/defaults.ts`, in pt of the drawing (1 px = 0.75 pt). Until 14 November 2026 this table gave half of each size (14 pt text, 5.6 pt ticks, a 6 pt symbol): the code had been set to twice those sizes, so that a chart at its usual size reads well, and the code is the reference.
+
 | Token | Value |
 |---|---|
-| Base text | 14 pt sans-serif (D) |
-| Axis title | 14 pt bold |
-| Tick labels | 13.3 pt bold (D, 0.95 × base) |
-| Chart title | 16.8 pt bold (D, 1.2 × base) |
-| Legend text | 11.2 pt regular (D, 0.8 × base) |
-| Major / minor tick | 5.6 pt / 2.8 pt |
-| Axis stroke | about 2.1 pt |
-| Data path / symbol / symbol border | 1.5 pt / 6 pt / 0.75 pt |
-| Error stem / cap length | 1 pt / 5 pt |
-| Box and violin border | 1 pt |
+| Font | Arial, Helvetica, sans-serif (one list; the export dialog says which family a missing font falls back to) |
+| Axis title | 28 pt bold |
+| Tick labels | 26.6 pt bold |
+| Chart title | 33.6 pt bold |
+| Legend text, point labels | 22.4 pt regular |
+| Major / minor tick | 11.2 pt / 5.6 pt |
+| Axis stroke, data line | 4 pt |
+| Symbol / symbol border | 12 pt / 3 pt |
+| Error stem / cap length | 4 pt / 10 pt |
+| Bar, box and violin border | none (0 pt; a setting) |
 | Band fill opacity | 0.20 |
 | Background, text | white, black; grid and full frame off |
 
-Seed palette (P, not any source's exact colors): `#000000`, `#0072B2`, `#D55E00`, `#009E73`, `#CC79A7`, `#E69F00`, `#56B4E9`, `#F0E442`. A palette change keeps manual overrides unless "replace overrides" is chosen. Palette overflow repeats with distinct shapes and a warning. Use one pinned sans-serif font and disclose fallbacks.
+Default palette: Science (AAAS) of the ggsci set (README, "Palettes"); the Okabe-Ito colours that this section once called the seed palette are "Colorblind-friendly", one of the earlier palettes kept so that saved graphs open. Choosing a palette takes the colours set by hand away, so that the palette governs. Palette overflow repeats with distinct shapes and a warning (not checked on 14 November 2026). One pinned sans-serif font list is used and fallbacks are disclosed in the export dialog.
 
 ## 15. Acceptance fixtures
 
@@ -171,8 +172,8 @@ Interaction and applicability tests:
 
 - Absent controls matter as much as present ones: a bar has error stems but no curve ribbon; a box has whisker rules but no SEM; a supplied-summary violin is blocked; a category axis has no log scale; a heatmap has a colourbar but no second value axis; a pie has no numeric-axis inspector.
 - Switching error bars to a band keeps the bound calculation. Hiding the centre path leaves a valid band.
-- Rotating a categorical chart rotates errors, brackets, labels and roles together.
-- Reordering categories keeps custom point styles, pairs, bracket targets and legend labels on the same IDs.
+- Rotating a categorical chart rotates errors, labels and roles together.
+- Reordering categories keeps custom point styles, pairs and legend labels on the same IDs.
 - Undo of a theme edit leaves data edits. A data change updates labels and comparison results together. An invalid property keeps the last valid render.
 
 ## 16. Open fidelity items (U)
@@ -188,7 +189,7 @@ Built for the X column of an XY table (29 October 2026). Y columns, survival, hi
 | Type | Stored as | Written as |
 |---|---|---|
 | `date` | whole days since 1970-01-01 (proleptic Gregorian, years 0001 to 9999) | `2025-03-04` |
-| `datetime` | seconds since 1970-01-01T00:00:00, a fraction to a microsecond | `2025-03-04T10:30:00` (a space is read too) |
+| `datetime` | seconds since 1970-01-01T00:00:00, a fraction to a microsecond (exact within about 270 years of 1970; at the far ends of the years 1 to 9999 a double holds it to about 30 microseconds, so a fraction there is rounded to that) | `2025-03-04T10:30:00` (a space is read too) |
 | `duration` | a length in the unit of the column (days, hours, minutes or seconds) | `1:30:00` (hours may pass 24) |
 
 Dates are counted with integer calendar arithmetic. `Date` and the machine's time zone are never used for values, so a file reads the same everywhere.
@@ -220,7 +221,7 @@ Dates are counted with integer calendar arithmetic. `Date` and the machine's tim
 
 **File.** `time` on the first column of an XY table: `{"kind":"date","unit":"d"}`, `{"kind":"datetime","unit":"s"}`, `{"kind":"duration","unit":"s"|"min"|"h"|"d"}`. Optional, so a file without it opens as before and no migration step is needed; no version change. A `time` that is not one of these, or on any other column, refuses the file. An older program ignores it and reads the numbers as plain ones.
 
-**Not built (29 October 2026):** a type on Y columns, survival times, histogram values and the other tables; a date as the axis of a category chart; a major tick interval in calendar units (every 2 weeks); minor ticks on dates; local time zones and daylight saving; locale date forms; week numbers; Fill series, annotations, brackets and vector steps in dates (they take numbers in the stored unit); the Results sheet and a fit on dates.
+**Not built (29 October 2026):** a type on Y columns, survival times, histogram values and the other tables; a date as the axis of a category chart; a major tick interval in calendar units (every 2 weeks); minor ticks on dates; local time zones and daylight saving; locale date forms; week numbers; Fill series, annotations and shapes in dates (they take numbers in the stored unit); the Results sheet and a fit on dates.
 
 Fixtures: section 15 (dates to days, offsets, zones, ticks). The tests are `src/util/timeColumn.test.ts`, `src/chart/shared/axes/timeAxis.test.ts`, `src/chart/xy/xyTime.test.ts` and `src/ui/data/timeCells.test.ts`; the reference values are Unix times and day numbers known from outside the code.
 
@@ -228,7 +229,7 @@ Fixtures: section 15 (dates to days, offsets, zones, ticks). The tests are `src/
 
 Built 29 October 2026, tested on the model and in the SVG export (the reference values are worked by hand or are geometric properties). Controls not tried in a browser.
 
-**Results in text.** A text of a figure (an annotation, a reference line label, a bracket label) may hold `{{stat Name}}` or `{{stat Name|d}}`: `stat` is n, sum, mean, sd, sem, median, min or max, `Name` a data set (its table name or the name shown on the chart, case ignored; a table with one data set needs none) and `d` the decimals. The value is the descriptive statistic of the values of that data set with excluded values left out, as in every calculation (SD and SEM need two values). It is filled each time the graph is drawn, so it follows the data. A token that cannot be filled (no such data set, no values) stays as typed and the chart warns. Fixture: values 2, 4, 4, 4, 5, 5, 7, 9 give mean 5, SD √(32/7), SEM SD/√8, median 4.5. A reference line bound to a result (`valueFrom`) is drawn at it; when it is unavailable the line is not drawn and a notice says so.
+**Results in text.** A text of a figure (an annotation, a reference line label, the text of a shape) may hold `{{stat Name}}` or `{{stat Name|d}}`: `stat` is n, sum, mean, sd, sem, median, min or max, `Name` a data set (its table name or the name shown on the chart, case ignored; a table with one data set needs none) and `d` the decimals. The value is the descriptive statistic of the values of that data set with excluded values left out, as in every calculation (SD and SEM need two values). It is filled each time the graph is drawn, so it follows the data. A token that cannot be filled (no such data set, no values) stays as typed and the chart warns. Fixture: values 2, 4, 4, 4, 5, 5, 7, 9 give mean 5, SD √(32/7), SEM SD/√8, median 4.5. A reference line bound to a result (`valueFrom`) is drawn at it; when it is unavailable the line is not drawn and a notice says so.
 
 **X error bars** (XY table layout `xerror`: Y, Y error, X error; plus or minus). The bar runs from X − e to X + e (one side only, when the error direction setting says so). A negative error draws no bar and is counted in a notice; an empty one is no bar and no notice. On a log axis an end at or below 0 is drawn at the low end and counted as clipped; on a broken axis a bar with an end in the omitted range is not drawn and is counted. They enter the axis range unless kept out. The OP-008 check (centre inside its limits) does not apply, since the error is given as plus or minus.
 
@@ -238,7 +239,7 @@ Built 29 October 2026, tested on the model and in the SVG export (the reference 
 
 **Right Y axis on XY charts.** A series bound to the right axis is scaled on it (points, lines, bars, spikes, areas, error bars, the fit curve). The right axis has its own range, log scale, reversal and limits, and no breaks. Reference lines, regions, extra ticks and annotations in data units use the left axis. A bracket joining two series on the right axis uses its scale; one joining series on different axes is skipped with a notice.
 
-**Comparison brackets on grouped and XY charts.** Placement is the rule of section 13 and of the column charts: a bracket stands above the highest value either end draws, overlapping brackets are stacked (the shorter lower), a hidden bracket keeps its room, and the axis grows to hold the stack and its label unless the bracket layer is kept out of the range. Grouped bars: the ends are two series in one category, or one series in two categories; an end with no value skips the bracket with a warning. XY: a vertical bar to the right of the two points at one X, with lanes where brackets overlap; a bracket with no point at its X is skipped with a warning. The placement uses loops, not spreads into `Math.min`/`Math.max`, so a very large number of values is safe.
+
 
 **Heat map intervals.** `steps` (2 to 12) cuts the scale into equal intervals and `breaks` (up to 11 edges) into the intervals you give, which win; an interval takes the scale colour at its middle; intervals are `[b(i), b(i+1))` with an inclusive final maximum (section 7). Missing, excluded and out-of-range cells each have a mark and, for the last two, a colour of their own; a cell is excluded only when it has no value left after exclusion.
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fitCurve, fitModelById, isFailure, type FitModelId, type FitResult } from './fit';
+import { fitCurve, isFailure, type FitResult } from './fit';
+import { fitModelById, type FitModelId } from './fitModels';
 
 /**
  * Metamorphic tests of the nonlinear fits: exact data from known parameters, then X shifted or rescaled and Y rescaled. The

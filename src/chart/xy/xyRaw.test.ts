@@ -44,11 +44,13 @@ describe('the mean layer and the individual values of an XY chart', () => {
     expect(raw.length).toBe(pts.length);
     expect(raw.every((l) => !l.visible && !l.rangeContribution)).toBe(true);
     expect(pts.every((l) => l.calc?.kind === 'summary')).toBe(true);
-    const on = layersOf(rawOn(chartOf(p)), tableOf(p)).filter((l) => l.kind === 'rawPoints');
+    const onAll = layersOf(rawOn(chartOf(p)), tableOf(p));
+    const on = onAll.filter((l) => l.kind === 'rawPoints');
     expect(on.every((l) => l.visible && l.rangeContribution)).toBe(true);
-    expect(Math.max(...on.map((l) => l.z))).toBeLessThan(Math.min(...pts.map((l) => l.z)));
+    const at = (l: (typeof onAll)[number]) => onAll.findIndex((x) => x.id === l.id);
+    expect(Math.max(...on.map(at))).toBeLessThan(Math.min(...onAll.filter((l) => l.kind === 'points').map(at)));
     const top = layersOf({ ...rawOn(chartOf(p)), lineOrder: 'onTop' }, tableOf(p));
-    const z = (k: string) => top.find((l) => l.kind === k)!.z;
+    const z = (k: string) => top.findIndex((l) => l.kind === k);
     expect(z('rawPoints')).toBeLessThan(z('points'));
     expect(z('points')).toBeLessThan(z('line'));
   });

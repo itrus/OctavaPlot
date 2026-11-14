@@ -90,7 +90,7 @@ function midOf(pts: readonly P[]): { at: P; dir: P } | null {
   return null;
 }
 
-export interface DrawingGeometry {
+interface DrawingGeometry {
   /** The outline (a line: shortened under its arrowheads). */
   d: string;
   closed: boolean;

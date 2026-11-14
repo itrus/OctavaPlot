@@ -5,274 +5,13 @@
 
 import { meanOf } from './moments';
 import { studentTQuantileUpper } from './special';
+import { fitModelById, geoMid, range, type FitModel, type FitModelId } from './fitModels';
+import { invert, jtj, solve, type Mat } from './linalg';
 
 /** Raise when the numbers a fit gives change, so that no cached result of the old algorithm is shown. */
-export const FIT_ALGORITHM_VERSION = 2;
-
-export type FitModelId = 'linear' | 'polynomial' | 'exp_decay' | 'exp_association' | 'exp_two_phase' | 'gaussian_peak' | 'hyperbola' | 'hill_4pl' | 'asymmetric_5pl';
-
-interface FitModel {
-  id: FitModelId;
-  label: string;
-  /** What the curve is, for the help text and the label of the curve. */
-  formula: string;
-  linear: boolean;
-  /** Names of the parameters, in the order of `fn`. A polynomial has degree + 1. */
-  paramNames: (degree: number) => string[];
-  fn: (x: number, p: readonly number[]) => number;
-  /** Starting values from the data. */
-  init: (xs: readonly number[], ys: readonly number[], degree: number) => number[];
-  /** Other starting values to try as well (the fit keeps the best result): for a model whose one start can end in a local minimum. */
-  starts?: (xs: readonly number[], ys: readonly number[]) => number[][];
-  /** Bounds of each parameter (a rate cannot be negative), for the nonlinear models. */
-  lower?: (n: number) => number[];
-  upper?: (n: number) => number[];
-  /** X must be above 0 (the formula has x in a denominator or a power). */
-  positiveX?: boolean;
-  /** X may be 0 but not negative (the formula is defined at 0, and a negative X can put a pole in the denominator). */
-  nonNegativeX?: boolean;
-  /** Fewest points that can fix the parameters. */
-  minPoints: (degree: number) => number;
-}
-
-const mean = (a: readonly number[]) => a.reduce((s, v) => s + v, 0) / a.length;
-const minOf = (a: readonly number[]) => a.reduce((m, v) => (v < m ? v : m), Infinity);
-const maxOf = (a: readonly number[]) => a.reduce((m, v) => (v > m ? v : m), -Infinity);
-const range = (a: readonly number[]): [number, number] => [minOf(a), maxOf(a)];
-
-/**
- * Starting values for c + A1 exp(-k1 x) + A2 exp(-k2 x) by variable projection: for each pair of rates on a grid (k1 above k2, in
- * units of 1 / the range of X), the offset and the two amplitudes that fit best are found by linear least squares, and the pairs with
- * the smallest residual are the starts. A single start from the ends of the data can end with the two rates equal; these cannot.
- */
-function twoPhaseStarts(xs: readonly number[], ys: readonly number[]): number[][] {
-  const [x0, x1] = [minOf(xs), maxOf(xs)];
-  const span = Math.max(x1 - x0, 1e-12);
-  const grid: number[] = [];
-  for (let k = 0.1; k <= 100; k *= 1.5) grid.push(k / span);
-  const found: Array<{ rss: number; start: number[] }> = [];
-  for (let i = 0; i < grid.length; i++) {
-    for (let j = 0; j < i; j++) {
-      const k1 = grid[i];
-      const k2 = grid[j];
-      const cols = [xs.map(() => 1), xs.map((x) => Math.exp(-k1 * (x - x0))), xs.map((x) => Math.exp(-k2 * (x - x0)))];
-      const a: Mat = cols.map((ci) => cols.map((cj) => ci.reduce((sum, v, r) => sum + v * cj[r], 0)));
-      const inv = invert(a);
-      if (!inv) continue;
-      const b = cols.map((ci) => ci.reduce((sum, v, r) => sum + v * ys[r], 0));
-      const [c, a1, a2] = inv.map((row) => row.reduce((sum, v, r) => sum + v * b[r], 0));
-      let rss = 0;
-      for (let r = 0; r < xs.length; r++) rss += (ys[r] - c - a1 * cols[1][r] - a2 * cols[2][r]) ** 2;
-      // The amplitudes are those at X = x0 here; the model has them at X = 0, so they are taken back.
-      if (Number.isFinite(rss)) found.push({ rss, start: [c, a1 * Math.exp(k1 * x0), k1, a2 * Math.exp(k2 * x0), k2] });
-    }
-  }
-  return found.sort((u, v) => u.rss - v.rss).slice(0, 3).map((f) => f.start);
-}
-const trendSign = (xs: readonly number[], ys: readonly number[]) => {
-  const mx = mean(xs);
-  const my = mean(ys);
-  let s = 0;
-  for (let i = 0; i < xs.length; i++) s += (xs[i] - mx) * (ys[i] - my);
-  return s >= 0 ? 1 : -1;
-};
-const geoMid = (xs: readonly number[]) => {
-  const pos = xs.filter((x) => x > 0);
-  return pos.length ? Math.exp(mean(pos.map(Math.log))) : 1;
-};
-const INF = Infinity;
-
-export const FIT_MODELS: readonly FitModel[] = [
-  {
-    id: 'linear',
-    label: 'Straight line',
-    formula: 'a + b x',
-    linear: true,
-    paramNames: () => ['a (intercept)', 'b (slope)'],
-    fn: (x, p) => p[0] + p[1] * x,
-    init: () => [0, 0],
-    minPoints: () => 2,
-  },
-  {
-    id: 'polynomial',
-    label: 'Polynomial',
-    formula: 'a0 + a1 x + a2 x^2 + ...',
-    linear: true,
-    paramNames: (d) => Array.from({ length: d + 1 }, (_, i) => `a${i}`),
-    fn: (x, p) => p.reduceRight((acc, c) => acc * x + c, 0),
-    init: (_x, _y, d) => new Array<number>(d + 1).fill(0),
-    minPoints: (d) => d + 1,
-  },
-  {
-    id: 'exp_decay',
-    label: 'One-phase decay',
-    formula: 'c + A exp(-k x)',
-    linear: false,
-    paramNames: () => ['c (plateau)', 'A (span)', 'k (rate)'],
-    fn: (x, p) => p[0] + p[1] * Math.exp(-p[2] * x),
-    init: (xs, ys) => {
-      const [x0, x1] = range(xs);
-      const first = ys[xs.indexOf(x0)];
-      const last = ys[xs.indexOf(x1)];
-      return [last, first - last, 3 / Math.max(x1 - x0, 1e-12)];
-    },
-    lower: () => [-INF, -INF, 0],
-    minPoints: () => 3,
-  },
-  {
-    id: 'exp_association',
-    label: 'One-phase association',
-    formula: 'c + A (1 - exp(-k x))',
-    linear: false,
-    paramNames: () => ['c (start)', 'A (span)', 'k (rate)'],
-    fn: (x, p) => p[0] + p[1] * (1 - Math.exp(-p[2] * x)),
-    init: (xs, ys) => {
-      const [x0, x1] = range(xs);
-      const first = ys[xs.indexOf(x0)];
-      const last = ys[xs.indexOf(x1)];
-      return [first, last - first, 3 / Math.max(x1 - x0, 1e-12)];
-    },
-    lower: () => [-INF, -INF, 0],
-    minPoints: () => 3,
-  },
-  {
-    id: 'exp_two_phase',
-    label: 'Two-phase decay',
-    formula: 'c + A1 exp(-k1 x) + A2 exp(-k2 x)',
-    linear: false,
-    paramNames: () => ['c (plateau)', 'A1', 'k1 (fast rate)', 'A2', 'k2 (slow rate)'],
-    fn: (x, p) => p[0] + p[1] * Math.exp(-p[2] * x) + p[3] * Math.exp(-p[4] * x),
-    init: (xs, ys) => {
-      const [x0, x1] = range(xs);
-      const span = Math.max(x1 - x0, 1e-12);
-      const first = ys[xs.indexOf(x0)];
-      const last = ys[xs.indexOf(x1)];
-      return [last, (first - last) * 0.6, 10 / span, (first - last) * 0.4, 1 / span];
-    },
-    starts: (xs, ys) => twoPhaseStarts(xs, ys),
-    lower: () => [-INF, -INF, 0, -INF, 0],
-    minPoints: () => 5,
-  },
-  {
-    id: 'gaussian_peak',
-    label: 'Gaussian peak',
-    formula: 'c + A exp(-0.5 ((x - mu) / sigma)^2)',
-    linear: false,
-    paramNames: () => ['c (baseline)', 'A (height)', 'mu (centre)', 'sigma (width)'],
-    fn: (x, p) => p[0] + p[1] * Math.exp(-0.5 * ((x - p[2]) / p[3]) ** 2),
-    init: (xs, ys) => {
-      const base = minOf(ys);
-      const top = maxOf(ys);
-      const at = xs[ys.indexOf(top)];
-      const [x0, x1] = range(xs);
-      return [base, top - base, at, Math.max((x1 - x0) / 6, 1e-12)];
-    },
-    lower: () => [-INF, -INF, -INF, 1e-12],
-    minPoints: () => 4,
-  },
-  {
-    id: 'hyperbola',
-    label: 'Hyperbola (Michaelis-Menten)',
-    formula: 'c + V x / (K + x)',
-    linear: false,
-    paramNames: () => ['c (offset)', 'V (maximum)', 'K (half-saturation)'],
-    fn: (x, p) => p[0] + (p[1] * x) / (p[2] + x),
-    init: (xs, ys) => {
-      const top = maxOf(ys);
-      return [0, top, Math.max(mean(xs), 1e-12)];
-    },
-    lower: () => [-INF, -INF, 1e-12],
-    nonNegativeX: true,
-    minPoints: () => 3,
-  },
-  {
-    id: 'hill_4pl',
-    label: 'Four-parameter logistic (Hill)',
-    formula: 'bottom + (top - bottom) / (1 + (c / x)^h)',
-    linear: false,
-    paramNames: () => ['bottom', 'top', 'c (EC50 or IC50)', 'h (Hill slope)'],
-    fn: (x, p) => p[0] + (p[1] - p[0]) / (1 + (p[2] / x) ** p[3]),
-    init: (xs, ys) => {
-      // A rising curve has a positive slope, a falling one a negative slope (the formula's own convention).
-      const [lo, hi] = range(ys);
-      const rising = trendSign(xs.map(Math.log), ys) > 0;
-      return [lo, hi, geoMid(xs), rising ? 1 : -1];
-    },
-    lower: () => [-INF, -INF, 1e-12, -INF],
-    positiveX: true,
-    minPoints: () => 4,
-  },
-  {
-    id: 'asymmetric_5pl',
-    label: 'Five-parameter logistic',
-    formula: 'bottom + (top - bottom) / (1 + (c / x)^h)^s',
-    linear: false,
-    paramNames: () => ['bottom', 'top', 'c', 'h (slope)', 's (asymmetry)'],
-    fn: (x, p) => p[0] + (p[1] - p[0]) / (1 + (p[2] / x) ** p[3]) ** p[4],
-    init: (xs, ys) => {
-      const [lo, hi] = range(ys);
-      const rising = trendSign(xs.map(Math.log), ys) > 0;
-      return [lo, hi, geoMid(xs), rising ? 1 : -1, 1];
-    },
-    lower: () => [-INF, -INF, 1e-12, -INF, 1e-6],
-    positiveX: true,
-    minPoints: () => 5,
-  },
-];
-
-export const fitModelById = (id: FitModelId): FitModel => FIT_MODELS.find((m) => m.id === id) ?? FIT_MODELS[0];
+export const FIT_ALGORITHM_VERSION = 4;
 
 // ---------------------------------------------------------------------------------------------------------------
-// Small dense linear algebra: matrices as arrays of rows.
-
-type Mat = number[][];
-
-/** Solve A x = b (A square) by Gaussian elimination with partial pivoting; null when A is singular. */
-function solve(a: Mat, b: readonly number[]): number[] | null {
-  const n = a.length;
-  const m = a.map((row, i) => [...row, b[i]]);
-  let scale = 0;
-  for (const row of a) for (const v of row) scale = Math.max(scale, Math.abs(v));
-  for (let c = 0; c < n; c++) {
-    let p = c;
-    for (let r = c + 1; r < n; r++) if (Math.abs(m[r][c]) > Math.abs(m[p][c])) p = r;
-    if (!(Math.abs(m[p][c]) > 1e-13 * Math.max(scale, 1e-300))) return null;
-    [m[c], m[p]] = [m[p], m[c]];
-    for (let r = c + 1; r < n; r++) {
-      const f = m[r][c] / m[c][c];
-      for (let k = c; k <= n; k++) m[r][k] -= f * m[c][k];
-    }
-  }
-  const x = new Array<number>(n).fill(0);
-  for (let r = n - 1; r >= 0; r--) {
-    let s = m[r][n];
-    for (let k = r + 1; k < n; k++) s -= m[r][k] * x[k];
-    x[r] = s / m[r][r];
-  }
-  return x;
-}
-
-/** The inverse of a square matrix; null when it is singular. */
-function invert(a: Mat): Mat | null {
-  const n = a.length;
-  const cols: number[][] = [];
-  for (let j = 0; j < n; j++) {
-    const e = new Array<number>(n).fill(0);
-    e[j] = 1;
-    const col = solve(a, e);
-    if (!col) return null;
-    cols.push(col);
-  }
-  return a.map((_, i) => cols.map((c) => c[i]));
-}
-
-const jtj = (j: Mat): Mat => {
-  const p = j[0]?.length ?? 0;
-  const out: Mat = Array.from({ length: p }, () => new Array<number>(p).fill(0));
-  for (const row of j) for (let a = 0; a < p; a++) for (let b = a; b < p; b++) out[a][b] += row[a] * row[b];
-  for (let a = 0; a < p; a++) for (let b = 0; b < a; b++) out[a][b] = out[b][a];
-  return out;
-};
 
 // ---------------------------------------------------------------------------------------------------------------
 
@@ -283,6 +22,16 @@ export interface FitParam {
   se: number | null;
   lower: number | null;
   upper: number | null;
+}
+
+/** The level a fit is solved at when the level is not the caller's concern (the limits of a parameter are derived from se and df at any level, see confidenceLimits). */
+export const FIT_SOLVE_LEVEL = 0.95;
+
+/** The limits of the interval of a parameter at `level`, from its standard error and the residual degrees of freedom; null when it has none. */
+export function confidenceLimits(param: Pick<FitParam, 'value' | 'se'>, df: number, level: number): { lower: number; upper: number } | null {
+  if (param.se === null || !(level > 0 && level < 1)) return null;
+  const t = studentTQuantileUpper((1 - level) / 2, df);
+  return Number.isFinite(t) ? { lower: param.value - t * param.se, upper: param.value + t * param.se } : null;
 }
 
 export interface FitResult {
@@ -311,8 +60,8 @@ interface FitOptions {
   degree?: number;
   /** Confidence level of the parameter intervals and of the bands (default 0.95). */
   level?: number;
+  /** Iterations allowed (the default is MAX_ITERATIONS); a test asks for few, to see a fit that does not settle. */
   maxIterations?: number;
-  relativeTolerance?: number;
 }
 
 /** One failed fit: no curve at all, with the reason. */
@@ -336,7 +85,9 @@ function numericJacobian(model: FitModel, xs: readonly number[], p: readonly num
     const down = [...p];
     up[k] += h;
     down[k] -= h;
-    xs.forEach((x, i) => (rows[i][k] = (model.fn(x, up) - model.fn(x, down)) / (2 * h)));
+    // All points for one parameter vector, then all for the other (the same arithmetic): the model sees one vector for a long run of calls.
+    for (let i = 0; i < xs.length; i++) rows[i][k] = model.fn(xs[i], up);
+    for (let i = 0; i < xs.length; i++) rows[i][k] = (rows[i][k] - model.fn(xs[i], down)) / (2 * h);
   }
   return rows;
 }
@@ -490,7 +241,7 @@ interface LinearFit {
  */
 function linearLeastSquares(xs: readonly number[], ys: readonly number[], degree: number): LinearFit | null {
   const cols = degree + 1;
-  const centre = mean(xs);
+  const centre = meanOf(xs);
   const scale = xs.reduce((m, x) => Math.max(m, Math.abs(x - centre)), 0) || 1;
   const design: Mat = xs.map((x) => Array.from({ length: cols }, (_, k) => ((x - centre) / scale) ** k));
   const ls = qrLeastSquares(design, ys);
@@ -537,7 +288,7 @@ function normalisation(id: FitModelId, xs: readonly number[], ys: readonly numbe
   const [y0, y1] = range(ys);
   const ratio = id === 'hyperbola' || id === 'hill_4pl' || id === 'asymmetric_5pl';
   // Values that are all equal are centred on themselves exactly, so that rounding in the mean cannot make a signal of them.
-  const yShift = y0 === y1 ? y0 : mean(ys);
+  const yShift = y0 === y1 ? y0 : meanOf(ys);
   return {
     xShift: ratio ? 0 : id === 'gaussian_peak' ? (x0 + x1) / 2 : x0,
     xScale: ratio ? geoMid(xs) : x1 - x0 || 1,
@@ -663,11 +414,23 @@ export function solveFit(points: ReadonlyArray<{ x: number; y: number }>, option
     /** One search from one start: its own scales, bounds and result, and the residual it ends with. */
     const attempt = (start: number[]) => {
       const scales = start.map((v) => (Math.abs(v) > 1e-6 && Number.isFinite(v) ? Math.abs(v) : 1));
-      const scaledModel: FitModel = { ...model, fn: (x, t) => model.fn(x, t.map((v, i) => v * scales[i])) };
+      // The parameters are multiplied by their scales once for each parameter vector, not once for each data point.
+      let lastT: readonly number[] | null = null;
+      let lastP: number[] = [];
+      const scaledModel: FitModel = {
+        ...model,
+        fn: (x, t) => {
+          if (t !== lastT) {
+            lastT = t;
+            lastP = t.map((v, i) => v * scales[i]);
+          }
+          return model.fn(x, lastP);
+        },
+      };
       const bound = (raw: number[] | undefined, fallback: number) => (raw ?? new Array<number>(p).fill(fallback)).map((v, i) => (v > 0 && Number.isFinite(v) && dims[i] === 'x' ? 1e-9 : v) / scales[i]);
       const lo = bound(model.lower?.(p), -Infinity);
-      const hi = bound(model.upper?.(p), Infinity);
-      const r = levenbergMarquardt(scaledModel, xn, yn, start.map((v, i) => v / scales[i]), lo, hi, options.maxIterations ?? MAX_ITERATIONS, options.relativeTolerance ?? REL_TOL);
+      const hi = bound(undefined, Infinity);
+      const r = levenbergMarquardt(scaledModel, xn, yn, start.map((v, i) => v / scales[i]), lo, hi, options.maxIterations ?? MAX_ITERATIONS, REL_TOL);
       let rssN = 0;
       for (let i = 0; i < xn.length; i++) rssN += (yn[i] - scaledModel.fn(xn[i], r.p)) ** 2;
       return { scales, scaledModel, r, rssN: Number.isFinite(rssN) ? rssN : Infinity };
@@ -757,13 +520,23 @@ export function fitFromSolution(sol: FitSolution): FitResult {
     predict = (x) => nm.yShift + nm.yScale * scaledModel.fn((x - nm.xShift) / nm.xScale, working);
     gradientAt = (x) => numericJacobian(scaledModel, [(x - nm.xShift) / nm.xScale], working)[0];
   }
+  // The t quantile depends on the level only: one value for every X of a band.
+  let tLevel = NaN;
+  let tValue = NaN;
+  const quantile = (lv: number): number => {
+    if (lv !== tLevel) {
+      tLevel = lv;
+      tValue = studentTQuantileUpper((1 - lv) / 2, df);
+    }
+    return tValue;
+  };
   const halfWidth = (x: number, kind: 'confidence' | 'prediction', lv: number): number | null => {
     if (!cov || sigma === null || !(lv > 0 && lv < 1)) return null;
     const g = gradientAt(x);
     let v = 0;
     for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) v += g[a] * cov[a][b] * g[b];
     if (!(v >= 0)) return null;
-    const t = studentTQuantileUpper((1 - lv) / 2, df);
+    const t = quantile(lv);
     if (!Number.isFinite(t)) return null;
     return t * unitScale * Math.sqrt(kind === 'prediction' ? v + (sigma / unitScale) ** 2 : v);
   };

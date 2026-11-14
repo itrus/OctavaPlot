@@ -6,10 +6,9 @@ import { analysesOf } from '../../model/project/analysis';
 import type { Chart, DataTable } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import type { ExportFormat } from '../../state/settings';
-import { copyText } from '../../util/download';
 import { useFitsVersion } from '../components/useFitsVersion';
 import { browserFontAvailable, browserHasGlyph } from './browserFonts';
-import { ReportBody } from './ReportBody';
+import { copyReport, ReportBody } from './ReportBody';
 import { exportStatusText } from './exportJob';
 import { graphExportJob } from './graphExportJob';
 import { useExportFileName } from './useExportFileName';
@@ -76,7 +75,7 @@ export function ExportPanel({ chart, table }: { chart: Chart; table: DataTable }
   // The file is named after the graph (a date and time are added when Settings says so); the button shows the name it will have.
   const fileName = useExportFileName(chart.name, format);
   const start = () => void job.start(graphExportJob(chart, table, curve, { format, fileName }));
-  const copy = async () => setCopied((await copyText(JSON.stringify(report, null, 2))) ? 'Report copied.' : 'The browser did not allow copying.');
+  const copy = async () => setCopied(await copyReport(report));
 
   return (
     <div className="export-panel">

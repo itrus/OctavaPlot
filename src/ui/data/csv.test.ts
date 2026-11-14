@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import type { DataTable } from '../../model/types';
-import { importCsv, isCsvFile, parseCsv, tableToCsv } from './csv';
+import { isCsvFile, parseCsv, tableToCsv } from './csv';
+import { importCsv } from './csvTestKit';
 
 describe('CSV', () => {
   it('parses quotes, doubled quotes, embedded commas and line breaks', () => {
@@ -70,7 +71,7 @@ describe('other delimiters', () => {
     expect(importCsv('A;B\n1,5;2\n3;\n', 'comma')).toEqual({ ok: true, data: { names: ['A', 'B'], titles: null, values: [[1.5, 2], [3, null]] } });
     const r = importCsv('A,B\n1,2\n', 'comma');
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.message).toContain('comma-separated');
+    if (!r.ok) expect(r.message).toContain('commas');
     expect(importCsv('A;B\n"1;5";2\n', 'comma').ok).toBe(false);
   });
   it('a title that holds the delimiter is quoted in either mode', () => {
@@ -186,8 +187,8 @@ describe('CSV export of excluded values', () => {
 
 describe('the header and the size of a file', () => {
   it('ignores a byte-order mark, as Excel writes one, in the first group name', () => {
-    expect(parseCsv('﻿a,b\n1,2')).toEqual([['a', 'b'], ['1', '2']]);
-    const r = importCsv('﻿Control,Treated\n1,2\n3,4');
+    expect(parseCsv('\uFEFFa,b\n1,2')).toEqual([['a', 'b'], ['1', '2']]);
+    const r = importCsv('\uFEFFControl,Treated\n1,2\n3,4');
     expect(r.ok && r.data.names).toEqual(['Control', 'Treated']);
   });
   it('keeps two groups with the same name as two groups', () => {

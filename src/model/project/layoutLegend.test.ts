@@ -3,7 +3,8 @@ import { addLayout, patchLayout } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { createExampleProject } from '../defaults';
 import type { Project } from '../types';
-import { arrangeLayout, defaultLayout, mmToPt, pageFrame, sanitizeLayout, slotRects } from './layout';
+import { arrangeLayout, defaultLayout, pageFrame, sanitizeLayout, slotRects } from './layout';
+import { mmToPt } from '../units';
 
 const addLayoutTo = (p: Project): Project => addLayout('layout_1', {}, p.charts[0].id)(p);
 const base = defaultLayout('l1', 'Page', { arrangement: { kind: 'grid', cols: 2, rows: 1 } }); // margin 12 mm, gap 6 mm, landscape

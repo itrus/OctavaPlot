@@ -61,7 +61,7 @@ export function swarmOffsets(ys: readonly number[], diameter: number, maxHalf: n
 }
 
 /** What decides where the dots of a plot of individual values sit sideways. */
-export interface DotSpread {
+interface DotSpread {
   enabled: boolean;
   swarm: boolean;
   widthFraction: number;

@@ -42,7 +42,7 @@ export function sanitizeVolcano(raw: unknown, base: VolcanoOptions): VolcanoOpti
 /** What a point of a volcano plot is, from its fold change (X) and the Y of the plot (−log10 p). */
 export function volcanoClass(o: Pick<VolcanoOptions, 'fcThreshold' | 'pThreshold'>, x: number, negLog10P: number): 'up' | 'down' | 'ns' {
   if (negLog10P <= pLine(o.pThreshold) || Math.abs(x) < o.fcThreshold) return 'ns';
-  return x > 0 ? 'up' : 'down';
+  return x > 0 ? 'up' : x < 0 ? 'down' : 'ns';
 }
 
 /** The Y of the plot for a value of the Y column; null for a p-value outside (0, 1] or a value that is not a number. */

@@ -74,7 +74,7 @@ describe('per-axis domains', () => {
     const stats = (pr: Project) => modelOf(pr).groups.map((g) => g.stats);
     expect(stats(p)).toEqual(stats(q));
     const g = p.dataTables[0].groups[2];
-    expect(modelOf(p).groups[2].stats).toBe(statsFor(g.observations, resolveSummary(p.charts[0].layers[0], g.id)));
+    expect(modelOf(p).groups[2].stats).toEqual(statsFor(g.observations, resolveSummary(p.charts[0].layers[0], g.id)));
   });
 });
 

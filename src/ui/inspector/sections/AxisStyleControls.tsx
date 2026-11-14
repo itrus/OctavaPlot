@@ -8,7 +8,14 @@ import { TimeField } from '../common/TimeField';
 import type { TimeColumn } from '../../../util/timeColumn';
 import { SLIDERS } from '../common/sliderRanges';
 
-const DECIMALS = ['auto', '0', '1', '2', '3', '4', '5', '6'] as const;
+/** Auto and 0 to 10: the whole range that the setting accepts (a value above the menu would show as Auto). */
+const DECIMALS = ['auto', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const;
+
+/** A change to one axis of the chart, as one undo step named after the axis ("X axis tick length"). */
+function useAxisEdit(chart: Chart, which: AxisKey, name: string): (label: string, patch: Parameters<typeof patchAxis>[2], key?: string) => void {
+  const { run } = useApp();
+  return (label, patch, key) => run(`${name} ${label}`, patchAxis(chart.id, which, patch), key);
+}
 
 /**
  * Scale, direction, ticks and number format of one numeric axis (spec 6.1, 6.3, 6.4). `canScale` is false for charts
@@ -33,9 +40,8 @@ export function AxisStyleControls({
   /** The axis shows dates, times or durations (the X column of an XY table has this type): it is linear, and its values are typed as dates. */
   time?: TimeColumn;
 }) {
-  const { run } = useApp();
   const axis = chart[which];
-  const set = (label: string, patch: Parameters<typeof patchAxis>[2], key?: string) => run(`${name} ${label}`, patchAxis(chart.id, which, patch), key);
+  const set = useAxisEdit(chart, which, name);
   const isLog = axis.scale !== 'linear';
   const minorLogOk = axis.scale === 'log10';
   return (
@@ -93,7 +99,7 @@ export function AxisStyleControls({
       </Field>
       <Field label="Decimals" hint="Digits after the decimal point; Auto picks them from the tick step">
         <SelectInput<(typeof DECIMALS)[number]>
-          value={axis.decimals === null || axis.decimals > 6 ? 'auto' : (String(axis.decimals) as (typeof DECIMALS)[number])}
+          value={axis.decimals === null ? 'auto' : (String(axis.decimals) as (typeof DECIMALS)[number])}
           disabled={axis.numberFormat === 'auto'}
           options={DECIMALS.map((d) => ({ value: d, label: d === 'auto' ? 'Auto' : d }))}
           onChange={(v) => set('decimals', { decimals: v === 'auto' ? null : Number(v) })}
@@ -116,9 +122,8 @@ export function AxisStyleControls({
 
 /** Direction and length of the tick marks: the part of the axis style every axis has, the category axis too. */
 export function TickFields({ chart, which, name }: { chart: Chart; which: AxisKey; name: string }) {
-  const { run } = useApp();
   const axis = chart[which];
-  const set = (label: string, patch: Parameters<typeof patchAxis>[2], key?: string) => run(`${name} ${label}`, patchAxis(chart.id, which, patch), key);
+  const set = useAxisEdit(chart, which, name);
   return (
     <>
       <Field label="Tick direction">
@@ -148,10 +153,16 @@ function BreakFields({ chart, which, name, scale, blocked, time }: { chart: Char
   const [lo, hi] = [Math.min(...scale.domain), Math.max(...scale.domain)];
   const add = () => {
     const third = (hi - lo) / 3;
-    const free = axis.breaks.length === 0 ? lo + third : (axis.breaks[axis.breaks.length - 1].to + hi) / 2 - third / 2;
+    // The first break is in the middle of the axis; the second goes in the middle of what is left above the first, so that it never touches it.
+    const lastTo = axis.breaks.length === 0 ? null : axis.breaks[axis.breaks.length - 1].to;
+    if (lastTo !== null && !(hi - lastTo > 0)) return;
+    const free = lastTo === null ? lo + third : lastTo + (hi - lastTo) / 4;
+    const width = lastTo === null ? third / 2 : (hi - lastTo) / 2;
     // A date or a time is a whole day or second; the six digits that suit a plain number would cut a time of 1.7 billion seconds.
     const snap = (v: number) => (time ? (time.kind === 'duration' ? v : Math.round(v)) : Number(v.toPrecision(6)));
-    set([...axis.breaks, { from: snap(free), to: snap(free + third / 2) }], 'break added');
+    const [from, to] = [snap(free), snap(free + width)];
+    if (!(from < to) || (lastTo !== null && !(from > lastTo))) return;
+    set([...axis.breaks, { from, to }], 'break added');
   };
   return (
     <Section title="Breaks" defaultOpen={false}>

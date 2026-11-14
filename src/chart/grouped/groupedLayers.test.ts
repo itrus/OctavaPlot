@@ -46,7 +46,6 @@ describe('the layers of a grouped or contingency chart', () => {
     expect(new Set(ls.map((l) => l.id)).size).toBe(ls.length);
     const bars = ls.filter((l) => l.kind === 'bars');
     expect(bars).toHaveLength(2);
-    expect(bars.every((l) => l.binding?.tableId === replicates.id)).toBe(true);
     expect(new Set(bars.map((l) => l.binding?.seriesId)).size).toBe(2);
   });
 

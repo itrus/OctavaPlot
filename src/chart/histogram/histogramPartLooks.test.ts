@@ -90,7 +90,7 @@ describe('keeping the bars or the steps of a histogram out of the axis range', (
     expect(drawn(out)).toEqual(drawn(chart));
     expect(buildHistogramModel(out, lopsided).x.domain).toEqual(buildHistogramModel(chart, lopsided).x.domain);
     expect(out.hiddenLayerIds).toEqual(chart.hiddenLayerIds);
-    expect(layersOf(out, lopsided).map((l) => [l.id, l.visible, l.z])).toEqual(layersOf(chart, lopsided).map((l) => [l.id, l.visible, l.z]));
+    expect(layersOf(out, lopsided).map((l) => [l.id, l.visible])).toEqual(layersOf(chart, lopsided).map((l) => [l.id, l.visible]));
     expect(markIds(svg(out))).toEqual(markIds(svg(chart)));
   });
 

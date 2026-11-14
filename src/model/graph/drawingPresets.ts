@@ -8,7 +8,7 @@ import { newId } from '../ids';
  * and a bent line goes between two corners of that box.
  */
 
-export type DrawingGroup = 'shapes' | 'lines' | 'text';
+type DrawingGroup = 'shapes' | 'lines' | 'text';
 
 /** How the two points of an object are taken from the box of a drag: as dragged, or from two of its corners. */
 type Corners = 'drag' | 'tl-br' | 'bl-tr';
@@ -76,7 +76,7 @@ export const DRAWING_GROUPS: ReadonlyArray<{ id: DrawingGroup; label: string }> 
 export const presetById = (id: string): DrawingPreset | undefined => DRAWING_PRESETS.find((p) => p.id === id);
 
 /** The look a new object takes: the colour of the texts of the chart (or black on a page), the width of its line (see DRAWING_WIDTH; 1 pt when absent), and the size of the numbers of the chart (or 12 pt). */
-export interface DrawingLook {
+interface DrawingLook {
   color: string;
   fontSizePt: number;
   widthPt?: number;
@@ -101,14 +101,19 @@ export function snapToAxis(a: { x: number; y: number }, b: { x: number; y: numbe
 }
 
 export function pointsOfDrag(preset: DrawingPreset, a: { x: number; y: number }, b: { x: number; y: number }): [{ x: number; y: number }, { x: number; y: number }] {
-  let end = b;
-  if (Math.hypot(b.x - a.x, b.y - a.y) < 3) end = { x: a.x + preset.click[0], y: a.y + preset.click[1] };
-  if (preset.lock === 'across') end = { x: end.x, y: a.y };
-  else if (preset.lock === 'down') end = { x: a.x, y: end.y };
-  else if (preset.lock === 'square') {
-    const side = Math.max(Math.abs(end.x - a.x), Math.abs(end.y - a.y));
-    end = { x: a.x + Math.sign(end.x - a.x || 1) * side, y: a.y + Math.sign(end.y - a.y || 1) * side };
-  }
+  // The lock is applied first, and a click is told from a drag by the length that is left: a bracket dragged straight down is not a click, and a
+  // bracket locked across and dragged straight down would otherwise be a line of no length.
+  const locked = (e: { x: number; y: number }): { x: number; y: number } => {
+    if (preset.lock === 'across') return { x: e.x, y: a.y };
+    if (preset.lock === 'down') return { x: a.x, y: e.y };
+    if (preset.lock === 'square') {
+      const side = Math.max(Math.abs(e.x - a.x), Math.abs(e.y - a.y));
+      return { x: a.x + Math.sign(e.x - a.x || 1) * side, y: a.y + Math.sign(e.y - a.y || 1) * side };
+    }
+    return e;
+  };
+  let end = locked(b);
+  if (Math.hypot(end.x - a.x, end.y - a.y) < 3) end = locked({ x: a.x + preset.click[0], y: a.y + preset.click[1] });
   // A straight line close to across or to up and down is put exactly so.
   if (preset.shape === 'line' && !preset.lock && !preset.route && preset.corners === 'drag') end = snapToAxis(a, end);
   if (preset.corners === 'drag') return [a, end];
@@ -117,14 +122,17 @@ export function pointsOfDrag(preset: DrawingPreset, a: { x: number; y: number },
   return preset.corners === 'tl-br' ? [{ x: l, y: t }, { x: r, y: bt }] : [{ x: l, y: bt }, { x: r, y: t }];
 }
 
+const unit = (v: number): number => Math.min(1, Math.max(0, v));
+
 /** A new object of a preset between two points (fractions of the chart or page), on the page (not anchored to data). */
 export function createDrawing(preset: DrawingPreset, from: DrawingPoint, to: DrawingPoint, look: DrawingLook, id: string = newId('drw')): Drawing {
   const width = clampDrawing('widthPt', look.widthPt ?? 1);
   return {
     id,
     shape: preset.shape,
-    from: { xFrac: from.xFrac, yFrac: from.yFrac },
-    to: { xFrac: to.xFrac, yFrac: to.yFrac },
+    // Held to the page, as a file is read and a move is made: an object placed by a click near the edge would otherwise change when the project is opened again.
+    from: { xFrac: unit(from.xFrac), yFrac: unit(from.yFrac) },
+    to: { xFrac: unit(to.xFrac), yFrac: unit(to.yFrac) },
     ...(preset.route && preset.route !== 'straight' ? { route: preset.route } : {}),
     ...(preset.start && preset.start !== 'none' ? { start: preset.start } : {}),
     ...(preset.end && preset.end !== 'none' ? { end: preset.end } : {}),
@@ -147,7 +155,13 @@ export function drawingName(d: Drawing): string {
   const route = d.route ?? 'straight';
   const group: DrawingGroup = d.text !== undefined ? 'text' : route === 'straight' ? 'lines' : 'shapes';
   const same = DRAWING_PRESETS.filter((p) => p.group === group && p.shape === 'line' && (p.route ?? 'straight') === route && (p.start ?? 'none') === (d.start ?? 'none') && (p.end ?? 'none') === (d.end ?? 'none'));
-  const best = same.find((p) => p.endSizePt === d.endSizePt) ?? same[0];
+  // Presets that differ only by their lock (a bracket across, a side bracket down) are told apart by the way the object runs.
+  const down = d.from.xFrac === d.to.xFrac ? true : d.from.yFrac === d.to.yFrac ? false : Math.abs(d.to.xFrac - d.from.xFrac) < Math.abs(d.to.yFrac - d.from.yFrac);
+  const pool = same.filter((p) => p.lock === undefined || p.lock === 'square' || (p.lock === 'down') === down);
+  const candidates = pool.length > 0 ? pool : same;
+  // The size an object is made at grows with the width of its line (createDrawing), so it is compared at the object's width.
+  const sizeAt = (p: (typeof same)[number]) => (p.endSizePt === undefined ? undefined : Number((p.endSizePt * Math.max(1, Math.sqrt(d.widthPt ?? 1))).toFixed(1)));
+  const best = candidates.find((p) => sizeAt(p) === d.endSizePt) ?? candidates[0];
   return best?.label ?? (d.text !== undefined ? 'Line with text' : 'Line');
 }
 
@@ -166,3 +180,21 @@ export const endSizeOf = (d: Pick<Drawing, 'endSizePt' | 'widthPt'>, kind: LineE
 
 /** A setting of an object held to its limits (a typed value, a value read from a file). */
 export const clampDrawing = (key: keyof typeof DRAWING_LIMITS, v: number): number => Math.min(DRAWING_LIMITS[key].max, Math.max(DRAWING_LIMITS[key].min, v));
+
+/** A move or a resize of drawing objects in progress: where the pointer started, how far it has gone, and the objects with their points (pt) when it began. */
+export interface ShapeDrag {
+  mode: 'move' | 'from' | 'to';
+  start: { x: number; y: number };
+  delta: { x: number; y: number };
+  items: Array<{ drawing: Drawing; from: { x: number; y: number }; to: { x: number; y: number } }>;
+}
+
+/** The live points of an object being moved or resized, pt: a move shifts both, a handle one. */
+export function draggedPoints(it: ShapeDrag['items'][number], d: Pick<ShapeDrag, 'mode' | 'delta'>) {
+  const shift = (q: { x: number; y: number }) => ({ x: q.x + d.delta.x, y: q.y + d.delta.y });
+  if (d.mode === 'move') return { from: shift(it.from), to: shift(it.to) };
+  // A handle of a straight line close to across or to up and down puts it exactly so, from its other end.
+  const straight = it.drawing.shape === 'line' && (it.drawing.route ?? 'straight') === 'straight';
+  if (d.mode === 'from') return { from: straight ? snapToAxis(it.to, shift(it.from)) : shift(it.from), to: it.to };
+  return { from: it.from, to: straight ? snapToAxis(it.from, shift(it.to)) : shift(it.to) };
+}

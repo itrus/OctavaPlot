@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHART_TYPES, chartTypesFor } from './chartTypes';
+import { CHART_TYPES, chartTypeInfo, chartTypesFor } from './chartTypes';
 import { GALLERY, availableItems, galleryItems } from './chartGallery';
 import { applyVariant } from './chartVariant';
 import { createChart } from '../defaults';
@@ -37,14 +37,13 @@ describe('graph gallery', () => {
     }
   });
 
-  it('planned graphs say which preset of the catalogue they are', () => {
-    for (const k of KINDS) for (const i of galleryItems(k).filter((x) => x.type === null)) expect(i.spec).toMatch(/^[a-z_]+\.[a-z_]+$/);
+  it('a planned graph (one without a chart type, shown locked) names its catalogue preset; none is planned now', () => {
+    const all = KINDS.flatMap((k) => galleryItems(k));
+    // The check is not vacuous: there are entries, and the ones that are planned (none today) carry a preset of the form "family.name".
+    expect(all.length).toBeGreaterThan(50);
+    for (const i of all.filter((x) => x.type === null)) expect(i.spec).toMatch(/^[a-z_]+\.[a-z_]+$/);
   });
 
-  it('names the catalogue preset of every graph that is still planned', () => {
-    const planned = KINDS.flatMap((k) => galleryItems(k).filter((i) => i.type === null));
-    expect(planned.every((i) => !!i.spec)).toBe(true);
-  });
   it('makes aligned dots as the dot plot without sideways spreading', () => {
     const aligned = galleryItems('column').find((i) => i.id === 'cat.aligned');
     expect(aligned?.type).toBe('scatter');
@@ -60,14 +59,20 @@ describe('graph gallery', () => {
 });
 
 describe('gallery contents', () => {
-  it('holds every graph of a table type in its tabs, the creatable ones among them', () => {
+  it('holds the creatable graphs of a table type among its tabs, each under the table type its chart type is drawn from', () => {
     for (const k of KINDS) {
-      expect(GALLERY[k].flatMap((t) => t.items)).toEqual(galleryItems(k));
-      expect(galleryItems(k).filter((i) => i.type !== null)).toEqual(availableItems(k));
+      const made = galleryItems(k).filter((i) => i.type !== null);
+      expect(made).toEqual(availableItems(k));
+      expect(made.every((i) => chartTypeInfo(i.type!)?.tableKind === k)).toBe(true);
+      expect(GALLERY[k].every((t) => t.items.length > 0)).toBe(true);
     }
   });
 
-  it('every locked entry has a preset id', () => {
-    for (const k of KINDS) for (const i of galleryItems(k).filter((x) => x.type === null)) expect(i.spec).toBeTruthy();
+  it('says of a plain graph (no variant) what its chart type says: the same name and description', () => {
+    for (const k of KINDS) {
+      const plain = galleryItems(k).filter((i) => i.type !== null && i.variant === undefined);
+      expect(plain.length).toBeGreaterThan(0);
+      for (const i of plain) expect({ id: i.id, label: i.label, description: i.description }).toEqual({ id: i.id, label: chartTypeInfo(i.type!)?.label, description: chartTypeInfo(i.type!)?.description });
+    }
   });
 });

@@ -274,3 +274,24 @@ describe('column types', () => {
     expect(detectTimeColumn([])).toBeNull();
   });
 });
+
+describe('microseconds of a date and time', () => {
+  const col = { kind: 'datetime', unit: 's' } as const;
+  const back = (text: string) => {
+    const r = parseTimeCell(text, col);
+    if (!r.ok || r.value === null) throw new Error(text);
+    return formatTimeCell(r.value, col);
+  };
+  it('are kept exactly within about 270 years of 1970', () => {
+    expect(back('2025-03-04T10:30:00.123456')).toBe('2025-03-04T10:30:00.123456');
+    expect(back('1900-01-01T00:00:00.000001')).toBe('1900-01-01T00:00:00.000001');
+    expect(back('2200-12-31T23:59:59.999999')).toBe('2200-12-31T23:59:59.999999');
+  });
+  it('are held to about 30 microseconds at the ends of the years 1 to 9999 (a double of seconds), and still read back as the nearest', () => {
+    const text = back('9999-12-31T23:59:59.123456');
+    expect(text.startsWith('9999-12-31T23:59:59.1234')).toBe(true);
+    const micro = Number(text.slice(text.indexOf('.') + 1).padEnd(6, '0'));
+    expect(Math.abs(micro - 123456)).toBeLessThan(40);
+    expect(back('0001-01-01T00:00:00.000500')).toMatch(/^0001-01-01T00:00:00\.0005/);
+  });
+});

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { InProcessWorker, ManualEngine } from '../testing/fitEngines';
 import { clearCalcCache, peekCalc, type CalcIdentity } from './calcCache';
 import { FIT_ALGORITHM_VERSION, fitCurve, isFailure, type FitFailure, type FitResult } from './fit';
-import { WorkerFitEngine, runFitRequest, type FitReply, type FitRequest } from './fitEngine';
+import { WorkerFitEngine } from './fitEngine';
+import { runFitRequest, type FitReply, type FitRequest } from './fitProtocol';
 import { deferredFitResult, fitJobStats, fitProvenance, fitsVersion, pendingFitCount, resetFitService, setFitEngine, subscribeFits } from './fitService';
 
 const pointsOf = (n: number, k = 0.7) => Array.from({ length: n }, (_, i) => ({ x: i * 0.5, y: 3 + 4 * Math.exp(-k * i * 0.5) + ((i * 7) % 5) * 0.02 }));

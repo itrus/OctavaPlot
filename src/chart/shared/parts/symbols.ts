@@ -1,5 +1,4 @@
 import type { SymbolShape } from '../../../model/types';
-import { SYMBOL_SHAPES } from '../../../model/graph/look';
 import { n2 } from '../../../model/units';
 
 /**
@@ -123,6 +122,3 @@ function starPath(cx: number, cy: number, radius: number): string {
   }
   return d + 'Z';
 }
-
-/** The symbol shapes the inspector offers. */
-export const SYMBOL_SHAPE_OPTIONS = SYMBOL_SHAPES;

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createExampleProject } from '../model/defaults';
-import type { Project } from '../model/types';
+import { createExampleProject } from '../../model/defaults';
+import type { Project } from '../../model/types';
 import { affectsRecovery, AUTOSAVE_META_KEY, isConflict } from './recovery';
 import { currentSignature, newEditorId, writeRecovery } from './recoveryStore';
-import { AUTOSAVE_KEY, loadAutosave, parseProject, stringifyProject } from './serialize';
+import { AUTOSAVE_KEY, loadAutosave, parseProject, stringifyProject } from '../serialize';
 
 /** One shared store, as two tabs of one browser have. */
 function sharedStorage(initial: Record<string, string> = {}, failKeys: string[] = []) {

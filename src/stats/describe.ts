@@ -40,7 +40,7 @@ export function spreadOptions(centre: CentreKind): { value: SpreadKind; label: s
 }
 
 /** Names a spread; range and IQR are never called a confidence interval. */
-export function describeSpread(spread: SpreadKind, level: number, centre: CentreKind = 'mean'): string {
+export function describeSpread(spread: SpreadKind, level: number | null, centre: CentreKind = 'mean'): string {
   switch (spread) {
     case 'none':
       return 'no spread';
@@ -49,7 +49,7 @@ export function describeSpread(spread: SpreadKind, level: number, centre: Centre
     case 'sem':
       return 'SEM';
     case 'ci':
-      return `${percentLabel(level)} confidence interval of the ${centreLower(centre)}`;
+      return `${level === null ? '' : percentLabel(level) + ' '}confidence interval of the ${centreLower(centre)}`;
     case 'range':
       return 'range (min to max)';
     case 'iqr':
@@ -90,7 +90,7 @@ function intervalLine(stats: GroupStats, fmt: (v: number) => string, errorHidden
   if (interval.status !== 'ok' || interval.lower === null || interval.upper === null) return null;
   const name =
     stats.effectiveSpread === 'ci'
-      ? `${percentLabel(stats.confidenceLevel)} CI`
+      ? `${stats.confidenceLevel === null ? '' : percentLabel(stats.confidenceLevel) + ' '}CI`
       : stats.effectiveSpread === 'gsd'
         ? 'Geometric SD limits'
         : SPREAD_NAME[stats.effectiveSpread];
@@ -233,13 +233,6 @@ export function describeCounts(stats: GroupStats, clippedEnds = 0): string {
   if (stats.invalid > 0) parts.push(`${stats.invalid} invalid`);
   if (clippedEnds > 0) parts.push(`${clippedEnds} error bar end${clippedEnds === 1 ? '' : 's'} clipped`);
   return parts.join(', ');
-}
-
-/** e.g. "Mean with SD", used only as a caption, never as a control label. */
-export function summaryCaption(spec: SummarySpec, showErrorBars: boolean): string {
-  const text = describeSummary(spec);
-  if (showErrorBars || effectiveSpreadOf(spec.centre, spec.spread) === 'none') return text;
-  return `${text} (error bars hidden)`;
 }
 
 const SPREAD_CODES: ReadonlyArray<string> = ['n-too-small', 'coverage', 'too-large', 'level-range', 'interval-invalid', 'ties', 'not-allowed'];

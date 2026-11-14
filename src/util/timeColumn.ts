@@ -2,7 +2,7 @@
  * Date, time and duration values (contract section 17). A time column holds plain numbers, as every column does; the column's type says
  * what they mean, and the number is never changed by it:
  *   date      whole days since 1970-01-01 (the civil calendar, proleptic Gregorian, years 0001 to 9999)
- *   datetime  seconds since 1970-01-01T00:00:00 (fractions of a second allowed, to a microsecond)
+ *   datetime  seconds since 1970-01-01T00:00:00 (fractions of a second allowed, to a microsecond: exact within 2^33 seconds, about 270 years, of 1970; further out, to the ends of the years 1 to 9999, a double holds the seconds to about 30 microseconds, and a fraction is rounded to that)
  *   duration  a length of time in the column's unit: days, hours, minutes or seconds
  * Nothing here uses `Date` or the machine's time zone: dates are counted with integer calendar arithmetic, so the same file gives the same
  * numbers and the same text on every computer.
@@ -87,9 +87,10 @@ export const MAX_DAY = daysFromCivil(9999, 12, 31);
 
 // ---------------------------------------------------------------- reading
 
-type TimeParse = { ok: true; value: number | null; offset?: boolean } | { ok: false; message: string };
+/** One cell read: its number (null for an empty one), whether it had an offset, or why it cannot be read. */
+export type CellParse = { ok: true; value: number | null; offset?: boolean } | { ok: false; message: string };
 
-const bad = (message: string): TimeParse => ({ ok: false, message });
+const bad = (message: string): CellParse => ({ ok: false, message });
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:[.,](\d{1,6}))?)?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
 const CLOCK_RE = /^([+-])?(\d+):([0-5]\d)(?::([0-5]\d)(?:[.,](\d{1,6}))?)?$/;
@@ -125,7 +126,7 @@ const fraction = (digits: string | undefined): number => (digits ? Number(`0.${d
  * ISO 8601 (`PT1H30M`, `P1DT2H`, `P2W`; no years or months, which have no fixed length), or a number with an optional unit (`90 min`,
  * `1.5h`); a bare number is in the column's unit.
  */
-export function parseTimeCell(text: string, col: TimeColumn): TimeParse {
+export function parseTimeCell(text: string, col: TimeColumn): CellParse {
   const t = text.trim();
   if (t === '') return { ok: true, value: null };
   if (col.kind === 'date') {
@@ -159,10 +160,11 @@ export function parseTimeCell(text: string, col: TimeColumn): TimeParse {
   return parseDuration(t, col.unit);
 }
 
-function parseDuration(t: string, unit: TimeUnit): TimeParse {
+function parseDuration(t: string, unit: TimeUnit): CellParse {
   const clock = CLOCK_RE.exec(t);
   if (clock) {
     const seconds = Number(clock[2]) * 3600 + Number(clock[3]) * 60 + (clock[4] === undefined ? 0 : Number(clock[4])) + fraction(clock[5]);
+    if (!Number.isFinite(seconds)) return bad(`"${t}" is not a finite duration`);
     return { ok: true, value: ((clock[1] === '-' ? -1 : 1) * seconds) / UNIT_SECONDS[unit] };
   }
   if (/^[+-]?P/.test(t)) {
@@ -197,7 +199,7 @@ interface TimeBatch {
  * or all times with an offset: the cells of the other kind than the first one are problems, since mixing them would put readings of
  * different clocks on one axis. `readOne` reads a cell (the default is `parseTimeCell`); a caller can add what it accepts in a number.
  */
-export function parseTimeBatch(texts: readonly string[], col: TimeColumn, readOne: (text: string) => TimeParse = (t) => parseTimeCell(t, col)): TimeBatch {
+export function parseTimeBatch(texts: readonly string[], col: TimeColumn, readOne: (text: string) => CellParse = (t) => parseTimeCell(t, col)): TimeBatch {
   const values: Array<number | null> = [];
   const problems: TimeBatch['problems'] = [];
   let firstOffset: boolean | null = null;

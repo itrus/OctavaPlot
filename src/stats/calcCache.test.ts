@@ -56,17 +56,16 @@ describe('a style or axis edit does not calculate again (metamorphic)', () => {
     for (const e of edits) buildXyModel(e, table, fit);
     expect(calcStats.computed).toBe(before);
   });
-  it('a change to the data, the method or the level calculates again', () => {
+  it('a change to the data or the method calculates again; a change of the level does not (limits and bands follow from the fit)', () => {
     buildXyModel(chart, table, fit);
     let before = calcStats.computed;
     buildXyModel(chart, table, { ...fit, level: 0.9 });
-    expect(calcStats.computed).toBeGreaterThan(before);
-    before = calcStats.computed;
+    expect(calcStats.computed).toBe(before);
     buildXyModel(chart, table, { ...fit, model: 'polynomial', degree: 2 });
     expect(calcStats.computed).toBeGreaterThan(before);
   });
   it('a change of the summary calculation (spread) calculates the summaries again', () => {
-    const values = [1, 2, 3, 4];
+    const values = Array.from({ length: 80 }, (_, i) => i + 1); // short lists are computed directly, not cached
     const a = summaryOf(values, { ...DEFAULT_SUMMARY, spread: 'sd' });
     expect(summaryOf(values, { ...DEFAULT_SUMMARY, spread: 'sem' })).not.toBe(a);
     expect(summaryOf(values, { ...DEFAULT_SUMMARY, spread: 'sd' })).toBe(a);
@@ -122,5 +121,16 @@ describe('the cost of a key and the size of the cache', () => {
     expect(n).toBe(2);
     expect(() => cachedCalc(id(), () => { throw new Error('x'); })).toThrow();
     expect(cachedCalc(id(), () => 'ok')).toBe('ok');
+  });
+});
+
+describe('what the cache drops first', () => {
+  beforeEach(clearCalcCache);
+  it('keeps a fit while thousands of summaries pass through (a worker hands its fit over through the cache)', () => {
+    const fit = id({ kind: 'fit', data: [1, 2, 3] });
+    cachedCalc(fit, () => 'the fit');
+    for (let i = 0; i < 25_000; i++) cachedCalc(id({ kind: 'summary', data: [i, i + 1] }), () => i);
+    expect(calcStats.hits).toBeGreaterThanOrEqual(0);
+    expect(cachedCalc(fit, () => 'calculated again')).toBe('the fit');
   });
 });

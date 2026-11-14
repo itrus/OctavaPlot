@@ -1,4 +1,5 @@
 import { pageMm, slotRects } from '../../model/project/layout';
+import { mmToPt } from '../../model/units';
 import type { LayoutArrangement, PageOrientation } from '../../model/types';
 
 /** The longest side of a sketch of a page, in px. */
@@ -11,7 +12,7 @@ export function ArrangementSketch({ arrangement, orientation }: { arrangement: L
   const scale = SIDE / Math.max(mm.width, mm.height);
   const [w, h] = [mm.width * scale, mm.height * scale];
   // The panels are in pt on the page; the sketch is in px.
-  const k = w / ((mm.width * 72) / 25.4);
+  const k = w / mmToPt(mm.width);
   return (
     <svg width={w + 2} height={h + 2} viewBox={`-1 -1 ${w + 2} ${h + 2}`} fill="none" stroke="currentColor" strokeWidth={1.2} aria-hidden="true">
       <rect x={0} y={0} width={w} height={h} rx={1.5} />

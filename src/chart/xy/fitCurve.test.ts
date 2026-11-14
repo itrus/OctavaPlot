@@ -6,6 +6,7 @@ import type { Chart, DataTable, FitSettings, Project } from '../../model/types';
 import { addAnalysis, addChart, addDataTable, composeCommands, patchAnalysis, patchLook, removeAnalysis } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { chartToSvgString } from '../export/export';
+import { confidenceLimits } from '../../stats/fit';
 import { fitLines } from './fitCurve';
 import { buildXyModel } from './xyModel';
 
@@ -166,8 +167,11 @@ describe('the curve fit in the Results', () => {
     const slope = sheet.rows.find((r) => r.key === 'p1')!;
     const m = buildXyModel(createChart(table.id, undefined, 'xyScatter'), table, { ...NO_FIT_SETTINGS, model: 'linear' });
     expect(Number(slope.exact![0])).toBe(m.series[0].fit!.summary!.params[1].value);
-    const at = (level: number) => buildXyModel(createChart(table.id, undefined, 'xyScatter'), table, { ...NO_FIT_SETTINGS, model: 'linear', level }).series[0].fit!.summary!.params[1];
-    expect(at(0.99).upper! - at(0.99).lower!).toBeGreaterThan(at(0.9).upper! - at(0.9).lower!);
+    const at = (level: number) => {
+      const sum = buildXyModel(createChart(table.id, undefined, 'xyScatter'), table, { ...NO_FIT_SETTINGS, model: 'linear', level }).series[0].fit!.summary!;
+      return confidenceLimits(sum.params[1], sum.df, level)!;
+    };
+    expect(at(0.99).upper - at(0.99).lower).toBeGreaterThan(at(0.9).upper - at(0.9).lower);
   });
   it('follows the model, and says why a series could not be fitted', () => {
     const hill = curveFitSheet(table, { ...analysis, model: 'hill_4pl' });
@@ -191,7 +195,7 @@ describe('the curve fit in the Results', () => {
 describe('writing a fit', () => {
   it('is written as lines: a parameter with its interval, then R²', () => {
     const lines = fitLines({ modelLabel: 'm', formula: 'f', params: [{ name: 'A', value: 1.23456, se: 0.1, lower: 1, upper: 1.5 }, { name: 'B', value: 2, se: null, lower: null, upper: null }], n: 5, df: 3, rSquared: 0.98765, converged: true, message: null }, 0.95);
-    expect(lines).toEqual(['A = 1.235 (95% CI 1 to 1.5)', 'B = 2', 'R² = 0.9877']);
+    expect(lines).toEqual(['A = 1.235 (95% CI 0.9163 to 1.553)', 'B = 2', 'R² = 0.9877']);
   });
 });
 
@@ -199,6 +203,7 @@ describe('fit caching', () => {
   it('does not fit again for a style edit, and fits only the series whose data changed', async () => {
     const { fitStats } = await import('./fitCurve');
     const { buildAnyModelCached } = await import('../anyModel');
+    (await import('../../stats/calcCache')).clearCalcCache(); // the level is not part of a fit's identity, so an earlier test may have made this fit
     const table = createXyTable('XY', true);
     const chart = createChart(table.id, undefined, 'xyScatter');
     const fit = { ...NO_FIT_SETTINGS, model: 'linear' as const, level: 0.93 };
@@ -261,7 +266,10 @@ describe('one fit for the graph and the Results sheet', () => {
     expect(fitStats.calculated - before).toBe(sheetFits);
     curveFitSheet(table, analysis);
     expect(fitStats.calculated - before).toBe(sheetFits);
+    // Another level is no other fit: the limits are worked out from the same one.
     curveFitSheet(table, { ...analysis, level: 0.9 });
+    expect(fitStats.calculated - before).toBe(sheetFits);
+    curveFitSheet(table, { ...analysis, model: 'polynomial', degree: 2 });
     expect(fitStats.calculated - before).toBe(2 * sheetFits);
   });
 });

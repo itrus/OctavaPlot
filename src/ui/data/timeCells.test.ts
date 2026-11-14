@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createXyTable } from '../../model/defaults';
 import { timeColumn } from '../../util/timeColumn';
 import { blockToText, formatCellFor, parseCellFor, parseClipboardBlock, planPaste } from './cellText';
-import { importCsv, previewCsv, tableToCsv } from './csv';
+import { previewCsv, tableToCsv } from './csv';
+import { importCsv } from './csvTestKit';
 
 // 2025-03-04 is day 20151, 2025-03-05 is 20152; 2025-03-04T10:30:00 is 1741084200 s (from 2025-01-01T00:00:00Z = 1735689600).
 const DATE = timeColumn('date');
@@ -132,5 +133,15 @@ describe('CSV with dates', () => {
     expect(out).toContain('2025-03-05,2');
     const back = importCsv(out, 'auto', ',', 'auto', [DATE, undefined, undefined]);
     expect(back.ok && back.data.values.slice(0, 2)).toEqual([[20151, 1.5, null], [20152, 2, null]]);
+  });
+});
+
+describe('a duration cell and the decimal separator', () => {
+  it('follows the rules of a number: comma mode refuses 1.234 and reads 1,5 h; an underflow is refused', () => {
+    expect(parseCellFor('1.234', 'comma', HOURS)).toMatchObject({ ok: false });
+    expect(parseCellFor('1,5 h', 'comma', HOURS)).toEqual({ ok: true, value: 1.5 });
+    expect(parseCellFor('1.5 h', 'point', HOURS)).toEqual({ ok: true, value: 1.5 });
+    expect(parseCellFor('1e-400', 'auto', HOURS)).toMatchObject({ ok: false });
+    expect(parseCellFor('1:30:00', 'comma', HOURS)).toEqual({ ok: true, value: 1.5 });
   });
 });

@@ -5,13 +5,13 @@ import type { ExportFormat } from '../../state/settings';
 import type { ExportJob } from './exportJob';
 
 /** What one export of a graph needs besides the graph: the format and the name of the file. */
-export interface GraphExportRequest {
+interface GraphExportRequest {
   format: ExportFormat;
   /** The whole name of the file, with its extension and the date and time when Settings says so (see useExportFileName). */
   fileName: string;
 }
 
-/** The export of a graph as a job for the export controller. The renderer (react-dom/server) is loaded on first use, not at startup. */
+/** The export of a graph as a job for the export controller. The export code is loaded on first use, not at startup. */
 export function graphExportJob(chart: Chart, table: DataTable, curve: FitSettings | undefined, req: GraphExportRequest): ExportJob {
   const { format, fileName } = req;
   if (format === 'svg') {

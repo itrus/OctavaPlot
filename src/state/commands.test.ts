@@ -248,7 +248,7 @@ describe('duplicating and deleting items', () => {
       expect(copy.rangeExcludedLayerIds, type).toEqual(ids.map(remap));
       expect(copy.layerOrder, type).toEqual(ids.map(remap));
       expect(Object.keys(copy.layerStyles), type).toEqual(ids.map(remap));
-      const view = (c: typeof copy, back: (i: string) => string) => layersOf(c, tb).map((l) => [back(l.id), l.visible, l.rangeContribution, l.z]);
+      const view = (c: typeof copy, back: (i: string) => string) => layersOf(c, tb).map((l) => [back(l.id), l.visible, l.rangeContribution]);
       expect(view(copy, (i) => (i.startsWith('h:') ? `g${i.slice(1)}` : i))).toEqual(view(p.charts.find((c) => c.id === 'g')!, (i) => i));
       expect(layersOf(copy, tb).filter((l) => l.id.startsWith('h:')).every((l) => !l.visible), type).toBe(true);
     }
@@ -258,11 +258,59 @@ describe('duplicating and deleting items', () => {
     let p = createExampleProject();
     p = duplicateChart(p.charts[0].id, 'chart-copy')(p);
     expect(p.charts.map((c) => c.id)).toContain('chart-copy');
-    expect(p.charts[1].layers[0].id).not.toBe(p.charts[0].layers[0].id);
     expect(removeChart('chart-copy')(p).charts).toHaveLength(1);
     p = addAnalysis('a1', p.dataTables[0].id, 'descriptive')(p);
     p = duplicateAnalysis('a1', 'a2')(p);
     expect(p.analyses!.map((a) => a.id)).toEqual(['a1', 'a2']);
     expect(removeAnalysis('a1')(p).analyses!.map((a) => a.id)).toEqual(['a2']);
+  });
+});
+
+describe('deleting a row', () => {
+  it('takes with it the style of its point, so the value later pasted at that row does not inherit it', async () => {
+    const { patchPointStyle, deleteRows } = await import('./commands');
+    const { effectiveTable } = await import('../model/table/chartTable');
+    const { resolveStyle, dataLayer } = await import('../model/graph/style');
+    let p = createExampleProject();
+    const table = p.dataTables[0];
+    const last = table.rowCount - 1;
+    const point = table.groups[0].observations[last];
+    p = patchPointStyle(p.charts[0].id, point.id, { symbolColor: '#ff0000' })(p);
+    p = deleteRows(table.id, [last])(p);
+    expect(Object.keys(dataLayer(p.charts[0]).objectOverrides)).not.toContain(point.id);
+    p = pasteMatrix(table.id, last, 0, [[1]])(p);
+    const t = effectiveTable(p, p.charts[0])!;
+    const fresh = t.groups[0].observations[last];
+    expect(resolveStyle(p.charts[0], dataLayer(p.charts[0]), t.groups[0], fresh.id).symbolColor).not.toBe('#ff0000');
+  });
+  it('is not pasted past the limit of rows a file can hold', async () => {
+    const { appendRows, MAX_TABLE_ROWS } = await import('./commands');
+    let p = createExampleProject();
+    p = appendRows(p.dataTables[0].id, MAX_TABLE_ROWS)(p);
+    const before = p;
+    expect(pasteMatrix(p.dataTables[0].id, MAX_TABLE_ROWS - 1, 0, [[1], [2]])(before)).toBe(before);
+  });
+});
+
+describe('choosing a palette', () => {
+  it('colours every data set by its own place, also one that was hidden when the palette was chosen', async () => {
+    const { applyPalette, setGroupOnGraph, patchStyle } = await import('./commands');
+    const { PALETTES } = await import('../model/graph/palettes');
+    const { effectiveTable } = await import('../model/table/chartTable');
+    const { resolveStyle, dataLayer } = await import('../model/graph/style');
+    let p = createExampleProject();
+    const [a, b] = p.dataTables[0].groups;
+    p = patchStyle(p.charts[0].id, a.id, { barFill: '#123456' })(p);
+    p = applyPalette(p.charts[0].id, PALETTES[1])(p);
+    const fills = () => {
+      const t = effectiveTable(p, p.charts[0])!;
+      return t.groups.map((g) => resolveStyle(p.charts[0], dataLayer(p.charts[0]), g).barFill);
+    };
+    const shown = fills();
+    expect(shown[0]).not.toBe('#123456');
+    expect(shown[0]).not.toBe(shown[1]);
+    p = setGroupOnGraph(p.charts[0].id, p.dataTables[0].id, b.id, false)(p);
+    p = setGroupOnGraph(p.charts[0].id, p.dataTables[0].id, b.id, true)(p);
+    expect(fills()).toEqual(shown);
   });
 });

@@ -115,7 +115,7 @@ describe('keeping a part of a column chart out of the axis range', () => {
     expect(b.y.domain[1]).toBeLessThan(a.y.domain[1]);
     expect(stats(out, far)).toEqual(stats(chart, far));
     expect(out.hiddenLayerIds).toEqual(chart.hiddenLayerIds);
-    expect(layersOf(out, far).map((l) => [l.id, l.visible, l.z])).toEqual(layersOf(chart, far).map((l) => [l.id, l.visible, l.z]));
+    expect(layersOf(out, far).map((l) => [l.id, l.visible])).toEqual(layersOf(chart, far).map((l) => [l.id, l.visible]));
     expect(b.groups.map((g) => g.points.length)).toEqual(a.groups.map((g) => g.points.length));
     expect(markIds(svg(out, far))).toEqual(markIds(svg(chart, far)));
   });

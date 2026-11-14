@@ -1,7 +1,11 @@
 import type { ExportReport } from '../../chart/export/exportReport';
+import { copyText } from '../../util/download';
 import { SubHeading } from '../inspector/common/controls';
 
 const mmText = (n: number) => String(Math.round(n * 10) / 10);
+
+/** Copies the report as JSON text and says how that went (what a panel shows under its Export button). */
+export const copyReport = async (report: ExportReport): Promise<string> => ((await copyText(JSON.stringify(report, null, 2))) ? 'Report copied.' : 'The browser did not allow copying.');
 
 /** What the font lacks of the characters in the texts, in plain language. */
 function GlyphsBody({ glyphs }: { glyphs: ExportReport['glyphs'] }) {
