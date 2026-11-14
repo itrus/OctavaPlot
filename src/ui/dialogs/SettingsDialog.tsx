@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { CloseIcon } from '../components/icons';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
-import { useApp } from '../../state/AppContext';
+import { usePreferences, useRecovery } from '../../state/AppContext';
 import { EXPORT_DPI_CHOICES, type ExportDpi, type ExportFormat } from '../../state/settings';
 import { DialogShell, trapTab } from './DialogShell';
 import { Check, Field, NumField, SelectInput, SubHeading } from '../inspector/common/controls';
@@ -9,7 +9,8 @@ import type { DecimalSeparator } from '../../model/types';
 
 /** Centralised application preferences, all on one screen. They apply to the app and to new charts, not to a saved project. */
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const { settings, updateSettings, autosaveOk } = useApp();
+  const { settings, updateSettings } = usePreferences();
+  const { autosaveOk } = useRecovery();
   const ref = useRef<HTMLDivElement>(null);
 
   // Focus the dialog once, when it opens. (Doing it in the effect below would pull focus out of a field being edited

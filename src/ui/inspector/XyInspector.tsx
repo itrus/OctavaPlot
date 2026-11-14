@@ -17,7 +17,7 @@ import { bindingOf, bindingSelectState } from '../../chart/shared/axes/axes';
 import { IntervalFields, LineAtField } from './sections/SummaryControls';
 import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
 import type { AxisBinding, AxisConfig, Chart, ChartStyle, DataTable, LineConnect, LineStyle, SummarySpec } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useProject, useSelection } from '../../state/AppContext';
 import { MAX_LEGEND_SIZES } from '../../chart/shared/scene/sizeLegend';
 import { NumberListField } from './common/NumberListField';
 import { clearGroupStyleSettings, clearGroupSummarySettings, composeCommands, patchAxis, patchChart, patchLook, patchStyle, patchSummary, patchSurvival } from '../../state/commands';
@@ -52,7 +52,7 @@ const stepOf = majorStepOf;
 
 /** Range, limits and ticks of one numeric axis: Auto fits the data, Manual uses the limits. */
 export function AxisLimits({ chart, which, scale, name, canScale = true, canReverse = true, time }: { chart: Chart; which: 'xAxis' | 'yAxis' | 'y2Axis'; scale: YAxisScale; name: string; canScale?: boolean; canReverse?: boolean; time?: TimeColumn }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const axis = chart[which];
   const ctx = axisCtx(axis, scale);
   const tag = which === 'xAxis' ? 'x' : 'y';
@@ -105,7 +105,9 @@ const SEVERAL = '__several__';
 const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'analysis', 'notes', 'export'];
 
 export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { project, selection, setSelection, run } = useApp();
+  const { project } = useProject();
+  const { selection, setSelection } = useSelection();
+  const { run } = useCommands();
   const nav = useInspectorNav(chart.id, PAGES);
   const { shows } = nav;
 

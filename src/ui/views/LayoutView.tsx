@@ -8,7 +8,7 @@ import { createAnnotation, FONT_FAMILY, PAGE_TEXT_LOOK } from '../../model/defau
 import { annotationBox } from '../../chart/shared/scene/annotations';
 import { AnnotationEditor } from '../inspector/sections/AnnotationEditor';
 import { focusWhenShown } from '../inspector/common/pendingFocus';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useLayoutViewport, useProject } from '../../state/AppContext';
 import { addDrawing, addFreePanel, composeCommands, freeLayout, patchDrawings, patchLayout, removeDrawings, removeFreePanel, setFrame, setLayoutPanel } from '../../state/commands';
 import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById } from '../../model/graph/drawingPresets';
 import { drawingElements, drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
@@ -98,7 +98,7 @@ const DEFAULT_PAGE_LEGEND: LayoutLegend = { position: 'bottom', fontSizePt: 9, h
 
 /** An A4 page of graphs, with the settings of the page, the arrangement, the scaling and the panel labels beside it. */
 export function LayoutView({ layoutId }: { layoutId: string }) {
-  const { project } = useApp();
+  const { project } = useProject();
   const layout = (project.layouts ?? []).find((l) => l.id === layoutId);
   if (!layout) return <div className="empty">This layout no longer exists.</div>;
   return <LayoutPage layout={layout} />;
@@ -121,7 +121,9 @@ const intersect = (a: FrameMm, b: FrameMm): FrameMm => {
 };
 
 function LayoutPage({ layout }: { layout: Layout }) {
-  const { project, run, layoutZoom, setLayoutZoom } = useApp();
+  const { project } = useProject();
+  const { run } = useCommands();
+  const { layoutZoom, setLayoutZoom } = useLayoutViewport();
   // The shapes and lines are drawn by the page itself, over the picture, so that they follow a drag at once (an export draws them in the picture).
   const drawing = useMemo(() => drawLayout(layout, project, { withoutDrawings: true }), [layout, project]);
   const [selected, setSelected] = useState(0);

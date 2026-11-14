@@ -11,7 +11,7 @@ import { buildColumnModel } from '../../chart/column/columnModel';
 import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext } from '../../chart/shared/axes/scales';
 import { tooltipFmt } from '../../chart/tooltip';
 import { DIRECTION_HINT, centreChangeCompat, centreTitles, centreNoticeLines, describeCounts, describeSummaryControls, datasetRowText, intervalCaptionLines } from './common/summaryUi';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useSelection } from '../../state/AppContext';
 import {
   clearGroupStyleSettings,
   clearGroupSummarySettings,
@@ -85,7 +85,8 @@ const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'analysis', '
 const pagesOf = (type: Chart['type']): InspectorPage[] => (type === 'box' || type === 'violin' || type === 'floating' ? PAGES : PAGES.filter((p) => p !== 'analysis'));
 
 export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { selection, setSelection, run, setStatus } = useApp();
+  const { selection, setSelection } = useSelection();
+  const { run, setStatus } = useCommands();
   const nav = useInspectorNav(chart.id, pagesOf(chart.type));
   const { shows } = nav;
   const layer = dataLayer(chart);

@@ -3,7 +3,7 @@ import { layoutPngSize, layoutTextGroups, layoutToPdf, layoutToPngBlob, layoutTo
 import { buildExportReport } from '../../chart/export/exportReport';
 import { FONT_FAMILY } from '../../model/defaults';
 import type { Layout } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { useCommands, usePreferences, useProject } from '../../state/AppContext';
 import { EXPORT_DPI_CHOICES, type ExportDpi } from '../../state/settings';
 import { copyText, downloadBlob } from '../../util/download';
 import { Field, SelectInput } from '../inspector/common/controls';
@@ -20,7 +20,9 @@ import { useExportJob } from './useExportJob';
  * report puts on the clipboard as JSON.
  */
 export function LayoutExportPanel({ layout, drawing }: { layout: Layout; drawing: LayoutDrawing }) {
-  const { project, settings, updateSettings, setStatus } = useApp();
+  const { project } = useProject();
+  const { settings, updateSettings } = usePreferences();
+  const { setStatus } = useCommands();
   const [copied, setCopied] = useState<string | null>(null);
   // One export at a time: while one runs the Export button is disabled, and a second start is ignored.
   const job = useExportJob(setStatus);

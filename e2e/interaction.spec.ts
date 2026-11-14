@@ -81,7 +81,7 @@ test.describe('annotations', () => {
     await page.mouse.up();
     expect(Number(await left.inputValue())).toBeGreaterThan(before + 5);
 
-    await page.getByRole('button', { name: 'Undo' }).click();
+    await page.locator('.undo-redo').getByRole('button', { name: 'Undo' }).click();
     expect(Number(await left.inputValue())).toBe(before);
   });
 

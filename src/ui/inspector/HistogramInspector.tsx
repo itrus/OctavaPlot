@@ -4,7 +4,7 @@ import { buildHistogramModel } from '../../chart/histogram/histogramModel';
 import { defaultYTitle, FREQUENCIES, HISTOGRAM_LIMITS } from '../../model/options/histogramOptions';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { Chart, DataTable, HistogramOptions } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { useCommands } from '../../state/AppContext';
 import { composeCommands, patchAxis, patchChart, patchLook, patchStyle } from '../../state/commands';
 import { LayersSection } from './sections/LayersSection';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput } from './common/controls';
@@ -22,7 +22,7 @@ const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'notes', 'exp
 
 /** The formatting panel of histograms and cumulative distributions of a column table. */
 export function HistogramInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const nav = useInspectorNav(chart.id, PAGES);
   const { shows } = nav;
   const model = useMemo(() => buildHistogramModel(chart, table), [chart, table]);

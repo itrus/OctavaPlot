@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { planBatch, type BatchFormat, type BatchPlan } from '../../chart/export/batchExport';
 import type { Id, Project } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { usePreferences } from '../../state/AppContext';
 import { Field, SubHeading } from '../inspector/common/controls';
 import { Modal } from '../dialogs/NewItemDialogs';
 import { exportStatusText, isBusy, type ExportOutcome, type ExportState } from './exportJob';
@@ -30,7 +30,7 @@ interface Props {
  * here: open a graph and its Export to see them.
  */
 export function BatchExportDialog({ project, ids, state, onExport, onClose }: Props) {
-  const { settings, updateSettings } = useApp();
+  const { settings, updateSettings } = usePreferences();
   const format: BatchFormat = settings.exportFormat;
   const plan = useMemo(() => planBatch(project, ids, format, settings.timestampExports), [project, ids, format, settings.timestampExports]);
   const busy = isBusy(state);

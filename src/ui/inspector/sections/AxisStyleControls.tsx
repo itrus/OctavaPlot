@@ -1,7 +1,7 @@
 import type { YAxisScale } from '../../../chart/shared/axes/scales';
 import { AXIS_LIMITS, AXIS_SCALES, BREAK_MARKS, MAX_BREAKS, NUMBER_FORMATS, TICK_DIRECTIONS } from '../../../model/graph/axis';
 import type { AxisBreak, AxisScaleKind, BreakMark, Chart, NumberFormatKind, TickDirection } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { patchAxis, type AxisKey } from '../../../state/commands';
 import { Check, Field, NumField, Section, SelectInput, TextInput } from '../common/controls';
 import { TimeField } from '../common/TimeField';
@@ -33,7 +33,7 @@ export function AxisStyleControls({
   /** The axis shows dates, times or durations (the X column of an XY table has this type): it is linear, and its values are typed as dates. */
   time?: TimeColumn;
 }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const axis = chart[which];
   const set = (label: string, patch: Parameters<typeof patchAxis>[2], key?: string) => run(`${name} ${label}`, patchAxis(chart.id, which, patch), key);
   const isLog = axis.scale !== 'linear';
@@ -116,7 +116,7 @@ export function AxisStyleControls({
 
 /** Direction and length of the tick marks: the part of the axis style every axis has, the category axis too. */
 export function TickFields({ chart, which, name }: { chart: Chart; which: AxisKey; name: string }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const axis = chart[which];
   const set = (label: string, patch: Parameters<typeof patchAxis>[2], key?: string) => run(`${name} ${label}`, patchAxis(chart.id, which, patch), key);
   return (
@@ -142,7 +142,7 @@ export function TickFields({ chart, which, name }: { chart: Chart; which: AxisKe
  * below. A new break starts in the middle of the axis, a third of its range wide.
  */
 function BreakFields({ chart, which, name, scale, blocked, time }: { chart: Chart; which: AxisKey; name: string; scale: YAxisScale; blocked: string | null; time?: TimeColumn }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const axis = chart[which];
   const set = (breaks: AxisBreak[], label: string, key?: string) => run(`${name} ${label}`, patchAxis(chart.id, which, { breaks }), key);
   const [lo, hi] = [Math.min(...scale.domain), Math.max(...scale.domain)];

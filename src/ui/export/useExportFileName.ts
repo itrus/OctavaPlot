@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useApp } from '../../state/AppContext';
+import { usePreferences } from '../../state/AppContext';
 import { exportFileName } from '../../util/download';
 
 /**
@@ -8,7 +8,7 @@ import { exportFileName } from '../../util/download';
  * on with the clock (at each change of the minute) only while a time is part of the name.
  */
 export function useExportFileName(base: string, ext: string): string {
-  const { settings } = useApp();
+  const { settings } = usePreferences();
   const stamped = settings.timestampExports;
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {

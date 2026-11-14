@@ -10,7 +10,7 @@ import { densePreviewNote, isDense, nearestDot } from '../../chart/shared/scene/
 import { hitFromTarget, type HitTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
 import type { PreparedChart } from '../../model/table/preparedChart';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useGraphViewport, useNavigation, useSelection } from '../../state/AppContext';
 import { addAnnotation, addDrawing, composeCommands, patchAnnotation, patchDrawings, patchPointStyle, removeAnnotation, removeDrawings, resetAllDataSets } from '../../state/commands';
 import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById } from '../../model/graph/drawingPresets';
 import { drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
@@ -29,7 +29,10 @@ const SCROLLBAR_ROOM = 17;
 
 export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const { chart, table, fit: curve } = prepared;
-  const { selection, setSelection, run, setStatus, zoom, setZoom, fitRequest, navigateInspector } = useApp();
+  const { selection, setSelection } = useSelection();
+  const { run, setStatus } = useCommands();
+  const { zoom, setZoom, fitRequest } = useGraphViewport();
+  const { navigateInspector } = useNavigation();
   // A fit that takes long is made in a worker: the graph is drawn without it (and says so) until useFitsVersion changes.
   const fitsVersion = useFitsVersion();
   const any = useMemo(() => buildAnyModelCached(chart, table, curve, { deferFits: true }), [chart, table, curve, fitsVersion]);

@@ -17,7 +17,7 @@ import { capabilitiesOf } from '../../../model/graph/capabilities';
 import { COMPARED_COLOURS, safeColours } from '../../../model/graph/colour/colorVision';
 import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../../model/graph/palettes';
 import type { Annotation, Chart, Group, Id, ResultStat } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands, useProject, useSelection } from '../../../state/AppContext';
 import {
   addAnnotation,
   addReferenceLine,
@@ -62,12 +62,12 @@ import { SLIDERS } from '../common/sliderRanges';
 
 /** Edit a chart property as one undoable step (`key` merges rapid edits). */
 function useChartSetter(chart: Chart) {
-  const { run } = useApp();
+  const { run } = useCommands();
   return (label: string, patch: Partial<Chart>, key?: string) => run(label, patchChart(chart.id, patch), key);
 }
 
 export function TextSections({ chart, groups, yName, dual, axes = true }: { chart: Chart; groups: Group[]; yName: string; dual: boolean; axes?: boolean }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const setChart = useChartSetter(chart);
   return (
     <div>
@@ -199,7 +199,7 @@ export function DimensionsSection({ chart }: { chart: Chart }) {
 }
 
 export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[] }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   return (
     <div>
       <Section title="Legend">
@@ -254,7 +254,8 @@ export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[]
 const RESULT_HINT = 'A result of a data set can be written in the text, as {{n Control}}, {{mean Control}} or {{sd Control|2}} (n, sum, mean, sd, sem, median, min, max; a number of decimals after a bar). It is filled when the graph is drawn, so it follows the data.';
 
 function ReferenceLinesSection({ chart }: { chart: Chart }) {
-  const { run, project } = useApp();
+  const { run } = useCommands();
+  const { project } = useProject();
   const lines = capabilitiesOf(chart.type).referenceLines;
   if (lines === 'none') return null;
   const table = prepareChartInput(project, chart)?.table;
@@ -343,7 +344,7 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
 
 /** Shaded regions: a band across the plot between two values of an axis (XY charts), behind the reference lines and the data. */
 function RegionsSection({ chart }: { chart: Chart }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   if (!capabilitiesOf(chart.type).guides) return null;
   const add = (axis: 'x' | 'y') => run('Add shaded region', addRegion(chart.id, { id: newId('reg'), axis, from: 0, to: 1, color: '#4f81bd', opacity: 0.25, label: '', showLabel: false }));
   return (
@@ -385,7 +386,8 @@ function RegionsSection({ chart }: { chart: Chart }) {
  * values on the axes instead of a place on the page. Without it (a graph with no model here) every text is placed on the page.
  */
 export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: AnnotationPlacer }) {
-  const { run, selection, setSelection } = useApp();
+  const { run } = useCommands();
+  const { selection, setSelection } = useSelection();
   // Several annotations selected together are edited together, and where they differ a field says so ("Mixed").
   const picked = selectedAnnotationIds(selection);
   const chosen = chart.annotations.filter((a) => picked.includes(a.id));
@@ -493,7 +495,8 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
 
 /** Check boxes to put data sets on the graph or take them off, grouped by table. */
 export function OnThisGraph({ chart }: { chart: Chart }) {
-  const { project, run } = useApp();
+  const { project } = useProject();
+  const { run } = useCommands();
   const tablesWithSources = useMemo(() => {
     const byTable = new Map<Id, [Id, string, GraphSource[]]>();
     for (const s of graphSources(project, chart)) {
@@ -615,7 +618,7 @@ function PaletteInfo({ paletteId }: { paletteId: string | null }) {
 
 /** The colour palette of the data sets: choosing one gives them coordinated colours in order. */
 export function PaletteField({ chart, hint }: { chart: Chart; hint: string }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const palette = paletteById(chart.paletteId);
   return (
     <div className="palette-field">

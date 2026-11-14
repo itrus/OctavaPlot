@@ -3,7 +3,7 @@ import { galleryItems } from '../../../model/graph/chartGallery';
 import { chartTypesFor } from '../../../model/graph/chartTypes';
 import { dataLayer } from '../../../model/graph/style';
 import type { Chart, ChartType, DataTable } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { composeCommands, patchStyle, patchSummary, setChartType, type Command } from '../../../state/commands';
 import { GallerySketch, TypeSketch } from '../../dialogs/GallerySketches';
 
@@ -44,7 +44,7 @@ function choicesFor(chart: Chart, table: DataTable): Choice[] {
 
 /** The first tab of the Graph page: the types the table can be drawn as, each with its drawing; choosing one changes the type of this graph. */
 export function ChartTypePicker({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { run, setStatus } = useApp();
+  const { run, setStatus } = useCommands();
   return (
     <div className="chart-type-grid" role="radiogroup" aria-label="Graph type">
       {choicesFor(chart, table).map((c) => (

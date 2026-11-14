@@ -1,6 +1,6 @@
 import { FRAME_STYLES, GRID_LIMITS, LINE_STYLES } from '../../../model/graph/look';
 import type { BarLabelMode, Chart, FrameStyle, InsideBarLabel, InsideLabelPosition, LineOrder, LineStyle } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { patchLook } from '../../../state/commands';
 import { AUTO_BAR_GAP_PCT, AUTO_BAR_OUTER_PCT, BAR_LIMITS } from '../../../model/options/columnOptions';
 import { BAR_LABEL_MODES, INSIDE_LABEL_POSITIONS } from '../../../model/options/columnOptions';
@@ -25,7 +25,7 @@ function OptionalColour({ label, value, fallback, onChange, hint }: { label: str
 
 /** Frame, axis colour, and the colours of the plotting region and of the whole chart (spec 5.1, 6.2). */
 function FrameAndColours({ chart }: { chart: Chart }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   return (
     <Section title="Frame and colours">
       <Field label="Frame" hint="A box round the plotting region">
@@ -43,7 +43,7 @@ function FrameAndColours({ chart }: { chart: Chart }) {
 
 /** Colour, thickness and pattern of the major and the minor gridlines; each axis switches its own on in its section. */
 function GridStyleSection({ chart }: { chart: Chart }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const g = chart.grid;
   const set = (label: string, grid: Partial<Chart['grid']>, key?: string) => run(label, patchLook(chart.id, { grid }), key);
   const styles = LINE_STYLES.map((s) => ({ value: s.value, label: s.label }));
@@ -71,7 +71,7 @@ function GridStyleSection({ chart }: { chart: Chart }) {
 
 /** Frame section: the axis lines, the frame round the plot, colours and gridline style. */
 export function FrameSection({ chart, dual, origin = 'y' }: { chart: Chart; dual: boolean; origin?: 'xy' | 'y' | 'none' }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const set = (patch: Partial<Chart['origin']>, label: string, key: string) => run(label, patchLook(chart.id, { origin: { ...chart.origin, ...patch } }), key);
   return (
     <div>
@@ -98,7 +98,7 @@ export function FrameSection({ chart, dual, origin = 'y' }: { chart: Chart; dual
  * column's width, Auto = the usual layout), and where the bars begin.
  */
 export function ColumnLayoutSection({ chart, spacing, baseline, numericX }: { chart: Chart; spacing: boolean; baseline: boolean; numericX?: boolean }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const b = chart.bars;
   const { min, max } = BAR_LIMITS.spacingPct;
   const pct = (v: number) => (v >= min && v <= max ? null : `Between ${min} and ${max}.`);
@@ -129,7 +129,7 @@ export const hasBarLabels = (type: Chart['type']): boolean => type === 'bar' || 
 
 /** Labels above the bars: the plotted value or the sample size, with the number format and the text style. */
 export function BarLabelSection({ chart }: { chart: Chart }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const l = chart.barLabels;
   const set = (label: string, patch: Partial<Chart['barLabels']>, key?: string) => run(label, patchBarLabels(chart.id, patch), key);
   const inside: InsideBarLabel = l.inside ?? { position: 'end', show: 'none', color: null };
@@ -187,7 +187,7 @@ export function BarLabelSection({ chart }: { chart: Chart }) {
 
 /** Direction of a column chart: up from the category axis, or across from it. */
 export function DirectionSection({ chart }: { chart: Chart }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   return (
     <Section title="Direction">
       <Field label="Columns run" hint="Vertical: categories along the bottom. Horizontal: categories down the left and the value axis along the bottom.">
@@ -207,7 +207,7 @@ export function DirectionSection({ chart }: { chart: Chart }) {
 
 /** Whether lines and error bars are drawn over or under the symbols and bars (Prism: "Line and error go"). */
 export function LineOrderSection({ chart }: { chart: Chart }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   return (
     <Section title="Drawing order">
       <Field label="Lines and error bars go" hint="Auto draws them as the chart type usually does: over bars, under symbols. On top puts them over the symbols and bars too; Underneath puts them behind both.">
@@ -227,7 +227,7 @@ export function LineOrderSection({ chart }: { chart: Chart }) {
 
 /** The offset between the traces of an offset-traces chart: blank is the automatic step, shown as a hint. */
 export function OffsetSection({ chart, autoStep }: { chart: Chart; autoStep: number }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   return (
     <Section title="Offset traces">
       <OptionalNumField label="Offset between traces" hint="In Y units; trace 1 stays where it is, trace 2 is lifted by one step, trace 3 by two. Auto: a little more than the largest range of a trace, so they do not overlap. Below 0 stacks them downward." value={chart.traceOffset} autoValue={autoStep} onCommit={(v) => run('Offset between traces', patchLook(chart.id, { traceOffset: v }), 'offset:step')} />

@@ -7,7 +7,7 @@ import { FOLDER_TITLE } from '../../model/project/folderItems';
 import type { AnalysisKind, ChartType, FolderKey, Id, TableKind } from '../../model/types';
 import type { ViewRef } from '../../model/editor/types';
 import type { ChartVariant } from '../../model/graph/chartVariant';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useNavigation, usePreferences, useProject } from '../../state/AppContext';
 import { newChartStart } from '../../state/settings';
 import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, unlinkChart, removeAnalysis, type NewTableOptions } from '../../state/commands';
 import { DeleteIcon } from '../components/icons';
@@ -25,7 +25,10 @@ const LOCKED_SECTIONS: readonly string[] = [];
 
 export function Navigator() {
   const [renaming, setRenaming] = useState<string | null>(null);
-  const { project, view, setView, run, settings, setStatus } = useApp();
+  const { project } = useProject();
+  const { view, setView } = useNavigation();
+  const { run, setStatus } = useCommands();
+  const { settings } = usePreferences();
   const [open, setOpen] = useState<Record<FolderKey, boolean>>({ tables: true, results: true, graphs: true, layouts: true });
 
   const currentTableId =
