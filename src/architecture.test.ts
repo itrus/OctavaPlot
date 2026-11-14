@@ -115,7 +115,7 @@ const MAY_IMPORT: Record<string, string[]> = {
   util: upTo('util'),
   stats: ['stats', 'util'], // and model/types.ts, see the test
   model: upTo('model'),
-  state: [...upTo('state'), 'chart'], // the project in memory uses the charts' models
+  state: upTo('state'), // persistence and commands use model contracts, never drawing code
   chart: upTo('chart').filter((l) => l !== 'state'), // a chart does not know the project's state
   testing: ['testing', 'model', 'state', 'chart', 'stats', 'util'],
   ui: upTo('ui'),

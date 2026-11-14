@@ -1,5 +1,5 @@
 import { ANNOTATION_LINE_SPACING, CHART_PX_MAX, createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
-import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../chart/shared/parts/labels';
+import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../model/options/pointLabelOptions';
 import { CHART_TYPES, chartTypeInfo, defaultChartTypeFor } from '../model/graph/chartTypes';
 import { leadingColumns } from '../model/graph/chartTypes';
 import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../model/table/tableLayout';
