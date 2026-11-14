@@ -21,6 +21,13 @@ describe('version', () => {
     for (const version of [0, 2, 3, '1', null]) expect(() => parseProject(JSON.stringify({ ...env, version }))).toThrow(/version/);
     expect(() => parseProject(JSON.stringify({ ...env, format: 'other-project' }))).toThrow(/format/);
   });
+  it('preserves a graph with manually assigned colours and no palette', () => {
+    const p = createExampleProject();
+    p.charts[0].paletteId = null;
+    const r = parseProjectWithNotes(stringifyProject(p));
+    expect(r.project.charts[0].paletteId).toBeNull();
+    expect(r.notes).toEqual([]);
+  });
   it('round trips and a valid project has no notes', () => {
     const p = createExampleProject();
     const r = parseProjectWithNotes(stringifyProject(p));
