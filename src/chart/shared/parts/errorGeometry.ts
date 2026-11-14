@@ -4,7 +4,7 @@
  */
 
 import type { ChartStyle, ErrorDirection, Id } from '../../../model/types';
-import { describeSpread } from '../../../stats/describe';
+import { describeSpread } from '../../../model/presentation/summaryText';
 import type { GroupStats } from '../../../stats/summary';
 
 export interface ErrorBarGeom {

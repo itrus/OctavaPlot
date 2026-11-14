@@ -7,7 +7,7 @@ import { chartFamily, supportsHorizontal } from '../../model/graph/chartTypes';
 import { layoutOf, summaryFormatInfo, xySeries } from '../../model/table/tableLayout';
 import { hasFactors, seriesPaletteIndex, usesFactors } from '../../model/table/factors';
 import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/graph/summary';
-import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from '../../stats/describe';
+import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from './common/summaryUi';
 import { tooltipFmt } from '../../chart/tooltip';
 import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, OffsetSection } from './sections/LookControls';
 import { autoOffsetStep } from '../../model/table/offset';

@@ -10,16 +10,7 @@ import { clippedEndpointCount, clippedEndpointMessage } from '../../chart/shared
 import { buildColumnModel } from '../../chart/column/columnModel';
 import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext } from '../../chart/shared/axes/scales';
 import { tooltipFmt } from '../../chart/tooltip';
-import {
-  DIRECTION_HINT,
-  centreChangeCompat,
-  centreTitles,
-  centreNoticeLines,
-  describeCounts,
-  describeSummaryControls,
-  datasetRowText,
-  intervalCaptionLines,
-} from '../../stats/describe';
+import { DIRECTION_HINT, centreChangeCompat, centreTitles, centreNoticeLines, describeCounts, describeSummaryControls, datasetRowText, intervalCaptionLines } from './common/summaryUi';
 import { useApp } from '../../state/AppContext';
 import {
   clearGroupStyleSettings,

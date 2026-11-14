@@ -1,27 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { SummarySpec } from '../model/types';
-import {
-  DIRECTION_HINT,
-  centreChangeCompat,
-  centreName,
-  centreNoticeLines,
-  centreTitles,
-  datasetRowText,
-  describeCounts,
-  describeSpread,
-  describeSummary,
-  describeSummaryControls,
-  intervalCaptionLines,
-  parseConfidencePercent,
-  percentLabel,
-  spreadOptions,
-  spreadSelectModel,
-  staleSpread,
-  staleSpreadNote,
-  summaryCaption,
-  summaryTooltipLines,
-} from './describe';
-import { SPREADS_BY_CENTRE, computeGroupStats, effectiveSpreadOf } from './summary';
+import type { SummarySpec } from '../../../model/types';
+import { centreName, describeSpread, describeSummary, percentLabel, summaryTooltipLines } from '../../../model/presentation/summaryText';
+import { DIRECTION_HINT, centreChangeCompat, centreNoticeLines, centreTitles, datasetRowText, describeCounts, describeSummaryControls, intervalCaptionLines, parseConfidencePercent, spreadOptions, spreadSelectModel, staleSpread, staleSpreadNote, summaryCaption } from './summaryUi';
+import { SPREADS_BY_CENTRE, computeGroupStats, effectiveSpreadOf } from '../../../stats/summary';
 
 const spec = (over: Partial<SummarySpec> = {}): SummarySpec => ({
   centre: 'mean',
