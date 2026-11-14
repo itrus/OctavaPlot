@@ -4,7 +4,6 @@ import type { GroupedModel } from './groupedModel';
 import type { ChromeScene } from '../shared/scene/scene';
 import { compileCategoryChrome, lineAndSymbolKeys } from '../shared/scene/categoryChrome';
 import { referenceLinesOf } from '../shared/scene/referenceLines';
-import { bracketElements } from '../shared/parts/brackets';
 import { el } from '../shared/scene/sceneElement';
 import { n2 } from '../../model/units';
 
@@ -27,8 +26,6 @@ export function compileGroupedScene(chart: Chart, model: GroupedModel): ChromeSc
       el('path', [['d', `M${n2(f.x1 + 1)},${n2(f.y + 1)}H${n2(f.x2 - 1)}`], ['fill', 'none'], ['stroke', chart.axisColor], ['stroke-width', 1], ['stroke-opacity', chart.axisOpacity < 1 ? chart.axisOpacity : undefined]]),
       el('text', [['x', n2((f.x1 + f.x2) / 2)], ['y', n2(f.y + 2 + chart.xAxis.tickFontSizePt * 0.9)], ['text-anchor', 'middle'], ['font-size', n2(f.fontPt)], ['font-weight', chart.xAxis.tickBold ? 'bold' : undefined], ['fill', chart.textColor]], { text: f.text }),
     ]),
-    // The comparison brackets stand in front of the data; one whose layer is hidden is not drawn.
-    ...bracketElements(model.brackets, model.orient, new Set(chart.hiddenLayerIds)),
     ],
     references: referenceLinesOf(chart, { family: 'grouped', model }).placed.filter((l) => !chart.hiddenLayerIds.includes(`${l.line.id}:referenceLine`)),
     keysOf: (it, w) => {

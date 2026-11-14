@@ -5,15 +5,12 @@ import { paletteById, paletteColor } from '../../model/graph/palettes';
 import { legendEntries } from '../../model/graph/legendEntries';
 import { isPatternInvisible, resolveBarFill } from '../../model/graph/fill';
 import { groupRowTitle } from '../../model/table/rows';
-import { hasSubjects, subjectUnits, unitObservations } from '../../model/table/subjects';
 import { resolveSummary } from '../../model/graph/summary';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { statsFor, summarize, type GroupStats, type GroupSummary, type Notice } from '../../stats/summary';
-import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, groupRangeContribution, populateAxes, type RangeRow } from '../shared/axes/axes';
-import type { BracketGeom } from '../shared/parts/brackets';
-import { placeBrackets } from '../shared/axes/bracketPlacement';
+import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, populateAxes, type RangeRow } from '../shared/axes/axes';
 import { buildErrorBar, clippedEndpointCount, clippedEndpointMessage, errorEndValues, type ErrorBarGeom } from '../shared/parts/errorGeometry';
 import { countMarks, patternMarks, type Point, type Rect } from '../shared/parts/hatch';
 import { chartLayout, type Layout } from '../shared/parts/layout';
@@ -33,7 +30,7 @@ import type { ChromeScene } from '../shared/scene/scene';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { Orientation } from '../shared/parts/orientation';
 import { displayName } from '../shared/parts/names';
-import { dotOffsets, hash01 } from '../shared/parts/jitter';
+import { dotOffsets } from '../shared/parts/jitter';
 import { stableList } from '../shared/parts/stable';
 import { BarGeom } from '../shared/parts/barGeom';
 import { compileColumnScene } from './columnChrome';
@@ -134,8 +131,6 @@ export interface ColumnModel {
   groups: GroupGeom[];
   /** Paired plots: the line of each subject across the data sets, in the virtual drawing like every other shape. */
   pairLines: PairLine[];
-  /** Comparison brackets between data sets, in the vertical drawing (see model/types.ts Bracket). */
-  brackets: BracketGeom[];
   /** Index into `groups` of each legend entry, in legend order. */
   legendGroups: number[];
   /** Point labels; always present, empty while none is requested. They never affect ranges, summaries or layout. */
@@ -176,19 +171,13 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   const partOf = (kind: LayerKind, groupId: Id, style: ChartStyle): ChartStyle => partStyle(chart, `${groupId}:${kind}`, style);
 
   // 1. Statistical summaries + resolved styles (independent of presentation settings).
-  // Nested dots: the dots of a subject are repeats of one unit, so the mean and the error bar are calculated from the unit means.
-  const nestedOn = chart.type === 'scatter' && chart.jitter.bySubject === true;
-  if (nestedOn && !hasSubjects(table)) warnings.push('Dots are grouped by subject, but no value has a subject: name the subjects in the data table (Subject…).');
   const rows = table.groups.map((group) => {
     const summary = summarize(group.observations.map((o) => o.value));
-    const units = nestedOn ? subjectUnits(group) : null;
-    const nested = units !== null && units.units.length > 0 ? units : null;
     // The observations array itself is the cache key, so style-only edits reuse the GroupStats.
-    const stats = statsFor(nested ? unitObservations(group) : group.observations, resolveSummary(layer, group.id));
+    const stats = statsFor(group.observations, resolveSummary(layer, group.id));
     const style = resolveStyle(chart, layer, group);
     const name = displayName(chart, group.id, group.name);
-    if (nested && nested.unassigned > 0) warnings.push(`${name}: ${nested.unassigned} value${nested.unassigned === 1 ? ' has' : 's have'} no subject, and ${nested.unassigned === 1 ? 'is' : 'are'} left out of the mean and the error bar.`);
-    return { group, summary, stats, style, name, nested, binding: horizontal ? ('primary' as AxisBinding) : bindingOf(style) };
+    return { group, summary, stats, style, name, binding: horizontal ? ('primary' as AxisBinding) : bindingOf(style) };
   });
 
   // Calculation notices. Visual warning (spec 21.5 L1462) for unavailable statistics, blocking (L1460)
@@ -254,25 +243,6 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     };
   });
   const pools = populateAxes(rangeRows, chart.type);
-  // Comparison brackets: each stands above the data sets it joins (and above the brackets it overlaps), and the axis is extended to show it
-  // and its label. A bracket that is hidden still takes its room, so hiding one moves nothing.
-  const placement = placeBrackets({
-    brackets: chart.brackets,
-    order: rows.map((r) => r.group.id),
-    tops: rangeRows.map((r) => {
-      const v = groupRangeContribution(r, chart.type).values;
-      return v.length > 0 ? v.reduce((m, x) => (x > m ? x : m), -Infinity) : null;
-    }),
-    primary: rows.map((r) => r.binding === 'primary'),
-    log: axisConfigFor(chart, 'primary').scale !== 'linear',
-    values: pools.primary.values,
-    includeZero: pools.primary.hasBars && axisConfigFor(chart, 'primary').scale === 'linear',
-    // The value axis is the length of the chart (its width for a horizontal chart) less the margins, the title and the labels: about 60%.
-    plotLengthPt: (horizontal ? widthPt : heightPt) * 0.6,
-  });
-  for (const s of placement.skipped) warnings.push(`Bracket "${s.bracket.label.trim() || 'no label'}" is not drawn: ${s.reason}.`);
-  // A bracket kept out of the range (see rangeContribution) is still placed above its data sets, but the axis does not grow to show it: the plot clips it.
-  for (const p of placement.placed) if (inRange('bracket', p.bracket.id)) pools.primary.values.push(p.top);
   const dual = pools.secondaryInUse;
   const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? widthPt / 120 : heightPt / 100)));
   const axisScaleFor = (binding: AxisBinding): YAxisScale => {
@@ -374,7 +344,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   // 5. Geometry. Values with no position on a log axis (0 or less) are left out and counted.
   // For paired plots: the value of each subject (table row) in each data set, with its place across, whether or not its dot can be drawn.
   const pairValues = rows.map(() => new Map<number, { x: number; y: number }>());
-  const groups: GroupGeom[] = rows.map(({ group, summary, stats, style, name, nested, binding }, gi) => {
+  const groups: GroupGeom[] = rows.map(({ group, summary, stats, style, name, binding }, gi) => {
     const { scale, toY, baseline } = axisOf(binding);
     const x0 = cols.x(group.id) ?? plot.x;
     const centerX = x0 + bw / 2;
@@ -473,14 +443,8 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
             return;
           }
           // The dots of a paired plot stay on the line of their column: a subject's line would not meet them otherwise.
-          let offset = sideways.get(o.id) ?? 0;
-          if (nested) {
-            // Each subject has a cluster of its own across the slot; a value with no subject stays in the middle.
-            const k = nested.units.findIndex((u) => u.subject === (o.subject ?? ''));
-            const clusterWidth = (bw * 0.8) / nested.units.length;
-            offset = k < 0 ? 0 : -bw * 0.4 + clusterWidth * (k + 0.5) + (chart.jitter.enabled ? (hash01(o.id) - 0.5) * clusterWidth * 0.6 : 0);
-          }
-          // A value inside an omitted range has no dot, but its subject's line still runs to the edge of the gap.
+          const offset = sideways.get(o.id) ?? 0;
+          // A value inside an omitted range has no dot, but its row's line still runs to the edge of the gap.
           if (chart.type === 'paired') pairValues[gi].set(row, { x: centerX + offset, y: o.value });
           if (inBreak(scale, o.value)) {
             inGap++;
@@ -508,31 +472,6 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
       }
     }
 
-    // Nested dots: a larger marker at the mean of each subject, in the middle of its cluster.
-    if (nested && !isDist && style.showSymbols) {
-      const unitSize = pst.symbolSizePt * 1.9;
-      const clusterWidth = (bw * 0.8) / nested.units.length;
-      nested.units.forEach((u, k) => {
-        const mean = u.values.reduce((a, b) => a + b, 0) / u.values.length;
-        if (!placeable(scale, mean)) return;
-        points.push({
-          id: `${group.id}:unit:${k}`,
-          groupId: group.id,
-          observationId: null,
-          row: -1,
-          value: mean,
-          cx: centerX - bw * 0.4 + clusterWidth * (k + 0.5),
-          cy: toY(mean),
-          shape: pst.symbolShape,
-          size: unitSize,
-          color: pst.symbolColor,
-          fillOpacity: 1,
-          borderColor: chart.textColor ?? '#000000',
-          borderWidth: Math.max(pst.symbolBorderWidthPt, 1),
-          borderOpacity: 1,
-        });
-      });
-    }
 
     // Box plot or violin: the body and lines from the raw values, the dots by the distribution options.
     let dist: DistGeom | null = null;
@@ -798,14 +737,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     );
   }
 
-  // The brackets as geometry: the two data sets' places across, and the height of the bar on the left axis (not inside an omitted range).
-  const brackets: BracketGeom[] = placement.placed.flatMap((p) => {
-    const { scale, toY } = axisOf('primary');
-    const at = toY(p.value);
-    if (!Number.isFinite(at) || inBreak(scale, p.value)) return [];
-    return [{ id: p.bracket.id, label: p.bracket.label, x1: groups[p.i].centerX, x2: groups[p.j].centerX, y: at - (p.bracket.liftPt ?? 0), tick: Math.max(6, p.bracket.fontSizePt * 0.6), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
-  });
-  const model: ColumnModel = { widthPt, heightPt, layout, orient, y, yScale, y2, y2Scale, clipped, groups, pairLines, brackets, legendGroups, labels, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
+  const model: ColumnModel = { widthPt, heightPt, layout, orient, y, yScale, y2, y2Scale, clipped, groups, pairLines, legendGroups, labels, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileColumnScene(chart, model);
   // The marks are compiled when a drawing, an export or a hit test first asks for them, so a model that is only measured does not pay for them.
   let marks: SceneElement[] | undefined;

@@ -18,11 +18,12 @@ describe('the legend key of a chart over columns', () => {
     const p0 = base();
     const id = tableOf(p0).groups[3].id;
     const layered = patchLayerStyle('c', `${id}:points`, { shape: 'square' })(p0);
+    // The dots of a column chart have no look of their own in the layers: a look stored there is not drawn.
+    expect(keyPaths(svg(layered))).toEqual(keyPaths(svg(p0)));
     const whole = patchStyle('c', id, { symbolShape: 'square' })(p0);
-    expect(keyPaths(svg(layered))).toEqual(keyPaths(svg(whole)));
-    expect(keyPaths(svg(layered))).not.toEqual(keyPaths(svg(p0)));
+    expect(keyPaths(svg(whole))).not.toEqual(keyPaths(svg(p0)));
     // Only that data set's key changed.
-    expect(keyPaths(svg(layered)).slice(0, 3)).toEqual(keyPaths(svg(p0)).slice(0, 3));
+    expect(keyPaths(svg(whole)).slice(0, 3)).toEqual(keyPaths(svg(p0)).slice(0, 3));
   });
 });
 

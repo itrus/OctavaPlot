@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { CloseIcon } from '../components/icons';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
 import { useApp } from '../../state/AppContext';
-import type { ExportFormat } from '../../state/settings';
+import { EXPORT_DPI_CHOICES, type ExportDpi, type ExportFormat } from '../../state/settings';
 import { DialogShell, trapTab } from './DialogShell';
 import { Check, Field, NumField, SelectInput, SubHeading } from '../inspector/common/controls';
 import type { DecimalSeparator } from '../../model/types';
@@ -71,7 +71,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           <Field label="Date and time in file names" hint="Exported JSON, CSV, PNG and SVG files get a suffix like _261022_1435 (yymmdd_HHMM)">
             <Check checked={settings.timestampExports} onChange={(v) => updateSettings({ timestampExports: v })} ariaLabel="Date and time in file names" />
           </Field>
-          <Field label="Format" hint="Used by the Export button on the Graphs page. PNG is a bitmap at the size of the graph on screen; SVG and PDF are vector (shapes and text), at the size of the graph.">
+          <Field label="Default format" hint="The format the Export page of a graph and of a layout starts with. Choosing a format on an Export page also makes it the default. PNG is a bitmap at the size of the graph on screen; SVG and PDF are vector (shapes and text), at the size of the graph.">
             <span className="switch-group" role="group" aria-label="Export format">
               {(
                 [
@@ -85,6 +85,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 </button>
               ))}
             </span>
+          </Field>
+          <Field label="Default resolution" hint="Dots per inch of a PNG of a layout page (A4): the resolution the Export page of a layout starts with. Choosing a resolution there also makes it the default. A graph's PNG is at its own size; SVG and PDF have no resolution. 600 dpi takes a few seconds.">
+            <SelectInput<string>
+              value={String(settings.exportDpi)}
+              options={EXPORT_DPI_CHOICES.map((d) => ({ value: String(d), label: `${d} dpi` }))}
+              onChange={(v) => updateSettings({ exportDpi: Number(v) as ExportDpi })}
+            />
           </Field>
         </div>
       </div>

@@ -140,7 +140,7 @@ describe('the layer rows of a column chart', () => {
   it('offer hiding and moving; looks and the axis range only for the parts that have them (see columnPartLooks.test.ts)', () => {
     const rows = layerRows(chartOf('bar'), table);
     expect(rows.filter((r) => r.layer.kind === 'bars').every((r) => r.takes === null && r.inRange === null)).toBe(true);
-    expect(rows.filter((r) => r.layer.kind === 'points').every((r) => r.takes !== null && r.inRange === true)).toBe(true);
+    expect(rows.filter((r) => r.layer.kind === 'points').every((r) => r.takes === null && r.inRange === true)).toBe(true);
     expect(rows.some((r) => r.canMoveUp || r.canMoveDown)).toBe(true);
     const chart = chartOf('bar');
     // A body is styled with the fill of its data set, so a look given to it is not stored.

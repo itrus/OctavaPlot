@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import type { Project } from '../../model/types';
-import { addAnnotation, addBracket, addChart, addDataTable, patchAxis, patchChart } from '../../state/commands';
+import { addAnnotation, addChart, addDataTable, addDrawing, patchAxis, patchChart } from '../../state/commands';
+import { createDrawing, presetById } from '../../model/graph/drawingPresets';
 import { buildAnyModel, chartTexts } from '../anyModel';
 import { measureText } from '../shared/parts/text';
 import { chartToSvgString } from './export';
@@ -35,11 +36,10 @@ describe('rich text in a figure', () => {
     p = { ...p, dataTables: p.dataTables.map((t) => (t.id === 't' ? { ...t, groups: t.groups.map((g, i) => (i === 0 ? { ...g, name: 'CO_{2}' } : g)) } : t)) };
     expect((svg(p).match(/<tspan font-size="70%" dy="0.4em">2<\/tspan>/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
-  it('works in annotations, in the labels of comparison brackets and in reference lines', () => {
+  it('works in annotations, in the texts of shapes and in reference lines', () => {
     let p = base();
     p = addAnnotation('c', { id: 'a1', text: 'n = 10^{3}', xFrac: 0.4, yFrac: 0.08, fontSizePt: 28, color: '#000000', opacity: 1 })(p);
-    const [a, b] = tableOf(p).groups.map((g) => g.id);
-    p = addBracket('c', { id: 'b1', from: a, to: b, label: 'p_{adj} = 0.01', color: '#000000', widthPt: 2, fontSizePt: 24 })(p);
+    p = addDrawing({ chartId: 'c' }, { ...createDrawing(presetById('bracketText')!, { xFrac: 0.2, yFrac: 0.3 }, { xFrac: 0.6, yFrac: 0.3 }, { color: '#000000', fontSizePt: 24 }, 'b1'), text: 'p_{adj} = 0.01' })(p);
     const out = svg(p);
     expect(out).toContain('<tspan font-size="70%" dy="-0.571em">3</tspan>');
     expect(out).toContain('<tspan font-size="70%" dy="0.4em">adj</tspan>');

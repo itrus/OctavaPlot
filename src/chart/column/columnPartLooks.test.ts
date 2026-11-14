@@ -19,9 +19,9 @@ const svg = (chart: Chart, t: DataTable = table) => chartToSvgString(chart, t);
 const stats = (chart: Chart, t: DataTable = table) => buildColumnModel(chart, t).groups.map((g) => ({ n: g.stats.n, centre: g.stats.centre, lower: g.stats.interval.lower, upper: g.stats.interval.upper }));
 
 describe('the look of the parts of a column chart', () => {
-  it('is given to one part and drawn: the dots, the error bars, the mean lines, the joins and the lines of a paired plot', () => {
+  it('is given to one part and drawn: the error bars, the mean lines, the joins and the lines of a paired plot', () => {
     const red = { color: '#ff0000' };
-    const cases: Array<[ChartType, string]> = [['bar', 'points'], ['bar', 'errorBars'], ['scatter', 'meanLine'], ['mean', 'line'], ['paired', 'pairLines']];
+    const cases: Array<[ChartType, string]> = [['bar', 'errorBars'], ['scatter', 'meanLine'], ['mean', 'line'], ['paired', 'pairLines']];
     for (const [type, kind] of cases) {
       const chart = chartOf(type);
       const id = idOf(chart, kind);
@@ -35,26 +35,19 @@ describe('the look of the parts of a column chart', () => {
     }
   });
 
-  it('is drawn on the dots of one data set only, and a look given to a single dot still wins over it', () => {
+  it('gives the dots no look of their own: they are set in Style, and a stored look from an older file is not drawn', () => {
     const chart = chartOf('scatter');
     const id = idOf(chart, 'points');
-    const once = afterCommands(chart, table, patchLayerStyle(chart.id, id, { shape: 'square', color: '#00aa00' }));
-    const model = buildColumnModel(once, table);
-    expect(model.groups[0].points.every((p) => p.shape === 'square' && p.color === '#00aa00')).toBe(true);
-    expect(model.groups[1].points.some((p) => p.shape === 'square')).toBe(false);
-    // An override on one dot (the most specific) stays over the look of the part.
-    const dot = model.groups[0].points[0].id;
-    const layer = once.layers[0];
-    const single: Chart = { ...once, layers: [{ ...layer, objectOverrides: { ...layer.objectOverrides, [dot]: { symbolColor: '#123456' } } }, ...once.layers.slice(1)] };
-    const g0 = buildColumnModel(single, table).groups[0].points;
-    expect(g0[0].color).toBe('#123456');
-    expect(g0[1].color).toBe('#00aa00');
+    expect(layerRows(chart, table).find((r) => r.layer.id === id)?.takes).toBeNull();
+    expect(afterCommands(chart, table, patchLayerStyle(chart.id, id, { shape: 'square', color: '#00aa00' })).layerStyles).toEqual({});
+    const stale: Chart = { ...chart, layerStyles: { [id]: { shape: 'square', color: '#00aa00' } } };
+    expect(svg(stale)).toBe(svg(chart));
   });
 
   it('offers only what the drawing honours, and stores nothing else', () => {
     const rows = (type: ChartType) => layerRows(chartOf(type), table);
     const takes = (type: ChartType, kind: string) => rows(type).find((r) => r.layer.kind === kind)?.takes ?? null;
-    expect(takes('bar', 'points')).toEqual(['color', 'widthPt', 'opacity', 'shape']);
+    expect(takes('bar', 'points')).toBeNull();
     expect(takes('bar', 'errorBars')).toEqual(['color', 'widthPt', 'opacity']);
     // The join of a mean chart is drawn solid, so a pattern is not offered; the bodies are styled with the fill of the data set.
     expect(takes('mean', 'line')).toEqual(['color', 'widthPt', 'opacity']);
@@ -72,7 +65,8 @@ describe('the look of the parts of a column chart', () => {
       for (const l of layersOf(chart, table)) {
         for (const [key, value] of [['color', '#336699'], ['widthPt', 4], ['opacity', 0.5], ['shape', 'diamond']] as const) styled = afterCommands(styled, table, patchLayerStyle(chart.id, l.id, { [key]: value }));
       }
-      expect(Object.keys(styled.layerStyles).length).toBeGreaterThan(0);
+      // A box plot has no part that takes a look any more; the others store what their parts take.
+      expect(Object.keys(styled.layerStyles).length > 0).toBe(type !== 'box');
       expect(layersOf(styled, table).map((l) => l.id)).toEqual(layersOf(chart, table).map((l) => l.id));
       expect(markIds(svg(styled))).toEqual(markIds(svg(chart)));
     }

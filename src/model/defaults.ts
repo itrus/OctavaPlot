@@ -6,6 +6,7 @@ import { chartFamily } from './graph/chartTypes';
 import { defaultSeriesName, subLabels, summaryFormatInfo } from './table/tableLayout';
 import { canonicalObservationId, createRows } from './table/rows';
 import type {
+  Annotation,
   AxisConfig,
   BarLabels,
   BarLayout,
@@ -85,7 +86,7 @@ export const defaultSummaryFor = (type: ChartType): SummarySpec =>
 
 export const DEFAULT_SURVIVAL: SurvivalOptions = { band: false, level: 0.95, method: 'loglog', atRisk: false, eventSymbols: false, errorBars: false };
 
-const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4, bySubject: false, swarm: false };
+const DEFAULT_JITTER = { enabled: true, widthFraction: 0.4, swarm: false };
 
 /** Line weight shared by the axes, bar borders, error bars and connecting lines, so they read as one family. */
 const AXIS_LINE_PT = 4;
@@ -113,7 +114,7 @@ const DEFAULT_FIT: ChartFit = { analysisId: null, band: 'none', extend: false, s
 /** Histograms (spec 11.1): automatic bins, counts, bars touching; the cumulative distribution steps up at each value. */
 const DEFAULT_HISTOGRAM: HistogramOptions = { binning: 'auto', binWidth: null, firstEdge: null, frequency: 'count', cumulative: 'off', arrangement: 'overlay', gapPct: 0, ecdfDirection: 'atOrBelow', ecdfUnits: 'fraction', ecdfSymbols: false, ecdfExtend: true };
 /** Pies and doughnuts (spec 14): the first part starts at the top, clockwise, labels with the share to one decimal. */
-const DEFAULT_PIE: PieOptions = { startAngle: 0, direction: 'clockwise', hole: 0.5, labels: 'percent', percentDigits: 1, showTotal: false, totalPrefix: 'Total = ' };
+const DEFAULT_PIE: PieOptions = { startAngle: 0, direction: 'clockwise', hole: 0.5, labels: 'percent', percentDigits: 1, showTotal: false, totalPrefix: 'Total = ', dotShape: 'circle', dotSize: 0.8 };
 /** Labels on bars are off until asked for. */
 export const DEFAULT_BAR_LABELS: BarLabels = { show: 'none', decimals: null, thousands: false, prefix: '', suffix: '', sizePt: 22.4, color: null };
 /** Automatic column layout: the spacing the column charts always had. */
@@ -270,6 +271,23 @@ export interface ChartStart {
   pageColor?: string | null;
 }
 
+/** Line spacing of an annotation that has none of its own (in multiples of the font size), and the limits a typed one is held to. */
+export const ANNOTATION_LINE_SPACING = { default: 1.2, min: 0.8, max: 3 } as const;
+/** The font sizes the "larger" and "smaller" buttons of a text step through, and the limits of a typed size. */
+export const ANNOTATION_FONT_STEPS = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40] as const;
+export const ANNOTATION_FONT_LIMITS = { min: 4, max: 72 } as const;
+
+/** A new text annotation "Text" at a place (fractions of the width and height of the chart or page), in a colour and size, bold. */
+export function createAnnotation(look: { color: string; fontSizePt: number }, xFrac: number, yFrac: number, id: string = newId('ann')): Annotation {
+  const size = Math.min(ANNOTATION_FONT_LIMITS.max, Math.max(ANNOTATION_FONT_LIMITS.min, look.fontSizePt));
+  return { id, text: 'Text', xFrac: Math.min(0.98, Math.max(0, xFrac)), yFrac: Math.min(0.98, Math.max(0, yFrac)), fontSizePt: size, color: look.color, opacity: 1, bold: true };
+}
+
+/** How a new text of a graph looks: as large as the numbers of the axes, in the graph's text colour. */
+export const chartTextLook = (chart: Pick<Chart, 'textColor' | 'xAxis'>) => ({ color: chart.textColor, fontSizePt: chart.xAxis.tickFontSizePt });
+/** How a new text of a page layout looks: 12 pt black, as the page is printed at its real size. */
+export const PAGE_TEXT_LOOK = { color: '#000000', fontSizePt: 12 } as const;
+
 export function createChart(dataTableId: string, size?: ChartStart, type: ChartType = 'bar'): Chart {
   const titles = axisTitlesFor(type);
   const layer: ChartLayer = {
@@ -318,7 +336,7 @@ export function createChart(dataTableId: string, size?: ChartStart, type: ChartT
     barLabels: { ...DEFAULT_BAR_LABELS },
     // A violin shows its values from the start: the Points box then switches them off.
     distribution: { ...DEFAULT_DISTRIBUTION, ...(type === 'violin' || type === 'groupedViolin' ? { points: 'all' as const } : {}) },
-    pairs: { bridge: false, bySubject: false, lineColour: 'subject' },
+    pairs: { bridge: false, lineColour: 'subject' },
     heatmap: { ...DEFAULT_HEATMAP, breaks: [], customColours: { ...DEFAULT_CUSTOM_COLOURS } },
     histogram: { ...DEFAULT_HISTOGRAM },
     fit: { ...DEFAULT_FIT },
@@ -335,7 +353,6 @@ export function createChart(dataTableId: string, size?: ChartStart, type: ChartT
     annotations: [],
     referenceLines: [],
     regions: [],
-    brackets: [],
     hiddenLayerIds: [],
     rangeExcludedLayerIds: [],
     layerOrder: [],

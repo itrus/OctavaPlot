@@ -27,7 +27,7 @@ export function ExportCsvDialog({ excluded, onExport, onClose }: { excluded: num
         ))}
       </div>
       <div style={{ color: 'var(--muted)', fontSize: 11.5, marginTop: 8 }}>
-        Whatever you choose, a column whose values name subjects is followed by a "&lt;Group&gt; subject" column, and the first column of a series with a factor by a "&lt;Group&gt; factor" column, so that the file reads back with the same roles.
+        Whatever you choose, the first column of a series with a factor is followed by a "&lt;Group&gt; factor" column, so that the file reads back with the same factors.
       </div>
     </Modal>
   );

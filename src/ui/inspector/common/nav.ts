@@ -18,7 +18,8 @@ export function inspectorTargetFor(hit: HitTarget): InspectorTarget | null {
     case 'title':
       return { page: 'graph', part: 'text' };
     case 'annotation':
-    case 'bracket':
+    case 'drawing':
+    case 'handle':
       return { page: 'notes' };
     default:
       return null;
@@ -35,6 +36,6 @@ export const PAGES: Array<{ id: InspectorPage; label: string; title: string; hea
   { id: 'axes', label: 'Axes', title: 'Axes: scales, ticks and grid', parts: [{ id: 'axes', label: 'Axes' }] },
   { id: 'legend', label: 'Legend', title: 'Legend', parts: [{ id: 'legend', label: 'Legend' }] },
   { id: 'analysis', label: 'Analysis', title: 'Analysis: summary, error bars and fits', parts: [{ id: 'analysis', label: 'Analysis' }] },
-  { id: 'notes', label: 'Notes', title: 'Notes: text, brackets and guides', parts: [{ id: 'annotations', label: 'Notes' }] },
+  { id: 'notes', label: 'Notes', title: 'Notes: texts, shapes and guides', parts: [{ id: 'annotations', label: 'Notes' }] },
   { id: 'export', label: 'Export', title: 'Export this graph as a picture or a vector file', heading: 'Export Graph', parts: [{ id: 'export', label: 'Export' }] },
 ];

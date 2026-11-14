@@ -3,7 +3,8 @@ import { createEmptyProject, createExampleProject } from '../../model/defaults';
 import { GALLERY } from '../../model/graph/chartGallery';
 import { defaultLayout } from '../../model/project/layout';
 import type { Project, TableKind } from '../../model/types';
-import { addAnnotation, addBracket, addChart, addDataTable, patchLook } from '../../state/commands';
+import { addAnnotation, addChart, addDataTable, addDrawing, patchLook } from '../../state/commands';
+import { createDrawing, presetById } from '../../model/graph/drawingPresets';
 import { buildVectorPdf, pdfTextString } from './pdf';
 import { chartToPdf, chartToSvgString } from './export';
 import { layoutToPdf } from './layoutExport';
@@ -298,15 +299,14 @@ describe('a graph as a PDF', () => {
     expect(notes).toEqual([]);
   });
 
-  it('draws the brackets and an annotation of a graph', async () => {
+  it('draws the shapes and an annotation of a graph', async () => {
     let p = addChart('c', 't', undefined, 'bar')(addDataTable('t', 'column', { sample: true })(createExampleProject()));
-    const ids = p.dataTables.find((t) => t.id === 't')!.groups.map((g) => g.id);
-    p = addBracket('c', { id: 'b', from: ids[0], to: ids[3], label: 'Welch\np = 0.003', color: '#aa0000', widthPt: 2, fontSizePt: 14 })(p);
+    p = addDrawing({ chartId: 'c' }, { ...createDrawing(presetById('bracketText')!, { xFrac: 0.2, yFrac: 0.2 }, { xFrac: 0.7, yFrac: 0.2 }, { color: '#aa0000', fontSizePt: 14, widthPt: 2 }, 'b'), text: 'p = 0.003' })(p);
     p = addAnnotation('c', { id: 'n', text: 'first line\nsecond', xFrac: 0.4, yFrac: 0.2, fontSizePt: 10, color: '#000000', opacity: 1 })(p);
     const { stream, notes } = await graphPdf(p, 'c');
     expect(notes).toEqual([]);
     expect(stream).toContain('0.667 0 0 RG');
-    for (const word of ['Welch', 'p = 0.003', 'first line', 'second']) expect(stream).toContain(`(${word}) Tj`);
+    for (const word of ['p = 0.003', 'first line', 'second']) expect(stream).toContain(`(${word}) Tj`);
   });
 });
 

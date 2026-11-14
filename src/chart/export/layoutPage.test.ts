@@ -142,3 +142,23 @@ describe('a master legend', () => {
     expect(band.h).toBeCloseTo(rows * 24 * 1.55, 6);
   });
 });
+
+describe('texts placed on a page', () => {
+  const note = { id: 'n1', text: 'Figure 1', xFrac: 0.5, yFrac: 0.1, fontSizePt: 12, color: '#123456', opacity: 1, bold: true, fontFamily: "'Times New Roman', Times, serif" };
+  it('draws each text of the page on top of the graphs, at its fractions of the page, with its look', () => {
+    const p = project();
+    const { svg, widthPt } = drawLayout(page(p, { annotations: [note] }), p);
+    const at = svg.indexOf('Figure 1');
+    expect(at).toBeGreaterThan(svg.lastIndexOf('</svg>', svg.length - 7));
+    expect(svg).toContain(`x="${Math.round(widthPt * 0.5 * 100) / 100}"`);
+    expect(svg).toContain('font-weight="bold"');
+    expect(svg).toContain('fill="#123456"');
+    // Editor-only marks (the hit pad and the selection frame) are not written.
+    expect(svg).not.toContain('stroke-dasharray="6 4"');
+  });
+  it('checks the characters of a page text in its own font', () => {
+    const p = project();
+    const groups = layoutTextGroups(page(p, { annotations: [note] }), p, 'Arial, Helvetica, sans-serif');
+    expect(groups.find((g) => g.fontFamily === note.fontFamily)?.texts).toEqual(['Figure 1']);
+  });
+});

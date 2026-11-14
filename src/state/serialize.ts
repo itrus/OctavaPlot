@@ -1,7 +1,7 @@
-import { CHART_PX_MAX, createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
+import { ANNOTATION_LINE_SPACING, CHART_PX_MAX, createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
 import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../chart/shared/parts/labels';
 import { CHART_TYPES, chartTypeInfo, defaultChartTypeFor } from '../model/graph/chartTypes';
-import { BRACKET_LIFT_LIMIT, leadingColumns } from '../model/graph/chartTypes';
+import { leadingColumns } from '../model/graph/chartTypes';
 import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../model/table/tableLayout';
 import { sanitizeFillKeys } from '../model/graph/fill';
 import { sanitizeAxis } from '../model/graph/axis';
@@ -9,7 +9,8 @@ import { analysisTypeInfo } from '../model/project/analysis';
 import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLegendLayout, withoutLegendLayout } from '../model/graph/legendEntries';
-import { sanitizeLook, SYMBOL_SHAPES } from '../model/graph/look';
+import { FONT_FAMILIES, sanitizeLook, SYMBOL_SHAPES } from '../model/graph/look';
+import { clampDrawing, DRAWING_LIMITS } from '../model/graph/drawingPresets';
 import { sanitizeOrder } from '../model/table/groupOrder';
 import { canonicalObservationId, canonicalRowId, MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
@@ -18,7 +19,7 @@ import { defaultLayout, sanitizeLayout } from '../model/project/layout';
 import { timeColumnOf, type TimeColumn } from '../util/timeColumn';
 import { writeProject } from './tableFile/tableCodec';
 import { FILE_FORMAT, FILE_VERSION, migrateRead, migrateShape, upgradeToCurrent } from './migrate';
-import type { Analysis, Chart, ChartLayer, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, ResultStat, SummarySpec } from '../model/types';
+import type { Analysis, Chart, ChartLayer, Drawing, DrawingPoint, LineEnd, LineStyle, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, ResultStat, SummarySpec } from '../model/types';
 
 /** The envelope of a project file (.oplot): this format, and the version written (earlier ones are read: see migrate.ts). */
 const FORMAT = FILE_FORMAT;
@@ -99,8 +100,9 @@ function parseRows(raw: unknown, path: string, rowCount: number): DataRow[] {
 }
 
 /**
- * The values of a column: `[index, value]`, or `[index, value, {id, subject, excluded, excludedReason}]` for a cell with
- * something to say besides its value. A cell that is not listed is empty: null, no subject, not excluded. The ID of a cell
+ * The values of a column: `[index, value]`, or `[index, value, {id, excluded, excludedReason}]` for a cell with
+ * something to say besides its value. A cell that is not listed is empty: null, not excluded. A `subject` that older files
+ * stored on a cell is ignored (subjects were removed). The ID of a cell
  * is stored unless it is the canonical one of its place.
  */
 function parseObservations(raw: unknown, path: string, rowCount: number, groupId: string, taken: Set<string>): Observation[] {
@@ -114,8 +116,7 @@ function parseObservations(raw: unknown, path: string, rowCount: number, groupId
       if (named[index] === '') fail(`${ep}[2].id`, 'must not be empty');
     }
     // An excluded value is kept, with its reason, but not used (model/table/exclusion.ts).
-    const subject = typeof o.subject === 'string' ? o.subject.trim() : '';
-    cells[index] = { value, ...(subject !== '' ? { subject } : {}), ...(o.excluded === true ? { excluded: true as const, ...(typeof o.excludedReason === 'string' && o.excludedReason !== '' ? { excludedReason: o.excludedReason } : {}) } : {}) };
+    cells[index] = { value, ...(o.excluded === true ? { excluded: true as const, ...(typeof o.excludedReason === 'string' && o.excludedReason !== '' ? { excludedReason: o.excludedReason } : {}) } : {}) };
   }
   return fillIds(named, (i) => canonicalObservationId(groupId, i), path, taken).map((id, i) => ({ id, ...cells[i] }));
 }
@@ -396,12 +397,87 @@ function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['a
       color,
       opacity: Math.min(1, Math.max(0, finiteOr(a.opacity, 1))),
       ...(a.anchor === 'data' && (hasX || hasY) ? { anchor: 'data' as const, ...(hasX ? { x: a.x as number } : {}), ...(hasY ? { y: a.y as number } : {}) } : {}),
+      // The look of the text: each is optional and written only when it is not the default; a value that cannot be read is left out.
+      ...(a.bold === true ? { bold: true } : {}),
+      ...(a.italic === true ? { italic: true } : {}),
+      ...(a.underline === true ? { underline: true } : {}),
+      ...(typeof a.fontFamily === 'string' && FONT_FAMILIES.some((f) => f.value === a.fontFamily) ? { fontFamily: a.fontFamily } : {}),
+      ...(a.align === 'center' || a.align === 'right' ? { align: a.align } : {}),
+      ...(typeof a.lineSpacing === 'number' && Number.isFinite(a.lineSpacing) ? { lineSpacing: Math.min(ANNOTATION_LINE_SPACING.max, Math.max(ANNOTATION_LINE_SPACING.min, a.lineSpacing)) } : {}),
     });
   });
   return out;
 }
 
 const LINE_STYLES = ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'] as const;
+
+const DRAWING_SHAPES: ReadonlyArray<Drawing['shape']> = ['line', 'ellipse', 'rect', 'arc'];
+const LINE_ENDS: ReadonlyArray<LineEnd> = ['none', 'arrow', 'bar', 'tick', 'tickFlip'];
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * Drawing objects (shapes and lines): every field checked, each optional one written only when it is not the default; an entry without
+ * a readable ID, shape or points, or one that repeats an ID, is dropped and noted. `page` (a layout) never anchors an object to data.
+ */
+function cleanDrawings(raw: unknown, path: string, notes: string[], page = false): Drawing[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    notes.push(`${path} was not a list and was reset.`);
+    return [];
+  }
+  const out: Drawing[] = [];
+  const seen = new Set<string>();
+  const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  const frac = (v: unknown) => Math.min(1, Math.max(0, v as number));
+  raw.forEach((d, i) => {
+    const point = (v: unknown): DrawingPoint | null => (isObj(v) && num(v.xFrac) && num(v.yFrac) ? { xFrac: frac(v.xFrac), yFrac: frac(v.yFrac), ...(!page && num(v.x) ? { x: v.x } : {}), ...(!page && num(v.y) ? { y: v.y } : {}) } : null);
+    const from = isObj(d) ? point(d.from) : null;
+    const to = isObj(d) ? point(d.to) : null;
+    if (!isObj(d) || typeof d.id !== 'string' || d.id === '' || seen.has(d.id) || !DRAWING_SHAPES.includes(d.shape as Drawing['shape']) || !from || !to) {
+      notes.push(`${path}[${i}] could not be read and was dropped.`);
+      return;
+    }
+    seen.add(d.id);
+    const limit = (key: keyof typeof DRAWING_LIMITS, v: unknown) => (num(v) ? { [key]: clampDrawing(key, v) } : {});
+    const end = (v: unknown) => (LINE_ENDS.includes(v as LineEnd) && v !== 'none' ? (v as LineEnd) : undefined);
+    const line = d.shape === 'line';
+    const start = line ? end(d.start) : undefined;
+    const finish = line ? end(d.end) : undefined;
+    const anchored = !page && d.anchor === 'data' && [from, to].every((q) => q.x !== undefined || q.y !== undefined);
+    if (!page && d.anchor === 'data' && !anchored) notes.push(`${path}[${i}] was anchored to data without values and was placed on the page.`);
+    const plain = (q: DrawingPoint): DrawingPoint => ({ xFrac: q.xFrac, yFrac: q.yFrac });
+    out.push({
+      id: d.id,
+      shape: d.shape as Drawing['shape'],
+      from: anchored ? from : plain(from),
+      to: anchored ? to : plain(to),
+      ...(anchored ? { anchor: 'data' as const } : {}),
+      ...(line && (d.route === 'hv' || d.route === 'vh') ? { route: d.route } : {}),
+      ...(start ? { start } : {}),
+      ...(finish ? { end: finish } : {}),
+      ...(line ? limit('endSizePt', d.endSizePt) : {}),
+      ...(d.shape === 'rect' ? limit('cornerPt', d.cornerPt) : {}),
+      color: typeof d.color === 'string' && HEX_COLOR.test(d.color) ? d.color : '#000000',
+      opacity: num(d.opacity) ? Math.min(1, Math.max(0, d.opacity)) : 1,
+      widthPt: num(d.widthPt) ? clampDrawing('widthPt', d.widthPt) : 1,
+      lineStyle: LINE_STYLES.includes(d.lineStyle as LineStyle) ? (d.lineStyle as LineStyle) : 'solid',
+      ...((d.shape === 'ellipse' || d.shape === 'rect') && typeof d.fill === 'string' && HEX_COLOR.test(d.fill) ? { fill: d.fill, ...(num(d.fillOpacity) ? { fillOpacity: Math.min(1, Math.max(0, d.fillOpacity)) } : {}) } : {}),
+      ...(line && typeof d.text === 'string'
+        ? {
+            text: d.text,
+            ...limit('fontSizePt', d.fontSizePt),
+            ...(typeof d.textColor === 'string' && HEX_COLOR.test(d.textColor) ? { textColor: d.textColor } : {}),
+            ...(typeof d.fontFamily === 'string' && FONT_FAMILIES.some((f) => f.value === d.fontFamily) ? { fontFamily: d.fontFamily } : {}),
+            ...(d.bold === true ? { bold: true } : {}),
+            ...(d.italic === true ? { italic: true } : {}),
+            ...(d.textSide === 'below' ? { textSide: 'below' as const } : {}),
+            ...limit('textGapPt', d.textGapPt),
+          }
+        : {}),
+    });
+  });
+  return out;
+}
 
 /** Reference lines: every field checked; an entry that cannot be read (or repeats an ID) is dropped and noted. */
 function cleanReferenceLines(raw: unknown, path: string, notes: string[]): Chart['referenceLines'] {
@@ -471,41 +547,6 @@ function cleanRegions(raw: unknown, path: string, notes: string[]): Chart['regio
   return out;
 }
 
-/** Comparison brackets: every field checked; an entry that cannot be read (or repeats an ID) is dropped and noted. */
-function cleanBrackets(raw: unknown, path: string, notes: string[]): Chart['brackets'] {
-  if (raw === undefined) return [];
-  if (!Array.isArray(raw)) {
-    notes.push(`${path} was not a list and was reset.`);
-    return [];
-  }
-  const out: Chart['brackets'] = [];
-  const seen = new Set<string>();
-  raw.forEach((b, i) => {
-    if (!isObj(b) || typeof b.id !== 'string' || b.id === '' || seen.has(b.id) || typeof b.from !== 'string' || b.from === '' || typeof b.to !== 'string' || b.to === '') {
-      notes.push(`${path}[${i}] could not be read and was dropped.`);
-      return;
-    }
-    seen.add(b.id);
-    const width = finiteOr(b.widthPt, 2);
-    const font = finiteOr(b.fontSizePt, 24);
-    out.push({
-      id: b.id,
-      from: b.from,
-      to: b.to,
-      label: typeof b.label === 'string' ? b.label : '',
-      color: typeof b.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(b.color) ? b.color : '#000000',
-      widthPt: width > 0 && width <= 40 ? width : 2,
-      fontSizePt: font >= 4 && font <= 200 ? font : 24,
-      ...(isRow(b.row) ? { row: b.row } : {}),
-      ...(isRow(b.toRow) ? { toRow: b.toRow } : {}),
-      ...(typeof b.at === 'number' && Number.isFinite(b.at) ? { at: b.at } : {}),
-      ...(typeof b.liftPt === 'number' && Number.isFinite(b.liftPt) && b.liftPt !== 0 ? { liftPt: Math.max(-BRACKET_LIFT_LIMIT, Math.min(BRACKET_LIFT_LIMIT, b.liftPt)) } : {}),
-    });
-  });
-  return out;
-}
-
-const isRow = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
 
 /**
  * Data sets taken from other tables. An entry that cannot be read, or a data set listed twice, refuses the file (which
@@ -544,6 +585,9 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
   const c = conform(c0, base as unknown as Obj, path, notes, new Set(['defaults', 'layers']));
   // The print width of earlier builds (docs/FILE_FORMAT.md): not read, and not written back.
   delete c.printWidthMm;
+  // Comparison brackets joined to data sets were removed (14 November 2026): those of an older file are dropped, with a note. Brackets are now drawn with Graphics.
+  if (Array.isArray(c.brackets) && c.brackets.length > 0) notes.push(`${path}.brackets: ${c.brackets.length} comparison bracket${c.brackets.length === 1 ? ' was' : 's were'} dropped; draw brackets with Graphics on the graph's toolbar.`);
+  delete c.brackets;
   // Merged over the defaults: a value that is missing or not valid takes the default.
   const defaults = cleanStyle(c.defaults, `${path}.defaults`, notes);
   // A graph has one data layer (see dataLayer in model/graph/style.ts); migrate.ts cut a file's others, with a note.
@@ -574,14 +618,15 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
       hiddenGroupIds: Array.isArray(legendIn.hiddenGroupIds) ? legendIn.hiddenGroupIds.filter((id): id is string => typeof id === 'string') : [],
       ...sanitizeLegendLayout(legendIn),
     },
-    jitter: { ...base.jitter, ...(isObj(c.jitter) ? c.jitter : {}) },
+    // `bySubject` of older files (dots grouped by subject) was removed and is not read.
+    jitter: (({ bySubject: _bySubject, ...j }) => ({ ...base.jitter, ...j }))(isObj(c.jitter) ? c.jitter : {}),
     defaults: { ...DEFAULT_STYLE, ...defaults },
     displayNames: cleanDisplayNames(c.displayNames, `${path}.displayNames`, notes),
     annotations: cleanAnnotations(c.annotations, `${path}.annotations`, notes),
+    ...((drawings) => (drawings.length > 0 ? { drawings } : {}))(cleanDrawings(c.drawings, `${path}.drawings`, notes)),
     referenceLines: cleanReferenceLines(c.referenceLines, `${path}.referenceLines`, notes),
     regions: cleanRegions(c.regions, `${path}.regions`, notes),
     ...(c.equalUnits === true ? { equalUnits: true } : { equalUnits: undefined }),
-    brackets: cleanBrackets(c.brackets, `${path}.brackets`, notes),
     layerStyles: (() => {
       const r = sanitizeLayerStyles(c.layerStyles);
       if (r.dropped > 0) notes.push(`${path}.layerStyles: ${r.dropped} setting${r.dropped === 1 ? '' : 's'} could not be read and ${r.dropped === 1 ? 'was' : 'were'} dropped.`);
@@ -677,7 +722,11 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
       notes.push(`${lp}.panels[${pi}] referred to a graph that is missing and was emptied.`);
       return null;
     });
-    return { ...made, panels };
+    // The texts of the page are checked as a graph's are; a page has no axes, so a text is always placed on the page.
+    const annotations = cleanAnnotations(o.annotations, `${lp}.annotations`, notes).map(({ anchor: _a, x: _x, y: _y, ...rest }) => rest);
+    const drawings = cleanDrawings(o.drawings, `${lp}.drawings`, notes, true);
+    const { annotations: _raw, drawings: _rawDrawings, ...withoutTexts } = made;
+    return { ...withoutTexts, panels, ...(annotations.length > 0 ? { annotations } : {}), ...(drawings.length > 0 ? { drawings } : {}) };
   });
   if (new Set(layouts.map((l) => l.id)).size !== layouts.length) fail('project.layouts', 'has two layouts with the same ID');
   // A chart type that does not suit its table's type (a hand-edited file) is switched to the table's default chart

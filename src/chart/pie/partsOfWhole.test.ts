@@ -3,8 +3,7 @@ import { createChart, createContingencyTable } from '../../model/defaults';
 import type { DataTable, Project } from '../../model/types';
 import { patchLook, setCells } from '../../state/commands';
 import { chartToSvgString } from '../export/export';
-import { dotAllocation, dotsPath } from './pieModel';
-import { buildPieModel } from './pieModel';
+import { buildPieModel, cutForArea, dotsPath } from './pieModel';
 
 const setup = (type: 'slices' | 'dotGrid') => {
   const table: DataTable = createContingencyTable('Outcomes', true); // Treated 38/12, Control 21/29
@@ -14,30 +13,40 @@ const setup = (type: 'slices' | 'dotGrid') => {
 };
 const circles = (d: string) => (d.match(/M/g) ?? []).length;
 
-describe('dotAllocation', () => {
-  it('always uses 100 dots, by the largest remainders, the earlier part first on a tie', () => {
-    expect(dotAllocation([38, 12])).toEqual([76, 24]);
-    expect(dotAllocation([1, 1, 1])).toEqual([34, 33, 33]);
-    expect(dotAllocation([1, 2])).toEqual([33, 67]);
-    expect(dotAllocation([1, 0, 1])).toEqual([50, 0, 50]);
-    for (const w of [[7, 11, 13, 2], [1, 1e6], [3, 3, 3, 3, 3, 3, 3]]) expect(dotAllocation(w).reduce((a, b) => a + b, 0)).toBe(100);
-  });
-  it('gives no dots to a part with no weight, and none at all when nothing has any', () => {
-    expect(dotAllocation([0, 5])).toEqual([0, 100]);
-    expect(dotAllocation([0, 0])).toEqual([0, 0]);
-  });
-  it('never makes a part with a weight smaller than its share rounded down', () => {
-    const w = [1, 99.4, 0.3];
-    const counts = dotAllocation(w);
-    const total = w.reduce((a, b) => a + b, 0);
-    counts.forEach((c, i) => expect(c).toBeGreaterThanOrEqual(Math.floor((w[i] / total) * 100)));
+describe('cutForArea', () => {
+  it('finds the vertical line that leaves the given share of a circle on its left', () => {
+    expect(cutForArea(0)).toBeCloseTo(-1, 6);
+    expect(cutForArea(0.5)).toBeCloseTo(0, 6);
+    expect(cutForArea(1)).toBeCloseTo(1, 6);
+    expect(cutForArea(0.25)).toBeLessThan(0);
   });
 });
 
 describe('dotsPath', () => {
-  it('is one circle for each dot, and nothing for none', () => {
+  it('is one shape for each dot reached, whole or part, and nothing for none', () => {
     expect(circles(dotsPath(50, 50, 100, 0, 7))).toBe(7);
+    expect(circles(dotsPath(50, 50, 100, 0, 7.4))).toBe(8);
+    expect(circles(dotsPath(50, 50, 100, 6.5, 8.25))).toBe(3);
     expect(dotsPath(50, 50, 100, 30, 30)).toBe('');
+  });
+});
+
+describe('dot shape and size', () => {
+  it('draws squares, cut by width at the share of a dot, and a size that scales the dots', () => {
+    const sq = dotsPath(50, 50, 100, 0, 7.5, 'square');
+    expect(circles(sq)).toBe(8);
+    expect(sq).not.toContain('a');
+    // Size 1 on a pitch of 1: a half dot ends at its middle.
+    expect(dotsPath(5, 5, 10, 0, 0.5, 'square', 1)).toBe('M0,0H0.5V1H0Z');
+    expect(dotsPath(50, 50, 100, 0, 1, 'square', 1)).toBe('M0,0H10V10H0Z');
+    expect(dotsPath(50, 50, 100, 0, 1, 'square', 0.5)).toBe('M2.5,2.5H7.5V7.5H2.5Z');
+  });
+
+  it('keeps the options in the chart, with defaults for a file without them', () => {
+    const { table, chart } = setup('dotGrid');
+    expect(chart.pie).toMatchObject({ dotShape: 'circle', dotSize: 0.8 });
+    const m = buildPieModel({ ...chart, pie: { ...chart.pie, dotShape: 'square', dotSize: 1 } }, table);
+    expect(m.pies[0].slices[0].path).toContain('H');
   });
 });
 
@@ -86,6 +95,14 @@ describe('10 × 10 dot plot', () => {
     expect(m.pies[1].slices.map((s) => circles(s.path))).toEqual([42, 58]);
     expect(m.pies.every((p) => p.slices.reduce((n, s) => n + circles(s.path), 0) === 100)).toBe(true);
     expect(m.pies[0].slices.every((s) => s.text === null)).toBe(true);
+  });
+
+  it('splits a dot that two parts share, so that a share that is not a whole number of dots is kept', () => {
+    const { p, table, chart } = setup('dotGrid');
+    const t = setCells(table.id, [{ row: 0, col: 0, value: 1 }, { row: 0, col: 1, value: 2 }])(p).dataTables[0];
+    const m = buildPieModel(chart, t);
+    // 33.33 and 66.67 dots: dot 33 is shared.
+    expect(m.pies[0].slices.map((s) => circles(s.path))).toEqual([34, 67]);
   });
 
   it('has the same grid in every row, and the exact share stays on the part', () => {

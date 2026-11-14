@@ -14,7 +14,6 @@ import { crossingPosition, labelOffset } from '../shared/axes/axisTicks';
 import { backgroundElements, extraGridElements, frameElement, gridElements, legendElements, numericAxisElements, plotClipElement, referenceLineElements, regionElements, scaleBarElement, secondaryAxisElements, titleElements } from '../shared/scene/chrome';
 import { referenceLinesOf, regionsOf } from '../shared/scene/referenceLines';
 import { atRiskElements, fitParameterElements } from './xyChrome';
-import { xyBracketElements } from './xyBrackets';
 import { sizeKeyElements } from '../shared/scene/sizeLegend';
 import { LEGEND_KEY, Y_TICK_LABEL_GAP } from '../shared/parts/layout';
 
@@ -150,8 +149,6 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
     // The gridlines that added ticks want in front of the data.
     ...(ya.visible ? extraGridElements({ dir: 'h', grid: chart.grid, extras: y.extraTicks, at: yScale, from: plot.x, to: right }, true) : []),
     ...(xa.visible ? extraGridElements({ dir: 'v', grid: chart.grid, extras: x.extraTicks, at: xScale, from: plot.y, to: bottom }, true) : []),
-    // The comparison brackets stand in front of the data; one whose layer is hidden is not drawn.
-    ...xyBracketElements(model.brackets ?? [], hidden),
     ...(model.fit.showParameters ? fitParameterElements(series, plot.x + 16, plot.y + 8, ya.tickFontSizePt, model.fit.level) : []),
     ...numericAxisElements({ ...axis, cfg: ya, scale: y, along: 'y', crossing: yCross, pieces: yPieces, gaps: axisGaps(y, bottom, -plot.height), map: yScale }),
     ...(y2 ? secondaryAxisElements({ chart, cfg: y2a, scale: y2.scale, map: y2.map, plot }) : []),

@@ -23,7 +23,7 @@ export function columnDrawing(chart: Chart, model: ColumnModel, preview = false)
       { nodes: compileColumnLabels(chart, model) },
       { nodes: scene.front },
       { nodes: compileColumnPointLabels(chart, model) },
-      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), place: annotationPlacer({ family: 'column', model }, model.widthPt, model.heightPt).place },
+      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), drawings: chart.drawings, place: annotationPlacer({ family: 'column', model }, model.widthPt, model.heightPt).place },
     ],
     selection: (s) => compileColumnSelection(model, s.groupIds, s.pointIds),
   };

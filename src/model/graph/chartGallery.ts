@@ -40,7 +40,6 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('xy.spikes', 'Spikes', 'Thin lines from the baseline up to each point.', 'xySpikes', 'xy.spikes'),
         item('xy.bubble', 'Bubbles', 'Symbols whose area follows a second column: make the table with "Y and size".', 'xyBubble', 'xy.bubble', { bubbles: true }),
         item('xy.volcano', 'Volcano plot', 'Fold change (log2) against significance: the X column holds the log2 fold change, the Y column the p-values, the row titles the names.', 'xyVolcano', 'xy.volcano'),
-        item('xy.trajectory', 'Repeated measures', 'One line per subject, for example before and after: name the subjects in the table (Subject…).', 'xyLineSymbols', 'xy.trajectory', { lineConnect: 'subject' }),
         item('xy.offset', 'Offset traces', 'Several series stacked with a fixed offset and a scale bar.', 'xyOffset', 'xy.offset_traces', { offsetTraces: true }),
         item('curve.fit', 'Points with a fitted curve', 'A fitted line with its confidence band; choose another model in the panel.', 'xyScatter', 'curve.fit', { fit: { model: 'linear', band: 'confidence' } }),
       ],
@@ -54,8 +53,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('scatter', 'Scatter dot plot', 'Every value as a dot, grouped by column, with an optional line at the mean.', 'scatter'),
         item('cat.aligned', 'Aligned dots', 'Dots in a column without spreading them sideways.', 'scatter', 'category.aligned', { jitter: false }),
         item('cat.swarm', 'Beeswarm', 'Every value as a dot, placed sideways by its value so that none touches another.', 'scatter', 'category.swarm', { swarm: true }),
-        item('paired', 'Before and after', 'The values of each subject joined by a line.', 'paired', 'category.paired'),
-        item('cat.nested', 'Nested dots', 'Technical repeats inside each independent unit: name the subjects in the table (Subject…); the mean and error bar are of the subjects.', 'scatter', 'category.nested', { bySubject: true }),
+        item('paired', 'Before and after', 'The values of each row joined by a line.', 'paired', 'category.paired'),
       ],
     },
     {
@@ -94,7 +92,6 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       items: [
         item('grp.scatterI', 'Interleaved scatter', 'Dots of every series side by side within each category.', 'groupedBar', 'category.grouped', { dotsOnly: true }),
         item('grp.scatterS', 'Separated scatter', 'Dots of each series in its own group of columns, one column for each category.', 'groupedBar', 'category.grouped', { dotsOnly: true, separated: true }),
-        item('grp.paired', 'Before and after, grouped', 'Subject lines inside each category: enter the values as replicates and name the subjects in the table (Subject…).', 'groupedBar', 'category.paired', { dotsOnly: true, subjectLines: true }),
       ],
     },
     {

@@ -1,4 +1,4 @@
-import { bracketKindOf, CHART_TYPES, chartFamily, isSeriesColourType, supportsHorizontal } from './chartTypes';
+import { CHART_TYPES, chartFamily, isSeriesColourType, supportsHorizontal } from './chartTypes';
 import { hasPartLooks, rangeKindsOf } from './layers';
 import type { ChartType } from '../types';
 
@@ -30,8 +30,6 @@ interface Capabilities {
   rangeSwitch: boolean;
   /** The chart has numeric axes that can be broken, reversed or put on a log scale. */
   numericAxes: boolean;
-  /** Comparison brackets can join two data sets (charts over columns, side by side grouped bars, XY charts; see bracketKindOf in chartTypes.ts). */
-  brackets: boolean;
   /** XY charts: an oblique reference line (the identity line, y = a + bx), shaded regions between two values, extra ticks at chosen values, equal-unit scaling of the two axes. */
   guides: boolean;
   /** XY charts: error bars along X from an error table (layout 'xerror'), a layer of their own with a look and a range switch. */
@@ -67,7 +65,6 @@ export function capabilitiesOf(type: ChartType): Capabilities {
     seriesColour: isSeriesColourType(type),
     survivalOptions: family === 'survival',
     numericAxes: family !== 'pie' && family !== 'heatmap',
-    brackets: bracketKindOf(type) !== null,
     guides: family === 'xy',
     xErrorBars: family === 'xy',
     partLooks: hasPartLooks(type),
@@ -88,7 +85,7 @@ export function capabilityTable(): string {
   const rows = CHART_TYPES.map((c) => {
     const k = capabilitiesOf(c.type);
     const lines = k.referenceLines === 'xy' ? 'X and Y' : k.referenceLines === 'y' ? 'Y' : '–';
-    return `| ${c.label} | ${yes(k.horizontal)} | ${lines} | ${yes(k.secondaryAxis)} | ${yes(k.curveFit)} | ${yes(k.lineConnect)} | ${yes(k.survivalOptions)} | ${yes(k.partLooks)} | ${yes(k.rangeSwitch)} | ${yes(k.brackets)} |`;
+    return `| ${c.label} | ${yes(k.horizontal)} | ${lines} | ${yes(k.secondaryAxis)} | ${yes(k.curveFit)} | ${yes(k.lineConnect)} | ${yes(k.survivalOptions)} | ${yes(k.partLooks)} | ${yes(k.rangeSwitch)} |`;
   });
-  return ['| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options | Look per part | Keep out of range | Brackets |', '|---|---|---|---|---|---|---|---|---|---|', ...rows].join('\n');
+  return ['| Chart type | Horizontal | Reference lines | Right Y axis | Curve fit | Join by X | Survival options | Look per part | Keep out of range |', '|---|---|---|---|---|---|---|---|---|', ...rows].join('\n');
 }

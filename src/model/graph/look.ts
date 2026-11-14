@@ -72,7 +72,7 @@ export const GRID_LIMITS = { widthPt: { min: 0.2, max: 10 } } as const;
 const LINES = valuesOf(LINE_STYLES);
 const FRAMES = valuesOf(FRAME_STYLES);
 const LINE_ORDERS: ReadonlyArray<LineOrder> = ['auto', 'onTop', 'underneath'];
-const LINE_CONNECTS: ReadonlyArray<LineConnect> = ['table', 'x', 'subject'];
+const LINE_CONNECTS: ReadonlyArray<LineConnect> = ['table', 'x'];
 const GROUPED_BYS: ReadonlyArray<GroupedBy> = ['category', 'series'];
 const ORIENTATIONS:readonly ChartOrientation[] = ['vertical', 'horizontal'];
 const PAIR_LINE_COLOURS: ReadonlyArray<Chart['pairs']['lineColour']> = ['subject', 'one'];
@@ -133,7 +133,8 @@ export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
   return {
     orientation: oneOf(ORIENTATIONS, c.orientation, base.orientation),
     lineOrder: oneOf(LINE_ORDERS, c.lineOrder, base.lineOrder),
-    lineConnect: oneOf(LINE_CONNECTS, c.lineConnect, base.lineConnect),
+    // One line for each subject was removed: an older file's points are joined in ascending X, the nearest there is.
+    lineConnect: oneOf(LINE_CONNECTS, c.lineConnect === 'subject' ? 'x' : c.lineConnect, base.lineConnect),
     groupedBy: oneOf(GROUPED_BYS, c.groupedBy, base.groupedBy),
     // Row ids that are drawn as a diamond: text only, once each; none left is the absence of the field.
     summaryRows: 'summaryRows' in c ? summaryRowIds(c.summaryRows) : base.summaryRows,
@@ -146,7 +147,7 @@ export function sanitizeLook(c: Record<string, unknown>, base: Look): Look {
     bars: sanitizeBars(c.bars, base.bars),
     barLabels: sanitizeBarLabels(c.barLabels, base.barLabels),
     distribution: sanitizeDistribution(c.distribution, base.distribution),
-    pairs: { bridge: bool(record(c.pairs).bridge, base.pairs.bridge), bySubject: bool(record(c.pairs).bySubject, base.pairs.bySubject), lineColour: oneOf(PAIR_LINE_COLOURS, record(c.pairs).lineColour, base.pairs.lineColour) },
+    pairs: { bridge: bool(record(c.pairs).bridge, base.pairs.bridge), lineColour: oneOf(PAIR_LINE_COLOURS, record(c.pairs).lineColour, base.pairs.lineColour) },
     heatmap: sanitizeHeatmap(c.heatmap, base.heatmap),
     histogram: sanitizeHistogram(c.histogram, base.histogram),
     fit: sanitizeFit(c.fit, base.fit),

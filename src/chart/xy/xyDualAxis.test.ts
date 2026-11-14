@@ -4,14 +4,13 @@ import { capabilitiesOf } from '../../model/graph/capabilities';
 import { fitObservations } from '../../model/project/curveFit';
 import { xySeries } from '../../model/table/tableLayout';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
-import type { Annotation, Bracket, ChartType, Project } from '../../model/types';
+import type { Annotation, ChartType, Project } from '../../model/types';
 import { n2 } from '../../model/units';
-import { addAnnotation, addBracket, addChart, addDataTable, addReferenceLine, patchAxis, patchChart, patchStyle, patchSummary, replaceTableData } from '../../state/commands';
+import { addAnnotation, addChart, addDataTable, addReferenceLine, patchAxis, patchChart, patchStyle, patchSummary, replaceTableData } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { annotationPlacer } from '../shared/scene/annotationPlace';
 import { referenceLinesOf } from '../shared/scene/referenceLines';
 import { chartToSvgString } from '../export/export';
-import { placeXyBrackets } from './xyBrackets';
 import { buildXyModel } from './xyModel';
 import { xyTooltipLines } from '../tooltip';
 
@@ -276,49 +275,6 @@ describe('what stays on the left axis', () => {
     const high: Annotation = { ...a, id: 'h', y: 400 };
     expect(placer.place(high)).toBeNull();
     expect(placer.skipped([high])).toEqual([high]);
-  });
-});
-
-describe('comparison brackets between series on the right axis', () => {
-  const bracket = (id: string, from: string, to: string, atX: number): Bracket => ({ id, from, to, label: '*', color: '#000000', widthPt: 2, fontSizePt: 12, at: atX });
-
-  it('are placed by the right axis when both series are on it, and the lanes ignore which axis a bracket is on only when it is the same', () => {
-    let p = dual();
-    p = patchStyle('c', sid(p)[2], { axisBinding: 'secondary' })(p);
-    const [, b, c] = sid(p);
-    p = addBracket('c', bracket('k', b, c, 2))(p);
-    const m = model(p);
-    expect(m.brackets).toHaveLength(1);
-    const { plot } = m.layout;
-    // C is 4 and B is 200 at X = 2; on the right axis (0 to 400) they stand at these heights.
-    expect(m.y2!.domain[1]).toBeGreaterThanOrEqual(400);
-    const ends = [m.brackets![0].y1, m.brackets![0].y2].sort((u, v) => u - v);
-    expect(ends[0]).toBeCloseTo(at(200, m.y2!.domain, plot), 9);
-    expect(ends[1]).toBeCloseTo(at(4, m.y2!.domain, plot), 9);
-  });
-
-  it('are not drawn between series on different axes, and the notice says why', () => {
-    let p = dual();
-    const [a, b] = sid(p);
-    p = addBracket('c', bracket('k', a, b, 2))(p);
-    const m = model(p);
-    expect(m.brackets).toEqual([]);
-    expect(m.warnings).toContain('Bracket "*" is not drawn: the two data sets it joins are on different Y axes, so their values cannot be compared on one scale.');
-  });
-
-  it('stand in separate lanes when they are at one X and on different axes, whatever their values', () => {
-    const series = [
-      { id: 'a', axis: 'primary' as const, points: [{ x: 1, y: 1 }, { x: 2, y: 2 }] },
-      { id: 'a2', axis: 'primary' as const, points: [{ x: 2, y: 3 }] },
-      { id: 'b', axis: 'secondary' as const, points: [{ x: 2, y: 300 }] },
-      { id: 'b2', axis: 'secondary' as const, points: [{ x: 2, y: 400 }] },
-    ];
-    const { placed } = placeXyBrackets([bracket('l', 'a', 'a2', 2), bracket('r', 'b', 'b2', 2)], series);
-    expect(placed.map((q) => q.lane).sort()).toEqual([1, 2]);
-    expect(placed.find((q) => q.bracket.id === 'r')!.axis).toBe('secondary');
-    // Series without an axis (the older callers) are all on the left and keep their lanes as before.
-    const old = placeXyBrackets([bracket('l', 'a', 'a2', 2)], series.map(({ id, points }) => ({ id, points })));
-    expect(old.placed[0].lane).toBe(1);
   });
 });
 

@@ -2,8 +2,11 @@ import type { Annotation } from '../../../model/types';
 import { extent } from '../../../model/units';
 import { insideAxis, type ModelOfFamily } from './referenceLines';
 
-/** Where on the page (pt) a text annotation goes (its top-left corner); null when it has no place and is not drawn. */
-type AnnotationPlace = (a: Annotation) => { x: number; y: number } | null;
+/** What is placed: a text annotation, or a point of a drawing object; its place on the page and, anchored to data, its values on the axes. */
+export type Spot = Pick<Annotation, 'xFrac' | 'yFrac' | 'anchor' | 'x' | 'y'>;
+
+/** Where on the page (pt) a text annotation goes (its top-left corner), or a point of a drawing object; null when it has no place and is not drawn. */
+type AnnotationPlace = (a: Spot) => { x: number; y: number } | null;
 
 export interface AnnotationPlacer {
   /** The size of the page, pt. */
@@ -20,7 +23,7 @@ export interface AnnotationPlacer {
   /** The data values at a position of the page (pt): the inverse of `place`; each is absent where the chart has no such axis. */
   fromPage: (xPt: number, yPt: number) => { x?: number; y?: number };
   /** The data-anchored annotations that cannot be drawn: out of the axis range, in a gap of a broken axis, or on a chart with no axes. */
-  skipped: (annotations: readonly Annotation[]) => Annotation[];
+  skipped: <T extends Spot>(annotations: readonly T[]) => T[];
 }
 
 interface Axis {
@@ -55,10 +58,10 @@ function invert(map: AxisMap, at: number): number {
   return significant(log ? Math.exp(t) : t);
 }
 
-const isData = (a: Annotation): boolean => a.anchor === 'data';
+const isData = (a: Spot): boolean => a.anchor === 'data';
 
 /** The position a page-anchored annotation has: its fractions of the page. */
-const onPage = (a: Annotation, w: number, h: number) => ({ x: a.xFrac * w, y: a.yFrac * h });
+const onPage = (a: Spot, w: number, h: number) => ({ x: a.xFrac * w, y: a.yFrac * h });
 
 /**
  * Where annotations go on a chart. An annotation with the page anchor is at its fractions of the page; with the data anchor it is
@@ -74,7 +77,7 @@ export function annotationPlacer(any: ModelOfFamily, widthPt: number, heightPt: 
       const m = any.model;
       const xm: AxisMap = { axis: m.x as Axis, to: m.xScale };
       const ym: AxisMap = { axis: m.y as Axis, to: m.yScale };
-      const spot = (a: Annotation) => {
+      const spot = (a: Spot) => {
         const x = a.x !== undefined ? xm.to(a.x) : undefined;
         const y = a.y !== undefined ? ym.to(a.y) : undefined;
         return { x, y, okX: a.x === undefined || (insideAxis(m.x, a.x) && Number.isFinite(x)), okY: a.y === undefined || (insideAxis(m.y, a.y) && Number.isFinite(y)) };
@@ -101,7 +104,7 @@ export function annotationPlacer(any: ModelOfFamily, widthPt: number, heightPt: 
       // The value axis, as a position along the page (across for a horizontal chart).
       const along = (v: number) => (horizontal ? m.orient.toScreen(0, m.yScale(v)).x : m.yScale(v));
       const ym: AxisMap = { axis: m.y as Axis, to: along };
-      const ok = (a: Annotation) => a.y === undefined || (insideAxis(m.y, a.y) && Number.isFinite(along(a.y)));
+      const ok = (a: Spot) => a.y === undefined || (insideAxis(m.y, a.y) && Number.isFinite(along(a.y)));
       return {
         widthPt,
         heightPt,
@@ -136,7 +139,7 @@ export function annotationNotices(skipped: readonly Annotation[], supportsData: 
 }
 
 /** The position an annotation is drawn at, as fractions of the page; null when it is not drawn. */
-export function drawnFractions(a: Annotation, placer: AnnotationPlacer): { xFrac: number; yFrac: number } | null {
+export function drawnFractions(a: Spot, placer: AnnotationPlacer): { xFrac: number; yFrac: number } | null {
   const at = placer.place(a);
   return at ? { xFrac: at.x / placer.widthPt, yFrac: at.y / placer.heightPt } : null;
 }
@@ -145,7 +148,7 @@ export function drawnFractions(a: Annotation, placer: AnnotationPlacer): { xFrac
  * What to store when an annotation is moved to a place on the page (a drag, an arrow key): the new fractions, and for a data-anchored
  * annotation the values on the axes at that place as well, so the text stays where it was put whatever the axes do later.
  */
-export function patchForMove(a: Annotation, placer: AnnotationPlacer, xFrac: number, yFrac: number): Partial<Annotation> {
+export function patchForMove(a: Spot, placer: AnnotationPlacer, xFrac: number, yFrac: number): Partial<Spot> {
   if (a.anchor !== 'data') return { xFrac, yFrac };
   const v = placer.fromPage(xFrac * placer.widthPt, yFrac * placer.heightPt);
   return { xFrac, yFrac, ...(placer.numericX && v.x !== undefined ? { x: v.x } : {}), ...(v.y !== undefined ? { y: v.y } : {}) };

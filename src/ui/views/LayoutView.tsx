@@ -2,17 +2,27 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { drawLayout } from '../../chart/export/layoutExport';
 import { clampFrame, FREE_MAX, GAP_MM_MAX, GRID_MAX, LABEL_PT_MAX, LEGEND_PT_MAX, LEGEND_PT_MIN, LABEL_PT_MIN, MARGIN_MM_MAX, pageMm, PERCENT_MAX, PERCENT_MIN, standardArrangements, sameArrangement } from '../../model/project/layout';
-import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, LayoutScaling, PanelLabelStyle } from '../../model/types';
+import type { Annotation, Drawing, FrameMm, Layout, LayoutArrangement, LayoutLegend, LayoutScaling, PanelLabelStyle } from '../../model/types';
+import { createAnnotation, FONT_FAMILY, PAGE_TEXT_LOOK } from '../../model/defaults';
+import { annotationBox } from '../../chart/shared/scene/annotations';
+import { AnnotationEditor } from '../inspector/sections/AnnotationEditor';
+import { focusWhenShown } from '../inspector/common/pendingFocus';
 import { useApp } from '../../state/AppContext';
-import { addFreePanel, freeLayout, patchLayout, removeFreePanel, setFrame, setLayoutPanel } from '../../state/commands';
+import { addDrawing, addFreePanel, composeCommands, freeLayout, patchDrawings, patchLayout, removeDrawings, removeFreePanel, setFrame, setLayoutPanel } from '../../state/commands';
+import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById, snapToAxis } from '../../model/graph/drawingPresets';
+import { drawingElements, drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
+import { hitFromTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
+import { SceneElements } from '../../chart/shared/scene/SceneElements';
+import { GraphicsMenu } from '../components/GraphicsMenu';
+import { DrawingList } from '../inspector/sections/DrawingEditor';
 import { ArrangementSketch, FreeSketch } from '../components/ArrangementSketch';
-import { ExportIcon, GraphPageIcon, LegendPageIcon, PanelsPageIcon, SheetPageIcon } from '../components/icons';
+import { ExportIcon, GraphPageIcon, LegendPageIcon, NotesPageIcon, PanelsPageIcon, PointerIcon, SheetPageIcon, TextToolIcon } from '../components/icons';
 import { LayoutExportPanel } from '../export/LayoutExportPanel';
 import { InspectorShell, type InspectorKit } from '../inspector/common/InspectorShell';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, TextInput } from '../inspector/common/controls';
 
-type LayoutInspectorPage = 'page' | 'panels' | 'graphs' | 'legend' | 'export';
-const LAYOUT_PAGES: readonly LayoutInspectorPage[] = ['page', 'panels', 'graphs', 'legend', 'export'];
+type LayoutInspectorPage = 'page' | 'panels' | 'graphs' | 'legend' | 'notes' | 'export';
+const LAYOUT_PAGES: readonly LayoutInspectorPage[] = ['page', 'panels', 'graphs', 'legend', 'notes', 'export'];
 /** The rail of the inspector of a layout, as the graph has one: the sheet, the boxes on it, the master legend, and Export at the foot. */
 const LAYOUT_KIT: InspectorKit<LayoutInspectorPage> = {
   name: 'Layout',
@@ -21,9 +31,10 @@ const LAYOUT_KIT: InspectorKit<LayoutInspectorPage> = {
     { id: 'panels', label: 'Panels', title: 'Panels: how the graphs are arranged on the page', heading: 'Format Panels' },
     { id: 'graphs', label: 'Graphs', title: 'Graphs: the graph in each panel and the size of the graphs', heading: 'Format Graphs' },
     { id: 'legend', label: 'Legend', title: 'Legend of the page', heading: 'Format Legend' },
+    { id: 'notes', label: 'Notes', title: 'Notes: texts placed on the page', heading: 'Format Notes' },
     { id: 'export', label: 'Export', title: 'Export this page as a picture or a vector file', heading: 'Export Layout' },
   ],
-  icons: { page: SheetPageIcon, panels: PanelsPageIcon, graphs: GraphPageIcon, legend: LegendPageIcon, export: ExportIcon },
+  icons: { page: SheetPageIcon, panels: PanelsPageIcon, graphs: GraphPageIcon, legend: LegendPageIcon, notes: NotesPageIcon, export: ExportIcon },
 };
 
 /** What choosing Array starts with; the numbers across and down are then typed. */
@@ -72,6 +83,33 @@ interface Drag {
 
 const PT_TO_MM = 25.4 / 72;
 
+/** A text of the page being dragged: where the pointer started, where the text was then, and where it is now (fractions of the page). */
+interface NoteDrag {
+  id: string;
+  startX: number;
+  startY: number;
+  from: { xFrac: number; yFrac: number };
+  now: { xFrac: number; yFrac: number };
+}
+
+/** Shapes and lines of the page being moved (all the selected ones) or resized by a handle (pt of the page). */
+interface ShapeDrag {
+  mode: 'move' | 'from' | 'to';
+  start: { x: number; y: number };
+  delta: { x: number; y: number };
+  items: Array<{ drawing: Drawing; from: { x: number; y: number }; to: { x: number; y: number } }>;
+}
+
+/** The live points of an object being moved or resized, pt: a move shifts both, a handle one. */
+function draggedPoints(it: ShapeDrag['items'][number], d: Pick<ShapeDrag, 'mode' | 'delta'>) {
+  const shift = (q: { x: number; y: number }) => ({ x: q.x + d.delta.x, y: q.y + d.delta.y });
+  if (d.mode === 'move') return { from: shift(it.from), to: shift(it.to) };
+  // A handle of a straight line close to across or to up and down puts it exactly so, from its other end.
+  const straight = it.drawing.shape === 'line' && (it.drawing.route ?? 'straight') === 'straight';
+  if (d.mode === 'from') return { from: straight ? snapToAxis(it.to, shift(it.from)) : shift(it.from), to: it.to };
+  return { from: it.from, to: straight ? snapToAxis(it.from, shift(it.to)) : shift(it.to) };
+}
+
 /** What switching on the master legend starts with. */
 const DEFAULT_PAGE_LEGEND: LayoutLegend = { position: 'bottom', fontSizePt: 9, hideGraphLegends: true };
 
@@ -101,10 +139,27 @@ const intersect = (a: FrameMm, b: FrameMm): FrameMm => {
 
 function LayoutPage({ layout }: { layout: Layout }) {
   const { project, run, layoutZoom, setLayoutZoom } = useApp();
-  const drawing = useMemo(() => drawLayout(layout, project), [layout, project]);
+  // The shapes and lines are drawn by the page itself, over the picture, so that they follow a drag at once (an export draws them in the picture).
+  const drawing = useMemo(() => drawLayout(layout, project, { withoutDrawings: true }), [layout, project]);
   const [selected, setSelected] = useState(0);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [inspPage, setInspPage] = useState<LayoutInspectorPage>('page');
+  // Texts on the page: the pointer tool (Select picks and drags; Text places a new text where the page is clicked), the selected text and a text being dragged.
+  // `draw:<preset>` draws a shape or line where the page is dragged. What is selected is kept here: texts and objects of the page, one or several.
+  const [tool, setTool] = useState<string>('select');
+  const drawPreset = tool.startsWith('draw:') ? presetById(tool.slice(5)) : undefined;
+  const [picked, setPicked] = useState<string[]>([]);
+  const [noteDrag, setNoteDrag] = useState<NoteDrag | null>(null);
+  const [draft, setDraft] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(null);
+  const [shapeDrag, setShapeDrag] = useState<ShapeDrag | null>(null);
+  const shapesRef = useRef<SVGSVGElement>(null);
+  const notes = layout.annotations ?? [];
+  const shapes = layout.drawings ?? [];
+  const owner = { layoutId: layout.id };
+  const pickedNotes = notes.filter((n) => picked.includes(n.id));
+  const pickedShapes = shapes.filter((d) => picked.includes(d.id));
+  /** Select one text or object of the page; with Ctrl, Cmd or Shift add it to the selection or take it out. */
+  const pick = (id: string, toggle: boolean) => setPicked(toggle ? (picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]) : [id]);
 
   // The inspector is the right panel of the app, the one a graph has: it is drawn into the app's own grid (a portal), because its
   // settings and the export belong to this page's state (the selected panel, the drawing).
@@ -136,6 +191,137 @@ function LayoutPage({ layout }: { layout: Layout }) {
   const slot = Math.min(selected, Math.max(0, frames.length - 1));
 
   const set = (label: string, patch: Partial<Omit<Layout, 'id' | 'panels'>>) => run(label, patchLayout(layout.id, patch));
+
+  // The texts of the page are kept on the layout; each change is one undoable step (changes with the same key merge, as typing does).
+  const setNotes = (label: string, list: Annotation[], key?: string) => run(label, patchLayout(layout.id, { annotations: list }), key);
+  const patchNote = (id: string, label: string, patch: Partial<Annotation>, key?: string) => setNotes(label, notes.map((n) => (n.id === id ? { ...n, ...patch } : n)), key);
+  const addNote = (xFrac: number, yFrac: number) => {
+    const added = createAnnotation(PAGE_TEXT_LOOK, xFrac, yFrac);
+    setNotes('Add text', [...notes, added]);
+    setPicked([added.id]);
+    focusWhenShown(`annotation-text:${added.id}`);
+    setInspPage('notes');
+  };
+  const placeText = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    addNote((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+    setTool('select');
+  };
+  const startNoteDrag = (e: PointerEvent, n: Annotation) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    setInspPage('notes');
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+      pick(n.id, true);
+      return;
+    }
+    if (!picked.includes(n.id)) setPicked([n.id]);
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    setNoteDrag({ id: n.id, startX: e.clientX, startY: e.clientY, from: { xFrac: n.xFrac, yFrac: n.yFrac }, now: { xFrac: n.xFrac, yFrac: n.yFrac } });
+  };
+  const moveNoteDrag = (e: PointerEvent) => {
+    if (!noteDrag) return;
+    const clamp = (v: number) => Math.min(0.98, Math.max(0, v));
+    setNoteDrag({ ...noteDrag, now: { xFrac: clamp(noteDrag.from.xFrac + (e.clientX - noteDrag.startX) / pageW), yFrac: clamp(noteDrag.from.yFrac + (e.clientY - noteDrag.startY) / pageH) } });
+  };
+  const endNoteDrag = () => {
+    if (noteDrag && (noteDrag.now.xFrac !== noteDrag.from.xFrac || noteDrag.now.yFrac !== noteDrag.from.yFrac)) patchNote(noteDrag.id, 'Move text', noteDrag.now);
+    setNoteDrag(null);
+  };
+  // Shapes and lines: drawn with the tool of the Graphics menu, picked and moved with Select, resized by their handles.
+  const W = drawing.widthPt;
+  const H = drawing.heightPt;
+  const pagePt = (e: PointerEvent) => (shapesRef.current ? pointerToChartPt(shapesRef.current, e.clientX, e.clientY, W, H) : { x: 0, y: 0 });
+  const startShapes = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    if (drawPreset) {
+      e.preventDefault();
+      e.stopPropagation();
+      const pt = pagePt(e);
+      setDraft({ a: pt, b: pt });
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      return;
+    }
+    const hit = hitFromTarget(e.target, shapesRef.current);
+    if ((hit.kind !== 'drawing' && hit.kind !== 'handle') || !hit.objectId) return;
+    const d = shapes.find((x) => x.id === hit.objectId);
+    if (!d) return;
+    e.stopPropagation();
+    setInspPage('notes');
+    if (hit.kind === 'drawing' && (e.ctrlKey || e.metaKey || e.shiftKey)) {
+      pick(d.id, true);
+      return;
+    }
+    const ids = hit.kind === 'handle' || !picked.includes(d.id) ? [d.id] : picked;
+    if (!picked.includes(d.id)) setPicked([d.id]);
+    const items = shapes.filter((x) => ids.includes(x.id)).map((x) => {
+      const [from, to] = drawnPoints(x, W, H);
+      return { drawing: x, from, to };
+    });
+    setShapeDrag({ mode: hit.kind === 'handle' ? (hit.handle ?? 'to') : 'move', start: pagePt(e), delta: { x: 0, y: 0 }, items });
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+  };
+  const moveShapes = (e: PointerEvent) => {
+    if (draft) setDraft({ ...draft, b: pagePt(e) });
+    else if (shapeDrag) {
+      const pt = pagePt(e);
+      setShapeDrag({ ...shapeDrag, delta: { x: pt.x - shapeDrag.start.x, y: pt.y - shapeDrag.start.y } });
+    }
+  };
+  const endShapes = (e: PointerEvent) => {
+    // Where the pointer is let go is the end of a drag, whether or not a move was reported there.
+    const last = e.type === 'pointerup' ? pagePt(e) : null;
+    if (draft && drawPreset) {
+      const [a, b] = pointsOfDrag(drawPreset, draft.a, last ?? draft.b);
+      const made = createDrawing(drawPreset, { xFrac: a.x / W, yFrac: a.y / H }, { xFrac: b.x / W, yFrac: b.y / H }, { ...PAGE_TEXT_LOOK, widthPt: DRAWING_WIDTH.page });
+      run(`Add ${drawPreset.label.toLowerCase()}`, addDrawing(owner, made));
+      setPicked([made.id]);
+      if (made.text !== undefined) focusWhenShown(`drawing-text:${made.id}`);
+      setInspPage('notes');
+      setTool('select');
+    }
+    setDraft(null);
+    const shapesMoved = shapeDrag && last ? { ...shapeDrag, delta: { x: last.x - shapeDrag.start.x, y: last.y - shapeDrag.start.y } } : shapeDrag;
+    if (shapesMoved && Math.hypot(shapesMoved.delta.x, shapesMoved.delta.y) >= 1) {
+      const moves = shapesMoved.items.map((it) => {
+        const q = draggedPoints(it, shapesMoved);
+        return patchDrawings(owner, [it.drawing.id], drawingPatchForPoints(it.drawing, q.from, q.to, W, H));
+      });
+      run(shapesMoved.mode === 'move' ? 'Move shape' : 'Resize shape', composeCommands(...moves));
+    }
+    setShapeDrag(null);
+  };
+  /** Delete the selected texts and objects of the page (one undo step). */
+  const deletePicked = () => {
+    const ids = new Set(picked);
+    run(picked.length === 1 ? 'Delete' : 'Delete selected', composeCommands(...(pickedNotes.length > 0 ? [patchLayout(layout.id, { annotations: notes.filter((n) => !ids.has(n.id)) })] : []), ...(pickedShapes.length > 0 ? [removeDrawings(owner, pickedShapes.map((d) => d.id))] : [])));
+    setPicked([]);
+  };
+  /** Move the selected texts and objects by a step (fractions of the page; an arrow key). */
+  const nudgePicked = (dx: number, dy: number) => {
+    const clamp = (v: number) => Math.min(0.98, Math.max(0, Math.round(v * 1000) / 1000));
+    const texts = pickedNotes.length > 0 ? [patchLayout(layout.id, { annotations: notes.map((n) => (picked.includes(n.id) ? { ...n, xFrac: clamp(n.xFrac + dx), yFrac: clamp(n.yFrac + dy) } : n)) })] : [];
+    const objects = nudgeDrawings(pickedShapes, dx, dy, W, H).map((m) => patchDrawings(owner, [m.id], m.patch));
+    run('Move', composeCommands(...texts, ...objects), `page:${picked.join()}:nudge`);
+  };
+  const shapeDrafts: Array<{ drawing: Drawing; drag: DrawingDrag }> = [];
+  if (draft && drawPreset) {
+    const [a, b] = pointsOfDrag(drawPreset, draft.a, draft.b);
+    const d = createDrawing(drawPreset, { xFrac: 0, yFrac: 0 }, { xFrac: 0, yFrac: 0 }, { ...PAGE_TEXT_LOOK, widthPt: DRAWING_WIDTH.page }, 'draft');
+    shapeDrafts.push({ drawing: d, drag: { id: d.id, from: a, to: b } });
+  }
+  if (shapeDrag) for (const it of shapeDrag.items) shapeDrafts.push({ drawing: it.drawing, drag: { id: it.drawing.id, ...draggedPoints(it, shapeDrag) } });
+
+  /** The outline of a text on the page, as percentages of the page: the box the text takes, with a little room round it. */
+  const noteBox = (n: Annotation) => {
+    const at = noteDrag?.id === n.id ? noteDrag.now : n;
+    const b = annotationBox(n, at.xFrac * drawing.widthPt, at.yFrac * drawing.heightPt, FONT_FAMILY);
+    const pad = 4;
+    return { left: `${((b.x - pad) / drawing.widthPt) * 100}%`, top: `${((b.y - pad) / drawing.heightPt) * 100}%`, width: `${((b.w + 2 * pad) / drawing.widthPt) * 100}%`, height: `${((b.h + 2 * pad) / drawing.heightPt) * 100}%` };
+  };
 
   // The box shown for a panel is the graph in it (the part that is visible, when it is cut off), so it shrinks and grows
   // with the scaling of the graphs; an empty panel shows its own box.
@@ -192,10 +378,47 @@ function LayoutPage({ layout }: { layout: Layout }) {
 
   return (
     <div className="graph-view layout-view">
+      <div className="toolbar">
+        <span className="switch-group tool-group" role="group" aria-label="Pointer tool">
+          <button className={`switch icon-text${tool === 'select' ? ' on' : ''}`} aria-pressed={tool === 'select'} aria-label="Select" title="Select: click a text on the page to select it and open its settings; drag it to move it. Panels are moved under Panels (V)" onClick={() => setTool('select')}>
+            <PointerIcon />
+          </button>
+          <button className={`switch icon-text${tool === 'text' ? ' on' : ''}`} aria-pressed={tool === 'text'} title="Text: click the page where the text should go (T; Escape cancels)" onClick={() => setTool(tool === 'text' ? 'select' : 'text')}>
+            <TextToolIcon />
+            Text
+          </button>
+          <GraphicsMenu active={drawPreset?.id ?? null} onPick={(id) => setTool(`draw:${id}`)} />
+        </span>
+      </div>
       <div className="layout-body">
         <div className="chart-scroller" ref={scrollerRef}>
           <div className="chart-wrap" style={{ width: pageW }}>
-            <div className="layout-page-wrap" style={{ width: pageW, height: pageH }}>
+            <div
+              className="layout-page-wrap"
+              style={{ width: pageW, height: pageH }}
+              tabIndex={0}
+              aria-label="Page. V selects, T places a text, Escape cancels a tool, the arrow keys move the selected texts and shapes (Shift 5%, Alt 0.1%), Delete removes them."
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget || e.ctrlKey || e.metaKey) return;
+                if (e.key.startsWith('Arrow') && picked.length > 0) {
+                  const step = e.shiftKey ? 0.05 : e.altKey ? 0.001 : 0.01;
+                  nudgePicked(e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0, e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0);
+                } else if (e.altKey) return;
+                else if (e.key === 'Escape') {
+                  setTool('select');
+                  setDraft(null);
+                  setPicked([]);
+                } else if (e.key === 'v' || e.key === 'V') setTool('select');
+                else if (e.key === 't' || e.key === 'T') setTool('text');
+                else if ((e.key === 'Delete' || e.key === 'Backspace') && picked.length > 0) deletePicked();
+                else return;
+                e.preventDefault();
+              }}
+              onPointerDown={(e) => {
+                // A click on the page away from a text or a shape lets go of what is selected.
+                if (tool === 'select' && !(e.target as Element).closest('.layout-note, .layout-drawings [data-hit]')) setPicked([]);
+              }}
+            >
               <div className="layout-page" role="img" aria-label={`${layout.name}, ${layout.panels.filter(Boolean).length} graphs`} dangerouslySetInnerHTML={{ __html: drawing.svg }} />
               {a.kind === 'free' && (
                 <div className="layout-frames" onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
@@ -210,6 +433,26 @@ function LayoutPage({ layout }: { layout: Layout }) {
                   })}
                 </div>
               )}
+              <svg
+                ref={shapesRef}
+                className={`layout-drawings${drawPreset ? ' placing' : ''}`}
+                viewBox={`0 0 ${W} ${H}`}
+                preserveAspectRatio="none"
+                onPointerDown={startShapes}
+                onPointerMove={moveShapes}
+                onPointerUp={endShapes}
+                onPointerCancel={endShapes}
+              >
+                <SceneElements nodes={drawingElements(shapes, W, H, undefined, FONT_FAMILY, shapeDrafts)} editor selectedAnnotations={new Set(picked)} />
+              </svg>
+              {notes.length > 0 && (
+                <div className="layout-notes" onPointerMove={moveNoteDrag} onPointerUp={endNoteDrag} onPointerCancel={endNoteDrag}>
+                  {notes.map((n) => (
+                    <div key={n.id} className={`layout-note${picked.includes(n.id) ? ' selected' : ''}`} style={noteBox(n)} title="Drag to move; its settings are under Notes" onPointerDown={(e) => startNoteDrag(e, n)} />
+                  ))}
+                </div>
+              )}
+              {tool === 'text' && <div className="layout-place-text" onPointerDown={placeText} aria-hidden="true" />}
             </div>
             {drawing.notices.length > 0 && (
               <ul className="warnings" aria-label="Layout warnings">
@@ -366,6 +609,48 @@ function LayoutPage({ layout }: { layout: Layout }) {
               </>
             )}
           </Section>
+              )}
+              {inspPage === 'notes' && (
+                <>
+                <Section title="Shapes and lines">
+                  <DrawingList
+                    drawings={shapes}
+                    picked={picked}
+                    onPick={(id, toggle) => (!toggle && picked.length === 1 && picked[0] === id ? setPicked([]) : pick(id, toggle))}
+                    onPatch={(ids, label, patch, key) => run(label, patchDrawings(owner, ids, patch), key)}
+                    onRemove={(ids) => {
+                      run(ids.length === 1 ? 'Delete shape' : 'Delete shapes', removeDrawings(owner, ids));
+                      setPicked(picked.filter((x) => !ids.includes(x)));
+                    }}
+                    size={{ widthPt: W, heightPt: H }}
+                    fontLabel="Arial"
+                  />
+                </Section>
+                <Section title="Texts on the page">
+                  <div className="button-row">
+                    <button onClick={() => addNote(0.4, 0.05)}>+ Add text</button>
+                  </div>
+                  {notes.length === 0 && <div className="muted small">No texts. Choose Text on the toolbar and click the page where the text should go, or use the button above. A text can be dragged on the page.</div>}
+                  {notes.map((n) => (
+                    <div key={n.id} className={`annotation-card${picked.includes(n.id) ? ' selected' : ''}`}>
+                      <button className="list-item" onClick={(e) => (!(e.ctrlKey || e.metaKey || e.shiftKey) && picked.length === 1 && picked[0] === n.id ? setPicked([]) : pick(n.id, e.ctrlKey || e.metaKey || e.shiftKey))}>
+                        {n.text.split('\n')[0] || '(empty)'}
+                      </button>
+                      {picked.includes(n.id) && (
+                        <AnnotationEditor
+                          annotation={n}
+                          fontLabel="Arial"
+                          onPatch={(label, patch, key) => patchNote(n.id, label, patch, key)}
+                          onDelete={() => {
+                            setNotes('Delete text', notes.filter((x) => x.id !== n.id));
+                            setPicked(picked.filter((x) => x !== n.id));
+                          }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </Section>
+                </>
               )}
               {inspPage === 'export' && <LayoutExportPanel layout={layout} drawing={drawing} />}
             </InspectorShell>

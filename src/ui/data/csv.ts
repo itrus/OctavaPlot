@@ -21,7 +21,10 @@ export type CsvExportMode = 'entered' | 'analysis' | 'withExclusions';
 /** Suffixes of the two columns that follow a data column holding excluded values. */
 const EXCLUDED_SUFFIX = ' excluded';
 const EXCLUDED_REASON_SUFFIX = ' excluded reason';
-/** Suffixes of the column that follows a data column holding subjects, and of the one that follows the first column of a series with a factor (repeated on every line). */
+/**
+ * Suffixes of the column that older exports wrote after a data column holding subjects (read only so that it is not taken for data),
+ * and of the one that follows the first column of a series with a factor (repeated on every line).
+ */
 const SUBJECT_SUFFIX = ' subject';
 const FACTOR_SUFFIX = ' factor';
 
@@ -30,17 +33,16 @@ const FACTOR_SUFFIX = ' factor';
  * Numbers are written with the decimal separator of the setting and the fields are separated as `csvDelimiter` says.
  * Excluded values are written as entered unless the mode says otherwise: `analysis` writes them as empty cells, and
  * `withExclusions` adds "<Group> excluded" (1 or empty) and "<Group> excluded reason" after each column that has one.
- * In every mode a column whose values name subjects is followed by "<Group> subject", and the first column of a series that has a
- * factor by "<Group> factor" (the factor on every line), so that a file read back has the same roles.
+ * In every mode the first column of a series that has a factor is followed by "<Group> factor" (the factor on every line), so that
+ * a file read back has the same factors.
  */
 export function tableToCsv(table: DataTable, separator: DecimalSeparator = 'auto', mode: CsvExportMode = 'entered'): string {
   const delimiter = csvDelimiter(separator);
   const quote = quoter(delimiter);
   const marked = table.groups.map((g) => mode === 'withExclusions' && g.observations.some((o) => o.excluded));
-  const withSubject = table.groups.map((g) => g.observations.some((o) => (o.subject ?? '') !== ''));
-  const withFactor = table.groups.map((g) => (g.factor ?? '') !== '');
+    const withFactor = table.groups.map((g) => (g.factor ?? '') !== '');
   const header = [ROW_TITLE_HEADER];
-  table.groups.forEach((g, c) => header.push(g.name, ...(marked[c] ? [g.name + EXCLUDED_SUFFIX, g.name + EXCLUDED_REASON_SUFFIX] : []), ...(withSubject[c] ? [g.name + SUBJECT_SUFFIX] : []), ...(withFactor[c] ? [g.name + FACTOR_SUFFIX] : [])));
+  table.groups.forEach((g, c) => header.push(g.name, ...(marked[c] ? [g.name + EXCLUDED_SUFFIX, g.name + EXCLUDED_REASON_SUFFIX] : []), ...(withFactor[c] ? [g.name + FACTOR_SUFFIX] : [])));
   const lines = [header.map(quote).join(delimiter)];
   const isBlank = (r: number) => (table.rows[r]?.title ?? '') === '' && table.groups.every((g) => (g.observations[r]?.value ?? null) === null);
   // The table keeps spare empty rows for typing into; they are not data and would export as lines of bare commas.
@@ -52,7 +54,6 @@ export function tableToCsv(table: DataTable, separator: DecimalSeparator = 'auto
       const o = g.observations[r];
       cells.push(formatCellFor(mode === 'analysis' && o?.excluded ? null : (o?.value ?? null), separator, g.time));
       if (marked[c]) cells.push(o?.excluded ? '1' : '', quote(o?.excluded ? (o.excludedReason ?? '') : ''));
-      if (withSubject[c]) cells.push(quote(o?.subject ?? ''));
       if (withFactor[c]) cells.push(quote(g.factor ?? ''));
     });
     lines.push(cells.join(delimiter));
@@ -132,8 +133,6 @@ interface ImportedTable {
   values: Array<Array<number | null>>;
   /** Per row and column: the exclusion (with its reason) the file marks, or null. Only present when the file has exclusion columns. */
   excluded?: Array<Array<{ reason: string } | null>>;
-  /** Per row and column: the subject the file names ('' for none). Only present when the file has subject columns. */
-  subjects?: string[][];
   /** Per column: the factor the file names ('' for none). Only present when the file has factor columns. */
   factors?: string[];
   /** Per column: the type the values were read as (a date, a time, a duration; undefined = a number). Only present when a column has one. */
@@ -181,7 +180,6 @@ interface CsvRead {
   /** Every data cell as the file has it. */
   texts: string[][];
   excluded?: Array<Array<{ reason: string } | null>>;
-  subjects?: string[][];
   factors?: string[];
   /** What reading the time columns did that the file did not ask for. */
   notes: string[];
@@ -248,7 +246,6 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
   const values: Array<Array<number | null>> = [];
   const texts: string[][] = [];
   const excluded: Array<Array<{ reason: string } | null>> = [];
-  const subjects: string[][] = [];
   const problems: CsvProblem[] = [];
   // A factor is one text for a column: the first line that has one.
   const factors: string[] = cols.map((c) => (c.factor === undefined ? '' : (body.map((rec) => (rec[c.factor!] ?? '').trim()).find((t) => t !== '') ?? '')));
@@ -259,7 +256,6 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
     const row: Array<number | null> = [];
     const cells: string[] = [];
     const marked: Array<{ reason: string } | null> = [];
-    const named: string[] = [];
     for (let c = 0; c < width; c++) {
       const at = cols[c].at;
       const cell = body[r][at] ?? '';
@@ -278,15 +274,14 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
       }
       // An excluded value is one that exists: a flag on an empty cell marks nothing.
       marked.push(flagText === '1' && (times[c] ? cell.trim() !== '' : row[c] !== null) ? { reason: reason === undefined ? '' : (body[r][reason] ?? '').trim() } : null);
-      const subjectAt = cols[c].subject;
-      named.push(subjectAt === undefined ? '' : (body[r][subjectAt] ?? '').trim());
     }
     values.push(row);
     texts.push(cells);
     excluded.push(marked);
-    subjects.push(named);
   }
   const notes: string[] = [];
+  // Subjects were removed: a "<Group> subject" column of an older export is recognised, so that it is not read as data, and left out.
+  if (hasSubjects) notes.push('The subject columns were not imported: subjects are no longer part of a table.');
   for (let c = 0; c < width; c++) {
     const time = times[c];
     if (!time) continue;
@@ -296,7 +291,7 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
     notes.push(...batch.notes);
   }
   problems.sort((x, y) => x.line - y.line || x.column - y.column);
-  return { read: { hasTitles, names, titles: hasTitles ? body.map((rec) => sanitizeRowTitle(rec[0] ?? '')) : null, values, texts, positions: cols.map((c) => c.at), ...(marks ? { excluded } : {}), ...(hasSubjects ? { subjects } : {}), ...(hasFactors ? { factors } : {}), notes, problems } };
+  return { read: { hasTitles, names, titles: hasTitles ? body.map((rec) => sanitizeRowTitle(rec[0] ?? '')) : null, values, texts, positions: cols.map((c) => c.at), ...(marks ? { excluded } : {}), ...(hasFactors ? { factors } : {}), notes, problems } };
 }
 
 /**
@@ -320,7 +315,6 @@ function importedOf(read: CsvRead, times: ReadonlyArray<TimeColumn | undefined>)
     titles: read.titles,
     values: read.values,
     ...(read.excluded ? { excluded: read.excluded } : {}),
-    ...(read.subjects ? { subjects: read.subjects } : {}),
     ...(read.factors ? { factors: read.factors } : {}),
     ...(typed.some((t) => t) ? { times: typed } : {}),
     ...(read.notes.length > 0 ? { notes: read.notes } : {}),

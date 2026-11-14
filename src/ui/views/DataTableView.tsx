@@ -4,7 +4,7 @@ import type { DataTable, DecimalSeparator, TableKind } from '../../model/types';
 import { useApp } from '../../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import { newId } from '../../model/ids';
-import { addAnalysis, addGroup, changeTableKind, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setColumnTime, setExcluded, setFactor, setSubject, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
+import { addAnalysis, addGroup, changeTableKind, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setColumnTime, setExcluded, setFactor, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
 import { copyText, downloadBlob, exportFileName } from '../../util/download';
 import { AddColumnIcon, AddManyRowsIcon, CloseIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon, TableTypeIcon } from '../components/icons';
 import { isCsvFile, tableToCsv, type CsvExportMode } from '../data/csv';
@@ -14,7 +14,6 @@ import { ExportCsvDialog } from '../dialogs/ExportCsvDialog';
 import { ImportCsvDialog, type CsvImportData } from '../dialogs/ImportCsvDialog';
 import { AppendRowsDialog } from '../dialogs/AppendRowsDialog';
 import { FillSeriesDialog, type SeriesDirection } from '../dialogs/FillSeriesDialog';
-import { SubjectDialog } from '../dialogs/SubjectDialog';
 import { TimeDialog } from '../dialogs/TimeDialog';
 import { offsetNote, type TimeColumn } from '../../util/timeColumn';
 import { FactorDialog } from '../dialogs/FactorDialog';
@@ -66,8 +65,6 @@ interface CellProps {
   /** The value is kept but not used by any chart or calculation. */
   excluded?: boolean;
   reason?: string;
-  /** The subject (independent unit) the value belongs to, if it has one. */
-  subject?: string;
   /** Cell width in px at the current zoom. */
   width: number;
   text: string;
@@ -85,7 +82,7 @@ interface CellProps {
 
 const Cell = memo(function Cell(p: CellProps) {
   const isTitle = p.col < 0;
-  const cls = `cell${isTitle ? ' cell-title' : ''}${p.inRange ? ' in-range' : ''}${p.active ? ' active' : ''}${p.invalid ? ' invalid' : ''}${p.excluded ? ' excluded' : ''}${p.subject ? ' has-subject' : ''}`;
+  const cls = `cell${isTitle ? ' cell-title' : ''}${p.inRange ? ' in-range' : ''}${p.active ? ' active' : ''}${p.invalid ? ' invalid' : ''}${p.excluded ? ' excluded' : ''}`;
   return (
     <div
       className={cls}
@@ -94,7 +91,7 @@ const Cell = memo(function Cell(p: CellProps) {
       aria-colindex={p.col + 2}
       aria-selected={p.inRange}
       aria-invalid={p.invalid || undefined}
-      title={[p.excluded ? `Excluded${p.reason ? `: ${p.reason}` : ''} (kept in the table, not used)` : null, p.subject ? `Subject: ${p.subject}` : null].filter(Boolean).join('. ') || undefined}
+      title={p.excluded ? `Excluded${p.reason ? `: ${p.reason}` : ''} (kept in the table, not used)` : undefined}
       style={{ width: p.width }}
       onMouseDown={(e) => p.onDown(p.row, p.col, e)}
       onMouseEnter={() => p.onEnter(p.row, p.col)}
@@ -152,7 +149,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const scrollerRef = useRef<HTMLDivElement>(null);
   const csvRef = useRef<HTMLInputElement>(null);
-  const [dialog, setDialog] = useState<'append' | 'exportCsv' | 'series' | 'subject' | 'factor' | 'time' | 'kind' | null>(null);
+  const [dialog, setDialog] = useState<'append' | 'exportCsv' | 'series' | 'factor' | 'time' | 'kind' | null>(null);
   // A picked file waits here, read but not imported, while the preview dialog is open.
   const [pendingCsv, setPendingCsv] = useState<{ name: string; text: string } | null>(null);
   const dragging = useRef(false);
@@ -374,14 +371,6 @@ export function DataTableView({ table }: { table: DataTable }) {
     if (cells.length === 0) return;
     run(excluded ? 'Exclude values' : 'Include values', setExcluded(table.id, cells, excluded));
     setMessage({ kind: 'info', text: excluded ? 'Excluded the selected values: they stay in the table but no chart or calculation uses them.' : 'Included the selected values again.' });
-  };
-
-  const setSelectionSubject = (subject: string) => {
-    setDialog(null);
-    const cells = selectedCells();
-    if (cells.length === 0) return;
-    run(subject.trim() === '' ? 'Clear subject' : 'Set subject', setSubject(table.id, cells, subject));
-    setMessage({ kind: 'info', text: subject.trim() === '' ? 'Cleared the subject of the selected cells.' : `Set the subject of the selected cells to ${subject.trim()}.` });
   };
 
   /** The first columns of the series that the selected columns belong to: what a factor is set on. */
@@ -691,9 +680,6 @@ export function DataTableView({ table }: { table: DataTable }) {
         <button className="icon-text" onClick={() => excludeSelection(false)} title="Include: use the selected values again">
           <IncludeIcon /> Include
         </button>
-        <button className="icon-text" onClick={() => setDialog('subject')} title="Subject: name the independent unit (a mouse, a plate) of the selected cells, so repeats of one unit are not taken for independent observations">
-          Subject…
-        </button>
         {table.kind === 'xy' && (
           <button className="icon-text" onClick={() => setDialog('time')} title="X type: say that the X column holds dates, times or durations (ISO 8601), so that the axis has ticks on calendar boundaries. No number is changed">
             X type…
@@ -873,7 +859,6 @@ export function DataTableView({ table }: { table: DataTable }) {
                     invalid={!!(invalidCell && invalidCell.row === r && invalidCell.col === c)}
                     excluded={g.observations[r].excluded === true}
                     reason={g.observations[r].excludedReason}
-                    subject={g.observations[r].subject}
                     onDown={onDown}
                     onEnter={onEnter}
                     onDouble={onDouble}
@@ -892,11 +877,6 @@ export function DataTableView({ table }: { table: DataTable }) {
         const b = bounds(sel);
         const direction: SeriesDirection = b.r1 === b.r0 && b.c1 > Math.max(0, b.c0) ? 'across' : 'down';
         return <FillSeriesDialog initial={{ ...suggestSeries(table, b, direction), direction }} separator={settings.decimalSeparator} onFill={fillSeries} onClose={() => setDialog(null)} />;
-      })()}
-      {dialog === 'subject' && (() => {
-        const cells = selectedCells();
-        const subjects = new Set(cells.map((c) => table.groups[c.col]?.observations[c.row]?.subject ?? ''));
-        return <SubjectDialog cells={cells.length} current={subjects.size === 1 ? [...subjects][0] : ''} onSet={setSelectionSubject} onClose={() => setDialog(null)} />;
       })()}
       {dialog === 'time' && (
         <TimeDialog

@@ -266,6 +266,8 @@ export function sanitizeLayout(raw: Partial<Record<keyof Layout, unknown>>, base
   const orientation = raw.orientation === 'portrait' || raw.orientation === 'landscape' ? raw.orientation : base.orientation;
   const arrangement = 'arrangement' in raw ? sanitizeArrangement(raw.arrangement, base.arrangement, orientation) : base.arrangement;
   const legend = 'legend' in raw ? sanitizeLegend(raw.legend, base.legend) : base.legend;
+  const annotations = 'annotations' in raw ? (Array.isArray(raw.annotations) ? (raw.annotations as Layout['annotations']) : undefined) : base.annotations;
+  const drawings = 'drawings' in raw ? (Array.isArray(raw.drawings) ? (raw.drawings as Layout['drawings']) : undefined) : base.drawings;
   return {
     id: base.id,
     name: typeof raw.name === 'string' && raw.name.trim() !== '' ? raw.name.trim() : base.name,
@@ -281,6 +283,10 @@ export function sanitizeLayout(raw: Partial<Record<keyof Layout, unknown>>, base
     marginMm: clampNum(raw.marginMm, 0, MARGIN_MM_MAX, base.marginMm),
     gapMm: clampNum(raw.gapMm, 0, GAP_MM_MAX, base.gapMm),
     ...(legend ? { legend } : {}),
+    // Texts on the page: a patch hands checked ones on; a file's are checked field by field where the project is read (serialize.ts).
+    ...(annotations && annotations.length > 0 ? { annotations } : {}),
+    // Shapes and lines on the page, likewise checked where a file is read.
+    ...(drawings && drawings.length > 0 ? { drawings } : {}),
   };
 }
 

@@ -28,16 +28,13 @@ describe('the table as written in a file', () => {
     expect(roundTrip(p).dataTables[0].groups[0].observations[7].value).toBe(0);
   });
 
-  it('keeps an empty cell that has a subject or is excluded, and reads it back as that, not as an empty cell', () => {
+  it('keeps an empty cell that is excluded, and reads it back as that, not as an empty cell', () => {
     const p = createExampleProject();
     const obs = p.dataTables[0].groups[0].observations;
-    obs[9] = { ...obs[9], value: null, subject: 'Mouse 3' };
     obs[10] = { ...obs[10], value: null, excluded: true, excludedReason: 'dropped out' };
     const t = tableJson(p);
-    expect(t.groups[0].observations).toContainEqual([9, null, { subject: 'Mouse 3' }]);
     expect(t.groups[0].observations).toContainEqual([10, null, { excluded: true, excludedReason: 'dropped out' }]);
     const back = roundTrip(p).dataTables[0].groups[0].observations;
-    expect(back[9]).toMatchObject({ value: null, subject: 'Mouse 3' });
     expect(back[10]).toMatchObject({ value: null, excluded: true, excludedReason: 'dropped out' });
     expect(back[11]).toEqual({ id: canonicalObservationId(p.dataTables[0].groups[0].id, 11), value: null });
   });

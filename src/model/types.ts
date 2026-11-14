@@ -13,12 +13,6 @@ export interface Observation {
   excluded?: boolean;
   /** Why it is excluded, for the record. */
   excludedReason?: string;
-  /**
-   * The independent unit this observation belongs to (a mouse, a patient, a plate), free text. Observations of one column
-   * that share a subject are repeats of that unit; one subject in several columns is the same unit measured again.
-   * Absent = no subject (see model/table/subjects.ts). Like the row titles it must not hold patient identifiers.
-   */
-  subject?: string;
 }
 
 export interface Group {
@@ -305,6 +299,9 @@ export interface PieOptions {
   /** The total of each pie, written under it (and in the hole of a doughnut). */
   showTotal: boolean;
   totalPrefix: string;
+  /** 10 × 10 dot plot: the dots are circles or squares, and `dotSize` wide as a fraction of the space between them. */
+  dotShape: 'circle' | 'square';
+  dotSize: number;
 }
 
 /** Which way the columns of a column chart run: up from the category axis, or across from it. */
@@ -344,8 +341,6 @@ export interface DistributionOptions {
 interface PairOptions {
   /** A subject with a missing value: join the values either side of it (never invent one), or break the line there. */
   bridge: boolean;
-  /** Grouped bars of replicates: join the values of each subject (see `Observation.subject`) across the series, inside each category. */
-  bySubject: boolean;
   /**
    * Paired plot: the colour of the lines. `subject`: each row has a colour of the chart's palette (the colours after those of the data
    * sets, so a line is not the colour of a column), unless the lines were given a colour of their own; `one`: every line has the one
@@ -498,12 +493,11 @@ export interface InsideBarLabel {
 
 /** Pattern of a line: solid, dashed or dotted. */
 export type LineOrder = 'auto' | 'onTop' | 'underneath';
-/** The order an XY line joins its points in: the rows of the table, or ascending X. */
-/** How the points of an XY series are joined: as the rows run, from the lowest X to the highest, or one line for each subject (in ascending X). */
 /** Grouped bars, boxes and violins: the columns of a category stand together (by category), or the columns of a series do, one for each category (by series). */
 export type GroupedBy = 'category' | 'series';
 
-export type LineConnect = 'table' | 'x' | 'subject';
+/** How the points of an XY series are joined: as the rows run, or from the lowest X to the highest. */
+export type LineConnect = 'table' | 'x';
 export type LineStyle = 'solid' | 'longDash' | 'dashed' | 'dotted' | 'dashDot' | 'dashDotDot';
 /** The frame round the plotting region: none, or a box (spec 6.2 frame.mode). */
 export type FrameStyle = 'none' | 'box';
@@ -645,12 +639,6 @@ export interface JitterConfig {
   widthFraction: number;
   /** Beeswarm instead of jitter: the dots are placed sideways, by their heights, so that none touches another. Only with `enabled`; `widthFraction` is then the widest the swarm may be. */
   swarm: boolean;
-  /**
-   * Dot plots only: the dots of each subject (see `Observation.subject`) sit side by side in a cluster of their own, each subject
-   * has a marker at its mean, and the mean line and the error bar are calculated from those unit means (n = the subjects).
-   * Values with no subject are drawn in the middle and left out of the calculation, and a warning counts them.
-   */
-  bySubject: boolean;
 }
 
 /** A result of a data set that a text or a reference line can be bound to (see model/graph/resultTokens.ts). */
@@ -695,36 +683,6 @@ export interface ShadedRegion {
   showLabel: boolean;
 }
 
-/**
- * A comparison bracket: a bar joining two data sets of a chart over columns, with the label the owner of the figure supplies (a p-value,
- * stars, "ns"). Nothing is calculated from it. `from` and `to` are the IDs of the two data sets, so the bracket stays on them when
- * they are reordered or renamed.
- */
-export interface Bracket {
-  id: Id;
-  from: Id;
-  to: Id;
-  label: string;
-  color: string;
-  widthPt: number;
-  /** Size of the label, pt. */
-  fontSizePt: number;
-  /**
-   * Grouped bars: the table row (category) of the `from` end, and of the `to` end when it differs (`toRow`; absent = the same row, so the
-   * bracket joins two series inside one category, and one series with two rows joins two categories). The first category when absent.
-   * Ignored by the other charts.
-   */
-  row?: number;
-  toRow?: number;
-  /** XY charts: the X value at which the two series are joined (each must have a point there). Ignored by the other charts. */
-  at?: number;
-  /**
-   * How far the bracket was moved from where it is placed, pt, away from the data: up on a chart over categories, to the right on a
-   * horizontal one and on an XY chart. Absent = not moved. It moves the drawing only: the axis range and the other brackets stay as they are.
-   */
-  liftPt?: number;
-}
-
 export interface Annotation {
   id: Id;
   text: string;
@@ -744,6 +702,76 @@ export interface Annotation {
   /** The X and Y value on the axes of a data-anchored text, in the units of the axes. */
   x?: number;
   y?: number;
+  /** The whole text bold, italic or underlined; absent = not. (Sub- and superscripts are markup in the text: `_{...}`, `^{...}`.) */
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  /** One of FONT_FAMILIES; absent = the font of the chart. */
+  fontFamily?: string;
+  /** How the lines of a text of several lines line up inside its box (whose left edge is the position); absent = left. */
+  align?: AnnotationAlign;
+  /** Distance between the baselines of two lines, in multiples of the font size; absent = 1.2. */
+  lineSpacing?: number;
+}
+
+export type AnnotationAlign = 'left' | 'center' | 'right';
+
+/** The kinds of drawing object: a line (straight or with one bend), an ellipse, a rectangle, or a quarter of an ellipse (an arc). */
+type DrawingShape = 'line' | 'ellipse' | 'rect' | 'arc';
+/**
+ * What an end of a line has: nothing, an arrowhead, a bar across it (centred), or a tick to one side. A tick goes to the side below
+ * (left of a line that runs up or down) the line; 'tickFlip' to the other side, above (right).
+ */
+export type LineEnd = 'none' | 'arrow' | 'bar' | 'tick' | 'tickFlip';
+/** The way a line runs from its start to its end: straight, across then up or down ('hv'), or up or down then across ('vh'). */
+export type LineRoute = 'straight' | 'hv' | 'vh';
+
+/** A point of a drawing object: a fraction of the chart's (or page's) width and height, and, anchored to data, its values on the axes. */
+export interface DrawingPoint {
+  xFrac: number;
+  yFrac: number;
+  x?: number;
+  y?: number;
+}
+
+/**
+ * A drawing object on a chart or a layout page: a shape or a line, with an optional text along a line. It is drawn between two points,
+ * the start and the end of a line, opposite corners of the box of a shape. Sizes are pt. Anchored to data (charts only), its points
+ * follow the axes as a text annotation does; a point whose value is outside the axis range leaves the object out.
+ */
+export interface Drawing {
+  id: Id;
+  shape: DrawingShape;
+  from: DrawingPoint;
+  to: DrawingPoint;
+  anchor?: 'data';
+  /** Lines: how the line runs (absent = straight) and what its ends have (absent = nothing). */
+  route?: LineRoute;
+  start?: LineEnd;
+  end?: LineEnd;
+  /** Lines: the length of an arrowhead, of a bar across an end or of a tick, pt. */
+  endSizePt?: number;
+  /** Rectangles: the radius of the corners, pt; absent = square corners. */
+  cornerPt?: number;
+  /** The line (outline) of the object. */
+  color: string;
+  opacity: number;
+  widthPt: number;
+  lineStyle: LineStyle;
+  /** Closed shapes (ellipse, rectangle): the fill; absent = none. */
+  fill?: string;
+  fillOpacity?: number;
+  /** Lines: a text at the middle of the line (absent = none), and its look. */
+  text?: string;
+  fontSizePt?: number;
+  textColor?: string;
+  fontFamily?: string;
+  bold?: boolean;
+  italic?: boolean;
+  /** Which side of the line the text is on: above (right of a line that runs up or down; the default) or below (left). */
+  textSide?: 'above' | 'below';
+  /** The distance between the line and the text, pt. */
+  textGapPt?: number;
 }
 
 /** How the pointwise interval of a survival estimate is built. Log-log keeps it inside 0 to 1; plain is S +/- z SE. */
@@ -851,14 +879,14 @@ export interface Chart {
   defaults: ChartStyle;
   layers: ChartLayer[];
   annotations: Annotation[];
+  /** Shapes and lines drawn on the chart, over the data and under the texts; absent = none. */
+  drawings?: Drawing[];
   /** Lines at chosen values of the axes. */
   referenceLines: ReferenceLine[];
   /** XY charts: bands between two values of an axis, behind the data. */
   regions: ShadedRegion[];
   /** XY charts: both axes are drawn with the same length for one unit, so that an identity line runs at 45 degrees; the axis with the larger room is widened to it. Absent = off. */
   equalUnits?: boolean;
-  /** Comparison brackets between two data sets (charts over columns). */
-  brackets: Bracket[];
   /** IDs of layers (see model/graph/layers.ts) that are not drawn. Hiding changes nothing that is calculated. */
   hiddenLayerIds: Id[];
   /** Layers whose values the axis range is not fitted to (the layer is still drawn); see rangeContribution in model/graph/layers.ts. */
@@ -959,6 +987,10 @@ export interface Layout {
   gapMm: number;
   /** The master legend of the page; absent = none. */
   legend?: LayoutLegend;
+  /** Texts placed on the page (positions are fractions of the page's width and height; never anchored to data); absent = none. */
+  annotations?: Annotation[];
+  /** Shapes and lines on the page (fractions of the page's width and height), under the texts; absent = none. */
+  drawings?: Drawing[];
 }
 
 export interface Project {
@@ -983,7 +1015,9 @@ export type Selection =
   | { kind: 'points'; points: Array<{ groupId: Id; pointId: Id }> }
   | { kind: 'annotation'; annotationId: Id }
   /** Several annotations edited together (two or more; one is an 'annotation'). */
-  | { kind: 'annotations'; annotationIds: Id[] };
+  | { kind: 'annotations'; annotationIds: Id[] }
+  /** One drawing object or several, edited together. */
+  | { kind: 'drawings'; drawingIds: Id[] };
 
 /** How numbers are written: by the decimal point, by the decimal comma, or either (a comma is taken as a decimal comma). */
 export type DecimalSeparator = 'auto' | 'point' | 'comma';

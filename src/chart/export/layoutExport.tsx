@@ -8,6 +8,9 @@ import { type AnyModel, buildAnyModelCached, ChartCanvas, chartTexts, drawingOf 
 import { SvgIdPrefix } from '../shared/scene/idPrefix';
 import { el } from '../shared/scene/sceneElement';
 import { SceneElements } from '../shared/scene/SceneElements';
+import { annotationElements } from '../shared/scene/annotations';
+import { drawingElements } from '../shared/scene/drawings';
+import { FONT_FAMILY } from '../../model/defaults';
 import { richPieces } from '../shared/scene/richSvg';
 import { layoutMasterLegend, legendEntriesOf, mergeLegendEntries, type LegendEntry, type MasterLegendLayout } from './masterLegend';
 import { svgToPngBlob } from './pngDpi';
@@ -94,7 +97,7 @@ function masterLegendMarkup(laid: MasterLegendLayout, band: { x: number; y: numb
   return `<g id="master-legend">${entries.join('')}</g>`;
 }
 
-export function drawLayout(layout: Layout, project: Project, options: { metadata?: boolean } = {}): LayoutDrawing {
+export function drawLayout(layout: Layout, project: Project, options: { metadata?: boolean; withoutDrawings?: boolean } = {}): LayoutDrawing {
   const panels = panelsOf(layout, project);
   const sizes: NaturalSize[] = layout.panels.map((id) => {
     const c = id === null ? undefined : project.charts.find((x) => x.id === id);
@@ -137,6 +140,10 @@ export function drawLayout(layout: Layout, project: Project, options: { metadata
     parts.unshift(textElement(`x="${n2(t.x + t.w / 2)}" y="${n2(t.y + t.h * 0.7)}" font-size="16" font-weight="700" text-anchor="middle" fill="#000000"`, layout.title));
   }
   if (frame.legend && master.legend.items.length > 0) parts.push(masterLegendMarkup(master.legend, frame.legend, layout.legend!.position));
+  // Shapes and lines placed on the page, over the graphs and under the texts (the editor draws them itself, live: `withoutDrawings`).
+  if (!options.withoutDrawings && layout.drawings && layout.drawings.length > 0) parts.push(renderToStaticMarkup(<SceneElements nodes={drawingElements(layout.drawings, frame.widthPt, frame.heightPt, undefined, FONT_FAMILY)} editor={false} />));
+  // Texts placed on the page come last, on top of the graphs, drawn by the same code as the texts of a graph.
+  if (layout.annotations && layout.annotations.length > 0) parts.push(renderToStaticMarkup(<SceneElements nodes={annotationElements(layout.annotations, frame.widthPt, frame.heightPt, null, undefined, FONT_FAMILY)} editor={false} />));
   const mm = { w: n2((frame.widthPt * 25.4) / 72), h: n2((frame.heightPt * 25.4) / 72) };
   const head = options.metadata ? `<title>${escapeXml(layout.name)}</title>` : '';
   const background = layout.background ? `<rect x="0" y="0" width="${n2(frame.widthPt)}" height="${n2(frame.heightPt)}" fill="${layout.background}"/>` : '';
@@ -180,6 +187,9 @@ export function layoutTextGroups(layout: Layout, project: Project, pageFont: str
   const page: string[] = layout.panels.map((_, i) => panelLabel(layout.labelStyle, i)).filter((t) => t !== '');
   if (layout.showTitle && layout.title.trim() !== '') page.unshift(plainText(layout.title));
   add(pageFont, page);
+  // Each text on the page in its own font (or the page's).
+  for (const a of layout.annotations ?? []) add(a.fontFamily ?? pageFont, a.text.split('\n').filter((l) => l.trim() !== '').map(plainText));
+  for (const d of layout.drawings ?? []) if (d.text) add(d.fontFamily ?? pageFont, [plainText(d.text)]);
   const panels = panelsOf(layout, project);
   panels.forEach((p) => p && add(p.chart.fontFamily, chartTexts(p.drawn, p.any)));
   for (const e of mergeLegendEntries(panels.map((p) => p?.entries ?? []))) add(e.fontFamily, [plainText(e.label)]);

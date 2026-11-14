@@ -18,7 +18,7 @@ export function heatDrawing(chart: Chart, model: HeatModel): ChartDrawing {
       { nodes: model.marks ?? compileHeatMarks(chart, model) },
       { nodes: heatAxisLabelElements(chart, model) },
       { nodes: titleElements(chart, layout, chart.xAxis, chart.yAxis) },
-      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), place: annotationPlacer({ family: 'heatmap', model }, W, H).place },
+      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), drawings: chart.drawings, place: annotationPlacer({ family: 'heatmap', model }, W, H).place },
     ],
   };
 }

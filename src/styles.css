@@ -306,7 +306,12 @@ button.primary:hover:not(:disabled) { background: #144fb0; border-color: #144fb0
 .chart-surface [data-hit] { cursor: pointer; }
 .chart-surface [data-hit='annotation'] { cursor: move; }
 .chart-surface [data-hit='label'] { cursor: pointer; }
-.chart-surface [data-hit='label'] text { user-select: none; }
+/* The texts drawn on a graph or a page are parts to click and drag, not page text: a click with a little movement, or a quick second click, must not highlight them. */
+.chart-surface svg, .layout-page svg { user-select: none; -webkit-user-select: none; }
+/* The Text tool places a text wherever the chart is clicked, so every part of it shows the text cursor. */
+.chart-surface.placing-text, .chart-surface.placing-text [data-hit] { cursor: crosshair; }
+.tool-group .switch { display: inline-flex; align-items: center; gap: 4px; }
+.tool-group .switch.on { background: var(--text, #222); color: #fff; border-color: var(--text, #222); }
 .tooltip {
   position: absolute;
   z-index: 10;
@@ -478,7 +483,6 @@ input[type='color'].mixed { opacity: 0.45; }
 .nav-actions button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 
 /* An excluded value stays in the table but is not used. */
-.cell.has-subject { box-shadow: inset 3px 0 0 var(--accent, #3b82f6); }
 .cell.excluded { text-decoration: line-through; color: var(--muted); background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(120,120,120,0.12) 4px 5px); }
 
 /* Searching the inspector: sections with no matching setting are hidden. */
@@ -529,6 +533,13 @@ input[type='color'].mixed { opacity: 0.45; }
 .layout-frame { position: absolute; box-sizing: border-box; border: 1px dashed #4a90d9; cursor: move; touch-action: none; }
 .layout-frame:hover { background: rgba(74, 144, 217, 0.08); }
 .layout-frame.selected { border: 2px solid var(--accent); background: rgba(74, 144, 217, 0.1); }
+/* Texts on a page: an outline over each (dashed when selected) that is clicked and dragged; with the Text tool a layer over the whole page takes the click. */
+.layout-notes { position: absolute; inset: 0; pointer-events: none; }
+.layout-note { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: move; touch-action: none; border: 1px solid transparent; }
+.layout-note:hover { border-color: rgba(43, 127, 255, 0.5); }
+.layout-note.selected { border: 2px dashed #2b7fff; }
+.layout-place-text { position: absolute; inset: 0; cursor: crosshair; }
+.layout-page-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .layout-frame-tag { position: absolute; right: 2px; bottom: 1px; font-size: 10px; line-height: 1; color: var(--accent); background: rgba(255, 255, 255, 0.85); padding: 1px 3px; border-radius: 2px; pointer-events: none; }
 .layout-handle { position: absolute; width: 10px; height: 10px; background: #fff; border: 2px solid var(--accent); box-sizing: border-box; }
 .layout-handle.nw { left: -6px; top: -6px; cursor: nwse-resize; }
@@ -669,7 +680,29 @@ input[type='color'].mixed { opacity: 0.45; }
 .symbol-cell:hover { background: #eef0f2; }
 .symbol-cell.on { background: var(--accent-soft); border-color: var(--accent); }
 
+/* The Graphics menu of a toolbar: shapes, lines and lines with text, six to a row; and drawing a new object. */
+.graphics-menu { display: inline-flex; }
+.graphics-menu .caret { font-size: 10px; margin-left: 2px; color: #5f6b76; }
+.graphics-pop { padding: 8px 10px; }
+.graphics-group + .graphics-group { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.graphics-heading { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #8a949e; margin: 0 0 4px 2px; }
+.graphics-grid { display: grid; grid-template-columns: repeat(6, 36px); gap: 2px; }
+.chart-surface.placing-drawing, .chart-surface.placing-drawing [data-hit] { cursor: crosshair; }
+.drawing-handle { cursor: crosshair; }
+.layout-drawings { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.layout-drawings [data-hit] { pointer-events: visiblePainted; cursor: move; }
+.layout-drawings .drawing-handle { cursor: crosshair; }
+.layout-drawings.placing { pointer-events: auto; cursor: crosshair; }
+
 /* A linked graph in the navigator: its Unlink beside the link symbol */
 .nav-row { display: flex; align-items: center; gap: 2px; }
 .nav-row .nav-item { flex: 1; min-width: 0; }
 .nav-unlink { flex: none; padding: 0 6px; font-size: 11px; line-height: 18px; border-radius: 4px; }
+
+/* The settings of a text annotation: rows of small buttons, and a red Delete across the box. */
+.text-style-tools { display: inline-flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.text-style-tools .switch, .quick-texts .switch { min-width: 30px; justify-content: center; display: inline-flex; align-items: center; }
+.quick-texts { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.quick-texts .switch { font-family: ui-monospace, Consolas, monospace; }
+.danger-button { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 10px; color: #c62828; border-color: #f2b8b5; background: transparent; }
+.danger-button:hover { background: #fdecea; }

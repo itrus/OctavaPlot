@@ -18,7 +18,7 @@ export function groupedDrawing(chart: Chart, model: GroupedModel): ChartDrawing 
       { nodes: scene.marks ?? compileGroupedMarks(chart, model) },
       { nodes: compileGroupedLabels(chart, model) },
       { nodes: scene.front },
-      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), place: annotationPlacer({ family: 'grouped', model }, model.widthPt, model.heightPt).place },
+      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), drawings: chart.drawings, place: annotationPlacer({ family: 'grouped', model }, model.widthPt, model.heightPt).place },
     ],
   };
 }

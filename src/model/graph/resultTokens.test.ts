@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../defaults';
 import type { Annotation, Chart, DataTable, Project } from '../types';
-import { addAnnotation, addBracket, addChart, addDataTable, addReferenceLine } from '../../state/commands';
+import { addAnnotation, addChart, addDataTable, addDrawing, addReferenceLine } from '../../state/commands';
+import { createDrawing, presetById } from './drawingPresets';
 import { buildAnyModel, chartTexts } from '../../chart/anyModel';
 import { fillResultTokens, resolveChartTokens, resultValue } from './resultTokens';
 
@@ -90,7 +91,7 @@ describe('tokens in a text', () => {
 describe('the chart with its tokens filled in', () => {
   const t = tableWith();
   const note = (text: string): Annotation => ({ id: 'a1', text, xFrac: 0.2, yFrac: 0.1, fontSizePt: 12, color: '#000000', opacity: 1 });
-  const chart = (over: Partial<Chart> = {}): Chart => ({ ...createExampleProject().charts[0], dataTableId: t.id, annotations: [], referenceLines: [], brackets: [], ...over });
+  const chart = (over: Partial<Chart> = {}): Chart => ({ ...createExampleProject().charts[0], dataTableId: t.id, annotations: [], referenceLines: [], ...over });
   const line = (over: object = {}) => ({ id: 'r1', axis: 'y' as const, value: 3, color: '#000000', widthPt: 2, style: 'dashed' as const, opacity: 1, label: '', showLabel: true, ...over });
 
   it('is the very same chart when nothing has a token', () => {
@@ -99,16 +100,16 @@ describe('the chart with its tokens filled in', () => {
     expect(r.chart).toBe(c);
     expect(r.notices).toEqual([]);
   });
-  it('fills the text of annotations, the labels of reference lines and the labels of brackets, and changes nothing else', () => {
+  it('fills the text of annotations, the labels of reference lines and the texts of shapes, and changes nothing else', () => {
     const c = chart({
       annotations: [note('n = {{n Control}}')],
       referenceLines: [line({ label: 'mean {{mean Control}}' })],
-      brackets: [{ id: 'b1', from: t.groups[0].id, to: t.groups[1].id, label: '{{n Drug A}} vs {{n Control}}', color: '#000000', widthPt: 1, fontSizePt: 12 }],
+      drawings: [{ ...createDrawing(presetById('bracketText')!, { xFrac: 0, yFrac: 0 }, { xFrac: 1, yFrac: 0 }, { color: '#000000', fontSizePt: 12 }, 'd1'), text: '{{n Drug A}} vs {{n Control}}' }],
     });
     const r = resolveChartTokens(c, t).chart;
     expect(r.annotations[0]).toEqual({ ...c.annotations[0], text: 'n = 8' });
     expect(r.referenceLines[0]).toEqual({ ...c.referenceLines[0], label: 'mean 5' });
-    expect(r.brackets[0].label).toBe('3 vs 8');
+    expect(r.drawings?.[0].text).toBe('3 vs 8');
     expect(c.annotations[0].text).toBe('n = {{n Control}}');
   });
   it('puts a reference line at a result when its value is bound to one, and not drawn (with a notice) when there is none', () => {
@@ -128,12 +129,12 @@ describe('a graph shows the results, and shows new ones when the data change', (
   const base = (): Project => addChart('c', 't', undefined, 'bar')(addDataTable('t', 'column', { sample: true })(createExampleProject()));
   const withTable = (p: Project, table: DataTable): Project => ({ ...p, dataTables: p.dataTables.map((x) => (x.id === 't' ? { ...table, id: 't' } : x)) });
   const texts = (p: Project) => chartTexts(p.charts.find((c) => c.id === 'c')!, buildAnyModel(p.charts.find((c) => c.id === 'c')!, p.dataTables.find((x) => x.id === 't')!));
-  it('draws n and the mean in an annotation, a reference line label and a bracket label, and follows the data', () => {
+  it('draws n and the mean in an annotation, a reference line label and the text of a shape, and follows the data', () => {
     let p = withTable(base(), tableWith());
-    const [g0, g1] = p.dataTables.find((x) => x.id === 't')!.groups;
+    const [g0] = p.dataTables.find((x) => x.id === 't')!.groups;
     p = addAnnotation('c', { id: 'a1', text: 'n = {{n Control}}', xFrac: 0.4, yFrac: 0.08, fontSizePt: 20, color: '#000000', opacity: 1 })(p);
     p = addReferenceLine('c', { id: 'r1', axis: 'y', value: 1, color: '#000000', widthPt: 1, style: 'solid', opacity: 1, label: 'mean {{mean Control}}', showLabel: true, valueFrom: { stat: 'mean', groupId: g0.id } })(p);
-    p = addBracket('c', { id: 'b1', from: g0.id, to: g1.id, label: 'n={{n Drug A}}', color: '#000000', widthPt: 1, fontSizePt: 12 })(p);
+    p = addDrawing({ chartId: 'c' }, { ...createDrawing(presetById('bracketText')!, { xFrac: 0.2, yFrac: 0.3 }, { xFrac: 0.6, yFrac: 0.3 }, { color: '#000000', fontSizePt: 12 }, 'd1'), text: 'n={{n Drug A}}' })(p);
     const out = texts(p);
     expect(out).toContain('n = 8');
     expect(out).toContain('mean 5');

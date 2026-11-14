@@ -60,7 +60,20 @@ export function PieInspector({ chart, table }: { chart: Chart; table: DataTable 
                     />
                   </Field>
                 )}
-                {dotGrid && <div className="muted small">One dot for each percent of a row, filled row by row from the top left. The shares are rounded to whole dots so that there are always 100; the legend names the parts.</div>}
+                {dotGrid && <div className="muted small">One dot for each percent of a row, filled row by row from the top left. A dot on the border between two parts is cut between them, so each share is exact; the legend names the parts.</div>}
+                {dotGrid && (
+                  <Field label="Dot shape">
+                    <SelectInput<PieOptions['dotShape']>
+                      value={d.dotShape}
+                      options={[
+                        { value: 'circle', label: 'Circle' },
+                        { value: 'square', label: 'Square' },
+                      ]}
+                      onChange={(v) => set('Dot shape', { dotShape: v })}
+                    />
+                  </Field>
+                )}
+                {dotGrid && <NumField {...SLIDERS.fraction} label="Dot size" hint="Width of a dot as a fraction of the space between dots" value={d.dotSize} min={PIE_LIMITS.dotSize.min} max={PIE_LIMITS.dotSize.max} onCommit={(v) => set('Dot size', { dotSize: v }, 'pie:dotsize')} />}
                 {doughnut && <NumField {...SLIDERS.fraction} label="Hole" hint="Fraction of the radius" value={d.hole} min={PIE_LIMITS.hole.min} max={PIE_LIMITS.hole.max} onCommit={(v) => set('Doughnut hole', { hole: v }, 'pie:hole')} />}
                 {!dotGrid && (
                 <Field label="Labels">

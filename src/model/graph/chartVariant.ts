@@ -19,16 +19,12 @@ export interface ChartVariant {
   swarm?: boolean;
   /** Grouped bars made with the columns grouped by series (separated: each series has its own group of columns). */
   separated?: boolean;
-  /** Grouped bars made with the values of each subject joined across the series inside each category. */
-  subjectLines?: boolean;
-  /** An XY chart made with its points joined as this says (for example one line for each subject). */
+  /** An XY chart made with its points joined as this says (as the rows run, or in ascending X). */
   lineConnect?: Chart['lineConnect'];
   /** Bubbles made as bubble charts usually are: a large largest bubble, a little see-through so that overlaps can be read. */
   bubbles?: boolean;
   /** Offset traces made as figures usually are: the Y axis hidden and a scale bar in its place. */
   offsetTraces?: boolean;
-  /** A dot plot made with its dots grouped by subject (nested dots). */
-  bySubject?: boolean;
   /** Grouped bars made as dots only: the bars are off, the replicate values are dots and a line marks the mean of each cell. */
   dotsOnly?: boolean;
   /**
@@ -60,9 +56,7 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
   }
   if (variant.jitter !== undefined && chart.type === 'scatter') next.jitter = { ...chart.jitter, enabled: variant.jitter };
   if (variant.swarm !== undefined && chart.type === 'scatter') next.jitter = { ...next.jitter, enabled: true, swarm: variant.swarm };
-  if (variant.bySubject !== undefined && chart.type === 'scatter') next.jitter = { ...next.jitter, bySubject: variant.bySubject };
   if (variant.separated && chart.type === 'groupedBar') next.groupedBy = 'series';
-  if (variant.subjectLines !== undefined && chart.type === 'groupedBar') next.pairs = { ...next.pairs, bySubject: variant.subjectLines };
   if (variant.bubbles && chart.type === 'xyBubble') {
     next.defaults = { ...chart.defaults, symbolSizePt: 36, symbolFillOpacity: 0.6 };
     // The sizes are not on the axes, so a bubble chart made from the gallery says what they mean.

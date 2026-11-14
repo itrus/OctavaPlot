@@ -1,8 +1,10 @@
 import { forwardRef } from 'react';
-import type { Annotation, Chart, Selection } from '../../../model/types';
+import type { Annotation, Chart, Drawing, Selection } from '../../../model/types';
 import { selectedAnnotationIds, selectedPoints } from '../../../model/graph/selection/multi';
 import { n2 } from '../../../model/units';
 import { annotationElements } from './annotations';
+import { drawingElements, type DrawingDrag } from './drawings';
+import type { Spot } from './annotationPlace';
 import { scopeRefs, useSvgIdPrefix } from './idPrefix';
 import type { Scene } from './scene';
 import type { SceneElement } from './sceneElement';
@@ -14,6 +16,8 @@ export interface EditorState {
   selection: Selection;
   /** Annotation being dragged: its live position (fractions) overrides the stored one. */
   dragging?: { id: string; xFrac: number; yFrac: number } | null;
+  /** Drawing objects being moved, resized or drawn: drawn at their live points in place of the stored ones (or added). */
+  drawingDrafts?: ReadonlyArray<{ drawing: Drawing; drag: DrawingDrag }>;
 }
 
 /** One part of a drawing, in the order it is written. */
@@ -22,8 +26,8 @@ type ChartSection =
   | { nodes: ReadonlyArray<SceneElement> }
   /** The data layers of an XY scene, clipped to the plotting region. */
   | { xyData: Scene }
-  /** The text annotations (the ones that are not hidden); the editor's drag and selection apply to them. */
-  | { annotations: ReadonlyArray<Annotation>; place?: (a: Annotation) => { x: number; y: number } | null };
+  /** The drawing objects and the text annotations (the ones that are not hidden), the objects under the texts; the editor's drag and selection apply to them. */
+  | { annotations: ReadonlyArray<Annotation>; drawings?: ReadonlyArray<Drawing>; place?: (a: Spot) => { x: number; y: number } | null };
 
 /** What a chart is drawn from, whatever its family: its size and its sections. The family builds it from its model. */
 export interface ChartDrawing {
@@ -56,7 +60,8 @@ export const SceneChart = forwardRef<SVGSVGElement, Props>(function SceneChart({
   const groupIds = editor?.selection.kind === 'group' ? [editor.selection.groupId] : editor?.selection.kind === 'groups' ? editor.selection.groupIds : [];
   const selectedGroups: ReadonlySet<string> = new Set(groupIds);
   const pointIds = editor ? selectedPoints(editor.selection).map((p) => p.pointId) : [];
-  const selectedAnnotations: ReadonlySet<string> = new Set(editor ? selectedAnnotationIds(editor.selection) : []);
+  // The selected texts and drawing objects share the editor's selection marks (their IDs never clash).
+  const selectedAnnotations: ReadonlySet<string> = new Set(editor ? [...selectedAnnotationIds(editor.selection), ...(editor.selection.kind === 'drawings' ? editor.selection.drawingIds : [])] : []);
   return (
     <svg ref={ref} xmlns="http://www.w3.org/2000/svg" width={cssWidth} height={cssHeight} viewBox={`0 0 ${n2(W)} ${n2(H)}`} fontFamily={chart.fontFamily} style={{ background: chart.pageColor ?? 'transparent' }}>
       {drawing.sections.map((s, i) =>
@@ -67,7 +72,7 @@ export const SceneChart = forwardRef<SVGSVGElement, Props>(function SceneChart({
             <SceneSvg scene={s.xyData} editor={ed} selectedGroups={selectedGroups} />
           </g>
         ) : (
-          <SceneElements key={i} nodes={annotationElements(s.annotations, W, H, editor?.dragging, s.place)} editor={ed} selectedAnnotations={selectedAnnotations} />
+          <SceneElements key={i} nodes={[...drawingElements(s.drawings ?? [], W, H, s.place, chart.fontFamily, editor?.drawingDrafts), ...annotationElements(s.annotations, W, H, editor?.dragging, s.place, chart.fontFamily)]} editor={ed} selectedAnnotations={selectedAnnotations} />
         ),
       )}
       {ed && drawing.selection && <SceneElements nodes={drawing.selection({ groupIds, pointIds })} editor />}

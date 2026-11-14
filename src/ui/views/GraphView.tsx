@@ -5,17 +5,40 @@ import { CHROME_STOPS, type ChromeStop, describeFocus, extendAnnotations, extend
 import { toggleGroupSelection } from '../../model/graph/selection/scope';
 import { selectedAnnotationIds, selectedPoints, toggleAnnotationSelection, togglePointSelection } from '../../model/graph/selection/multi';
 import { dragLabelPatch } from '../inspector/common/pointOverrideUi';
-import { liftAfterDrag } from '../../chart/shared/parts/brackets';
 import { densePreviewNote, isDense, nearestDot } from '../../chart/shared/scene/denseDots';
 import { hitFromTarget, type HitTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
 import type { PreparedChart } from '../../model/table/preparedChart';
 import { useApp } from '../../state/AppContext';
-import { composeCommands, patchAnnotation, patchBracket, patchPointStyle, resetAllDataSets } from '../../state/commands';
+import { addAnnotation, addDrawing, composeCommands, patchAnnotation, patchDrawings, patchPointStyle, removeAnnotation, removeDrawings, resetAllDataSets } from '../../state/commands';
+import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById, snapToAxis } from '../../model/graph/drawingPresets';
+import { drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
+import { GraphicsMenu } from '../components/GraphicsMenu';
+import type { Drawing } from '../../model/types';
+import { chartTextLook, createAnnotation } from '../../model/defaults';
+import { focusWhenShown } from '../inspector/common/pendingFocus';
 import { annotationPlacer, drawnFractions, nudgePatches, patchForMove } from '../../chart/shared/scene/annotationPlace';
-import { ResetIcon } from '../components/icons';
+import { PointerIcon, ResetIcon, TextToolIcon } from '../components/icons';
 import { inspectorTargetFor } from '../inspector/common/nav';
 import type { Box } from '../../chart/shared/parts/labels';
+
+/** Drawing objects being moved (all the selected ones) or resized by a handle: where the drag began, how far it has gone, and where each object's points were drawn when it began (pt). */
+interface ShapeDrag {
+  mode: 'move' | 'from' | 'to';
+  start: { x: number; y: number };
+  delta: { x: number; y: number };
+  items: Array<{ drawing: Drawing; from: { x: number; y: number }; to: { x: number; y: number } }>;
+}
+
+/** The live points of an object being moved or resized, pt: a move shifts both, a handle one. */
+function draggedPoints(it: ShapeDrag['items'][number], d: Pick<ShapeDrag, 'mode' | 'delta'>) {
+  const shift = (q: { x: number; y: number }) => ({ x: q.x + d.delta.x, y: q.y + d.delta.y });
+  if (d.mode === 'move') return { from: shift(it.from), to: shift(it.to) };
+  // A handle of a straight line close to across or to up and down puts it exactly so, from its other end.
+  const straight = it.drawing.shape === 'line' && (it.drawing.route ?? 'straight') === 'straight';
+  if (d.mode === 'from') return { from: straight ? snapToAxis(it.to, shift(it.from)) : shift(it.from), to: it.to };
+  return { from: it.from, to: straight ? snapToAxis(it.from, shift(it.to)) : shift(it.to) };
+}
 
 /** Space kept around the chart inside the canvas, in px. */
 const CANVAS_PAD = 24;
@@ -34,13 +57,20 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const [drag, setDrag] = useState<{ id: string; xFrac: number; yFrac: number; dx: number; dy: number; moved: boolean } | null>(null);
   // A point label being dragged: where the pointer started and the labels it moves, each with its point and its box when the drag began.
   const labelDrag = useRef<{ start: { x: number; y: number }; items: Array<{ id: string; cx: number; cy: number; box: Box }>; moved: boolean } | null>(null);
-  // A comparison bracket being dragged: where the pointer started, the lift it had then, and which way is away from the data.
-  const bracketDrag = useRef<{ id: string; start: { x: number; y: number }; lift: number; direction: 'up' | 'right'; moved: boolean } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   // The part of the chart besides its data sets that the keyboard is on (title, legend, an axis), and its outline in the surface.
   const [stop, setStop] = useState<ChromeStop | null>(null);
   const [stopBox, setStopBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  // The tool of the pointer: Select picks what is clicked (and drags what can be dragged); Text places a new text where the chart is clicked.
+  // Text places a new text where the chart is clicked; `draw:<preset>` draws a shape or line where the chart is dragged.
+  const [tool, setTool] = useState<string>('select');
+  const drawPreset = tool.startsWith('draw:') ? presetById(tool.slice(5)) : undefined;
+  // A drawing object being drawn (where the drag began and where it is now, pt), or objects being moved or resized by a handle.
+  const [draft, setDraft] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(null);
+  const [shapeDrag, setShapeDrag] = useState<ShapeDrag | null>(null);
+  const drawings = chart.drawings ?? [];
+  const owner = { chartId: chart.id };
 
   // Zoom 100% means the whole chart fits the window; the slider zooms relative to that.
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -81,8 +111,35 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   };
   const dots = previewDotCount(any, chart);
 
+  /** The Text tool: a new text whose top-left corner is where the chart was clicked, selected, with its settings open and its text box ready to type in. */
+  const placeText = (e: PointerEvent) => {
+    if (!svgRef.current) return;
+    const pt = pointerToChartPt(svgRef.current, e.clientX, e.clientY, model.widthPt, model.heightPt);
+    const a = createAnnotation(chartTextLook(chart), pt.x / model.widthPt, pt.y / model.heightPt);
+    run('Add text', addAnnotation(chart.id, a));
+    setSelection({ kind: 'annotation', annotationId: a.id });
+    focusWhenShown(`annotation-text:${a.id}`);
+    navigateInspector({ page: 'notes' });
+    setTool('select');
+    setTip(null);
+  };
+
   const onPointerDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
+    if (tool === 'text') {
+      e.preventDefault();
+      placeText(e);
+      return;
+    }
+    if (drawPreset && svgRef.current) {
+      // Drawing a new object: from where the pointer is pressed to where it is let go.
+      e.preventDefault();
+      const pt = pointerToChartPt(svgRef.current, e.clientX, e.clientY, model.widthPt, model.heightPt);
+      setDraft({ a: pt, b: pt });
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      setTip(null);
+      return;
+    }
     const hit = hitAt(e);
     setStop(null);
     // The inspector goes to the settings of whatever was clicked.
@@ -90,13 +147,25 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
     if (target) navigateInspector(target);
     const modified = e.ctrlKey || e.metaKey || e.shiftKey;
     const pickable = hit.groupId && hit.objectId && (hit.kind === 'point' || hit.kind === 'label') && !hit.objectId.endsWith(':mean');
-    if (hit.kind === 'bracket' && hit.objectId && svgRef.current) {
-      // A bracket is moved by dragging it; the lift is stored in points from where it is placed (one undo step for a drag).
-      const b = chart.brackets.find((x) => x.id === hit.objectId);
-      if (!b) return;
-      setSelection({ kind: 'chart' });
-      const horizontal = any.family === 'xy' || ('orient' in any.model && any.model.orient.horizontal);
-      bracketDrag.current = { id: b.id, start: pointerToChartPt(svgRef.current, e.clientX, e.clientY, model.widthPt, model.heightPt), lift: b.liftPt ?? 0, direction: horizontal ? 'right' : 'up', moved: false };
+    if ((hit.kind === 'drawing' || hit.kind === 'handle') && hit.objectId && svgRef.current) {
+      const d = drawings.find((x) => x.id === hit.objectId);
+      if (!d) return;
+      const picked = selection.kind === 'drawings' ? selection.drawingIds : [];
+      // Ctrl, Cmd or Shift on an object adds it to the selection, or takes it out: they are then edited and moved together.
+      if (modified && hit.kind === 'drawing') {
+        const next = picked.includes(d.id) ? picked.filter((id) => id !== d.id) : [...picked, d.id];
+        setSelection(next.length > 0 ? { kind: 'drawings', drawingIds: next } : { kind: 'chart' });
+        return;
+      }
+      // A handle moves one point of its object; pressing on one of several selected objects keeps them all and moves them together.
+      const ids = hit.kind === 'handle' || !picked.includes(d.id) ? [d.id] : picked;
+      if (!picked.includes(d.id)) setSelection({ kind: 'drawings', drawingIds: [d.id] });
+      const placer = annotationPlacer(any, model.widthPt, model.heightPt);
+      const items = drawings.filter((x) => ids.includes(x.id)).map((x) => {
+        const [from, to] = drawnPoints(x, model.widthPt, model.heightPt, placer);
+        return { drawing: x, from, to };
+      });
+      setShapeDrag({ mode: hit.kind === 'handle' ? (hit.handle ?? 'to') : 'move', start: pointerToChartPt(svgRef.current, e.clientX, e.clientY, model.widthPt, model.heightPt), delta: { x: 0, y: 0 }, items });
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       setTip(null);
     } else if (hit.kind === 'annotation' && hit.annotationId && svgRef.current) {
@@ -152,14 +221,13 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const onPointerMove = (e: PointerEvent) => {
     const svg = svgRef.current;
     if (!svg) return;
-    const brk = bracketDrag.current;
-    if (brk) {
+    if (draft) {
+      setDraft({ ...draft, b: pointerToChartPt(svg, e.clientX, e.clientY, model.widthPt, model.heightPt) });
+      return;
+    }
+    if (shapeDrag) {
       const pt = pointerToChartPt(svg, e.clientX, e.clientY, model.widthPt, model.heightPt);
-      const [dx, dy] = [pt.x - brk.start.x, pt.y - brk.start.y];
-      // A click that moves a little is still a click.
-      if (!brk.moved && Math.hypot(dx, dy) < 3) return;
-      brk.moved = true;
-      run('Move bracket', patchBracket(chart.id, brk.id, { liftPt: liftAfterDrag(brk.lift, brk.direction, dx, dy) }), `bracket-drag:${brk.id}`);
+      setShapeDrag({ ...shapeDrag, delta: { x: pt.x - shapeDrag.start.x, y: pt.y - shapeDrag.start.y } });
       return;
     }
     const labels = labelDrag.current;
@@ -199,10 +267,40 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const noteIds = chart.annotations.map((a) => a.id);
   const pickedNotes = selectedAnnotationIds(selection);
   const selectedNotes = chart.annotations.filter((a) => pickedNotes.includes(a.id));
+  const selectedShapes = selection.kind === 'drawings' ? drawings.filter((d) => selection.drawingIds.includes(d.id)) : [];
   const announcement = describeFocus(marks, { selection, stop }, undefined, chart.annotations);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     // Shortcuts (Ctrl+Z, Ctrl+S ...) belong to the app; so does everything while a dialog or another field has the keys.
-    if (e.ctrlKey || e.metaKey || e.target !== e.currentTarget) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.target !== e.currentTarget) return;
+    // V and T choose the tool, as in drawing programs; Escape leaves the Text tool.
+    if (e.key === 'Escape' && tool !== 'select') {
+      e.preventDefault();
+      setTool('select');
+      setDraft(null);
+      return;
+    }
+    // Delete takes the selected drawing objects or texts off the chart (undo brings them back).
+    if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedShapes.length > 0 || selectedNotes.length > 0)) {
+      e.preventDefault();
+      if (selectedShapes.length > 0) run(selectedShapes.length === 1 ? 'Delete shape' : 'Delete shapes', removeDrawings(owner, selectedShapes.map((d) => d.id)));
+      else run(selectedNotes.length === 1 ? 'Delete annotation' : 'Delete annotations', composeCommands(...selectedNotes.map((a) => removeAnnotation(chart.id, a.id))));
+      setSelection({ kind: 'chart' });
+      return;
+    }
+    if (selectedShapes.length > 0 && e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      const step = e.shiftKey ? 0.05 : e.altKey ? 0.001 : 0.01;
+      const dx = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0;
+      const dy = e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0;
+      const moves = nudgeDrawings(selectedShapes, dx, dy, model.widthPt, model.heightPt, annotationPlacer(any, model.widthPt, model.heightPt));
+      run('Move shape', composeCommands(...moves.map((m) => patchDrawings(owner, [m.id], m.patch))), `drw:${moves.map((m) => m.id).join()}:nudge`);
+      return;
+    }
+    if ((e.key === 'v' || e.key === 'V' || e.key === 't' || e.key === 'T') && !e.shiftKey) {
+      e.preventDefault();
+      setTool(e.key.toLowerCase() === 't' ? 'text' : 'select');
+      return;
+    }
     if (selectedNotes.length > 0 && e.key.startsWith('Arrow')) {
       e.preventDefault();
       const step = e.shiftKey ? 0.05 : e.altKey ? 0.001 : 0.01;
@@ -256,9 +354,30 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
     setStopBox({ left: r.left - box.left - 4, top: r.top - box.top - 4, width: r.width + 8, height: r.height + 8 });
   }, [stop, any, chart, cssW, cssH]);
 
-  const endDrag = () => {
+  const endDrag = (e?: PointerEvent) => {
+    // Where the pointer is let go is the end of a drag, whether or not a move was reported there.
+    const last = e && e.type === 'pointerup' && svgRef.current ? pointerToChartPt(svgRef.current, e.clientX, e.clientY, model.widthPt, model.heightPt) : null;
+    if (draft && drawPreset) {
+      const [a, b] = pointsOfDrag(drawPreset, draft.a, last ?? draft.b);
+      const made = createDrawing(drawPreset, { xFrac: a.x / model.widthPt, yFrac: a.y / model.heightPt }, { xFrac: b.x / model.widthPt, yFrac: b.y / model.heightPt }, { ...chartTextLook(chart), widthPt: DRAWING_WIDTH.chart });
+      run(`Add ${drawPreset.label.toLowerCase()}`, addDrawing(owner, made));
+      setSelection({ kind: 'drawings', drawingIds: [made.id] });
+      if (made.text !== undefined) focusWhenShown(`drawing-text:${made.id}`);
+      navigateInspector({ page: 'notes' });
+      setTool('select');
+    }
+    setDraft(null);
+    const shapesMoved = shapeDrag && last ? { ...shapeDrag, delta: { x: last.x - shapeDrag.start.x, y: last.y - shapeDrag.start.y } } : shapeDrag;
+    if (shapesMoved && Math.hypot(shapesMoved.delta.x, shapesMoved.delta.y) >= 1) {
+      const placer = annotationPlacer(any, model.widthPt, model.heightPt);
+      const moves = shapesMoved.items.map((it) => {
+        const p = draggedPoints(it, shapesMoved);
+        return patchDrawings(owner, [it.drawing.id], drawingPatchForPoints(it.drawing, p.from, p.to, model.widthPt, model.heightPt, placer));
+      });
+      run(shapesMoved.mode === 'move' ? 'Move shape' : 'Resize shape', composeCommands(...moves));
+    }
+    setShapeDrag(null);
     labelDrag.current = null;
-    bracketDrag.current = null;
     if (drag?.moved) {
       const moved = chart.annotations.find((x) => x.id === drag.id);
       // A text anchored to data keeps the values at its new place, so it stays there when the axes change.
@@ -267,16 +386,36 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
     setDrag(null);
   };
 
+  // What the chart draws live: the object being drawn, and the objects being moved or resized at their new points.
+  const drawingDrafts: Array<{ drawing: Drawing; drag: DrawingDrag }> = [];
+  if (draft && drawPreset) {
+    const [a, b] = pointsOfDrag(drawPreset, draft.a, draft.b);
+    const d = createDrawing(drawPreset, { xFrac: 0, yFrac: 0 }, { xFrac: 0, yFrac: 0 }, { ...chartTextLook(chart), widthPt: DRAWING_WIDTH.chart }, 'draft');
+    drawingDrafts.push({ drawing: d, drag: { id: d.id, from: a, to: b } });
+  }
+  if (shapeDrag) for (const it of shapeDrag.items) drawingDrafts.push({ drawing: it.drawing, drag: { id: it.drawing.id, ...draggedPoints(it, shapeDrag) } });
+
   return (
     <div className="graph-view">
       <div className="toolbar">
+        <span className="switch-group tool-group" role="group" aria-label="Pointer tool">
+          <button className={`switch icon-text${tool === 'select' ? ' on' : ''}`} aria-pressed={tool === 'select'} aria-label="Select" title="Select: click a part of the graph to select it and open its settings; drag a text, label or shape to move it (V)" onClick={() => setTool('select')}>
+            <PointerIcon />
+          </button>
+          <button className={`switch icon-text${tool === 'text' ? ' on' : ''}`} aria-pressed={tool === 'text'} title="Text: click the graph where the text should go (T; Escape cancels)" onClick={() => setTool(tool === 'text' ? 'select' : 'text')}>
+            <TextToolIcon />
+            Text
+          </button>
+          <GraphicsMenu active={drawPreset?.id ?? null} onPick={(id) => setTool(`draw:${id}`)} />
+        </span>
+        <span className="sep" aria-hidden="true" />
         <button
           className="icon-text"
           onClick={() => {
             run('Reset settings', resetAllDataSets(chart.id));
             setStatus('Settings reset to defaults.');
           }}
-          title="Reset the whole graph to a new graph's settings: data set styles, axes, grid, legend, fonts, colours, size. Kept: the title and axis titles, which data sets are shown and their order, annotations, reference lines and the chosen fit. Undo restores everything."
+          title="Reset the whole graph to a new graph's settings: data set styles, axes, grid, legend, fonts, colours, size. Kept: the title and axis titles, which data sets are shown and their order, annotations and the chosen fit. Reference lines are removed. Undo restores everything."
         >
           <ResetIcon />
           Reset
@@ -286,7 +425,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
       <div className="chart-scroller" ref={scrollerRef}>
         <div className="chart-wrap" ref={wrapRef} style={{ width: cssW }}>
           <div
-            className="chart-surface"
+            className={`chart-surface${tool === 'text' ? ' placing-text' : drawPreset ? ' placing-drawing' : ''}`}
             ref={surfaceRef}
             tabIndex={0}
             role="group"
@@ -299,7 +438,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
             onPointerLeave={() => setTip(null)}
           >
             {stopBox && <div className="key-stop" style={stopBox} aria-hidden="true" />}
-            <ChartCanvas ref={svgRef} chart={chart} any={any} editor={{ selection, dragging: drag }} preview cssWidth={`${cssW}px`} cssHeight={`${cssH}px`} />
+            <ChartCanvas ref={svgRef} chart={chart} any={any} editor={{ selection, dragging: drag, drawingDrafts }} preview cssWidth={`${cssW}px`} cssHeight={`${cssH}px`} />
           </div>
           <div className="visually-hidden" role="status" aria-live="polite">{announcement}</div>
           {tip && (

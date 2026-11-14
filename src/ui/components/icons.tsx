@@ -198,3 +198,31 @@ export const FitWindowIcon = () => (
     <path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" />
   </Icon>
 );
+
+/** An arrow pointer: the tool that selects what is clicked. */
+export const PointerIcon = () => (
+  <Icon>
+    <path d="M4 2.5l8 5.2-3.6.8 2 3.7-1.6.8-2-3.7L4 12z" />
+  </Icon>
+);
+
+/** A capital T: the tool that places a text on the chart. */
+export const TextToolIcon = () => (
+  <Icon>
+    <path d="M3 3.5h10M8 3.5V13M6 13h4" />
+  </Icon>
+);
+
+/** Arrows round to the left and right: undo and redo. */
+export const UndoIcon = () => (
+  <Icon>
+    <path d="M5.5 4L3 6.5 5.5 9" />
+    <path d="M3 6.5h6.5a3.5 3.5 0 010 7H7" />
+  </Icon>
+);
+export const RedoIcon = () => (
+  <Icon>
+    <path d="M10.5 4L13 6.5 10.5 9" />
+    <path d="M13 6.5H6.5a3.5 3.5 0 000 7H9" />
+  </Icon>
+);

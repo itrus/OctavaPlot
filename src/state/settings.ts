@@ -15,7 +15,7 @@ export interface Settings {
   /** New projects, and the New Data Table dialog, start with sample data (off: blank tables). */
   newProjectSample: boolean;
   exportFormat: ExportFormat;
-  /** Resolution of the PNG of a layout page, in dots per inch. Chosen in the export dialog of a layout, and remembered. */
+  /** Resolution of the PNG of a layout page, in dots per inch. Set in Settings (300 by default) and in the export dialog of a layout. */
   exportDpi: ExportDpi;
   /** How numbers typed, pasted or imported into tables are read (see DecimalSeparator). */
   decimalSeparator: DecimalSeparator;
@@ -31,7 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   timestampExports: true,
   newProjectSample: true,
   exportFormat: 'png',
-  exportDpi: 600,
+  exportDpi: 300,
   decimalSeparator: 'auto',
   defaultChartWidthPx: DEFAULT_CHART_WIDTH_PX,
   defaultChartHeightPx: DEFAULT_CHART_HEIGHT_PX,

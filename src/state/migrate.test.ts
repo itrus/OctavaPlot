@@ -85,9 +85,8 @@ describe('old files', () => {
     const { project, notes } = parseProjectWithNotes(text('df99336'));
     expect(notes).toEqual([]);
     const c = project.charts[0];
-    expect(c.brackets).toEqual([]);
+    expect(c.drawings).toBeUndefined();
     expect(project.dataTables[0].groups.some((g) => g.factor !== undefined)).toBe(false);
-    expect(project.dataTables[0].groups.some((g) => g.observations.some((o) => o.subject !== undefined))).toBe(false);
   });
 });
 

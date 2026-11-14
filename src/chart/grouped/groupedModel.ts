@@ -5,7 +5,6 @@ import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { legendEntries, withoutRepeats } from '../../model/graph/legendEntries';
 import { resolveSummary } from '../../model/graph/summary';
 import { layoutOf, xySeries } from '../../model/table/tableLayout';
-import { hasSubjects } from '../../model/table/subjects';
 import { measureText } from '../shared/parts/text';
 import { FACTOR_GAP, factorLayout, hasFactors, seriesPaletteIndex, usesFactors } from '../../model/table/factors';
 import type { Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
@@ -29,9 +28,6 @@ import { displayName } from '../shared/parts/names';
 import { dotOffsets } from '../shared/parts/jitter';
 import { suppliedStats } from '../../model/table/suppliedStats';
 import { compileGroupedScene } from './groupedChrome';
-import type { BracketGeom } from '../shared/parts/brackets';
-import { placeBrackets } from '../shared/axes/bracketPlacement';
-import { bracketKindOf } from '../../model/graph/chartTypes';
 
 /** How the bars of a cluster are arranged: side by side, stacked as counts, or stacked as shares of the row total. */
 type Arrangement = 'side' | 'stacked' | 'percent';
@@ -102,14 +98,6 @@ interface GroupedSeries {
   errorMeaning: string | null;
 }
 
-/** The values of one subject joined across the series inside one category (grouped bars with `pairs.bySubject`). */
-interface GroupedPairLine {
-  id: Id;
-  subject: string;
-  categoryIndex: number;
-  d: string;
-}
-
 /** The name of a factor written under its cluster of bars in one category. */
 interface GroupedFactorLabel {
   id: Id;
@@ -134,14 +122,10 @@ export interface GroupedModel {
   y: YAxisScale;
   yScale: (v: number) => number;
   series: GroupedSeries[];
-  /** One line for each subject inside each category, when the chart joins them. */
-  pairLines: GroupedPairLine[];
   /** The names of the factors under their clusters (see model/table/factors.ts); none when no series names a factor. */
   factorLabels: GroupedFactorLabel[];
   /** Grouped by series: where each column stands along the axis (one for each series and category) and its category name; absent when grouped by category. */
   axisColumns?: Array<{ key: string; centerX: number; label: string }>;
-  /** Comparison brackets between two series of a category, or two categories, in the vertical drawing (see model/types.ts Bracket). */
-  brackets: BracketGeom[];
   /** Index into `series` of each legend entry. */
   legendSeries: number[];
   warnings: string[];
@@ -219,7 +203,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
         }
       }
       // The replicate values themselves, with the observation each came from, for the dots over the bars.
-      const reps = layout.kind === 'replicates' && !contingency ? s.columns.flatMap((c) => (c.observations[r]?.value === null || c.observations[r] === undefined ? [] : [{ id: c.observations[r].id, value: c.observations[r].value as number, subject: c.observations[r].subject ?? '' }])) : [];
+      const reps = layout.kind === 'replicates' && !contingency ? s.columns.flatMap((c) => (c.observations[r]?.value === null || c.observations[r] === undefined ? [] : [{ id: c.observations[r].id, value: c.observations[r].value as number }])) : [];
       // A floating bar spans the replicate values, or the interval of values entered as limits.
       let span: [number, number] | null = null;
       if (floating) {
@@ -245,8 +229,6 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const stackedTotals = categoryRows.flatMap((_, ci) => [raw.reduce((sum, r) => sum + Math.max(0, r.cells[ci].value ?? 0), 0), raw.reduce((sum, r) => sum + Math.min(0, r.cells[ci].value ?? 0), 0)]);
   // Individual values are shown over bars of replicates, not over lines or counts.
   if (isDist && layout.kind !== 'replicates') warnings.push('Box plots and violins need the replicate values: enter the data as replicates.');
-  // Grouped bars of replicates can join the values of each subject across the series, inside each category.
-  const subjectLines = chart.type === 'groupedBar' && chart.pairs.bySubject && layout.kind === 'replicates';
   const showDots = (style: ChartStyle) => (chart.type === 'groupedBar' || floating) && layout.kind === 'replicates' && style.showSymbols;
   // A part kept out of the range (see rangeContribution in model/graph/layers.ts) adds nothing to it; the centre of a bar is the data and always counts.
   const layerList = layersOf(chart, table);
@@ -282,37 +264,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const tickCountHint = Math.max(3, Math.min(10, Math.round(horizontal ? W / 120 : H / 100)));
   // Log scales suit values side by side or on lines, not stacked parts or percentages, so those stay linear.
   const axisCfg = arrangement === 'side' ? chart.yAxis : { ...chart.yAxis, scale: 'linear' as const, reverse: false };
-  // Comparison brackets: each end is a series in a category, and the bracket stands above everything the places between its ends draw (and above the
-  // brackets it overlaps); the axis grows to show it and its label. A bracket that is hidden still takes its room. Places are in the order they stand across the chart.
-  const bracketing = bracketKindOf(chart.type) === 'grouped' && arrangement === 'side' && chart.brackets.length > 0;
-  const slots = bracketing
-    ? raw
-        .flatMap((r, si) => r.cells.map((c) => {
-          const shown = cellShows(r, c);
-          return { id: `${r.s.id}:${c.row}`, at: separated ? si * categoryRows.length + c.ci : c.ci * 1000 + (clusters ? clusters.slot[si] : si), top: shown.length > 0 ? Math.max(...shown) : NaN };
-        }))
-        .sort((a, b) => a.at - b.at)
-    : [];
-  const firstRow = categoryRows[0] ?? 0;
-  const endsOf = (b: Chart['brackets'][number]): [Id, Id] => [`${b.from}:${b.row ?? firstRow}`, `${b.to}:${b.toRow ?? b.row ?? firstRow}`];
-  const placement = placeBrackets({
-    brackets: bracketing ? chart.brackets : [],
-    order: slots.map((sl) => sl.id),
-    tops: slots.map((sl) => (Number.isFinite(sl.top) ? sl.top : null)),
-    primary: slots.map(() => true),
-    log: axisCfg.scale !== 'linear',
-    values: allY,
-    includeZero: axisCfg.scale === 'linear' && !isDist,
-    // The value axis is the length of the chart (its width for a horizontal chart) less the margins, the title and the labels: about 60%.
-    plotLengthPt: (horizontal ? W : H) * 0.6,
-    ends: endsOf,
-    strictEnds: true,
-  });
-  for (const sk of placement.skipped) warnings.push(`Bracket "${sk.bracket.label.trim() || 'no label'}" is not drawn: ${sk.reason}.`);
-  // A bracket kept out of the range (see rangeContribution) is still placed, but the axis does not grow to show it: the plot clips it.
-  const bracketTops = placement.placed.filter((p) => inRange('bracket', p.bracket.id)).map((p) => p.top);
   const yBase = resolveAxis({
-    values: arrangement === 'percent' ? [0, 100] : [...allY, ...bracketTops],
+    values: arrangement === 'percent' ? [0, 100] : allY,
     includeZero: axisCfg.scale === 'linear' && !isDist && (!asLines || allY.every((v) => v >= 0)),
     min: chart.yAxis.min ?? (arrangement === 'percent' ? 0 : null),
     max: chart.yAxis.max ?? (arrangement === 'percent' ? 100 : null),
@@ -521,9 +474,8 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
       bars.push(gbar);
       if (showDots(r.style)) {
         // Spread across the bar's width (a swarm, or a fixed hash of the observation, so the picture is the same every time).
-        // The dots of a chart that joins the subjects stay on the line of their series, or a subject's line would not meet them.
         const shown = cell.reps.filter((rep) => placeable(yAxis, rep.value));
-        const xs = dotOffsets({ enabled: chart.jitter.enabled && !subjectLines, swarm: chart.jitter.swarm }, shown.map((rep) => rep.id), shown.map((rep) => yScale(rep.value)), r.style.symbolSizePt, bw * chart.jitter.widthFraction);
+        const xs = dotOffsets({ enabled: chart.jitter.enabled, swarm: chart.jitter.swarm }, shown.map((rep) => rep.id), shown.map((rep) => yScale(rep.value)), r.style.symbolSizePt, bw * chart.jitter.widthFraction);
         shown.forEach((rep, k) => dots.push({ id: rep.id, row: cell.row, px: x + bw / 2 + xs[k], py: yScale(rep.value), value: rep.value, stats: null }));
       }
       let errTop: number | null = null;
@@ -564,45 +516,6 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   if (noSpan > 0) warnings.push(`${noSpan} value${noSpan === 1 ? ' has' : 's have'} no range to draw a floating bar from: enter replicates, or limits as the values already calculated.`);
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
 
-  // Subject lines: inside each category, the mean of a subject's replicates in each series, joined from the first series to the last. A series
-  // without a value for the subject breaks the line unless the chart bridges it (the values either side are joined; none is made up). A line needs two values.
-  const pairLines: GroupedPairLine[] = [];
-  if (chart.type === 'groupedBar' && chart.pairs.bySubject && separated) warnings.push('Lines joining the subjects are drawn inside each category; with the columns grouped by series there is none.');
-  if (chart.type === 'groupedBar' && chart.pairs.bySubject && !separated) {
-    if (layout.kind !== 'replicates') warnings.push('Lines joining the subjects need the replicate values: enter the data as replicates.');
-    else if (!hasSubjects(table)) warnings.push('Lines are drawn for each subject, but no value has a subject: name the subjects in the data table (Subject…).');
-    else {
-      let loose = 0;
-      categories.forEach((cat, ci) => {
-        const subjects: string[] = [];
-        for (const r of raw) {
-          for (const rep of r.cells[ci]?.reps ?? []) {
-            if (rep.subject === '') loose++;
-            else if (!subjects.includes(rep.subject)) subjects.push(rep.subject);
-          }
-        }
-        for (const subject of subjects) {
-          const seq: Array<{ x: number; y: number } | null> = [];
-          let have = 0;
-          raw.forEach((r, si) => {
-            const values = (r.cells[ci]?.reps ?? []).filter((x) => x.subject === subject && onAxis(yAxis, x.value)).map((x) => x.value);
-            if (values.length === 0) {
-              if (!chart.pairs.bridge) seq.push(null);
-              return;
-            }
-            const bw = cluster / (clusters?.units ?? nSeries);
-            seq.push({ x: cat.centerX - cluster / 2 + (clusters ? clusters.slot[si] : si) * bw + bw / 2, y: values.reduce((a, b) => a + b, 0) / values.length });
-            have++;
-          });
-          if (have < 2) continue;
-          const d = pathOfRuns(polylinesThroughBreaks(seq, { log: null, reverse: false }, yAxis), yScale, n2);
-          if (d !== '') pairLines.push({ id: `pair:${ci}:${subject}`, subject, categoryIndex: ci, d });
-        }
-      });
-      if (loose > 0) warnings.push(`${loose} value${loose === 1 ? ' has' : 's have'} no subject and ${loose === 1 ? 'is' : 'are'} not joined by a line.`);
-    }
-  }
-
   // The names of the factors, one row under the category labels. A horizontal chart has no such row.
   const factorLabels: GroupedFactorLabel[] = [];
   // A name is written at the tick size, or smaller (down to 60%) so that it fits the width of its cluster with a little room either side.
@@ -632,20 +545,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     }
   }
 
-  // The brackets as geometry: the places of the two ends across (the middle of the bar of a series in a category), and the height of the bar of the bracket.
-  const barWidth = separated ? sepUnit * CLUSTER_FRACTION : cluster / (clusters?.units ?? nSeries);
-  const centreOf = (id: Id): number => {
-    const si = raw.findIndex((r) => id.startsWith(`${r.s.id}:`));
-    const ci = categoryRows.indexOf(Number(id.slice(raw[si].s.id.length + 1)));
-    return separated ? sepCentre(si, ci) : categories[ci].centerX - cluster / 2 + (clusters ? clusters.slot[si] : si) * barWidth + barWidth / 2;
-  };
-  const brackets: BracketGeom[] = placement.placed.flatMap((p) => {
-    const [a, b] = endsOf(p.bracket);
-    const at = yScale(p.value);
-    if (!Number.isFinite(at) || inBreak(yAxis, p.value)) return [];
-    return [{ id: p.bracket.id, label: p.bracket.label, x1: centreOf(a), x2: centreOf(b), y: at - (p.bracket.liftPt ?? 0), tick: Math.max(6, p.bracket.fontSizePt * 0.6), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
-  });
-  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, pairLines, factorLabels, brackets, ...(separated ? { axisColumns: raw.flatMap((r, si) => categories.map((cat, ci) => ({ key: `${r.s.id}:${cat.row}`, centerX: sepCentre(si, ci), label: cat.label }))) } : {}), legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
+  const model: GroupedModel = { widthPt: W, heightPt: H, layout: lay, orient, arrangement, asLines, categories, y: yAxis, yScale, series, factorLabels, ...(separated ? { axisColumns: raw.flatMap((r, si) => categories.map((cat, ci) => ({ key: `${r.s.id}:${cat.row}`, centerX: sepCentre(si, ci), label: cat.label }))) } : {}), legendSeries, warnings: [...new Set(warnings)], layers: layersOf(chart, table) };
   model.scene = compileGroupedScene(chart, model);
   // The marks are compiled when a drawing, an export or a hit test first asks for them.
   let marks: SceneElement[] | undefined;

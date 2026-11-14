@@ -29,6 +29,7 @@ import type { TimeColumn } from '../util/timeColumn';
 import { followThresholds, sanitizeVolcano, withVolcanoLines } from '../model/options/volcanoOptions';
 import { LABEL_STYLE_KEYS, clearGroupKeys, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
 import type {
+  Drawing,
   LayerStyle,
   Analysis,
   AnalysisKind,
@@ -55,7 +56,6 @@ import type {
   Project,
   ReferenceLine,
   ShadedRegion,
-  Bracket,
   ReplicateLayout,
   SummarySpec,
   SurvivalOptions,
@@ -530,7 +530,8 @@ export const clearPointStyle = (
 /**
  * Put the graph back to the settings a new graph of its type starts with: data set styles at every level, palette, axes, grid,
  * legend, fonts, colours, size and shape, and the options of the chart type. What the graph shows is kept: its name, table, type,
- * the title and axis titles, which data sets are on it and in what order, annotations, reference lines and the chosen curve fit.
+ * the title and axis titles, which data sets are on it and in what order, annotations, drawing objects and the chosen curve fit. Reference lines are
+ * dropped (a new volcano plot gets its three threshold lines again).
  */
 export const resetAllDataSets = (chartId: Id): Command => (p) =>
   mapChart(p, chartId, (c) => {
@@ -546,9 +547,9 @@ export const resetAllDataSets = (chartId: Id): Command => (p) =>
       extraGroups: c.extraGroups,
       displayNames: c.displayNames,
       annotations: c.annotations,
-      referenceLines: c.referenceLines,
+      ...(c.drawings ? { drawings: c.drawings } : {}),
+      referenceLines: fresh.referenceLines,
       regions: c.regions,
-      brackets: c.brackets,
       fit: { ...fresh.fit, analysisId: c.fit.analysisId },
       xAxis: axis('xAxis'),
       yAxis: axis('yAxis'),
@@ -614,6 +615,41 @@ export const patchAnnotations = (chartId: Id, annotationIds: readonly Id[], patc
 export const removeAnnotation = (chartId: Id, annotationId: Id): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, annotations: c.annotations.filter((a) => a.id !== annotationId) }));
 
+// ---------------------------------------------------------------- drawing objects
+
+/** What a drawing object belongs to: a chart, or a layout page. */
+export type DrawingOwner = { chartId: Id } | { layoutId: Id };
+
+/** The objects of a chart or page changed by `fn`; the list is left out when it is empty. The same project when nothing changes. */
+const mapDrawings = (p: Project, owner: DrawingOwner, fn: (list: Drawing[]) => Drawing[]): Project => {
+  const apply = <T extends { drawings?: Drawing[] }>(o: T): T => {
+    const was = o.drawings ?? [];
+    const next = fn(was);
+    if (next === was) return o;
+    const { drawings: _old, ...rest } = o;
+    return (next.length > 0 ? { ...rest, drawings: next } : rest) as T;
+  };
+  return 'chartId' in owner ? mapChart(p, owner.chartId, apply) : mapLayout(p, owner.layoutId, apply);
+};
+
+export const addDrawing = (owner: DrawingOwner, drawing: Drawing): Command => (p) => mapDrawings(p, owner, (list) => [...list, drawing]);
+
+/** The same change to one object or several (one history step); a key set to undefined is taken off. */
+export const patchDrawings = (owner: DrawingOwner, ids: readonly Id[], patch: Partial<Drawing>): Command => (p) =>
+  mapDrawings(p, owner, (list) =>
+    list.some((d) => ids.includes(d.id))
+      ? list.map((d) => {
+          if (!ids.includes(d.id)) return d;
+          const next: Record<string, unknown> = { ...d, ...patch };
+          for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+          return next as unknown as Drawing;
+        })
+      : list,
+  );
+
+export const removeDrawings = (owner: DrawingOwner, ids: readonly Id[]): Command => (p) =>
+  mapDrawings(p, owner, (list) => (list.some((d) => ids.includes(d.id)) ? list.filter((d) => !ids.includes(d.id)) : list));
+
 // ---------------------------------------------------------------- reference lines
 
 export const addReferenceLine = (chartId: Id, line: ReferenceLine): Command => (p) =>
@@ -633,13 +669,7 @@ export const patchRegion = (chartId: Id, regionId: Id, patch: Partial<Omit<Shade
 
 export const removeRegion = (chartId: Id, regionId: Id): Command => (p) => mapChart(p, chartId, (c) => ({ ...c, regions: c.regions.filter((r) => r.id !== regionId), hiddenLayerIds: c.hiddenLayerIds.filter((id) => id !== `${regionId}:region`) }));
 
-/** Comparison brackets between two data sets: added, changed and removed one at a time. */
-export const addBracket = (chartId: Id, bracket: Bracket): Command => (p) => mapChart(p, chartId, (c) => ({ ...c, brackets: [...c.brackets, bracket] }));
 
-export const patchBracket = (chartId: Id, bracketId: Id, patch: Partial<Omit<Bracket, 'id'>>): Command => (p) =>
-  mapChart(p, chartId, (c) => ({ ...c, brackets: c.brackets.map((b) => (b.id === bracketId ? { ...b, ...patch } : b)) }));
-
-export const removeBracket = (chartId: Id, bracketId: Id): Command => (p) => mapChart(p, chartId, (c) => ({ ...c, brackets: c.brackets.filter((b) => b.id !== bracketId) }));
 
 // ---------------------------------------------------------------- project items
 
@@ -678,7 +708,7 @@ export const addDataTable = (id: Id, kind: TableKind = 'column', options: NewTab
  * Replace a table's rows and group values (CSV import) as one command. Groups keep their IDs, and so their chart
  * styling, by position; extra groups are added and missing ones dropped. Row titles are kept when the file has none.
  */
-export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>>; excluded?: Array<Array<{ reason: string } | null>>; subjects?: string[][]; factors?: string[]; times?: Array<TimeColumn | undefined> }): Command => (p) =>
+export const replaceTableData = (tableId: Id, data: { names: string[]; titles: string[] | null; values: Array<Array<number | null>>; excluded?: Array<Array<{ reason: string } | null>>; factors?: string[]; times?: Array<TimeColumn | undefined> }): Command => (p) =>
   mapTable(p, tableId, (t) => {
     const rowCount = Math.max(1, data.values.length);
     const width = usesSeriesBlocks(t.kind) ? tableSeriesWidth(t) : 1;
@@ -702,9 +732,8 @@ export const replaceTableData = (tableId: Id, data: { names: string[]; titles: s
         ...((data.times ? data.times[i] : old?.time) && i === 0 && t.kind === 'xy' ? { time: (data.times ? data.times[i] : old?.time)! } : {}),
         observations: fresh.observations.map((o, r) => {
           const ex = data.excluded?.[r]?.[i];
-          const subject = data.subjects?.[r]?.[i] ?? '';
           // Named after the group's kept ID (as a new group's are), so the file writes them without IDs and overrides of the old cells still apply.
-          return { ...o, id: canonicalObservationId(old?.id ?? fresh.id, r), value: data.values[r]?.[i] ?? null, ...(subject !== '' ? { subject } : {}), ...(ex ? { excluded: true as const, ...(ex.reason !== '' ? { excludedReason: ex.reason } : {}) } : {}) };
+          return { ...o, id: canonicalObservationId(old?.id ?? fresh.id, r), value: data.values[r]?.[i] ?? null, ...(ex ? { excluded: true as const, ...(ex.reason !== '' ? { excludedReason: ex.reason } : {}) } : {}) };
         }),
       };
     });
@@ -1041,31 +1070,6 @@ export const setExcluded = (tableId: Id, cells: CellRef[], excluded: boolean, re
         observations = observations ?? g.observations.slice();
         const { excluded: _e, excludedReason: _r, ...rest } = o;
         observations[r] = excluded ? { ...rest, excluded: true, ...(reason !== '' ? { excludedReason: reason } : {}) } : rest;
-      }
-      if (!observations) return g;
-      changed = true;
-      return { ...g, observations };
-    });
-    return changed ? { ...t, groups } : t;
-  });
-
-/**
- * Name the subject (the independent unit) of cells, or clear it with an empty text. Unlike an exclusion it can be set on an
- * empty cell, so a table can be labelled before it is filled. The same table when nothing changes.
- */
-export const setSubject = (tableId: Id, cells: CellRef[], subject: string): Command => (p) =>
-  mapTable(p, tableId, (t) => {
-    const next = subject.trim();
-    let changed = false;
-    const groups = t.groups.map((g, ci) => {
-      let observations: Observation[] | null = null;
-      for (const c of cells) {
-        if (c.col !== ci || c.row < 0 || c.row >= t.rowCount) continue;
-        const o = (observations ?? g.observations)[c.row];
-        if ((o.subject ?? '') === next) continue;
-        observations = observations ?? g.observations.slice();
-        const { subject: _s, ...rest } = o;
-        observations[c.row] = next === '' ? rest : { ...rest, subject: next };
       }
       if (!observations) return g;
       changed = true;

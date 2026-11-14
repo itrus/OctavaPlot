@@ -212,7 +212,6 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
       return;
     }
     let angle = start;
-    const dotCounts = dots ? dotAllocation(weights) : [];
     let dotAt = 0;
     let cumulative = 0;
     const slices: PieSlice[] = shown.map((p, i) => {
@@ -234,11 +233,11 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
         return { id, obsId, groupId: p.g.id, label: p.label, value: w, fraction, path: `M${n2(x0)},${n2(cy - barH / 2)}H${n2(x0 + width)}V${n2(cy + barH / 2)}H${n2(x0)}Z`, style: p.style, text };
       }
       if (dots) {
-        // The 100 dots of a 10 by 10 grid, filled row by row from the top left: this part's dots are the next ones.
-        const count = dotCounts[i];
+        // The 100 dots of a 10 by 10 grid, filled row by row from the top left: this part's share of the 100 is the next stretch, and
+        // a dot that two parts share is cut between them, so the shares are exact and not rounded to whole dots.
         const from = dotAt;
-        dotAt += count;
-        return { id, obsId, groupId: p.g.id, label: p.label, value: w, fraction, path: dotsPath(cx, cy, diameter, from, from + count), style: p.style, text: null };
+        dotAt += fraction * 100;
+        return { id, obsId, groupId: p.g.id, label: p.label, value: w, fraction, path: dotsPath(cx, cy, diameter, from, dotAt, opts.dotShape, opts.dotSize), style: p.style, text: null };
       }
       const mid = (a0 + a1) / 2;
       const content = sliceLabelText(opts.labels, p.label, w, fraction, opts.percentDigits);
@@ -282,31 +281,49 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   return model;
 }
 
-/**
- * How many of the 100 dots of a grid each part gets: its share of 100, rounded down, and the dots that are left go to the parts with the
- * largest remainders (the earlier part first on a tie), so that the 100 are always used and a part with a weight is never made smaller
- * by another's rounding. Parts with no weight get none; with no weight at all, none get any.
- */
-export function dotAllocation(weights: readonly number[]): number[] {
-  const total = weights.reduce((a, b) => a + b, 0);
-  if (!(total > 0)) return weights.map(() => 0);
-  const exact = weights.map((w) => (w / total) * 100);
-  const counts = exact.map(Math.floor);
-  let left = 100 - counts.reduce((a, b) => a + b, 0);
-  const order = exact.map((e, i) => ({ i, rest: e - Math.floor(e) })).filter((o) => weights[o.i] > 0).sort((a, b) => b.rest - a.rest || a.i - b.i);
-  for (let k = 0; left > 0 && order.length > 0; k = (k + 1) % order.length, left--) counts[order[k].i]++;
-  return counts;
+/** The share of a circle's area that lies left of a vertical line at `t` radii from its centre (-1 to 1). */
+const areaLeftOf = (t: number): number => (Math.acos(-t) + t * Math.sqrt(Math.max(0, 1 - t * t))) / Math.PI;
+
+/** Where a vertical line cuts a circle (in radii from its centre, -1 to 1) so that the share `f` of its area lies on the left. */
+export function cutForArea(f: number): number {
+  let [lo, hi] = [-1, 1];
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (areaLeftOf(mid) < f) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
 }
 
-/** The circles of the dots `from` to `to` (0 to 99, row by row from the top left) of a 10 by 10 grid of the given side centred on (cx, cy), as one path. */
-export function dotsPath(cx: number, cy: number, side: number, from: number, to: number): string {
+/**
+ * The dots `from` to `to` (counted in dots from 0 to 100, row by row from the top left; either end may fall inside a dot) of a 10 by 10 grid
+ * of the given side centred on (cx, cy), as one path; a dot is a circle or a square, `size` times the pitch of the grid wide. A dot that is only partly in the stretch is drawn as the part of its circle, between
+ * two vertical cuts, that holds that share of its area, filled from the left, so the next part takes up where this one stops.
+ */
+export function dotsPath(cx: number, cy: number, side: number, from: number, to: number, shape: 'circle' | 'square' = 'circle', size = 0.8): string {
   const pitch = side / 10;
-  const radius = pitch * 0.4;
+  const radius = (pitch * size) / 2;
   let d = '';
-  for (let k = from; k < to; k++) {
+  for (let k = Math.max(0, Math.floor(from + 1e-9)); k < Math.min(100, to - 1e-9); k++) {
+    const lo = Math.max(from - k, 0);
+    const hi = Math.min(to - k, 1);
+    if (hi - lo < 1e-6) continue;
     const x = cx - side / 2 + (k % 10 + 0.5) * pitch;
     const y = cy - side / 2 + (Math.floor(k / 10) + 0.5) * pitch;
-    d += `M${n2(x - radius)},${n2(y)}a${n2(radius)},${n2(radius)} 0 1 0 ${n2(2 * radius)},0a${n2(radius)},${n2(radius)} 0 1 0 ${n2(-2 * radius)},0Z`;
+    if (shape === 'square') {
+      // A square is cut by a vertical line at the share of its width, which is the share of its area.
+      const [xa, xb] = [x - radius + 2 * radius * lo, x - radius + 2 * radius * hi];
+      d += `M${n2(xa)},${n2(y - radius)}H${n2(xb)}V${n2(y + radius)}H${n2(xa)}Z`;
+      continue;
+    }
+    if (lo <= 1e-9 && hi >= 1 - 1e-9) {
+      d += `M${n2(x - radius)},${n2(y)}a${n2(radius)},${n2(radius)} 0 1 0 ${n2(2 * radius)},0a${n2(radius)},${n2(radius)} 0 1 0 ${n2(-2 * radius)},0Z`;
+      continue;
+    }
+    const [ta, tb] = [lo <= 1e-9 ? -1 : cutForArea(lo), hi >= 1 - 1e-9 ? 1 : cutForArea(hi)];
+    const [xa, xb] = [x + ta * radius, x + tb * radius];
+    const [ha, hb] = [radius * Math.sqrt(Math.max(0, 1 - ta * ta)), radius * Math.sqrt(Math.max(0, 1 - tb * tb))];
+    d += `M${n2(xa)},${n2(y - ha)}A${n2(radius)},${n2(radius)} 0 0 1 ${n2(xb)},${n2(y - hb)}L${n2(xb)},${n2(y + hb)}A${n2(radius)},${n2(radius)} 0 0 1 ${n2(xa)},${n2(y + ha)}Z`;
   }
   return d;
 }

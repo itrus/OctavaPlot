@@ -49,7 +49,6 @@ function encodeTable(t: DataTable, referenced: ReadonlySet<string>, inline: Inli
       const extras: Record<string, unknown> = {};
       // The ID of an empty cell matters only if something refers to it: no mark is drawn from it.
       if (o.id !== canonicalObservationId(g.id, i) && (o.value !== null || referenced.has(o.id))) extras.id = o.id;
-      if (o.subject !== undefined) extras.subject = o.subject;
       if (o.excluded) {
         extras.excluded = true;
         if (o.excludedReason !== undefined) extras.excludedReason = o.excludedReason;

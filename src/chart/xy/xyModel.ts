@@ -24,12 +24,9 @@ import { AXIS_NAME, AXIS_TAG, axisNotices, bindingOf } from '../shared/axes/axes
 import { displayName } from '../shared/parts/names';
 import { AUTO_BAR_GAP_PCT } from '../../model/options/columnOptions';
 import { suppliedStats } from '../../model/table/suppliedStats';
-import { hasSubjects } from '../../model/table/subjects';
 import { offsetStepOf, offsetTable } from '../../model/table/offset';
 import { attachLazyScene } from './xyScene';
-import { laneOffsetPt, placeXyBrackets, reachRightPt, type XyBracketGeom } from './xyBrackets';
 import { type SizeKey, sizeKeyOf } from '../shared/scene/sizeLegend';
-import { bracketKindOf } from '../../model/graph/chartTypes';
 
 /** One plotted point of an XY series: a single Y value, or the centre of replicate / supplied-summary values. */
 export interface XyPoint {
@@ -129,8 +126,6 @@ export interface XyModel {
   y2?: YAxisScale | null;
   y2Scale?: ((v: number) => number) | null;
   series: XySeries[];
-  /** Comparison brackets between two series at one X (see model/types.ts Bracket and xyBrackets.ts); absent for survival charts and histograms. */
-  brackets?: XyBracketGeom[];
   /** Index into `series` of each legend entry. */
   legendSeries: number[];
   /** Survival charts: the at-risk table, when asked for. */
@@ -329,25 +324,6 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   // Each Y axis holds the values of the series bound to it: with none on the right, the left one holds all of them, as before.
   const allYBy = (binding: AxisBinding): number[] => raw.filter((r) => r.binding === binding).flatMap(yValuesOf);
   const dual = raw.some((r) => r.binding === 'secondary');
-  // Comparison brackets: a bracket stands to the right of the two points it joins at one X, so the X axis grows to leave room for it and its label.
-  // A bracket that is hidden still takes its room; one kept out of the range (see rangeContribution) leaves the axis as it is and is clipped by the plot.
-  const bracketing = bracketKindOf(chart.type) === 'xy' ? placeXyBrackets(chart.brackets, raw.map((r) => ({ id: r.s.id, axis: r.binding, points: r.pts }))) : { placed: [], skipped: [] };
-  for (const sk of bracketing.skipped) warnings.push(`Bracket "${sk.bracket.label.trim() || 'no label'}" is not drawn: ${sk.reason}.`);
-  const bracketXs = bracketing.placed.filter((p) => counts('bracket', p.bracket.id)).map((p) => {
-    // The reach in pt becomes data units against the share of the width the plot has left; the X range is that of the data.
-    const reach = reachRightPt(p, chart.brackets, chart.fontFamily);
-    const free = Math.max(W * 0.2, W * 0.7 - reach);
-    let lowX = p.at;
-    let highX = p.at;
-    for (const v of allX) {
-      if (!Number.isFinite(v) || (xCfg.scale !== 'linear' && v <= 0)) continue;
-      if (v < lowX) lowX = v;
-      if (v > highX) highX = v;
-    }
-    if (xCfg.scale !== 'linear') return p.at * 10 ** ((Math.max(Math.log10(highX / lowX), 0.3) * reach) / free);
-    const range = highX - lowX;
-    return p.at + ((range > 0 ? range : Math.abs(p.at) || 1) * reach) / free;
-  });
   const tickCountY = Math.max(3, Math.min(10, Math.round(H / 100)));
   /** What a Y axis is made from: the values of its series, and the limits and ticks set for it. A baseline of 0 is always in range, as for bars. */
   const yInput = (binding: AxisBinding) => {
@@ -355,7 +331,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     return { values, includeZero: cfg.scale === 'linear' && (fromBaseline || nearZero(values)), min: cfg.min, max: cfg.max, majorInterval: cfg.majorInterval, tickCountHint: tickCountY };
   };
   const axisInput = {
-    x: { values: [...allX, ...bracketXs], includeZero: !timeX && xCfg.scale === 'linear' && nearZero(allX), min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) },
+    x: { values: allX, includeZero: !timeX && xCfg.scale === 'linear' && nearZero(allX), min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) },
     // Spikes and areas stand on a baseline of 0: it is always in range, as for bars.
     y: yInput('primary'),
   };
@@ -435,7 +411,6 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   if (isBubble && !sized) warnings.push('Bubbles need a size for each point: make the data table with the layout "Y and size" (New Table, XY). Until then every bubble has the symbol size.');
 
   // 4. Geometry.
-  if (chart.lineConnect === 'subject' && !hasSubjects(table)) warnings.push('Lines are drawn for each subject, but no value has a subject: name the subjects in the data table (Subject…).');
   let clipped = 0;
   let offAxis = 0;
   // Values inside an omitted range of a broken axis, and error bars with an end inside one: not drawn, and counted.
@@ -459,26 +434,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
     // A run ends where a row between two drawn points is missing (Y or X), so a gap is a gap in the line.
     // Joined in ascending X instead, a row with an X but no drawable Y (empty, or off a log axis) cuts the line at its sorted place; a row with no X is not there at all.
     const seq: Array<{ x: number; y: number } | null> = [];
-    if (chart.lineConnect === 'subject') {
-      // One run for each subject, in order of first appearance, joined from the lowest X to the highest. A point with no subject is not joined to anything.
-      const column = r.s.columns[0].observations;
-      const bySubject = new Map<string, typeof drawn>();
-      let loose = 0;
-      for (const p of drawn) {
-        const subject = column[p.row]?.subject ?? '';
-        if (subject === '') loose++;
-        else {
-          const list = bySubject.get(subject);
-          if (list) list.push(p);
-          else bySubject.set(subject, [p]);
-        }
-      }
-      for (const list of bySubject.values()) {
-        seq.push(null);
-        for (const p of [...list].sort((a, b) => a.x - b.x || a.row - b.row)) seq.push({ x: p.x, y: p.y });
-      }
-      if (loose > 0 && bySubject.size > 0) warnings.push(`${r.label}: ${loose} point${loose === 1 ? ' has' : 's have'} no subject and ${loose === 1 ? 'is' : 'are'} not joined by a line.`);
-    } else if (chart.lineConnect === 'x') {
+    if (chart.lineConnect === 'x') {
       const drawnRows = new Set(drawn.map((p) => p.row));
       const visits = [...drawn.map((p) => ({ row: p.row, x: p.x, at: { x: p.x, y: p.y } as { x: number; y: number } | null })), ...r.gapXs.map((g) => ({ ...g, at: null })), ...r.pts.filter((p) => !drawnRows.has(p.row)).map((p) => ({ row: p.row, x: p.x, at: null }))];
       visits.sort((a, b) => a.x - b.x || a.row - b.row);
@@ -563,14 +519,6 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   // Offset traces: the Y axis does not show the values of the traces, so the offset is told (on the figure and here).
   const offsetNote = isOffset ? `Traces offset by ${yAxis.tickLabel(offsetStep)}` : undefined;
   if (isOffset) warnings.push(`${offsetNote}: the Y axis does not show the values of the traces${chart.yAxis.visible ? '' : '; the scale bar does'}.`);
-  const brackets: XyBracketGeom[] = bracketing.placed.flatMap((p) => {
-    // A bracket is in the units of the axis its two series are on.
-    const [yA, yS] = p.axis === 'secondary' && y2Axis && y2Scale ? [y2Axis, y2Scale] : [yAxis, yScale];
-    const [y1, y2] = [yS(p.low), yS(p.high)];
-    const x = xScale(p.at) + laneOffsetPt(p.lane, chart.brackets, chart.fontFamily) + (p.bracket.liftPt ?? 0);
-    if (![x, y1, y2].every(Number.isFinite) || inBreak(xAxis, p.at) || inBreak(yA, p.low) || inBreak(yA, p.high)) return [];
-    return [{ id: p.bracket.id, label: p.bracket.label, x, y1, y2, tick: Math.max(6, p.bracket.fontSizePt * 0.4), color: p.bracket.color, widthPt: p.bracket.widthPt, fontSizePt: p.bracket.fontSizePt }];
-  });
   // Volcano plots: the counts of the three classes, and the labels of the up and down points when asked for (placed like the labels of a column chart).
   let volcanoCounts: XyModel['volcanoCounts'];
   let volcanoLabels: PointLabelModel | undefined;
@@ -601,7 +549,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
       warnings.push(...labelWarnings(volcanoLabels.report));
     }
   }
-  const model: XyModel = { ...(volcanoCounts ? { volcanoCounts } : {}), ...(volcanoLabels ? { labels: volcanoLabels } : {}), widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, y2: y2Axis, y2Scale, series, brackets, legendSeries, ...(offsetNote ? { offsetNote } : {}), ...(sizeKey ? { sizeKey } : {}), warnings: [...new Set(warnings)], fit, fitsPending: series.filter((q) => q.fit?.pending).length, layers: layerList };
+  const model: XyModel = { ...(volcanoCounts ? { volcanoCounts } : {}), ...(volcanoLabels ? { labels: volcanoLabels } : {}), widthPt: W, heightPt: H, layout: layoutOut, x: xAxis, y: yAxis, xScale, yScale, y2: y2Axis, y2Scale, series, legendSeries, ...(offsetNote ? { offsetNote } : {}), ...(sizeKey ? { sizeKey } : {}), warnings: [...new Set(warnings)], fit, fitsPending: series.filter((q) => q.fit?.pending).length, layers: layerList };
   attachLazyScene(chart, model);
   return model;
 }

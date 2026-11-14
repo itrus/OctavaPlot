@@ -18,7 +18,7 @@ function render(node: SceneElement, key: number, editor: boolean, selectedGroups
   const props: Record<string, unknown> = { key };
   for (const [name, value] of node.attrs ?? []) if (value !== undefined) props[reactName(name)] = scopeRefs(prefix, value);
   if (editor) for (const [name, value] of node.editorAttrs ?? []) if (value !== undefined) props[reactName(name)] = scopeRefs(prefix, value);
-  if (editor && node.hit) Object.assign(props, hitAttrs(node.hit.kind, node.hit.groupId, node.hit.objectId, node.hit.annotationId));
+  if (editor && node.hit) Object.assign(props, hitAttrs(node.hit.kind, node.hit.groupId, node.hit.objectId, node.hit.annotationId, node.hit.handle));
   if (node.id !== undefined) props.id = prefixed(prefix, node.id);
   const children = node.children && renderList(node.children, editor, selectedGroups, selectedAnnotations, prefix);
   // A text with markup (subscripts, superscripts, Greek names) is written as pieces; text without it is written exactly as it was.

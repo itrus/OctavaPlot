@@ -305,17 +305,6 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 </GroupBox>
               )}
 
-              {chart.type === 'groupedBar' && layout.kind === 'replicates' && (
-                <GroupBox title="Lines joining the subjects">
-                  <Field label="Join the values of each subject" hint="Inside each category, the replicates that share a subject (see Subject… in the data table) are joined from the first series to the last, as a before-and-after line. A subject's replicates in one series are joined at their mean. The dots stay on the line of their series.">
-                    <Check checked={chart.pairs.bySubject} onChange={(v) => run('Join the values of each subject', patchLook(chart.id, { pairs: { bySubject: v } }))} />
-                  </Field>
-                  <Field label="Join across a missing value" hint="A series with no value for the subject: join the values either side of it. Nothing is made up for the missing one.">
-                    <Check checked={chart.pairs.bridge} disabled={!chart.pairs.bySubject} onChange={(v) => run('Join across missing values', patchLook(chart.id, { pairs: { bridge: v } }))} />
-                  </Field>
-                </GroupBox>
-              )}
-
               {chart.type === 'xyVolcano' && <VolcanoControls chart={chart} counts={xyModel?.volcanoCounts} />}
               {(!barChart || ((chart.type === 'groupedBar' || chart.type === 'groupedFloating' || distChart) && layout.kind === 'replicates')) && (
               <GroupBox title={family === 'survival' ? 'Censor marks' : distChart ? 'Points' : barChart ? 'Individual values' : 'Symbols'} checked={symbolsOn} onCheckedChange={(v) => setStyle(v ? { showSymbols: true } : { showSymbols: false, showRawPoints: false })} overridden={ov('showSymbols')}>
@@ -398,8 +387,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <SelectInput<LineStyle> value={st.lineStyle} disabled={!st.showLines} options={LINE_STYLES.map((l) => ({ value: l.value, label: l.label }))} onChange={(v) => setStyle({ lineStyle: v })} />
                 </Field>
                 {family === 'xy' && capabilitiesOf(chart.type).lineConnect && (
-                  <Field label="Connect points in" hint="Table order joins the points as the rows run. Ascending X joins them from the lowest X to the highest. One line for each subject joins the points of each subject (see Subject… in the data table) from the lowest X to the highest; points with no subject are not joined. The table, the symbols and the fit do not change.">
-                    <SelectInput<LineConnect> value={chart.lineConnect} options={[{ value: 'table', label: 'Table order' }, { value: 'x', label: 'Ascending X' }, { value: 'subject', label: 'One line for each subject' }]} onChange={(v) => run('Connect points in', patchLook(chart.id, { lineConnect: v }))} />
+                  <Field label="Connect points in" hint="Table order joins the points as the rows run. Ascending X joins them from the lowest X to the highest. The table, the symbols and the fit do not change.">
+                    <SelectInput<LineConnect> value={chart.lineConnect} options={[{ value: 'table', label: 'Table order' }, { value: 'x', label: 'Ascending X' }]} onChange={(v) => run('Connect points in', patchLook(chart.id, { lineConnect: v }))} />
                   </Field>
                 )}
                 <div className="muted small">{family === 'survival' ? 'The Kaplan-Meier estimate, a step at each event time.' : family === 'grouped' ? 'The means of each series are joined across the categories.' : 'Points are joined in the order of the table rows; a missing Y value breaks the line.'}</div>

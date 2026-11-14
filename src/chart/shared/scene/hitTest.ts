@@ -6,7 +6,7 @@ import type { Id } from '../../../model/types';
  * emitted in exported SVG.
  */
 
-export type HitKind = 'bar' | 'point' | 'error' | 'line' | 'meanLine' | 'legend' | 'label' | 'annotation' | 'bracket' | 'axis' | 'title' | 'background';
+export type HitKind = 'bar' | 'point' | 'error' | 'line' | 'meanLine' | 'legend' | 'label' | 'annotation' | 'drawing' | 'handle' | 'axis' | 'title' | 'background';
 
 export interface HitTarget {
   kind: HitKind;
@@ -14,13 +14,16 @@ export interface HitTarget {
   /** Observation ID for points (the labelled point for labels), otherwise the mark's own ID. */
   objectId?: Id;
   annotationId?: Id;
+  /** A handle of a drawing object: which of its two points it moves. */
+  handle?: 'from' | 'to';
 }
 
-export function hitAttrs(kind: HitKind, groupId?: Id, objectId?: Id, annotationId?: Id): Record<string, string> {
+export function hitAttrs(kind: HitKind, groupId?: Id, objectId?: Id, annotationId?: Id, handle?: 'from' | 'to'): Record<string, string> {
   const attrs: Record<string, string> = { 'data-hit': kind };
   if (groupId) attrs['data-group-id'] = groupId;
   if (objectId) attrs['data-object-id'] = objectId;
   if (annotationId) attrs['data-annotation-id'] = annotationId;
+  if (handle) attrs['data-handle'] = handle;
   return attrs;
 }
 
@@ -35,6 +38,7 @@ export function hitFromTarget(target: EventTarget | null, root: Element | null):
         groupId: el.getAttribute('data-group-id') ?? undefined,
         objectId: el.getAttribute('data-object-id') ?? undefined,
         annotationId: el.getAttribute('data-annotation-id') ?? undefined,
+        handle: (el.getAttribute('data-handle') as 'from' | 'to' | null) ?? undefined,
       };
     }
     el = el.parentElement;

@@ -4,21 +4,22 @@ import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../../model
 import { graphSources, type GraphSource } from '../../../model/table/chartTable';
 import { AXIS_LIMITS } from '../../../model/graph/axis';
 import { FONT_FAMILIES } from '../../../model/graph/look';
-import { CHART_PX_MAX, CHART_PX_MIN } from '../../../model/defaults';
+import { CHART_PX_MAX, CHART_PX_MIN, chartTextLook, createAnnotation } from '../../../model/defaults';
+import { AnnotationEditor } from './AnnotationEditor';
+import { DrawingList } from './DrawingEditor';
+import { chartPx2Pt } from '../../../model/units';
+import { focusWhenShown } from '../common/pendingFocus';
 import { newId } from '../../../model/ids';
-import { type AnnotationPlacer, changeAnchor, nudgePatches } from '../../../chart/shared/scene/annotationPlace';
+import { type AnnotationPlacer, nudgePatches } from '../../../chart/shared/scene/annotationPlace';
 import { RESULT_STATS, resultValue } from '../../../model/graph/resultTokens';
 import { mixedAnnotationKeys, selectedAnnotationIds, toggleAnnotationSelection } from '../../../model/graph/selection/multi';
 import { capabilitiesOf } from '../../../model/graph/capabilities';
-import { BRACKET_LIFT_LIMIT, bracketKindOf } from '../../../model/graph/chartTypes';
-import { xySeries } from '../../../model/table/tableLayout';
 import { COMPARED_COLOURS, safeColours } from '../../../model/graph/colour/colorVision';
 import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../../model/graph/palettes';
 import type { Annotation, Chart, Group, Id, ResultStat } from '../../../model/types';
 import { useApp } from '../../../state/AppContext';
 import {
   addAnnotation,
-  addBracket,
   addReferenceLine,
   addRegion,
   applyPalette,
@@ -27,14 +28,14 @@ import {
   patchAnnotations,
   patchAxis,
   patchBothAxes,
-  patchBracket,
   patchChart,
   patchLegend,
   patchLook,
   patchReferenceLine,
   patchRegion,
+  patchDrawings,
   removeAnnotation,
-  removeBracket,
+  removeDrawings,
   removeReferenceLine,
   removeRegion,
   setDisplayName,
@@ -379,69 +380,6 @@ function RegionsSection({ chart }: { chart: Chart }) {
   );
 }
 
-/** Comparison brackets: a bar joining two data sets with the label the owner supplies. Nothing is calculated from it. */
-function BracketsSection({ chart }: { chart: Chart }) {
-  const { run, project } = useApp();
-  const kind = bracketKindOf(chart.type);
-  if (kind === null) return null;
-  const table = prepareChartInput(project, chart)?.table;
-  // Charts over columns join data sets (columns); grouped and XY charts join the series (blocks of columns) of their table.
-  const sets = !table ? [] : kind === 'columns' ? table.groups.map((g) => ({ id: g.id, name: g.name })) : xySeries(table).map((s) => ({ id: s.id, name: s.name }));
-  const options = sets.map((g) => ({ value: g.id, label: displayName(chart, g.id, g.name) }));
-  // A bracket that joins a data set that is no longer on the graph says so, and can be pointed at another.
-  const optionsFor = (id: Id) => (options.some((o) => o.value === id) ? options : [...options, { value: id, label: '(not on this graph)' }]);
-  // Grouped bars: the categories are the rows of the table that have a name (a bracket keeps the row, so inserting a row above moves it).
-  const rows = !table || kind !== 'grouped' ? [] : table.rows.flatMap((r, i) => (r.title.trim() !== '' ? [{ value: String(i), label: r.title.trim() }] : []));
-  const rowOptionsFor = (row: number) => (rows.some((o) => o.value === String(row)) ? rows : [...rows, { value: String(row), label: `Row ${row + 1}` }]);
-  const add = () => run('Add comparison bracket', addBracket(chart.id, { id: newId('brk'), from: sets[0].id, to: sets[1 % sets.length].id, label: '', color: '#000000', widthPt: 2, fontSizePt: 24, ...(kind === 'grouped' ? { row: Number(rows[0]?.value ?? 0) } : {}) }));
-  const what = kind === 'columns' ? 'data sets' : kind === 'grouped' ? 'series, in one category or across two' : 'series at one X';
-  return (
-    <Section title="Comparison brackets">
-      <div className="button-row">
-        <button onClick={add} disabled={sets.length < 2 && !(kind === 'grouped' && sets.length >= 1 && rows.length >= 2)}>+ Bracket between two {kind === 'columns' ? 'data sets' : kind === 'grouped' ? 'series or categories' : 'series'}</button>
-      </div>
-      {chart.brackets.length === 0 && <div className="muted small">A bracket joins two {what} and shows the label you give it (a p-value, stars, "ns"). Nothing is calculated: the result is yours, from your own test. {kind === 'xy' ? 'The bar stands to the right of the two points, and the X axis is extended to fit it.' : 'The axis is extended to fit the brackets, and brackets that overlap stand one above the other.'}</div>}
-      {chart.brackets.map((b, i) => {
-        const set = (label: string, patch: Parameters<typeof patchBracket>[2], key?: string) => run(label, patchBracket(chart.id, b.id, patch), key === undefined ? undefined : `brk:${b.id}:${key}`);
-        const row = b.row ?? Number(rows[0]?.value ?? 0);
-        return (
-          <div key={b.id} className="annotation-card selected">
-            <Field label={`From (bracket ${i + 1})`}>
-              <SelectInput<string> dropdown value={b.from} options={optionsFor(b.from)} onChange={(v) => set('Bracket start', { from: v })} />
-            </Field>
-            {kind === 'grouped' && (
-              <Field label="Category of From">
-                <SelectInput<string> dropdown value={String(row)} options={rowOptionsFor(row)} onChange={(v) => set('Bracket category', { row: Number(v) })} />
-              </Field>
-            )}
-            <Field label="To">
-              <SelectInput<string> dropdown value={b.to} options={optionsFor(b.to)} onChange={(v) => set('Bracket end', { to: v })} />
-            </Field>
-            {kind === 'grouped' && (
-              <Field label="Category of To" hint="The same category as From, or another one to join two categories.">
-                <SelectInput<string> dropdown value={String(b.toRow ?? row)} options={rowOptionsFor(b.toRow ?? row)} onChange={(v) => set('Bracket end category', { row, toRow: Number(v) })} />
-              </Field>
-            )}
-            {kind === 'xy' && <NumField label="At X" value={b.at ?? 0} onCommit={(v) => set('Bracket X', { at: v }, 'at')} hint="Both series must have a point at this X." />}
-            <Field label="Label" hint={`What you want written above the bracket: a p-value, stars, ns. Enter starts a new line. ${RESULT_HINT}`}>
-              <textarea rows={Math.min(5, Math.max(1, b.label.split('\n').length))} aria-label={`Label of bracket ${i + 1}`} value={b.label} onChange={(e) => set('Bracket label', { label: e.target.value }, 'label')} />
-            </Field>
-            <Field label="Colour">
-              <ColorInput value={b.color} onChange={(v) => set('Bracket colour', { color: v }, 'color')} />
-            </Field>
-            <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={b.widthPt} min={0.2} max={20} onCommit={(v) => set('Bracket thickness', { widthPt: v }, 'width')} />
-            <NumField {...SLIDERS.font} label="Label size" unit="pt" value={b.fontSizePt} min={4} max={40} onCommit={(v) => set('Bracket label size', { fontSizePt: v }, 'font')} />
-            <NumField label={kind === 'columns' || kind === 'grouped' ? 'Move up or right' : 'Move right'} unit="pt" value={b.liftPt ?? 0} min={-BRACKET_LIFT_LIMIT} max={BRACKET_LIFT_LIMIT} slider={false} onCommit={(v) => set('Move bracket', { liftPt: v === 0 ? undefined : v }, 'lift')} hint="How far the bracket was moved from where it is placed, away from the data: up on a vertical chart, to the right on a horizontal chart and on an XY chart. You can also drag it on the chart. The axis range does not follow." />
-            <div className="button-row">
-              <button onClick={() => run('Delete comparison bracket', removeBracket(chart.id, b.id))}>Delete bracket</button>
-            </div>
-          </div>
-        );
-      })}
-    </Section>
-  );
-}
-
 /**
  * The annotations of a graph. `placer` (from the model of the graph) says where each one is drawn; with it a text can be anchored to
  * values on the axes instead of a place on the page. Without it (a graph with no model here) every text is placed on the page.
@@ -458,19 +396,38 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
       {hasBarLabels(chart.type) && <BarLabelSection chart={chart} />}
       <ReferenceLinesSection chart={chart} />
       <RegionsSection chart={chart} />
-      <BracketsSection chart={chart} />
+      <Section title="Shapes and lines">
+        <DrawingList
+          drawings={chart.drawings ?? []}
+          picked={selection.kind === 'drawings' ? selection.drawingIds : []}
+          onPick={(id, toggle) => {
+            const was = selection.kind === 'drawings' ? selection.drawingIds : [];
+            const next = toggle ? (was.includes(id) ? was.filter((x) => x !== id) : [...was, id]) : was.length === 1 && was[0] === id ? [] : [id];
+            setSelection(next.length > 0 ? { kind: 'drawings', drawingIds: next } : { kind: 'chart' });
+          }}
+          onPatch={(ids, label, patch, key) => run(label, patchDrawings({ chartId: chart.id }, ids, patch), key)}
+          onRemove={(ids) => {
+            run(ids.length === 1 ? 'Delete shape' : 'Delete shapes', removeDrawings({ chartId: chart.id }, ids));
+            setSelection({ kind: 'chart' });
+          }}
+          placer={placer}
+          size={{ widthPt: chartPx2Pt(chart.widthPx), heightPt: chartPx2Pt(chart.heightPx) }}
+          fontLabel={FONT_FAMILIES.find((f) => f.value === chart.fontFamily)?.label ?? 'the graph'}
+        />
+      </Section>
       <div className="button-row">
         <button
           onClick={() => {
-            const id = newId('ann');
-            run('Add annotation', addAnnotation(chart.id, { id, text: 'Text', xFrac: 0.4, yFrac: 0.08, fontSizePt: 28, color: '#000000', opacity: 1 }));
-            setSelection({ kind: 'annotation', annotationId: id });
+            const added = createAnnotation(chartTextLook(chart), 0.4, 0.08);
+            run('Add annotation', addAnnotation(chart.id, added));
+            setSelection({ kind: 'annotation', annotationId: added.id });
+            focusWhenShown(`annotation-text:${added.id}`);
           }}
         >
           + Add text annotation
         </button>
       </div>
-      {chart.annotations.length === 0 && <div className="muted small">No annotations. Added text can be dragged within the chart.</div>}
+      {chart.annotations.length === 0 && <div className="muted small">No annotations. Choose Text on the graph's toolbar and click the graph where the text should go, or use the button above; a text can be dragged within the chart.</div>}
       {chosen.length > 1 && (
         <GroupBox title={`Selected annotations (${chosen.length})`}>
           <div className="muted small">These annotations are edited together. Ctrl or Shift on an annotation, on the chart or in the list, takes it in or out; the arrow keys move them together.</div>
@@ -515,55 +472,17 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
               {a.text.split('\n')[0] || '(empty)'}
             </button>
             {isSel && (
-              <>
-                <Field label="Text" hint={RESULT_HINT}>
-                  <textarea rows={2} aria-label="Annotation text" value={a.text} onChange={(e) => run('Edit annotation text', patchAnnotation(chart.id, a.id, { text: e.target.value }), `ann:${a.id}:text`)} />
-                </Field>
-                {placer?.supportsData && (
-                  <Field label="Anchor" hint="Page: a place on the page. Data values: a place on the axes, so the text follows the axis range, a log scale and breaks.">
-                    <SelectInput<'page' | 'data'>
-                      value={a.anchor === 'data' ? 'data' : 'page'}
-                      options={[
-                        { value: 'page', label: 'Page' },
-                        { value: 'data', label: 'Data values' },
-                      ]}
-                      onChange={(v) => {
-                        const patch = changeAnchor(a, placer, v);
-                        if (patch && Object.keys(patch).length > 0) run('Annotation anchor', patchAnnotation(chart.id, a.id, patch));
-                      }}
-                    />
-                  </Field>
-                )}
-                {placer && a.anchor === 'data' ? (
-                  <>
-                    {placer.numericX && <NumField label="X value" value={a.x ?? 0} min={-1e15} max={1e15} slider={false} hint="In the units of the X axis; the left edge of the text" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { x: v }), `ann:${a.id}:x`)} />}
-                    <NumField label="Y value" value={a.y ?? 0} min={-1e15} max={1e15} slider={false} hint="In the units of the value axis; the top edge of the text" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { y: v }), `ann:${a.id}:y`)} />
-                    {placer.acrossPage === 'x' && <NumField label="Left" unit="%" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Percent of the chart width. Across the categories the position stays a place on the page" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:xf`)} />}
-                    {placer.acrossPage === 'y' && <NumField label="Top" unit="%" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Percent of the chart height. Across the categories the position stays a place on the page" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:yf`)} />}
-                    {placer.skipped([a]).length > 0 && <div className="field-note">These values are outside the axis range, so the text is not drawn.</div>}
-                  </>
-                ) : (
-                  <>
-                    <NumField label="Left" unit="%" value={Math.round(a.xFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} hint="Percent of the chart width: the position of the left edge of the text; arrow keys nudge a selected annotation (Shift 5%, Alt 0.1%)" onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { xFrac: v / 100 }), `ann:${a.id}:x`)} />
-                    <NumField label="Top" unit="%" hint="Percent of the chart height: the position of the top of the text" value={Math.round(a.yFrac * 1000) / 10} min={0} max={100} slider={false} step={0.1} onCommit={(v) => run('Annotation position', patchAnnotation(chart.id, a.id, { yFrac: v / 100 }), `ann:${a.id}:y`)} />
-                  </>
-                )}
-                <NumField {...SLIDERS.font} label="Size" unit="pt" value={a.fontSizePt} min={8} max={40} onCommit={(v) => run('Annotation size', patchAnnotation(chart.id, a.id, { fontSizePt: v }), `ann:${a.id}:size`)} />
-                <Field label="Colour">
-                  <ColorInput value={a.color} onChange={(v) => run('Annotation colour', patchAnnotation(chart.id, a.id, { color: v }), `ann:${a.id}:color`)} />
-                </Field>
-                <NumField {...SLIDERS.fraction} label="Opacity" value={a.opacity} min={0} max={1} onCommit={(v) => run('Annotation opacity', patchAnnotation(chart.id, a.id, { opacity: v }), `ann:${a.id}:opacity`)} hint="0 = transparent, 1 = opaque" />
-                <div className="button-row">
-                  <button
-                    onClick={() => {
-                      run('Delete annotation', removeAnnotation(chart.id, a.id));
-                      setSelection({ kind: 'chart' });
-                    }}
-                  >
-                    Delete annotation
-                  </button>
-                </div>
-              </>
+              <AnnotationEditor
+                annotation={a}
+                placer={placer}
+                resultHint={RESULT_HINT}
+                fontLabel={FONT_FAMILIES.find((f) => f.value === chart.fontFamily)?.label ?? 'the graph'}
+                onPatch={(label, patch, key) => run(label, patchAnnotation(chart.id, a.id, patch), key)}
+                onDelete={() => {
+                  run('Delete annotation', removeAnnotation(chart.id, a.id));
+                  setSelection({ kind: 'chart' });
+                }}
+              />
             )}
           </div>
         );

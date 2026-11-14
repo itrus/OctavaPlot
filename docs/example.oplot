@@ -160,7 +160,6 @@
         },
         "pairs": {
           "bridge": false,
-          "bySubject": false,
           "lineColour": "subject"
         },
         "heatmap": {
@@ -228,7 +227,9 @@
           "labels": "percent",
           "percentDigits": 1,
           "showTotal": false,
-          "totalPrefix": "Total = "
+          "totalPrefix": "Total = ",
+          "dotShape": "circle",
+          "dotSize": 0.8
         },
         "xAxis": {
           "title": "",
@@ -331,7 +332,6 @@
         "jitter": {
           "enabled": true,
           "widthFraction": 0.4,
-          "bySubject": false,
           "swarm": false
         },
         "defaults": {
@@ -408,7 +408,6 @@
         "annotations": [],
         "referenceLines": [],
         "regions": [],
-        "brackets": [],
         "hiddenLayerIds": [],
         "rangeExcludedLayerIds": [],
         "layerOrder": [],

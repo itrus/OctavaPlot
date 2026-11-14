@@ -29,6 +29,23 @@ describe('version', () => {
   });
 });
 
+describe('subjects of older files', () => {
+  it('drops the subject of a cell, dots grouped by subject and subject lines, and joins one line for each subject in ascending X', () => {
+    const env = JSON.parse(stringifyProject(createExampleProject()));
+    const obs = env.project.dataTables[0].groups[0].observations;
+    obs[0] = [...obs[0].slice(0, 2), { subject: 'Mouse 1' }];
+    const c = env.project.charts[0];
+    c.lineConnect = 'subject';
+    c.jitter = { ...c.jitter, bySubject: true };
+    c.pairs = { ...c.pairs, bySubject: true };
+    const p = parseProject(JSON.stringify(env));
+    expect('subject' in p.dataTables[0].groups[0].observations[0]).toBe(false);
+    expect(p.charts[0].lineConnect).toBe('x');
+    expect('bySubject' in p.charts[0].jitter).toBe(false);
+    expect('bySubject' in p.charts[0].pairs).toBe(false);
+  });
+});
+
 describe('stored values', () => {
   const stored = (mutate: (l: Any) => void) => {
     const j = JSON.parse(stringifyProject(createExampleProject())) as Any;
@@ -204,6 +221,27 @@ describe('malformed persisted fields', () => {
     expect(a[0]).toEqual({ id: 'a1', text: '42', xFrac: 1, yFrac: 0.5, fontSizePt: 24, color: '#000000', opacity: 1 });
     expect(r.notes.some((n) => n.includes('annotations[0]'))).toBe(true);
     expect(() => chartToSvgString(r.project.charts[0], r.project.dataTables[0])).not.toThrow();
+  });
+  it('keeps the texts of a page layout, placed on the page (a data anchor is dropped), and checks them as a graph does', () => {
+    const text = { id: 'n1', text: 'Fig. 1', xFrac: 0.1, yFrac: 0.05, fontSizePt: 12, color: '#000000', opacity: 1, italic: true, anchor: 'data', x: 3, y: 4 };
+    const r = parseProjectWithNotes(build((p) => (p.layouts = [{ id: 'l1', name: 'Page', panels: [p.charts[0].id, null], annotations: [text, { id: '' }] }])));
+    const notes = r.project.layouts![0].annotations!;
+    expect(notes).toEqual([{ id: 'n1', text: 'Fig. 1', xFrac: 0.1, yFrac: 0.05, fontSizePt: 12, color: '#000000', opacity: 1, italic: true }]);
+    expect(r.notes.some((n) => n.includes('layouts[0].annotations[1]'))).toBe(true);
+    const again = parseProject(stringifyProject(r.project));
+    expect(again.layouts![0].annotations).toEqual(notes);
+    expect('annotations' in parseProject(build((p) => (p.layouts = [{ id: 'l1', name: 'Page', panels: [null, null] }]))).layouts![0]).toBe(false);
+  });
+  it('keeps the look of a text annotation, and leaves out what cannot be read', () => {
+    const look = { bold: true, italic: true, underline: true, fontFamily: "'Times New Roman', Times, serif", align: 'center', lineSpacing: 1.5 };
+    const ok = parseProject(build((p) => (p.charts[0].annotations = [{ id: 'a1', text: 'ns', xFrac: 0.2, yFrac: 0.3, fontSizePt: 12, color: '#000000', opacity: 1, ...look }])));
+    expect(ok.charts[0].annotations[0]).toMatchObject(look);
+    const bad = parseProject(build((p) => (p.charts[0].annotations = [{ id: 'a1', text: 'ns', xFrac: 0.2, yFrac: 0.3, fontSizePt: 12, color: '#000000', opacity: 1, bold: 'yes', fontFamily: 'Comic Sans', align: 'justify', lineSpacing: 9 }])));
+    const a = bad.charts[0].annotations[0];
+    expect(a.bold).toBeUndefined();
+    expect(a.fontFamily).toBeUndefined();
+    expect(a.align).toBeUndefined();
+    expect(a.lineSpacing).toBe(3);
   });
   it('keeps a reference line bound to a result, and drops the binding (with a note) when it cannot be read', () => {
     const line = { id: 'r1', axis: 'y', value: 3, color: '#000000', widthPt: 2, style: 'dashed', opacity: 1, label: 'mean {{mean Control}}', showLabel: true };

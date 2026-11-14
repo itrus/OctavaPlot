@@ -17,7 +17,7 @@ export function xyDrawing(chart: Chart, model: XyModel): ChartDrawing {
       { xyData: scene },
       { nodes: scene.front },
       // Layers can be taken out of the drawing by ID only in a chart drawn from layers.
-      { annotations: visibleAnnotations(chart.annotations, model.layers ? chart.hiddenLayerIds : []), place: annotationPlacer({ family: 'xy', model }, model.widthPt, model.heightPt).place },
+      { annotations: visibleAnnotations(chart.annotations, model.layers ? chart.hiddenLayerIds : []), drawings: chart.drawings, place: annotationPlacer({ family: 'xy', model }, model.widthPt, model.heightPt).place },
     ],
     selection: (s) => compileXySelection(model, s.pointIds),
   };

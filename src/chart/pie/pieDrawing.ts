@@ -17,7 +17,7 @@ export function pieDrawing(chart: Chart, model: PieModel): ChartDrawing {
       { nodes: backgroundElements(chart, W, H, layout.plot) },
       { nodes: model.marks ?? compilePieMarks(chart, model) },
       { nodes: titleElements(chart, layout, chart.xAxis, chart.yAxis) },
-      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), place: annotationPlacer({ family: 'pie', model }, W, H).place },
+      { annotations: visibleAnnotations(chart.annotations, chart.hiddenLayerIds), drawings: chart.drawings, place: annotationPlacer({ family: 'pie', model }, W, H).place },
       { nodes: pieLegendElements(chart, model) },
     ],
   };

@@ -17,7 +17,7 @@ describe('sanitizeSettings', () => {
 
   it('keeps valid values', () => {
     const s = sanitizeSettings({ autosave: false, newProjectSample: false, timestampExports: false, exportFormat: 'svg', defaultChartWidthPx: 800, defaultChartHeightPx: 500 });
-    expect(s).toEqual({ autosave: false, newProjectSample: false, timestampExports: false, exportFormat: 'svg', exportDpi: 600, decimalSeparator: 'auto', defaultChartWidthPx: 800, defaultChartHeightPx: 500, newGraphBackground: 'white' });
+    expect(s).toEqual({ autosave: false, newProjectSample: false, timestampExports: false, exportFormat: 'svg', exportDpi: 300, decimalSeparator: 'auto', defaultChartWidthPx: 800, defaultChartHeightPx: 500, newGraphBackground: 'white' });
   });
 
 it('reads the page background of new graphs, and turns it into the start of a new graph', () => {    expect(sanitizeSettings({ newGraphBackground: 'transparent' }).newGraphBackground).toBe('transparent');    expect(sanitizeSettings({ newGraphBackground: 'blue' }).newGraphBackground).toBe('white');    expect(newChartStart(DEFAULT_SETTINGS).pageColor).toBe('#ffffff');    expect(newChartStart({ ...DEFAULT_SETTINGS, newGraphBackground: 'transparent' }).pageColor).toBeNull();    expect(createChart('t', newChartStart({ ...DEFAULT_SETTINGS, newGraphBackground: 'transparent' })).pageColor).toBeNull();    expect(createChart('t').pageColor).toBe('#ffffff');  });
@@ -32,9 +32,9 @@ it('reads the page background of new graphs, and turns it into the start of a ne
     expect(s.autosave).toBe(true);
     expect(s.exportFormat).toBe('png');
     expect(sanitizeSettings({ exportFormat: 'pdf' }).exportFormat).toBe('pdf');
-    expect(sanitizeSettings({ exportDpi: 300 }).exportDpi).toBe(300);
-    expect(sanitizeSettings({ exportDpi: 123 }).exportDpi).toBe(600);
-    expect(sanitizeSettings({ exportDpi: '300' }).exportDpi).toBe(600);
+    expect(sanitizeSettings({ exportDpi: 600 }).exportDpi).toBe(600);
+    expect(sanitizeSettings({ exportDpi: 123 }).exportDpi).toBe(300);
+    expect(sanitizeSettings({ exportDpi: '600' }).exportDpi).toBe(300);
     // The graph PNG resolution of earlier builds is gone: a graph's PNG is at its own size.
     expect('pngDpi' in sanitizeSettings({ pngDpi: 300 })).toBe(false);
     expect(s.defaultChartWidthPx).toBe(100);

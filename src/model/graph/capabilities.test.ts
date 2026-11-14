@@ -119,7 +119,9 @@ describe('capability registry', () => {
   });
 
   it('offers looks to column, grouped and cumulative distribution types and a range switch to the types whose range holds more than the centres', () => {
-    for (const t of ['bar', 'scatter', 'mean', 'paired', 'box', 'violin', 'floating']) expect([t, by(t).partLooks, by(t).rangeSwitch]).toEqual([t, true, true]);
+    for (const t of ['bar', 'scatter', 'mean', 'paired']) expect([t, by(t).partLooks, by(t).rangeSwitch]).toEqual([t, true, true]);
+    // A box plot, a violin and floating bars have no error bars, mean lines or joins, and their dots are set in Style: nothing takes a look in the layers.
+    for (const t of ['box', 'violin', 'floating']) expect([t, by(t).partLooks, by(t).rangeSwitch]).toEqual([t, false, true]);
     expect(['groupedBar', 'groupedLine', 'groupedFloating', 'groupedBox', 'groupedViolin', 'groupedStacked', 'contingencyBars'].map((t) => [by(t).partLooks, by(t).rangeSwitch])).toEqual([[true, true], [true, true], [true, true], [true, true], [true, true], [false, false], [false, false]]);
     expect([by('histogram').partLooks, by('histogram').rangeSwitch, by('ecdf').partLooks, by('ecdf').rangeSwitch]).toEqual([false, true, true, true]);
   });

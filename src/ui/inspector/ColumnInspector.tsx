@@ -28,7 +28,6 @@ import {
   patchAxis,
   clearPointStyle,
   patchChart,
-  patchJitter,
   patchLegend,
   patchPointStyle,
   patchStyle,
@@ -397,11 +396,6 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             {chart.type !== 'mean' && (
               <>
                 <DotPlacementControls chart={chart} disabled={!st.showSymbols} />
-                {chart.type === 'scatter' && (
-                  <Field label="Group dots by subject" note="The dots of each subject sit together with a marker at their mean; the mean line and error bar are of the subjects. Name subjects in the data table (Subject…).">
-                    <Check checked={chart.jitter.bySubject === true} disabled={!st.showSymbols} onChange={(v) => run('Group dots by subject', patchJitter(chart.id, { bySubject: v }))} />
-                  </Field>
-                )}
               </>
             )}
           </GroupBox>
@@ -468,12 +462,12 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
           {(chart.type === 'mean' || chart.type === 'paired') && (
             <GroupBox title={chart.type === 'paired' ? 'Lines joining the rows' : 'Lines'} checked={st.showLines} onCheckedChange={(v) => setStyle({ showLines: v })} overridden={ov('showLines')}>
               {chart.type === 'paired' && (
-                <Field label="Color by" hint="Subject: each row's line has a color of the palette, after the colors of the data sets. One color: every line has the color below. Subject needs a palette (not colors set by hand).">
+                <Field label="Color by" hint="Row: each row's line has a color of the palette, after the colors of the data sets. One color: every line has the color below. Row needs a palette (not colors set by hand).">
                   <SelectInput<Chart['pairs']['lineColour']>
                     value={chart.pairs.lineColour}
                     disabled={!st.showLines}
                     options={[
-                      { value: 'subject', label: 'Subject' },
+                      { value: 'subject', label: 'Row' },
                       { value: 'one', label: 'One color' },
                     ]}
                     onChange={(v) => run('Line colors', patchLook(chart.id, { pairs: { lineColour: v } }))}

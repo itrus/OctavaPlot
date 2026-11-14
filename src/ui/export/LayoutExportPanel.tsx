@@ -8,7 +8,7 @@ import { EXPORT_DPI_CHOICES, type ExportDpi } from '../../state/settings';
 import { copyText, downloadBlob } from '../../util/download';
 import { Field, SelectInput } from '../inspector/common/controls';
 import { browserFontAvailable, browserHasGlyph } from './browserFonts';
-import { ReportBody } from './ExportDialog';
+import { ReportBody } from './ReportBody';
 import { exportStatusText } from './exportJob';
 import { ExportButton, FORMATS, Tiles } from './ExportPanel';
 import { useExportFileName } from './useExportFileName';
@@ -37,7 +37,7 @@ export function LayoutExportPanel({ layout, drawing }: { layout: Layout; drawing
         widthPx: (drawing.widthPt * 96) / 72,
         heightPx: (drawing.heightPt * 96) / 72,
         // The page's own font (labels and title), then those of the graphs on it.
-        fontFamilies: [FONT_FAMILY, ...layout.panels.flatMap((id) => project.charts.find((c) => c.id === id)?.fontFamily ?? [])],
+        fontFamilies: [FONT_FAMILY, ...layout.panels.flatMap((id) => { const c = project.charts.find((x) => x.id === id); return c ? [c.fontFamily, ...c.annotations.flatMap((a) => (a.fontFamily ? [a.fontFamily] : []))] : []; }), ...(layout.annotations ?? []).flatMap((a) => (a.fontFamily ? [a.fontFamily] : []))],
         textGroups,
         warnings: drawing.notices,
         format,
@@ -98,7 +98,7 @@ export function LayoutExportPanel({ layout, drawing }: { layout: Layout; drawing
 
       <div className="insp-heading">Options</div>
       <div className="insp-card">
-        <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : format === 'pdf' ? 'PDF has no resolution: it holds shapes and text, not a picture.' : 'Dots per inch of the A4 page. 600 dpi takes a few seconds.'}>
+        <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : format === 'pdf' ? 'PDF has no resolution: it holds shapes and text, not a picture.' : 'Dots per inch of the A4 page. 600 dpi takes a few seconds. The starting value is in Settings.'}>
           <SelectInput<string>
             value={String(dpi)}
             disabled={format !== 'png'}

@@ -9,7 +9,7 @@ import type { ExportFormat } from '../../state/settings';
 import { copyText } from '../../util/download';
 import { useFitsVersion } from '../components/useFitsVersion';
 import { browserFontAvailable, browserHasGlyph } from './browserFonts';
-import { ReportBody } from './ExportDialog';
+import { ReportBody } from './ReportBody';
 import { exportStatusText } from './exportJob';
 import { graphExportJob } from './graphExportJob';
 import { useExportFileName } from './useExportFileName';
@@ -62,7 +62,7 @@ export function ExportPanel({ chart, table }: { chart: Chart; table: DataTable }
         widthPx: chart.widthPx,
         heightPx: chart.heightPx,
         format,
-        fontFamilies: [chart.fontFamily],
+        fontFamilies: [...new Set([chart.fontFamily, ...chart.annotations.flatMap((a) => (a.fontFamily ? [a.fontFamily] : []))])],
         texts: chartTexts(chart, any),
         warnings: any.model.warnings,
         isFontAvailable: browserFontAvailable,

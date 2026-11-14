@@ -2,14 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import { xySeries } from '../../model/table/tableLayout';
 import type { DataTable, Project } from '../../model/types';
-import { addDataTable, replaceTableData, setExcluded, setFactor, setSubject } from '../../state/commands';
-import { importCsv, previewCsv, tableToCsv } from './csv';
+import { addDataTable, replaceTableData, setFactor } from '../../state/commands';
+import { importCsv, tableToCsv } from './csv';
 
 const tableOf = (p: Project) => p.dataTables.find((t) => t.id === 't')!;
-/** A column table of Group A = 1, 2, 3 and Group B = 4, 5, 6 (empty names of subjects). */
+/** A column table of Group A = 1, 2, 3 and Group B = 4, 5, 6. */
 const column = (): Project =>
   replaceTableData('t', { names: ['Group A', 'Group B'], titles: null, values: [[1, 4], [2, 5], [3, 6]] })(addDataTable('t', 'column', { sample: true })(createExampleProject()));
-const named = (p: Project, col: number, subjects: string[]) => subjects.reduce((q, s, row) => (s === '' ? q : setSubject('t', [{ col, row }], s)(q)), p);
 /** Export a table and read it back as the file would be imported. */
 const roundTrip = (t: DataTable, p: Project, mode: Parameters<typeof tableToCsv>[2] = 'entered') => {
   const read = importCsv(tableToCsv(t, 'point', mode), 'point');
@@ -17,49 +16,15 @@ const roundTrip = (t: DataTable, p: Project, mode: Parameters<typeof tableToCsv>
   return { data: read.data, back: tableOf(replaceTableData('t', read.data)(p)) };
 };
 
-describe('CSV: subjects', () => {
-  it('writes a "<Group> subject" column after a column whose values name subjects, and none for a table without', () => {
-    const p = named(column(), 0, ['M1', 'M1', 'M2']);
-    const [header, ...lines] = tableToCsv(tableOf(p), 'point').trim().split('\r\n');
-    expect(header).toBe('Row title,Group A,Group A subject,Group B');
-    expect(lines).toEqual([',1,M1,4', ',2,M1,5', ',3,M2,6']);
-    expect(tableToCsv(tableOf(column()), 'point')).not.toContain('subject');
-  });
-  it('reads the subjects back, and does not take the column for data', () => {
-    const p = named(column(), 0, ['M1', 'M1', 'M2']);
-    const { data, back } = roundTrip(tableOf(p), column());
-    expect(data.names).toEqual(['Group A', 'Group B']);
-    expect(data.subjects).toEqual([['M1', ''], ['M1', ''], ['M2', '']]);
-    expect(back.groups[0].observations.slice(0, 3).map((o) => o.subject)).toEqual(['M1', 'M1', 'M2']);
-    expect('subject' in back.groups[1].observations[0]).toBe(false);
-    expect(back.groups[0].observations.slice(0, 3).map((o) => o.value)).toEqual([1, 2, 3]);
-  });
-  it('is written in every mode, after the exclusion columns', () => {
-    let p = named(column(), 0, ['M1', 'M1', 'M2']);
-    p = setExcluded('t', [{ col: 0, row: 1 }], true, 'outlier')(p);
-    expect(tableToCsv(tableOf(p), 'point', 'withExclusions').split('\r\n')[0]).toBe('Row title,Group A,Group A excluded,Group A excluded reason,Group A subject,Group B');
-    expect(tableToCsv(tableOf(p), 'point', 'analysis').split('\r\n')[0]).toBe('Row title,Group A,Group A subject,Group B');
-    const { back } = roundTrip(tableOf(p), column(), 'withExclusions');
-    expect(back.groups[0].observations[1]).toMatchObject({ value: 2, excluded: true, excludedReason: 'outlier', subject: 'M1' });
-  });
-  it('keeps a subject with a comma or a quote in it, and a subject on an empty cell', () => {
-    let p = named(column(), 0, ['Mouse 1, left', 'say "hi"', '']);
-    p = setSubject('t', [{ col: 1, row: 0 }], 'P')(setExcluded('t', [], true)(p));
-    const { back } = roundTrip(tableOf(p), column());
-    expect(back.groups[0].observations.slice(0, 2).map((o) => o.subject)).toEqual(['Mouse 1, left', 'say "hi"']);
-    expect(back.groups[1].observations[0].subject).toBe('P');
-  });
-  it('works with the decimal comma, where fields are separated by semicolons', () => {
-    const p = named(column(), 1, ['A', 'B', 'C']);
-    const text = tableToCsv(tableOf(p), 'comma');
-    expect(text.split('\r\n')[0]).toBe('Row title;Group A;Group B;Group B subject');
-    const read = importCsv(text, 'comma');
-    expect(read.ok && read.data.subjects).toEqual([['', 'A'], ['', 'B'], ['', 'C']]);
-  });
-  it('is not counted among the columns of the preview', () => {
-    const preview = previewCsv(tableToCsv(tableOf(named(column(), 0, ['M1', 'M1', 'M2'])), 'point'), { delimiter: ',', separator: 'point', firstColumn: 'auto' });
-    expect(preview.ok && preview.columnCount).toBe(2);
-    expect(preview.ok && preview.data?.subjects).toBeDefined();
+describe('CSV: subjects of an older export', () => {
+  it('reads a "<Group> subject" column as no data and leaves it out, with a note', () => {
+    const read = importCsv('Row title,Group A,Group A subject,Group B\r\n,1,M1,4\r\n,2,M1,5\r\n,3,M2,6\r\n', 'point');
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.data.names).toEqual(['Group A', 'Group B']);
+    expect(read.data.values).toEqual([[1, 4], [2, 5], [3, 6]]);
+    expect(read.data.notes?.some((n) => n.includes('subject'))).toBe(true);
+    expect(tableToCsv(tableOf(replaceTableData('t', read.data)(column())), 'point')).not.toContain('subject');
   });
 });
 

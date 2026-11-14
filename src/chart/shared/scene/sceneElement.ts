@@ -16,14 +16,14 @@ export interface SceneElement {
   editorAttrs?: ReadonlyArray<readonly [string, string | number | undefined]>;
   children?: ReadonlyArray<SceneElement>;
   /** What a click on the element selects; the editor writes it as attributes, an export does not. */
-  hit?: { kind: HitKind; groupId?: string; objectId?: string; annotationId?: string };
+  hit?: { kind: HitKind; groupId?: string; objectId?: string; annotationId?: string; handle?: 'from' | 'to' };
   /** Written after the attributes. */
   id?: string;
   /** Present only in the editor (a transparent twin that makes a thin line easy to hit). */
   editorOnly?: boolean;
   /** Present only in the editor, while the series (data set) with this ID is selected (its glow, its frame). */
   whenSelected?: string;
-  /** Present only in the editor, while the annotation with this ID is selected (its frame). */
+  /** Present only in the editor, while the annotation (or drawing object) with this ID is selected (its frame, its handles). */
   whenAnnotationSelected?: string;
 }
 

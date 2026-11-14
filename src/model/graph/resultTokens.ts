@@ -73,13 +73,13 @@ export function fillResultTokens(text: string, table: DataTable, displayNames: R
 }
 
 /**
- * The chart as it is drawn: the annotations, the labels of the reference lines and of the brackets with their tokens filled in, and a
+ * The chart as it is drawn: the annotations, the labels of the reference lines and the texts of the drawing objects with their tokens filled in, and a
  * reference line bound to a result put at it (one whose result is not available is left out, with a notice). The very same chart when
  * nothing in it is bound, so that its caches and the memoised drawing are not disturbed. The chart as written is never changed.
  */
 export function resolveChartTokens(chart: Chart, table: DataTable): { chart: Chart; notices: string[] } {
   const bound = chart.referenceLines.some((l) => l.valueFrom !== undefined);
-  const typed = chart.annotations.some((a) => a.text.includes('{{')) || chart.referenceLines.some((l) => l.label.includes('{{')) || chart.brackets.some((b) => b.label.includes('{{'));
+  const typed = chart.annotations.some((a) => a.text.includes('{{')) || chart.referenceLines.some((l) => l.label.includes('{{')) || (chart.drawings ?? []).some((d) => d.text?.includes('{{'));
   if (!bound && !typed) return { chart, notices: [] };
   const notices: string[] = [];
   const fill = (what: string, text: string) => {
@@ -104,7 +104,7 @@ export function resolveChartTokens(chart: Chart, table: DataTable): { chart: Cha
       ...chart,
       annotations: chart.annotations.map((a) => (a.text.includes('{{') ? { ...a, text: fill('Text of an annotation', a.text) } : a)),
       referenceLines,
-      brackets: chart.brackets.map((b) => (b.label.includes('{{') ? { ...b, label: fill('Label of a bracket', b.label) } : b)),
+      ...(chart.drawings ? { drawings: chart.drawings.map((d) => (d.text?.includes('{{') ? { ...d, text: fill('Text of a shape', d.text) } : d)) } : {}),
     },
     notices,
   };
