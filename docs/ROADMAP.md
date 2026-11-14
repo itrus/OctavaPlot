@@ -30,6 +30,25 @@ The calculation rules, presets and acceptance fixtures are in [docs/calculation-
 
 Phases P0 to P5 are built as far as BACKLOG.md records. For each feature it says what was tested in code and what was also tried in a browser; a line that does not say "Browser" was not. Also in place: a calculation cache keyed by identity (`src/stats/calcCache.ts`), PDF and layout export, linked graphs, a folder overview with thumbnails and multi-select (Navigator), and tags for tables and graphs. Dead code is checked with `npx knip`.
 
+## Version 0.1 (22 October to 14 November 2026)
+
+Version 0.1 was built in 63 commits over about three weeks, from an empty repository to the editor described in this file. The version is now 0.2.0 (`package.json`; the app reads it from there). What 0.1 achieved, by date:
+
+| Date | Achieved |
+|---|---|
+| 22 Oct | First TypeScript implementation (React, SVG). GitHub Pages deployment. Table types chosen first (XY, grouped, contingency, survival), replicates, CSV paste and import, palettes, zoom, inspector, licence. |
+| 23 to 24 Oct | Charts with axes, curve fits and Results sheets; symbols and drawing order. The `.oplot` project file, reference lines, point exclusion, the capability registry, CI. Calculation cache keyed by identity. Page layouts, linked graphs and PDF export. |
+| 25 Oct | Every chart drawn from layers; folder overview (Navigator); `src` regrouped by family. |
+| 27 Oct | Data-integrity fixes; export dialog with font and glyph checks; one scene renderer for every family; heat map scales; reset ladder; annotations anchored to data; keyboard reach; editing several data sets together; Playwright browser tests and the performance measurements; the nonlinear fits checked against NIST. |
+| 28 Oct | Fits in a Web Worker (pending state, results keyed by inputs); own looks and range switch for the parts of column, grouped and histogram charts; subject and factor roles; the remaining graphs of the gallery opened (nested dots, trajectories, paired and three-way bars, bars at numeric X); brackets, rich text, survival summary. |
+| 29 Oct | Layouts with master legend and batch export to ZIP; date and right-hand axes; XY guides; result tokens in texts; project migrations; faster large-data preview. |
+| 1 Nov | Forest plot and summary diamond; browser tests for all 57 graphs and the layouts; sparse project tables; draggable brackets; bubble size legend; vector PDF. |
+| 4 to 5 Nov | Inspector icon rail and export page; new table options and changing a table's type; beeswarm, notched box, volcano, slices and dot grid; one symbol kind; a source review that fixed crashes, numeric and drawing errors. |
+| 8 Nov | Layout inspector, thumbnails on the Type tab, a round of fixes; the graph's print width removed. |
+| 14 Nov | Shapes and lines (33 presets, on graphs and layout pages, drawn the same in SVG, PNG and PDF); comparison brackets and subjects removed. |
+
+In numbers (1 November 2026 count, see "Size"): about 34.5 kLoC of source, 27.7 kLoC of tests, 57 graphs in the gallery, 48 browser tests. Phases P0 to P5 were built as far as BACKLOG.md records; items dropped by decision are listed under "Decisions".
+
 ## To do
 
 1. Beta-testing.

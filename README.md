@@ -2,7 +2,7 @@
   <img src="public/logo.svg" alt="OctavaPlot logo" width="128" height="128">
 </p>
 
-<h1 align="center">OctavaPlot — prototype v0.1</h1>
+<h1 align="center">OctavaPlot — v0.2</h1>
 
 <p align="center">
   <a href="https://itrus.github.io/OctavaPlot/"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6%20try%20it-live%20demo-2ea44f?style=for-the-badge"></a>
