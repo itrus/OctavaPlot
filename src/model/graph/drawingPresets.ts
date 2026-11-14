@@ -1,5 +1,6 @@
 import type { Drawing, DrawingPoint, LineEnd, LineRoute } from '../types';
 import { newId } from '../ids';
+import { drawingFraction } from '../options/drawingOptions';
 
 /**
  * The drawing objects the toolbar offers, in three groups: shapes, lines, and lines with a text. Each is a starting point; after it is
@@ -123,8 +124,8 @@ export function createDrawing(preset: DrawingPreset, from: DrawingPoint, to: Dra
   return {
     id,
     shape: preset.shape,
-    from: { xFrac: from.xFrac, yFrac: from.yFrac },
-    to: { xFrac: to.xFrac, yFrac: to.yFrac },
+    from: { xFrac: drawingFraction(from.xFrac), yFrac: drawingFraction(from.yFrac) },
+    to: { xFrac: drawingFraction(to.xFrac), yFrac: drawingFraction(to.yFrac) },
     ...(preset.route && preset.route !== 'straight' ? { route: preset.route } : {}),
     ...(preset.start && preset.start !== 'none' ? { start: preset.start } : {}),
     ...(preset.end && preset.end !== 'none' ? { end: preset.end } : {}),

@@ -1,3 +1,4 @@
+import { draggedPoints, type ShapeDrag } from '../interaction/drawingGesture';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { buildAnyModelCached, ChartCanvas, fitsPendingOf, previewDotCount } from '../../chart/anyModel';
 import { useFitsVersion } from '../components/useFitsVersion';
@@ -11,7 +12,7 @@ import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLine
 import type { PreparedChart } from '../../model/table/preparedChart';
 import { useApp } from '../../state/AppContext';
 import { addAnnotation, addDrawing, composeCommands, patchAnnotation, patchDrawings, patchPointStyle, removeAnnotation, removeDrawings, resetAllDataSets } from '../../state/commands';
-import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById, snapToAxis } from '../../model/graph/drawingPresets';
+import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById } from '../../model/graph/drawingPresets';
 import { drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
 import { GraphicsMenu } from '../components/GraphicsMenu';
 import type { Drawing } from '../../model/types';
@@ -21,24 +22,6 @@ import { annotationPlacer, drawnFractions, nudgePatches, patchForMove } from '..
 import { PointerIcon, ResetIcon, TextToolIcon } from '../components/icons';
 import { inspectorTargetFor } from '../inspector/common/nav';
 import type { Box } from '../../chart/shared/parts/labels';
-
-/** Drawing objects being moved (all the selected ones) or resized by a handle: where the drag began, how far it has gone, and where each object's points were drawn when it began (pt). */
-interface ShapeDrag {
-  mode: 'move' | 'from' | 'to';
-  start: { x: number; y: number };
-  delta: { x: number; y: number };
-  items: Array<{ drawing: Drawing; from: { x: number; y: number }; to: { x: number; y: number } }>;
-}
-
-/** The live points of an object being moved or resized, pt: a move shifts both, a handle one. */
-function draggedPoints(it: ShapeDrag['items'][number], d: Pick<ShapeDrag, 'mode' | 'delta'>) {
-  const shift = (q: { x: number; y: number }) => ({ x: q.x + d.delta.x, y: q.y + d.delta.y });
-  if (d.mode === 'move') return { from: shift(it.from), to: shift(it.to) };
-  // A handle of a straight line close to across or to up and down puts it exactly so, from its other end.
-  const straight = it.drawing.shape === 'line' && (it.drawing.route ?? 'straight') === 'straight';
-  if (d.mode === 'from') return { from: straight ? snapToAxis(it.to, shift(it.from)) : shift(it.from), to: it.to };
-  return { from: it.from, to: straight ? snapToAxis(it.from, shift(it.to)) : shift(it.to) };
-}
 
 /** Space kept around the chart inside the canvas, in px. */
 const CANVAS_PAD = 24;

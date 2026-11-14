@@ -10,6 +10,7 @@ import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLegendLayout, withoutLegendLayout } from '../model/graph/legendEntries';
 import { FONT_FAMILIES, sanitizeLook, SYMBOL_SHAPES } from '../model/graph/look';
+import { drawingFraction } from '../model/options/drawingOptions';
 import { clampDrawing, DRAWING_LIMITS } from '../model/graph/drawingPresets';
 import { sanitizeOrder } from '../model/table/groupOrder';
 import { canonicalObservationId, canonicalRowId, MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
@@ -428,7 +429,7 @@ function cleanDrawings(raw: unknown, path: string, notes: string[], page = false
   const out: Drawing[] = [];
   const seen = new Set<string>();
   const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-  const frac = (v: unknown) => Math.min(1, Math.max(0, v as number));
+  const frac = (v: unknown) => drawingFraction(v as number);
   raw.forEach((d, i) => {
     const point = (v: unknown): DrawingPoint | null => (isObj(v) && num(v.xFrac) && num(v.yFrac) ? { xFrac: frac(v.xFrac), yFrac: frac(v.yFrac), ...(!page && num(v.x) ? { x: v.x } : {}), ...(!page && num(v.y) ? { y: v.y } : {}) } : null);
     const from = isObj(d) ? point(d.from) : null;

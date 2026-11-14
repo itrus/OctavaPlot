@@ -1,3 +1,4 @@
+import { draggedPoints, type ShapeDrag } from '../interaction/drawingGesture';
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { drawLayout } from '../../chart/export/layoutExport';
@@ -9,7 +10,7 @@ import { AnnotationEditor } from '../inspector/sections/AnnotationEditor';
 import { focusWhenShown } from '../inspector/common/pendingFocus';
 import { useApp } from '../../state/AppContext';
 import { addDrawing, addFreePanel, composeCommands, freeLayout, patchDrawings, patchLayout, removeDrawings, removeFreePanel, setFrame, setLayoutPanel } from '../../state/commands';
-import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById, snapToAxis } from '../../model/graph/drawingPresets';
+import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById } from '../../model/graph/drawingPresets';
 import { drawingElements, drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
 import { hitFromTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { SceneElements } from '../../chart/shared/scene/SceneElements';
@@ -90,24 +91,6 @@ interface NoteDrag {
   startY: number;
   from: { xFrac: number; yFrac: number };
   now: { xFrac: number; yFrac: number };
-}
-
-/** Shapes and lines of the page being moved (all the selected ones) or resized by a handle (pt of the page). */
-interface ShapeDrag {
-  mode: 'move' | 'from' | 'to';
-  start: { x: number; y: number };
-  delta: { x: number; y: number };
-  items: Array<{ drawing: Drawing; from: { x: number; y: number }; to: { x: number; y: number } }>;
-}
-
-/** The live points of an object being moved or resized, pt: a move shifts both, a handle one. */
-function draggedPoints(it: ShapeDrag['items'][number], d: Pick<ShapeDrag, 'mode' | 'delta'>) {
-  const shift = (q: { x: number; y: number }) => ({ x: q.x + d.delta.x, y: q.y + d.delta.y });
-  if (d.mode === 'move') return { from: shift(it.from), to: shift(it.to) };
-  // A handle of a straight line close to across or to up and down puts it exactly so, from its other end.
-  const straight = it.drawing.shape === 'line' && (it.drawing.route ?? 'straight') === 'straight';
-  if (d.mode === 'from') return { from: straight ? snapToAxis(it.to, shift(it.from)) : shift(it.from), to: it.to };
-  return { from: it.from, to: straight ? snapToAxis(it.from, shift(it.to)) : shift(it.to) };
 }
 
 /** What switching on the master legend starts with. */

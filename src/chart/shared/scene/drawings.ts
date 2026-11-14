@@ -1,3 +1,4 @@
+import { drawingFraction } from '../../../model/options/drawingOptions';
 import type { Drawing, DrawingPoint, LineEnd } from '../../../model/types';
 import { endSizeOf } from '../../../model/graph/drawingPresets';
 import { dashOf } from '../../../model/graph/look';
@@ -226,7 +227,7 @@ export function drawingElements(drawings: ReadonlyArray<Drawing>, width: number,
  * data, their values on the axes there as well (as a moved text keeps them).
  */
 export function drawingPatchForPoints(d: Drawing, from: P, to: P, width: number, height: number, placer?: AnnotationPlacer): Pick<Drawing, 'from' | 'to'> {
-  const clamp = (v: number) => Math.min(1, Math.max(0, Math.round(v * 10000) / 10000));
+  const clamp = (v: number) => drawingFraction(Math.round(v * 10000) / 10000);
   const point = (p: P, was: DrawingPoint): DrawingPoint => {
     const [xFrac, yFrac] = [clamp(p.x / width), clamp(p.y / height)];
     if (d.anchor !== 'data' || !placer) return { xFrac, yFrac };
