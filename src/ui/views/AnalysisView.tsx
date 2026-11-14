@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { analysesOf, analysisKindApplies, analysisColumns, analysisTypeInfo } from '../../model/project/analysis';
-import { curveFitSheet, type Sheet } from '../../model/project/curveFit';
+import { curveFitSheet } from '../../model/project/curveFit';
+import type { Sheet } from '../../model/project/resultSheet';
 import { FIT_LIMITS } from '../../model/options/fitOptions';
 import { newId } from '../../model/ids';
 import type { Analysis } from '../../model/types';

@@ -1,3 +1,4 @@
+import type { Sheet, SheetRow } from './resultSheet';
 import { cachedCalc, peekCalc, type CalcIdentity } from '../../stats/calcCache';
 import { shouldDeferFit } from '../../stats/fitEngine';
 import { deferredFitResult } from '../../stats/fitService';
@@ -8,24 +9,6 @@ import type { Analysis, DataTable, Id } from '../types';
 import { suppliedStats } from '../table/suppliedStats';
 
 /** The Results of a curve fit: the numbers of each Y series of an XY table, as a sheet that can be shown, selected and copied. */
-
-/** One row of a results sheet: a label and one cell for each column. */
-interface SheetRow {
-  key: string;
-  label: string;
-  cells: string[];
-  /** The same cells at full precision, for copying and files; the cells are rounded for the screen. */
-  exact?: string[];
-  /** A gap between groups of rows. */
-  blank?: boolean;
-  indent?: boolean;
-}
-
-export interface Sheet {
-  corner: string;
-  columns: Array<{ id: Id; label: string }>;
-  rows: SheetRow[];
-}
 
 /** What a curve is fitted to, for each Y series: every replicate on its own, or the single Y or entered mean of each row. */
 export function fitObservations(source: DataTable): Array<{ id: Id; label: string; obs: Array<{ x: number; y: number }> }> {

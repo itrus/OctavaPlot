@@ -1,4 +1,4 @@
-import type { Selection } from '../model/types';
+import type { Selection } from '../model/editor/types';
 import { selectedGroupIds } from '../model/graph/selection/scope';
 import type { AnyModel } from './anyModel';
 

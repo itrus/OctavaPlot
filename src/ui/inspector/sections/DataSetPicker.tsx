@@ -1,4 +1,5 @@
-import type { Id, Selection } from '../../../model/types';
+import type { Id } from '../../../model/types';
+import type { Selection } from '../../../model/editor/types';
 import { toggleGroupSelection } from '../../../model/graph/selection/scope';
 
 /**

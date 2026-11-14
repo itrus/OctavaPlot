@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { createEmptyProject, createExampleProject } from '../model/defaults';
 import { viewAfterRemoval } from '../model/project/viewOrder';
-import type { Project, Selection, ViewRef } from '../model/types';
+import type { Project } from '../model/types';
+import type { Selection, ViewRef } from '../model/editor/types';
 import type { Command } from './commands';
 import { historyReducer, initialHistory, scopeCoalesceKey } from './history';
 import { affectsRecovery, flushDecision, isConflict, protectionOf, recoveryStatusText, shouldWarnOnUnload, bannerVisible } from './recovery';

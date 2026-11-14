@@ -1,4 +1,5 @@
-import type { Chart, ChartLayer, ChartStyle, Group, Id, Selection, SummarySpec } from '../../types';
+import type { Chart, ChartLayer, ChartStyle, Group, Id, SummarySpec } from '../../types';
+import type { Selection } from '../../editor/types';
 import { resolveStyle } from '../style';
 import { resolveSummary } from '../summary';
 
