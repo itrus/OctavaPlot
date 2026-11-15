@@ -58,7 +58,7 @@ test.describe('the graph type tab', () => {
 });
 
 test.describe('the graph a new graph starts as is among the thumbnails of the Type tab', () => {
-  /** A project of a grouped table of replicates and a graph made as the New Graph dialog makes its first entry (Interleaved scatter). */
+  /** A project of a grouped table of replicates and a graph made as the New Graph dialog makes its first entry (Interleaved bars). */
   const groupedProject = () => {
     let p = addDataTable('t', 'grouped', { sample: true })(createEmptyProject());
     const first = availableItems('grouped')[0];
@@ -67,7 +67,7 @@ test.describe('the graph a new graph starts as is among the thumbnails of the Ty
     return stringifyProject({ ...p, name: 'grouped' });
   };
 
-  test('Interleaved scatter is a thumbnail, is the chosen one at first, and Interleaved bars changes the drawing', async ({ page }) => {
+  test('Interleaved bars is selected initially, and switching to scatter and back restores the drawing', async ({ page }) => {
     await openApp(page);
     await openProject(page, groupedProject());
     await page.locator('.nav-item').filter({ hasText: 'Grouped graph' }).click();
@@ -75,15 +75,15 @@ test.describe('the graph a new graph starts as is among the thumbnails of the Ty
     await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Graph' }).click();
     const scatter = page.getByRole('radio', { name: 'Interleaved scatter' });
     const bars = page.getByRole('radio', { name: 'Interleaved bars' });
-    await expect(scatter).toHaveAttribute('aria-checked', 'true');
-    await expect(bars).toHaveAttribute('aria-checked', 'false');
-    const dots = await drawing(page);
-    await bars.click();
     await expect(bars).toHaveAttribute('aria-checked', 'true');
     await expect(scatter).toHaveAttribute('aria-checked', 'false');
-    expect(await drawing(page)).not.toBe(dots);
+    const initial = await drawing(page);
     await scatter.click();
     await expect(scatter).toHaveAttribute('aria-checked', 'true');
-    expect(await drawing(page)).toBe(dots);
+    await expect(bars).toHaveAttribute('aria-checked', 'false');
+    expect(await drawing(page)).not.toBe(initial);
+    await bars.click();
+    await expect(bars).toHaveAttribute('aria-checked', 'true');
+    expect(await drawing(page)).toBe(initial);
   });
 });
