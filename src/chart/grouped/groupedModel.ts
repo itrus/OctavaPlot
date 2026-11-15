@@ -266,7 +266,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
   const axisCfg = arrangement === 'side' ? chart.yAxis : { ...chart.yAxis, scale: 'linear' as const, reverse: false };
   const yBase = resolveAxis({
     values: arrangement === 'percent' ? [0, 100] : allY,
-    includeZero: axisCfg.scale === 'linear' && !isDist && (!asLines || allY.every((v) => v >= 0)),
+    includeZero: axisCfg.scale === 'linear' && ((!isDist && !asLines) || allY.every((v) => v >= 0)),
     min: chart.yAxis.min ?? (arrangement === 'percent' ? 0 : null),
     max: chart.yAxis.max ?? (arrangement === 'percent' ? 100 : null),
     majorInterval: chart.yAxis.majorInterval,

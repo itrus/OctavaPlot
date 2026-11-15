@@ -30,31 +30,33 @@ const glyphBodies = (report: ExportReport): ExportReport['glyphs'][] => {
   return withSpecials.length > 0 ? withSpecials : [report.glyphGroups[0]];
 };
 
-/** The report in plain language. Separate from the dialog's controls so that it reads as the document it is. */
-export function ReportBody({ report, page }: { report: ExportReport; page?: string }) {
-  const { px, pt, mm } = report.size;
+/**
+ * The report in plain language. Separate from the dialog's controls so that it reads as the document it is. A `compact` report leaves out
+ * what is only reassurance: the fonts and the characters while there is nothing to warn about, and the known limits.
+ */
+export function ReportBody({ report, page, compact = false }: { report: ExportReport; page?: string; compact?: boolean }) {
+  const { pt, mm } = report.size;
   const { raster } = report;
-  // The pixels of a PNG are those of the picture, so they follow the resolution of a page layout; the other sizes do not change with it.
-  const pixels = raster ?? px;
+  const fontProblems = report.fonts.some((f) => f.replacedBy !== null || f.used === null || f.missing.length > 0);
+  const glyphProblems = glyphBodies(report).some((g) => g !== null && g.skipped === null && g.missing.length > 0);
+  const showFonts = !compact || fontProblems;
+  const showGlyphs = !compact || glyphProblems;
   return (
     <div>
-      <SubHeading>Size</SubHeading>
-      {page !== undefined && raster === null ? (
-        // A vector page keeps the size of its paper whatever is exported: its name and its size in mm are all there is to say.
-        <div>{page} · {mmText(mm.width)} × {mmText(mm.height)} mm</div>
+      {!compact && <SubHeading>Size</SubHeading>}
+      {/* A PNG has pixels; an SVG and a PDF have only the size of their page, in mm (the paper's name too, for a layout). */}
+      {raster === null ? (
+        <div>{page !== undefined && `${page} · `}{mmText(mm.width)} × {mmText(mm.height)} mm</div>
       ) : (
-        <>
-          <ul className="report-sizes">
-            <li>{pixels.width} × {pixels.height} px</li>
-            <li>{pt.width} × {pt.height} pt</li>
-            <li>{page !== undefined && `${page} · `}{mmText(mm.width)} × {mmText(mm.height)} mm</li>
-          </ul>
-          {raster === null && <div className="muted small">{report.format === 'pdf' ? 'PDF' : 'SVG'} is vector: it has no pixels and no resolution.</div>}
-        </>
+        <ul className="report-sizes">
+          <li>{raster.width} × {raster.height} px</li>
+          <li>{pt.width} × {pt.height} pt</li>
+          <li>{page !== undefined && `${page} · `}{mmText(mm.width)} × {mmText(mm.height)} mm</li>
+        </ul>
       )}
-      <SubHeading>Fonts</SubHeading>
-      {report.fonts.length === 0 && <div className="muted small">No font is asked for.</div>}
-      {report.fonts.map((f) => (
+      {showFonts && <SubHeading>Fonts</SubHeading>}
+      {showFonts && report.fonts.length === 0 && <div className="muted small">No font is asked for.</div>}
+      {showFonts && report.fonts.map((f) => (
         <div key={f.requested}>
           <div>{f.requested}</div>
           {f.replacedBy !== null && f.families[0] && (
@@ -67,16 +69,20 @@ export function ReportBody({ report, page }: { report: ExportReport; page?: stri
           {f.missing.length > 0 && f.replacedBy === null && <div className="muted small">Not installed: {f.missing.join(', ')}.</div>}
         </div>
       ))}
-      <SubHeading>Characters</SubHeading>
-      {glyphBodies(report).map((g, i) => <GlyphsBody key={i} glyphs={g} />)}
+      {showGlyphs && <SubHeading>Characters</SubHeading>}
+      {showGlyphs && glyphBodies(report).map((g, i) => <GlyphsBody key={i} glyphs={g} />)}
       {report.warnings.length > 0 && (
         <>
           <SubHeading>Warnings of the graph</SubHeading>
           <ul className="warnings">{report.warnings.map((w, i) => <li key={i}>⚠ {w}</li>)}</ul>
         </>
       )}
-      <SubHeading>Known limits</SubHeading>
-      <ul className="muted small">{report.limits.map((l) => <li key={l}>{l}</li>)}</ul>
+      {!compact && (
+        <>
+          <SubHeading>Known limits</SubHeading>
+          <ul className="muted small">{report.limits.map((l) => <li key={l}>{l}</li>)}</ul>
+        </>
+      )}
     </div>
   );
 }

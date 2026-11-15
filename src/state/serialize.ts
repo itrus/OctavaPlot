@@ -557,7 +557,7 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
     const lp = `project.layouts[${li}]`;
     const o = obj(l, lp);
     const id = str(o.id, `${lp}.id`);
-    const made = sanitizeLayout(o, defaultLayout(id, typeof o.name === 'string' && o.name.trim() !== '' ? o.name.trim() : 'Layout'));
+    const made = sanitizeLayout(o, defaultLayout(id, typeof o.name === 'string' && o.name.trim() !== '' ? o.name.trim() : 'Layout', { showTitle: false }));
     const panels = made.panels.map((pid, pi) => {
       if (pid === null || chartIds.has(pid)) return pid;
       notes.push(`${lp}.panels[${pi}] referred to a graph that is missing and was emptied.`);

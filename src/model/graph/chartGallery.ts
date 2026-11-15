@@ -55,6 +55,15 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
   ],
   column: [
     {
+      id: 'summary',
+      label: 'Mean/median & error',
+      items: [
+        typed('bar', 'bar'),
+        typed('mean', 'mean'),
+        item('barsH', 'Horizontal bars', 'The bar chart turned on its side.', 'bar', 'category.bar', { orientation: 'horizontal' }),
+      ],
+    },
+    {
       id: 'individual',
       label: 'Individual values',
       items: [
@@ -62,14 +71,6 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('cat.aligned', 'Aligned dots', 'Dots in a column without spreading them sideways.', 'scatter', 'category.aligned', { jitter: false }),
         item('cat.swarm', 'Beeswarm', 'Every value as a dot, placed sideways by its value so that none touches another.', 'scatter', 'category.swarm', { swarm: true }),
         typed('paired', 'paired', 'category.paired'),
-      ],
-    },
-    {
-      id: 'frequency',
-      label: 'Histogram and distribution',
-      items: [
-        typed('histogram', 'histogram'),
-        typed('ecdf', 'ecdf'),
       ],
     },
     {
@@ -84,24 +85,15 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       ],
     },
     {
-      id: 'summary',
-      label: 'Mean/median & error',
+      id: 'frequency',
+      label: 'Histogram and distribution',
       items: [
-        typed('bar', 'bar'),
-        typed('mean', 'mean'),
-        item('barsH', 'Horizontal bars', 'The bar chart turned on its side.', 'bar', 'category.bar', { orientation: 'horizontal' }),
+        typed('histogram', 'histogram'),
+        typed('ecdf', 'ecdf'),
       ],
     },
   ],
   grouped: [
-    {
-      id: 'individual',
-      label: 'Individual values',
-      items: [
-        item('grp.scatterI', 'Interleaved scatter', 'Dots of every series side by side within each category.', 'groupedBar', 'category.grouped', { dotsOnly: true }),
-        item('grp.scatterS', 'Separated scatter', 'Dots of each series in its own group of columns, one column for each category.', 'groupedBar', 'category.grouped', { dotsOnly: true, separated: true }),
-      ],
-    },
     {
       id: 'summary',
       label: 'Summary data',
@@ -114,6 +106,14 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
         item('grp.forest', 'Forest plot', 'Estimates with their intervals, one row for each study, as typed (nothing is pooled): make the table with "Mean (or median), Upper/Lower limits". A dashed line marks no effect at 0.', 'groupedLine', 'special.forest', { forest: 'difference' }),
         item('grp.forestRatio', 'Forest plot, ratios', 'The same for ratios (odds, risk or hazard ratios): a log axis, and the dashed line marks no effect at 1.', 'groupedLine', 'special.forest', { forest: 'ratio' }),
         typed('grp.floating', 'groupedFloating', 'category.range'),
+      ],
+    },
+    {
+      id: 'individual',
+      label: 'Individual values',
+      items: [
+        item('grp.scatterI', 'Interleaved scatter', 'Dots of every series side by side within each category.', 'groupedBar', 'category.grouped', { dotsOnly: true }),
+        item('grp.scatterS', 'Separated scatter', 'Dots of each series in its own group of columns, one column for each category.', 'groupedBar', 'category.grouped', { dotsOnly: true, separated: true }),
       ],
     },
     {

@@ -44,10 +44,10 @@ function describeSvg(markup: string, chart: Chart, table: DataTable, notices: re
   return `${head}<title id="${base}-title">${escapeXml(title)}</title><desc id="${base}-desc">${escapeXml(desc)}</desc>${markup.slice(end + 1)}`;
 }
 
-/** Rasterise at the chart's own size, one pixel for each CSS pixel (GRAPH_PNG_DPI); the resolution is written into the file. */
-export async function chartToPngBlob(chart: Chart, table: DataTable, fit?: FitSettings): Promise<Blob> {
-  const { width, height } = exportPixels(chart, GRAPH_PNG_DPI);
-  return svgToPngBlob(chartToSvgString(chart, table, fit), width, height, GRAPH_PNG_DPI);
+/** Rasterise at a resolution (by default the chart's own size, one pixel for each CSS pixel: GRAPH_PNG_DPI); the resolution is written into the file. */
+export async function chartToPngBlob(chart: Chart, table: DataTable, fit?: FitSettings, dpi: number = GRAPH_PNG_DPI): Promise<Blob> {
+  const { width, height } = exportPixels(chart, dpi);
+  return svgToPngBlob(chartToSvgString(chart, table, fit), width, height, dpi);
 }
 
 /**

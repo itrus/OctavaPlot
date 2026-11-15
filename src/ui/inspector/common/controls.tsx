@@ -3,6 +3,7 @@ import { recallSection, rememberSection } from '../../../state/inspectorNav';
 import { isCommitEnter } from '../../components/shortcutGuard';
 import { formatNum, sliderStep, snapToStep } from './numberFormat';
 import { WheelRange } from '../../components/WheelRange';
+import { SymbolButton } from '../../components/SymbolButton';
 
 /** Which graph's inspector, and which page and tab of it, a Section is on: it is then open or shut as it was left (state/inspectorMemory.ts). Absent elsewhere. */
 export const PlaceContext = createContext<{ graphId: string; page: string } | null>(null);
@@ -222,7 +223,13 @@ export function SelectInput<T extends string>({
 
 export function TextInput({ value, onChange, placeholder, disabled, ariaLabel }: { value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean; ariaLabel?: string }) {
   const aria = useFieldAria(ariaLabel);
-  return <input type="text" value={value} placeholder={placeholder} disabled={disabled} {...aria} onChange={(e) => onChange(e.target.value)} />;
+  const ref = useRef<HTMLInputElement | null>(null);
+  return (
+    <span className="text-symbol-wrap">
+      <input ref={ref} type="text" value={value} placeholder={placeholder} disabled={disabled} {...aria} onChange={(e) => onChange(e.target.value)} />
+      <SymbolButton box={() => ref.current} disabled={disabled} />
+    </span>
+  );
 }
 
 interface NumProps {

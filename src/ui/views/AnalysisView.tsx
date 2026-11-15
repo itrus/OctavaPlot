@@ -8,7 +8,7 @@ import { describeValues, descriptiveRows, formatResult } from '../../stats/descr
 import { FIT_MODELS, fitModelById, type FitModelId } from '../../stats/fitModels';
 import { useApp } from '../../state/AppContext';
 import { newChartStart } from '../../state/settings';
-import { addChart, composeCommands, patchAnalysis, patchLook, removeAnalysis } from '../../state/commands';
+import { addChart, composeCommands, patchAnalysis, patchLook } from '../../state/commands';
 import { copyText, downloadBlob } from '../../util/download';
 import { exportFileName } from '../../util/fileName';
 import { NumField } from '../inspector/common/controls';
@@ -78,13 +78,6 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
   return (
     <div className="analysis-view">
       <div className="toolbar">
-        <input
-          className="analysis-name"
-          type="text"
-          value={analysis.name}
-          aria-label="Analysis name"
-          onChange={(e) => run('Rename analysis', patchAnalysis(analysis.id, { name: e.target.value }), `analysis:${analysis.id}:name`)}
-        />
         {curveFit && (
           <>
             <label className="inline-label">
@@ -116,15 +109,6 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
         </button>
         <button onClick={() => void copy()} title="Copy the selected cells, or all the results, as tab-separated text">Copy</button>
         {curveFit && <button onClick={makeGraph} title="Make a graph of the table that draws this curve and its band">Make graph</button>}
-        <button
-          onClick={() => {
-            run('Delete analysis', removeAnalysis(analysis.id));
-            setView({ kind: 'table', id: table.id });
-          }}
-          title="Delete this analysis (Undo brings it back)"
-        >
-          Delete
-        </button>
         <span className="toolbar-info">of {table.name} · recalculated when the data change</span>
       </div>
       <div className="results-scroller" tabIndex={0} onKeyDown={selection.onKeyDown} onCopy={selection.onCopy} onMouseUp={selection.release} onMouseLeave={selection.release} aria-label="Results: select cells and press Ctrl+C to copy">
@@ -138,7 +122,7 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
             ? 'The median is the first time at which the Kaplan-Meier estimate is 0.5 or below, the estimate the survival chart draws; "Not reached" means the curve never gets there (too few events, or most subjects censored). A subject censored at a tied time is still at risk at that time. Entries that are neither 1 (event) nor 0 (censored), and subjects with no valid time (a number, 0 or more), are left out and counted in the last row. No interval is given for the median.'
             : curveFit
             ? 'Every replicate is a point of the fit; a series entered as means is fitted to the means. Rows with a missing X or Y are left out. The error and the intervals come from the covariance of the parameters (a linear approximation for the curved models), with t-based intervals; they are empty when the points leave no degrees of freedom. A fit that does not settle says so under Notes.'
-            : 'Missing cells are left out, not counted as zero. A statistic that cannot be calculated from the values (too few values, or a geometric mean of values that are not all positive) is left empty. Percentiles are the (n + 1) p kind; the median interval is the exact order-statistic one and shows the coverage it actually reaches.'}
+            : 'Missing cells are left out, not counted as zero. A statistic that cannot be calculated from the values (too few values, or a geometric mean of values that are not all positive) is left empty. Percentiles are the (n + 1) p kind.'}
         </p>
       </div>
     </div>

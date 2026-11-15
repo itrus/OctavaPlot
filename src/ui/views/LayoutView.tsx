@@ -470,7 +470,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
               </Field>
             )}
             <Field label="Title on top of the page">
-              <Check checked={layout.showTitle} onChange={(v) => set('Page title', { showTitle: v })} ariaLabel="Title on top of the page" />
+              <Check checked={layout.showTitle} onChange={(v) => set('Page title', v && layout.title.trim() === '' ? { showTitle: v, title: layout.name } : { showTitle: v })} ariaLabel="Title on top of the page" />
             </Field>
             {layout.showTitle && (
               <Field label="Title">
@@ -605,7 +605,6 @@ function LayoutPage({ layout }: { layout: Layout }) {
                       run(ids.length === 1 ? 'Delete shape' : 'Delete shapes', removeDrawings(owner, ids));
                       setPicked(picked.filter((x) => !ids.includes(x)));
                     }}
-                    size={{ widthPt: W, heightPt: H }}
                     fontLabel="Arial"
                   />
                 </Section>
@@ -616,9 +615,11 @@ function LayoutPage({ layout }: { layout: Layout }) {
                   {notes.length === 0 && <div className="muted small">No texts. Choose Text on the toolbar and click the page where the text should go, or use the button above. A text can be dragged on the page.</div>}
                   {notes.map((n) => (
                     <div key={n.id} className={`annotation-card${picked.includes(n.id) ? ' selected' : ''}`}>
-                      <button className="list-item" onClick={(e) => (!(e.ctrlKey || e.metaKey || e.shiftKey) && picked.length === 1 && picked[0] === n.id ? setPicked([]) : pick(n.id, e.ctrlKey || e.metaKey || e.shiftKey))}>
-                        {n.text.split('\n')[0] || '(empty)'}
-                      </button>
+                      {!picked.includes(n.id) && (
+                        <button className="list-item" onClick={(e) => (!(e.ctrlKey || e.metaKey || e.shiftKey) && picked.length === 1 && picked[0] === n.id ? setPicked([]) : pick(n.id, e.ctrlKey || e.metaKey || e.shiftKey))}>
+                          {n.text.split('\n')[0] || '(empty)'}
+                        </button>
+                      )}
                       {picked.includes(n.id) && (
                         <AnnotationEditor
                           annotation={n}

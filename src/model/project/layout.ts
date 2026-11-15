@@ -290,7 +290,7 @@ export function sanitizeLayout(raw: Partial<Record<keyof Layout, unknown>>, base
   };
 }
 
-/** A new layout with the defaults (landscape, white, no title, panels lettered A B C, equal scaling). */
+/** A new layout with the defaults (landscape, white, a title on top, panels lettered A B C, equal scaling). */
 export function defaultLayout(id: string, name: string, over: Partial<Pick<Layout, 'orientation' | 'background' | 'showTitle' | 'arrangement' | 'panels'>> = {}): Layout {
   const arrangement = over.arrangement ?? { kind: 'grid', cols: 2, rows: 1 };
   return {
@@ -303,7 +303,7 @@ export function defaultLayout(id: string, name: string, over: Partial<Pick<Layou
     scaling: { mode: 'smallest' },
     labelStyle: 'A',
     labelSizePt: 16,
-    showTitle: over.showTitle ?? false,
+    showTitle: over.showTitle ?? true,
     title: '',
     marginMm: 12,
     gapMm: 6,

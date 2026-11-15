@@ -329,7 +329,8 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   /** What a Y axis is made from: the values of its series, and the limits and ticks set for it. A baseline of 0 is always in range, as for bars. */
   const yInput = (binding: AxisBinding) => {
     const [cfg, values] = [binding === 'secondary' ? chart.y2Axis : chart.yAxis, allYBy(binding)];
-    return { values, includeZero: cfg.scale === 'linear' && (fromBaseline || nearZero(values)), min: cfg.min, max: cfg.max, majorInterval: cfg.majorInterval, tickCountHint: tickCountY };
+    // The Y axis starts at 0 unless a value is negative.
+    return { values, includeZero: cfg.scale === 'linear' && (fromBaseline || values.every((v) => v >= 0)), min: cfg.min, max: cfg.max, majorInterval: cfg.majorInterval, tickCountHint: tickCountY };
   };
   const axisInput = {
     x: { values: allX, includeZero: !timeX && xCfg.scale === 'linear' && nearZero(allX), min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) },

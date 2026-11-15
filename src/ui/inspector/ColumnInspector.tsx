@@ -26,6 +26,7 @@ import {
   composeCommands,
   patchAxis,
   clearPointStyle,
+  patchDistribution,
   patchLegend,
   patchPointStyle,
   patchStyle,
@@ -347,7 +348,11 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
           <GroupBox
             title={isDist ? 'Points' : titles.symbols}
             checked={st.showSymbols}
-            onCheckedChange={(v) => setStyle({ showSymbols: v })}
+            onCheckedChange={(v) => {
+              setStyle({ showSymbols: v });
+              // Box plots, violins and floating bars draw only the values chosen in "Show values"; with None the box would switch on and show nothing.
+              if (v && isDist && chart.distribution.points === 'none') run('Points on the plot', patchDistribution(chart.id, { points: 'all' }));
+            }}
             overridden={ov('showSymbols')}
           >
             <Field label="Color" overridden={ov('symbolColor')}>

@@ -81,7 +81,7 @@ describe('the results sheet', () => {
     const rows = descriptiveRows(0.99).filter((r) => !r.blank);
     expect(rows[0].label).toBe('Number of values');
     expect(rows.map((r) => r.label)).toContain('Lower 99% CI of mean');
-    expect(rows.map((r) => r.label)).toContain('99% CI of median');
+    expect(rows.map((r) => r.label)).not.toContain('99% CI of median');
     expect(rows.at(-1)!.label).toBe('Sum');
     expect(new Set(descriptiveRows(0.95).map((r) => r.key)).size).toBe(descriptiveRows(0.95).length);
   });
@@ -92,7 +92,7 @@ describe('the results sheet', () => {
     expect(byKey.n).toBe(5);
     expect(byKey.median).toBe(3);
     expect(byKey.sum).toBe(15);
-    expect(byKey.medianLo).toBeNull();
+    expect(byKey.medianLo).toBeUndefined();
   });
 
   it('writes numbers with five significant digits, and nothing for a value that is not available', () => {

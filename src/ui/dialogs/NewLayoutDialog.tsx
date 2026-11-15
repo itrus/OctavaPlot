@@ -17,7 +17,7 @@ export function NewLayoutDialog({ charts, initialChartId, onCreate, onClose }: {
   const [orientation, setOrientation] = useState<PageOrientation>('landscape');
   const [transparent, setTransparent] = useState(false);
   const [background, setBackground] = useState('#ffffff');
-  const [showTitle, setShowTitle] = useState(false);
+  const [showTitle, setShowTitle] = useState(true);
   const [mode, setMode] = useState<'standard' | 'array'>('standard');
   const [standardId, setStandardId] = useState('two');
   const [cols, setCols] = useState(2);
@@ -36,7 +36,8 @@ export function NewLayoutDialog({ charts, initialChartId, onCreate, onClose }: {
 
   return (
     <Modal title="New layout" confirmLabel="Create layout" onConfirm={create} onClose={onClose} wide>
-      <p className="muted">A layout is an A4 page of graphs, exported as one SVG or PNG. Graphs are scaled together, so their fonts and lines match.</p>
+      <p className="muted">A layout is an A4 page of graphs, exported as one SVG, PNG or PDF. Graphs are scaled together, so their fonts and lines match.</p>
+      <div className="layout-row">
       <fieldset className="layout-fieldset">
         <legend>Page</legend>
         <span className="switch-group" role="radiogroup" aria-label="Orientation" {...rovingOrientation.groupProps}>
@@ -60,6 +61,19 @@ export function NewLayoutDialog({ charts, initialChartId, onCreate, onClose }: {
         </label>
       </fieldset>
       <fieldset className="layout-fieldset">
+        <legend>Graphs or placeholders</legend>
+        <label className="choice-label">
+          <input type="radio" name="layout-fill" checked={!fill} onChange={() => setFill(false)} /> Placeholders only. Add graphs later, one at a time.
+        </label>
+        <label className="choice-label">
+          <input type="radio" name="layout-fill" checked={fill} disabled={charts.length === 0} onChange={() => setFill(true)} /> Fill the layout with graphs, starting with:
+        </label>
+        <select value={first} onChange={(e) => setFirst(e.target.value)} disabled={!fill || charts.length === 0} aria-label="First graph">
+          {charts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </fieldset>
+      </div>
+      <fieldset className="layout-fieldset">
         <legend>Arrangement of graphs</legend>
         <div className="choice-grid layout-choices" role="radiogroup" aria-label="Arrangement" {...rovingArrangement.groupProps}>
           {standards.map((s, i) => (
@@ -82,18 +96,6 @@ export function NewLayoutDialog({ charts, initialChartId, onCreate, onClose }: {
           </select>
           down
         </div>
-      </fieldset>
-      <fieldset className="layout-fieldset">
-        <legend>Graphs or placeholders</legend>
-        <label className="choice-label">
-          <input type="radio" name="layout-fill" checked={!fill} onChange={() => setFill(false)} /> Placeholders only. Add graphs later, one at a time.
-        </label>
-        <label className="choice-label">
-          <input type="radio" name="layout-fill" checked={fill} disabled={charts.length === 0} onChange={() => setFill(true)} /> Fill the layout with graphs, starting with:
-        </label>
-        <select value={first} onChange={(e) => setFirst(e.target.value)} disabled={!fill || charts.length === 0} aria-label="First graph">
-          {charts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
       </fieldset>
     </Modal>
   );

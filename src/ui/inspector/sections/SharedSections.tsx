@@ -7,7 +7,6 @@ import { FONT_FAMILIES } from '../../../model/graph/look';
 import { CHART_PX_MAX, CHART_PX_MIN, chartTextLook, createAnnotation } from '../../../model/defaults';
 import { AnnotationEditor } from './AnnotationEditor';
 import { DrawingList } from './DrawingEditor';
-import { chartPx2Pt } from '../../../model/units';
 import { focusWhenShown } from '../common/pendingFocus';
 import { newId } from '../../../model/ids';
 import { type AnnotationPlacer, nudgePatches } from '../../../chart/shared/scene/annotationPlace';
@@ -89,9 +88,6 @@ export function TextSections({ chart, groups, yName, dual, axes = true }: { char
         </Field>
           </>
         )}
-        <div className="muted small">
-          In any text of the graph (titles, names, labels, annotations): a subscript {'H_{2}O'}, a superscript {'m^{2}'} or {'x^{-1}'}; Greek letters and symbols by name {'\\mu \\alpha \\Delta \\pm \\times \\deg'}, with {'{}'} to end a name ({'\\mu{}m'}). Text without a backslash or a brace is written as typed.
-        </div>
       </Section>
       {axes && (
       <Section title="Axis titles">
@@ -411,7 +407,6 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
             setSelection({ kind: 'chart' });
           }}
           placer={placer}
-          size={{ widthPt: chartPx2Pt(chart.widthPx), heightPt: chartPx2Pt(chart.heightPx) }}
           fontLabel={FONT_FAMILIES.find((f) => f.value === chart.fontFamily)?.label ?? 'the graph'}
         />
       </Section>
@@ -468,9 +463,12 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
               run('Move annotation', composeCommands(...moves.map((m) => patchAnnotation(chart.id, m.id, m.patch))), `ann:${moves.map((m) => m.id).join()}:nudge`);
             }}
           >
-            <button className="list-item" onClick={(e) => setSelection(e.ctrlKey || e.metaKey || e.shiftKey ? toggleAnnotationSelection(selection, a.id, chart.annotations.map((x) => x.id)) : { kind: 'annotation', annotationId: a.id })}>
-              {a.text.split('\n')[0] || '(empty)'}
-            </button>
+            {/* The selected text has its name in the heading of its settings, so its row is not repeated above them. */}
+            {!isSel && (
+              <button className="list-item" onClick={(e) => setSelection(e.ctrlKey || e.metaKey || e.shiftKey ? toggleAnnotationSelection(selection, a.id, chart.annotations.map((x) => x.id)) : { kind: 'annotation', annotationId: a.id })}>
+                {a.text.split('\n')[0] || '(empty)'}
+              </button>
+            )}
             {isSel && (
               <AnnotationEditor
                 annotation={a}

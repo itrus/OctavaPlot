@@ -1,28 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { layoutPngSize, layoutTextGroups, layoutToPdf, layoutToPngBlob, layoutToSvgString, type LayoutDrawing } from '../../chart/export/layoutExport';
 import { buildExportReport } from '../../chart/export/exportReport';
 import { FONT_FAMILY } from '../../model/defaults';
 import type { Layout } from '../../model/types';
 import { ptToPx } from '../../model/units';
 import { useApp } from '../../state/AppContext';
-import { EXPORT_DPI_CHOICES, type ExportDpi } from '../../state/settings';
 import { downloadBlob } from '../../util/download';
-import { Field, SelectInput } from '../inspector/common/controls';
 import { browserFontAvailable, browserHasGlyph } from './browserFonts';
-import { copyReport, ReportBody } from './ReportBody';
+import { ReportBody } from './ReportBody';
 import { exportStatusText } from './exportJob';
-import { ExportButton, FORMATS, Tiles } from './ExportPanel';
+import { ExportButton, FORMATS, ResolutionOptions, Tiles } from './ExportPanel';
 import { useExportFileName } from './useExportFileName';
 import { useExportJob } from './useExportJob';
+import { FileSizeLine } from './FileSizeLine';
 
 /**
  * The export of a layout page, as a page of the inspector (as the graph has): the format, the resolution of a PNG (the one place a
- * resolution is chosen; both are remembered in Settings), the Export button, and the report of what the file will hold, which Copy
- * report puts on the clipboard as JSON.
+ * resolution is chosen; both are remembered in Settings), the Export button, and the report of what the file will hold.
  */
 export function LayoutExportPanel({ layout, drawing }: { layout: Layout; drawing: LayoutDrawing }) {
   const { project, settings, updateSettings, setStatus } = useApp();
-  const [copied, setCopied] = useState<string | null>(null);
   // One export at a time: while one runs the Export button is disabled, and a second start is ignored.
   const job = useExportJob(setStatus);
   const format = settings.exportFormat;
@@ -50,6 +47,11 @@ export function LayoutExportPanel({ layout, drawing }: { layout: Layout; drawing
   );
   const tooBig = report.raster?.exceedsCanvasLimit === true;
   const blocked = job.busy || tooBig;
+  // The file as it would be written, measured for the size line.
+  const measure = useMemo(
+    () => (tooBig ? null : async () => (format === 'svg' ? new Blob([layoutToSvgString(layout, project)]).size : format === 'pdf' ? (await layoutToPdf(layout, project)).blob.size : (await layoutToPngBlob(layout, project, dpi)).size)),
+    [layout, project, format, dpi, tooBig],
+  );
 
   const exportSvg = () =>
     job.start({
@@ -91,34 +93,23 @@ export function LayoutExportPanel({ layout, drawing }: { layout: Layout; drawing
     });
   };
   const start = () => void (format === 'svg' ? exportSvg() : format === 'pdf' ? exportPdf() : exportRaster());
-  const copy = async () => setCopied(await copyReport(report));
 
   return (
     <div className="export-panel">
       <Tiles items={FORMATS} format={format} onPick={(f) => updateSettings({ exportFormat: f })} />
 
-      <div className="insp-heading">Options</div>
-      <div className="insp-card">
-        <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : format === 'pdf' ? 'PDF has no resolution: it holds shapes and text, not a picture.' : 'Dots per inch of the A4 page. 600 dpi takes a few seconds. The starting value is in Settings.'}>
-          <SelectInput<string>
-            value={String(dpi)}
-            disabled={format !== 'png'}
-            options={EXPORT_DPI_CHOICES.map((d) => ({ value: String(d), label: `${d} dpi` }))}
-            onChange={(v) => updateSettings({ exportDpi: Number(v) as ExportDpi })}
-          />
-        </Field>
+      <ResolutionOptions format={format} dpi={dpi} what="page" onChange={(d) => updateSettings({ exportDpi: d })} />
+
+      <div className="insp-heading">Size</div>
+      <div className="insp-card export-size">
+        <ReportBody report={report} page="A4" compact />
+        <FileSizeLine measure={measure} />
       </div>
 
       <ExportButton fileName={fileName} disabled={blocked} onClick={start} />
-      <div className="muted small" role="status">{job.busy ? exportStatusText(job.state) : (copied ?? '')}</div>
+      <div className="muted small" role="status">{job.busy ? exportStatusText(job.state) : ''}</div>
       {tooBig && <div className="warnings" role="alert">⚠ {report.raster?.width} × {report.raster?.height} px is more than the browser can make. Lower the resolution, or choose SVG.</div>}
       {job.state.phase === 'failed' && job.state.error && <div className="warnings" role="alert">⚠ {job.state.error}</div>}
-
-      <div className="insp-heading">Report</div>
-      <div className="insp-card">
-        <ReportBody report={report} page="A4" />
-        <button onClick={() => void copy()} title="Copy the report above as JSON text">Copy report</button>
-      </div>
     </div>
   );
 }

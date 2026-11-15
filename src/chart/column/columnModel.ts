@@ -253,7 +253,8 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     const resolved = resolveAxis(
       {
         values: pool.values,
-        includeZero: pool.hasBars && config.scale === 'linear',
+        // The axis starts at 0 for every chart unless a value is negative (bars always keep their baseline in range).
+        includeZero: config.scale === 'linear' && (pool.hasBars || pool.values.every((v) => v >= 0)),
         min: config.min,
         max: config.max,
         majorInterval: config.majorInterval,

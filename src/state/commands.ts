@@ -528,17 +528,20 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
       }
       return out;
     };
-    // A type made to show error bars (a mean with error bars, XY charts, grouped bars and lines) starts with the SD, as a new chart of it
-    // does, when the graph had no spread: otherwise "Mean with error bars" would draw none. A spread already chosen is kept.
+    // The settings a type starts with (the spread of its error bars, the dots of a violin) are those of a new chart of it: one still at the
+    // default of the old type moves to the default of the new (a bar chart made from a mean with error bars has none; a mean made from
+    // a bar chart has the SD). One that was chosen on purpose is kept.
     const startSpread = defaultSummaryFor(type).spread;
+    const oldSpread = defaultSummaryFor(c.type).spread;
+    const dotsOf = (t: ChartType) => (t === 'violin' || t === 'groupedViolin' ? 'all' : 'none');
     const next: Chart = {
       ...c,
       type,
-      distribution: (type === 'violin' || type === 'groupedViolin') && c.distribution.points === 'none' ? { ...c.distribution, points: 'all' } : c.distribution,
+      distribution: c.distribution.points === dotsOf(c.type) && dotsOf(type) !== dotsOf(c.type) ? { ...c.distribution, points: dotsOf(type) } : c.distribution,
       layers: c.layers.map((l) => ({
         ...l,
         style: { ...l.style, ...TYPE_PRESETS[type] },
-        summary: l.summary.spread === 'none' && startSpread !== 'none' ? { ...l.summary, spread: startSpread } : l.summary,
+        summary: l.summary.spread === oldSpread && startSpread !== oldSpread ? { ...l.summary, spread: startSpread } : l.summary,
         groupOverrides: strip(l.groupOverrides),
         objectOverrides: strip(l.objectOverrides),
       })),
@@ -1021,6 +1024,8 @@ export const addLayout = (id: Id, over: Parameters<typeof defaultLayout>[2] = {}
   let name = 'Layout';
   for (let i = 2; existing.some((l) => l.name === name); i++) name = `Layout ${i}`;
   const layout = defaultLayout(id, name, over);
+  // A page with a title starts with the name of the layout as its title (it is the text drawn on top of the page, and can be edited).
+  if (layout.showTitle) layout.title = name;
   if (fillFrom !== undefined) {
     const start = Math.max(0, p.charts.findIndex((c) => c.id === fillFrom));
     layout.panels = layout.panels.map((_, i) => p.charts[start + i]?.id ?? null);

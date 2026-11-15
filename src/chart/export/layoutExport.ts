@@ -90,6 +90,11 @@ function masterLegendMarkup(laid: MasterLegendLayout, band: { x: number; y: numb
   return `<g id="master-legend">${entries.join('')}</g>`;
 }
 
+/** Space between the title of a page and the top of the highest graph, pt. */
+const TITLE_GAP_PT = 14;
+/** Font size of the title of a page, pt. */
+const TITLE_FONT_PT = 20;
+
 export function drawLayout(layout: Layout, project: Project, options: { metadata?: boolean; withoutDrawings?: boolean } = {}): LayoutDrawing {
   const panels = panelsOf(layout, project);
   const sizes: NaturalSize[] = layout.panels.map((id) => {
@@ -130,7 +135,11 @@ export function drawLayout(layout: Layout, project: Project, options: { metadata
   });
   if (frame.title && layout.title.trim() !== '') {
     const t = frame.title;
-    parts.unshift(textElement(`x="${n2(t.x + t.w / 2)}" y="${n2(t.y + t.h * 0.7)}" font-size="16" font-weight="700" text-anchor="middle" fill="#000000"`, layout.title));
+    // The title stands just above the highest graph, not at the top of its band: the graphs are centred in their panels, so with a page
+    // that is taller than they need the band would leave the title far from them. It never goes above the band.
+    const graphTop = Math.min(...placements.flatMap((pl) => (pl.graph ? [pl.graph.y] : [])));
+    const baseline = Number.isFinite(graphTop) ? Math.max(t.y + TITLE_FONT_PT * 0.8, graphTop - TITLE_GAP_PT) : t.y + t.h * 0.7;
+    parts.unshift(textElement(`x="${n2(t.x + t.w / 2)}" y="${n2(baseline)}" font-size="${TITLE_FONT_PT}" font-weight="700" text-anchor="middle" fill="#000000"`, layout.title));
   }
   if (frame.legend && master.legend.items.length > 0) parts.push(masterLegendMarkup(master.legend, frame.legend, layout.legend!.position));
   // Shapes and lines placed on the page, over the graphs and under the texts (the editor draws them itself, live: `withoutDrawings`).

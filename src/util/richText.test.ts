@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasMarkup, parseRichText, plainText } from './richText';
+import { hasMarkup, insertSymbol, parseRichText, plainText, SYMBOL_GROUPS, symbolOf } from './richText';
 
 const runs = (s: string) => parseRichText(s).map((r) => `${r.script}:${r.text}`);
 
@@ -67,5 +67,21 @@ describe('rich text: Greek letters, symbols and escapes', () => {
   it('is the same as typing the character: Greek typed directly needs nothing', () => {
     expect(hasMarkup('μmol/L')).toBe(false);
     expect(plainText('μmol/L')).toBe('μmol/L');
+  });
+});
+
+describe('rich text: the symbol list', () => {
+  it('every symbol of the list is a name that resolves to one character', () => {
+    for (const g of SYMBOL_GROUPS) for (const n of g.names) expect(plainText(`\${n}`), n).toBe(symbolOf(n));
+    expect(SYMBOL_GROUPS.flatMap((g) => g.names).every((n) => symbolOf(n) !== '')).toBe(true);
+  });
+  it('inserts a name at the cursor, or in place of the selection', () => {
+    expect(insertSymbol('10  m', 3, 3, 'mu')).toEqual({ text: '10 \mu m', caret: 7 });
+    expect(insertSymbol('x abc', 2, 5, 'pm')).toEqual({ text: 'x \pm', caret: 5 });
+  });
+  it('ends the name with {} when a letter follows, so that it does not run into it', () => {
+    const out = insertSymbol('m', 0, 0, 'mu');
+    expect(out.text).toBe('\mu{}m');
+    expect(plainText(out.text)).toBe('μm');
   });
 });

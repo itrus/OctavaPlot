@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { type AnnotationPlacer } from '../../../chart/shared/scene/annotationPlace';
-import { changeDrawingAnchor, skippedDrawings } from '../../../chart/shared/scene/drawings';
+import { skippedDrawings } from '../../../chart/shared/scene/drawings';
 import { DRAWING_LIMITS, drawingName, endSizeOf } from '../../../model/graph/drawingPresets';
 import { FONT_FAMILIES, LINE_STYLES } from '../../../model/graph/look';
 import type { Drawing, LineEnd, LineRoute, LineStyle } from '../../../model/types';
@@ -8,7 +8,7 @@ import { DeleteIcon } from '../../components/icons';
 import { Check, ColorInput, Field, GroupBox, NumField, SelectInput } from '../common/controls';
 import { takeFocusRequest } from '../common/pendingFocus';
 import { SLIDERS } from '../common/sliderRanges';
-import { QuickTexts } from './AnnotationEditor';
+import { briefText, QuickTexts } from './AnnotationEditor';
 
 const ENDS: ReadonlyArray<{ value: LineEnd; label: string }> = [
   { value: 'none', label: 'None' },
@@ -29,12 +29,10 @@ const ROUTES: ReadonlyArray<{ value: LineRoute; label: string }> = [
  * line (pattern, colour, opacity, width), the ends and the route of a line, the corners of a rectangle, the fill of a closed shape, its
  * anchor on a chart with axes, and Delete.
  */
-function DrawingEditor({ drawing: d, placer, size, fontLabel, onPatch, onDelete }: {
+function DrawingEditor({ drawing: d, placer, fontLabel, onPatch, onDelete }: {
   drawing: Drawing;
   /** Where the object is drawn, on a graph; without it (a page layout) it is placed on the page only. */
   placer?: AnnotationPlacer;
-  /** The size of the chart or page, pt. */
-  size: { widthPt: number; heightPt: number };
   /** The name of the font a text without its own is written in. */
   fontLabel: string;
   /** Records a change of this object as one undoable step; changes with the same key merge into one step. */
@@ -50,7 +48,7 @@ function DrawingEditor({ drawing: d, placer, size, fontLabel, onPatch, onDelete 
   return (
     <>
       {line && hasText && (
-        <GroupBox title="Text">
+        <GroupBox title={`Text: ${briefText(d.text ?? '')}`}>
           <Field label="Quick text" hint="Write one of these as the whole text">
             <QuickTexts value={d.text} onPick={(t) => set('Shape text', { text: t })} />
           </Field>
@@ -102,7 +100,7 @@ function DrawingEditor({ drawing: d, placer, size, fontLabel, onPatch, onDelete 
           </div>
         </GroupBox>
       )}
-      <GroupBox title="Line">
+      <GroupBox title={drawingName(d)}>
         <Field label="Pattern">
           <SelectInput<LineStyle> value={d.lineStyle} options={LINE_STYLES.map((o) => ({ value: o.value, label: o.label }))} onChange={(v) => set('Shape pattern', { lineStyle: v })} />
         </Field>
@@ -154,23 +152,7 @@ function DrawingEditor({ drawing: d, placer, size, fontLabel, onPatch, onDelete 
           )}
         </GroupBox>
       )}
-      {placer?.supportsData && (
-        <Field label="Anchor" hint="Page: a place on the page. Data values: places on the axes, so the object follows the axis range, a log scale and breaks.">
-          <SelectInput<'page' | 'data'>
-            value={d.anchor === 'data' ? 'data' : 'page'}
-            options={[
-              { value: 'page', label: 'Page' },
-              { value: 'data', label: 'Data values' },
-            ]}
-            onChange={(v) => {
-              const patch = changeDrawingAnchor(d, v, size.widthPt, size.heightPt, placer);
-              if (patch && Object.keys(patch).length > 0) set('Shape anchor', patch);
-            }}
-          />
-        </Field>
-      )}
       {placer && skippedDrawings([d], placer).length > 0 && <div className="field-note">A point of this object is outside the axis range, so it is not drawn.</div>}
-      <div className="muted small">Drag the object to move it, or one of its square handles to move that end. The arrow keys move a selected object (Shift 5%, Alt 0.1%); Delete removes it.</div>
       <button className="danger-button" onClick={onDelete}>
         <DeleteIcon />
         Delete
@@ -183,7 +165,7 @@ function DrawingEditor({ drawing: d, placer, size, fontLabel, onPatch, onDelete 
  * The drawing objects of a chart or page as a list, with the settings of the selected one under it. Several selected together share a
  * box with their line colour, width and Delete. Ctrl, Cmd or Shift on an entry takes it in or out of the selection.
  */
-export function DrawingList({ drawings, picked, onPick, onPatch, onRemove, placer, size, fontLabel }: {
+export function DrawingList({ drawings, picked, onPick, onPatch, onRemove, placer, fontLabel }: {
   drawings: readonly Drawing[];
   picked: readonly string[];
   /** Select one object; `toggle` adds it to the selection or takes it out. */
@@ -191,7 +173,6 @@ export function DrawingList({ drawings, picked, onPick, onPatch, onRemove, place
   onPatch: (ids: readonly string[], label: string, patch: Partial<Drawing>, key?: string) => void;
   onRemove: (ids: readonly string[]) => void;
   placer?: AnnotationPlacer;
-  size: { widthPt: number; heightPt: number };
   fontLabel: string;
 }) {
   const chosen = drawings.filter((d) => picked.includes(d.id));
@@ -219,11 +200,13 @@ export function DrawingList({ drawings, picked, onPick, onPatch, onRemove, place
         const on = picked.includes(d.id);
         return (
           <div key={d.id} className={`annotation-card${on ? ' selected' : ''}`}>
-            <button className="list-item" onClick={(e) => onPick(d.id, e.ctrlKey || e.metaKey || e.shiftKey)}>
-              {drawingName(d)}
-              {d.text ? `: ${d.text}` : ''}
-            </button>
-            {on && chosen.length === 1 && <DrawingEditor drawing={d} placer={placer} size={size} fontLabel={fontLabel} onPatch={(label, patch, key) => onPatch([d.id], label, patch, key)} onDelete={() => onRemove([d.id])} />}
+            {!(on && chosen.length === 1) && (
+              <button className="list-item" onClick={(e) => onPick(d.id, e.ctrlKey || e.metaKey || e.shiftKey)}>
+                {drawingName(d)}
+                {d.text ? `: ${d.text}` : ''}
+              </button>
+            )}
+            {on && chosen.length === 1 && <DrawingEditor drawing={d} placer={placer} fontLabel={fontLabel} onPatch={(label, patch, key) => onPatch([d.id], label, patch, key)} onDelete={() => onRemove([d.id])} />}
           </div>
         );
       })}
