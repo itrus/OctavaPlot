@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../defaults';
-import type { Annotation, Selection } from '../../types';
+import type { Annotation } from '../../types';
+import type { Selection } from '../../editor/types';
 import { addAnnotation, composeCommands, patchAnnotations, patchPointStyle } from '../../../state/commands';
 import { dataLayer } from '../style';
 import { mixedAnnotationKeys, mixedPointStyleKeys, selectedAnnotationIds, selectedPoints, selectionOfAnnotations, selectionOfPoints, toggleAnnotationSelection, togglePointSelection } from './multi';

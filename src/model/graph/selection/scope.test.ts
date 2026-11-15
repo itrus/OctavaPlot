@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../defaults';
-import type { Selection } from '../../types';
+import type { Selection } from '../../editor/types';
 import { historyReducer, initialHistory } from '../../../state/history';
 import { clearGroupStyleSettings, clearGroupSummarySettings, clearSummaryOverrides, composeCommands, patchStyle, patchSummary, resetStyle } from '../../../state/commands';
 import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectedGroupIds, selectionOfGroups, toggleGroupSelection } from './scope';

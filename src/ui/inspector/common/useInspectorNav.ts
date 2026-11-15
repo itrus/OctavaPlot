@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type UIEvent } from 'react';
-import { useApp } from '../../../state/AppContext';
+import { useNavigation } from '../../../state/AppContext';
 import { recallPlace, rememberPlace, type InspectorPage } from '../../../state/inspectorNav';
 import { PAGES, type Part } from './nav';
 
@@ -12,7 +12,7 @@ import { PAGES, type Part } from './nav';
  * it then shows the page and the tab it was left on, scrolled as far as it was (see state/inspectorMemory.ts).
  */
 export function useInspectorNav(graphId: string, pages: readonly InspectorPage[], lacks: readonly Part[] = []) {
-  const { inspectorNav } = useApp();
+  const { inspectorNav } = useNavigation();
   // Read once, when the inspector is built: the place it is left at is written below.
   const [left] = useState(() => recallPlace(graphId));
   const [page, setPage] = useState<InspectorPage>(left && pages.includes(left.page) ? left.page : pages.includes('graph') ? 'graph' : pages[0]);

@@ -1,3 +1,4 @@
+import { draggedPoints, type ShapeDrag } from '../interaction/drawingGesture';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { buildAnyModelCached, ChartCanvas, fitsPendingOf, previewDotCount } from '../../chart/anyModel';
 import { useFitsVersion } from '../components/useFitsVersion';
@@ -9,9 +10,9 @@ import { densePreviewNote, isDense, nearestDot } from '../../chart/shared/scene/
 import { hitFromTarget, type HitTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { groupedTooltipLines, heatTooltipLines, histTooltipLines, pieTooltipLines, tooltipLines, xyTooltipLines } from '../../chart/tooltip';
 import type { PreparedChart } from '../../model/table/preparedChart';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useGraphViewport, useNavigation, useSelection } from '../../state/AppContext';
 import { addAnnotation, addDrawing, composeCommands, patchAnnotation, patchDrawings, patchPointStyle, removeAnnotation, removeDrawings, resetAllDataSets } from '../../state/commands';
-import { createDrawing, draggedPoints, DRAWING_WIDTH, pointsOfDrag, presetById, type ShapeDrag } from '../../model/graph/drawingPresets';
+import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById } from '../../model/graph/drawingPresets';
 import { drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
 import { GraphicsMenu } from '../components/GraphicsMenu';
 import type { Drawing } from '../../model/types';
@@ -22,14 +23,16 @@ import { PointerIcon, ResetIcon, TextToolIcon } from '../components/icons';
 import { inspectorTargetFor } from '../inspector/common/nav';
 import type { Box } from '../../chart/shared/parts/labels';
 
-/** Drawing objects being moved (all the selected ones) or resized by a handle: where the drag began, how far it has gone, and where each object's points were drawn when it began (pt). */
 /** Space kept around the chart inside the canvas, in px. */
 const CANVAS_PAD = 24;
 const SCROLLBAR_ROOM = 17;
 
 export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const { chart, table, fit: curve } = prepared;
-  const { selection, setSelection, run, setStatus, zoom, setZoom, fitRequest, navigateInspector } = useApp();
+  const { selection, setSelection } = useSelection();
+  const { run, setStatus } = useCommands();
+  const { zoom, setZoom, fitRequest } = useGraphViewport();
+  const { navigateInspector } = useNavigation();
   // A fit that takes long is made in a worker: the graph is drawn without it (and says so) until useFitsVersion changes.
   const fitsVersion = useFitsVersion();
   const any = useMemo(() => buildAnyModelCached(chart, table, curve, { deferFits: true }), [chart, table, curve, fitsVersion]);

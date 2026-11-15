@@ -1,4 +1,5 @@
-import type { Chart, ChartStyle, ChartType, PointLabelCollision, PointLabelPlacement, PointLabelSource } from '../../../model/types';
+import { LABEL_DECIMALS_LIMITS, effectiveLabelSource } from '../../../model/options/pointLabelOptions';
+import type { Chart, ChartStyle, ChartType, PointLabelCollision, PointLabelPlacement } from '../../../model/types';
 import { measureText } from './text';
 
 /** Point-label constants (P: spec 23 L1539 leaves label behaviour unspecified). */
@@ -9,23 +10,6 @@ const LABEL_EPS = 1e-6;
 const REPEL_MAX_RING = 6;
 const LEADER_MIN_GAP_PT = 2;
 export const MAX_LABELS = 5000;
-export const LABEL_FONT_LIMITS = { min: 8, max: 40 } as const;
-export const LABEL_OFFSET_LIMITS = { min: -400, max: 400 } as const;
-export const LABEL_DECIMALS_LIMITS = { min: 0, max: 10 } as const;
-export const LABEL_AUTO_COLOR = '#000000';
-
-const LABEL_REASONS = {
-  needsSymbols: 'Point labels need Symbols to be shown.',
-  meanRowTitle: 'Mean markers have no single row; they are labelled with their value.',
-} as const;
-
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
-
-/** Mean markers summarise a data set, so only the value source applies. */
-export function effectiveLabelSource(type: ChartType, source: PointLabelSource): PointLabelSource {
-  return type === 'mean' ? 'value' : source;
-}
-
 /** Fixed digits, or 6 significant digits when decimals is null. Non-finite values give ''. */
 export function formatLabelValue(value: number, decimals: number | null): string {
   if (!Number.isFinite(value)) return '';
@@ -39,59 +23,7 @@ export function formatLabelValue(value: number, decimals: number | null): string
   return /^-0(\.0*)?$/.test(text) ? text.slice(1) : text;
 }
 
-interface LabelSourceState {
-  value: PointLabelSource;
-  enabled: boolean;
-  reason: string | null;
-}
-
-interface LabelAvailability {
-  available: boolean;
-  reason: string | null;
-  sources: LabelSourceState[];
-}
-
-/** Which label controls apply; reasons are data so the Inspector can show them. */
-export function labelAvailability(type: ChartType, style: Pick<ChartStyle, 'showSymbols'>): LabelAvailability {
-  const available = style.showSymbols;
-  const rowTitleOk = type !== 'mean';
-  return {
-    available,
-    reason: available ? null : LABEL_REASONS.needsSymbols,
-    sources: [
-      { value: 'rowTitle', enabled: available && rowTitleOk, reason: rowTitleOk ? null : LABEL_REASONS.meanRowTitle },
-      { value: 'value', enabled: available, reason: null },
-    ],
-  };
-}
-
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-
-/** Fix invalid label keys; returns the same object when everything is valid. */
-export function sanitizeLabelStyle<T extends ChartStyle>(style: T): T {
-  const out: T = { ...style };
-  const num = (v: unknown, fallback: number, lo: number, hi: number) =>
-    typeof v === 'number' && Number.isFinite(v) ? clamp(v, lo, hi) : fallback;
-  out.pointLabelFontSizePt = num(
-    style.pointLabelFontSizePt,
-    22,
-    LABEL_FONT_LIMITS.min,
-    LABEL_FONT_LIMITS.max,
-  );
-  out.pointLabelOffsetXPt = num(style.pointLabelOffsetXPt, 0, LABEL_OFFSET_LIMITS.min, LABEL_OFFSET_LIMITS.max);
-  out.pointLabelOffsetYPt = num(style.pointLabelOffsetYPt, 0, LABEL_OFFSET_LIMITS.min, LABEL_OFFSET_LIMITS.max);
-  const c = style.pointLabelColor;
-  if (c !== null && !(typeof c === 'string' && HEX_COLOR.test(c))) out.pointLabelColor = null;
-  const d = style.pointLabelDecimals;
-  if (d !== null) {
-    out.pointLabelDecimals =
-      typeof d === 'number' && Number.isFinite(d)
-        ? clamp(Math.round(d), LABEL_DECIMALS_LIMITS.min, LABEL_DECIMALS_LIMITS.max)
-        : null;
-  }
-  const keys = Object.keys(out) as Array<keyof T>;
-  return keys.every((k) => out[k] === style[k]) ? style : out;
-}
 
 /** Extra gap between neighbouring slots when a repelled label steps outwards (P). */
 const LABEL_REPEL_GAP_PT = 4;

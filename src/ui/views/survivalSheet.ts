@@ -1,5 +1,5 @@
 import { kaplanMeier, medianSurvival, readSurvivalSubjects } from '../../chart/survival/survivalModel';
-import type { Sheet } from '../../model/project/curveFit';
+import type { Sheet } from '../../model/project/resultSheet';
 import { withoutExcluded } from '../../model/table/exclusion';
 import type { DataTable } from '../../model/types';
 

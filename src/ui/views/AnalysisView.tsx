@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { analysesOf, analysisKindApplies, analysisColumns, analysisTypeInfo } from '../../model/project/analysis';
-import { curveFitSheet, type Sheet } from '../../model/project/curveFit';
+import { curveFitSheet } from '../../model/project/curveFit';
+import type { Sheet } from '../../model/project/resultSheet';
 import { FIT_LIMITS } from '../../model/options/fitOptions';
 import { newId } from '../../model/ids';
 import type { Analysis } from '../../model/types';
 import { describeValues, descriptiveRows, formatResult } from '../../stats/descriptive';
 import { FIT_MODELS, fitModelById, type FitModelId } from '../../stats/fitModels';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useNavigation, usePreferences, useProject } from '../../state/AppContext';
 import { newChartStart } from '../../state/settings';
 import { addChart, composeCommands, patchAnalysis, patchLook } from '../../state/commands';
 import { copyText, downloadBlob } from '../../util/download';
@@ -44,7 +45,10 @@ function descriptiveSheet(analysis: Analysis, table: Parameters<typeof analysisC
  * always current and are never stored. The cells can be selected and copied like those of a data table.
  */
 export function AnalysisView({ analysisId }: { analysisId: string }) {
-  const { project, run, setView, setStatus, settings } = useApp();
+  const { project } = useProject();
+  const { run, setStatus } = useCommands();
+  const { setView } = useNavigation();
+  const { settings } = usePreferences();
   const analysis = analysesOf(project).find((a) => a.id === analysisId);
   const table = analysis ? project.dataTables.find((t) => t.id === analysis.dataTableId) : undefined;
   const sheet = useMemo<Sheet | null>(() => {

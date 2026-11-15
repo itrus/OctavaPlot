@@ -504,4 +504,3 @@ export function GroupBox({
     </fieldset>
   );
 }
-

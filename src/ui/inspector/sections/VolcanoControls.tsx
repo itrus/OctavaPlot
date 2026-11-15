@@ -1,12 +1,12 @@
 import { VOLCANO_LIMITS } from '../../../model/options/volcanoOptions';
 import type { Chart } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { patchVolcano } from '../../../state/commands';
 import { ColorInput, Field, GroupBox, NumField, SelectInput } from '../common/controls';
 
 /** The settings of a volcano plot: what the Y column holds, the thresholds that make a point up or down, their colours and the labels. */
 export function VolcanoControls({ chart, counts }: { chart: Chart; counts: { up: number; down: number; ns: number } | undefined }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const v = chart.volcano;
   const set = (label: string, patch: Parameters<typeof patchVolcano>[1], key?: string) => run(label, patchVolcano(chart.id, patch), key);
   return (

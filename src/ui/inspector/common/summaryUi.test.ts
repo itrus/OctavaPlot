@@ -1,26 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { SummarySpec } from '../model/types';
-import {
-  DIRECTION_HINT,
-  centreChangeCompat,
-  centreName,
-  centreNoticeLines,
-  centreTitles,
-  datasetRowText,
-  describeCounts,
-  describeSpread,
-  describeSummary,
-  describeSummaryControls,
-  intervalCaptionLines,
-  parseConfidencePercent,
-  percentLabel,
-  spreadOptions,
-  spreadSelectModel,
-  staleSpread,
-  staleSpreadNote,
-  summaryTooltipLines,
-} from './describe';
-import { SPREADS_BY_CENTRE, computeGroupStats, effectiveSpreadOf } from './summary';
+import type { SummarySpec } from '../../../model/types';
+import { centreName, describeSpread, describeSummary, percentLabel, summaryTooltipLines } from '../../../model/presentation/summaryText';
+import { DIRECTION_HINT, centreChangeCompat, centreNoticeLines, centreTitles, datasetRowText, describeCounts, describeSummaryControls, intervalCaptionLines, parseConfidencePercent, spreadOptions, spreadSelectModel, staleSpread, staleSpreadNote } from './summaryUi';
+import { SPREADS_BY_CENTRE, computeGroupStats, effectiveSpreadOf } from '../../../stats/summary';
 
 const spec = (over: Partial<SummarySpec> = {}): SummarySpec => ({
   centre: 'mean',
@@ -75,6 +57,14 @@ describe('summaryTooltipLines', () => {
   it('lists n, centre and interval', () => {
     const s = computeGroupStats([1, 2, 3, 4, 5], spec({ spread: 'ci' }));
     expect(summaryTooltipLines(s, fmt)).toEqual(['n = 5', 'Mean: 3', '95% CI: 1.0368 to 4.9632']);
+  });
+
+  it('does not invent a confidence level for supplied confidence limits', () => {
+    const s = computeGroupStats([1, 2, 3, 4, 5], spec({ spread: 'ci' }));
+    expect(describeSpread('ci', null)).toBe('confidence interval of the mean');
+    expect(summaryTooltipLines({ ...s, confidenceLevel: null }, fmt)).toEqual([
+      'n = 5', 'Mean: 3', 'CI: 1.0368 to 4.9632',
+    ]);
   });
 
   it('puts the interval first for an error hit and flags hidden error bars', () => {

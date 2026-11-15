@@ -3,7 +3,7 @@ import { ANNOTATION_FONT_LIMITS, ANNOTATION_FONT_STEPS, ANNOTATION_LINE_SPACING 
 import { FONT_FAMILIES } from '../../../model/graph/look';
 import { type AnnotationPlacer, changeAnchor } from '../../../chart/shared/scene/annotationPlace';
 import type { Annotation, AnnotationAlign } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useHistory } from '../../../state/AppContext';
 import { DeleteIcon, RedoIcon, UndoIcon } from '../../components/icons';
 import { ColorInput, Field, GroupBox, NumField, SelectInput } from '../common/controls';
 import { takeFocusRequest } from '../common/pendingFocus';
@@ -73,7 +73,7 @@ export function AnnotationEditor({ annotation: a, placer, resultHint, fontLabel,
   onPatch: (label: string, patch: Partial<Annotation>, key?: string) => void;
   onDelete: () => void;
 }) {
-  const { undo, redo, canUndo, canRedo } = useApp();
+  const { undo, redo, canUndo, canRedo } = useHistory();
   const textRef = useRef<HTMLTextAreaElement | null>(null);
   const set = (label: string, patch: Partial<Annotation>, key?: string) => onPatch(label, patch, key ? `ann:${a.id}:${key}` : undefined);
   const toggle = (key: 'bold' | 'italic' | 'underline', label: string) => set(label, { [key]: a[key] ? undefined : true });

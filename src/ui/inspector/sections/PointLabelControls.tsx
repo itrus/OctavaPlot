@@ -1,5 +1,6 @@
 import type { ChartStyle, ChartType, PointLabelCollision, PointLabelSource } from '../../../model/types';
-import { LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS, LABEL_DECIMALS_LIMITS, type Box, type PointLabelModel } from '../../../chart/shared/parts/labels';
+import { type Box, type PointLabelModel } from '../../../chart/shared/parts/labels';
+import { LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS, LABEL_DECIMALS_LIMITS } from '../../../model/options/pointLabelOptions';
 import { Check, ColorInput, Field, GroupBox, NumField, type Overridden, SelectInput } from '../common/controls';
 import {
   KEEP_LABEL_PATCH,

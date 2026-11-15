@@ -1,5 +1,6 @@
 import type { Drawing, DrawingPoint, LineEnd, LineRoute } from '../types';
 import { newId } from '../ids';
+import { drawingFraction } from '../options/drawingOptions';
 
 /**
  * The drawing objects the toolbar offers, in three groups: shapes, lines, and lines with a text. Each is a starting point; after it is
@@ -122,17 +123,14 @@ export function pointsOfDrag(preset: DrawingPreset, a: { x: number; y: number },
   return preset.corners === 'tl-br' ? [{ x: l, y: t }, { x: r, y: bt }] : [{ x: l, y: bt }, { x: r, y: t }];
 }
 
-const unit = (v: number): number => Math.min(1, Math.max(0, v));
-
 /** A new object of a preset between two points (fractions of the chart or page), on the page (not anchored to data). */
 export function createDrawing(preset: DrawingPreset, from: DrawingPoint, to: DrawingPoint, look: DrawingLook, id: string = newId('drw')): Drawing {
   const width = clampDrawing('widthPt', look.widthPt ?? 1);
   return {
     id,
     shape: preset.shape,
-    // Held to the page, as a file is read and a move is made: an object placed by a click near the edge would otherwise change when the project is opened again.
-    from: { xFrac: unit(from.xFrac), yFrac: unit(from.yFrac) },
-    to: { xFrac: unit(to.xFrac), yFrac: unit(to.yFrac) },
+    from: { xFrac: drawingFraction(from.xFrac), yFrac: drawingFraction(from.yFrac) },
+    to: { xFrac: drawingFraction(to.xFrac), yFrac: drawingFraction(to.yFrac) },
     ...(preset.route && preset.route !== 'straight' ? { route: preset.route } : {}),
     ...(preset.start && preset.start !== 'none' ? { start: preset.start } : {}),
     ...(preset.end && preset.end !== 'none' ? { end: preset.end } : {}),
@@ -180,21 +178,3 @@ export const endSizeOf = (d: Pick<Drawing, 'endSizePt' | 'widthPt'>, kind: LineE
 
 /** A setting of an object held to its limits (a typed value, a value read from a file). */
 export const clampDrawing = (key: keyof typeof DRAWING_LIMITS, v: number): number => Math.min(DRAWING_LIMITS[key].max, Math.max(DRAWING_LIMITS[key].min, v));
-
-/** A move or a resize of drawing objects in progress: where the pointer started, how far it has gone, and the objects with their points (pt) when it began. */
-export interface ShapeDrag {
-  mode: 'move' | 'from' | 'to';
-  start: { x: number; y: number };
-  delta: { x: number; y: number };
-  items: Array<{ drawing: Drawing; from: { x: number; y: number }; to: { x: number; y: number } }>;
-}
-
-/** The live points of an object being moved or resized, pt: a move shifts both, a handle one. */
-export function draggedPoints(it: ShapeDrag['items'][number], d: Pick<ShapeDrag, 'mode' | 'delta'>) {
-  const shift = (q: { x: number; y: number }) => ({ x: q.x + d.delta.x, y: q.y + d.delta.y });
-  if (d.mode === 'move') return { from: shift(it.from), to: shift(it.to) };
-  // A handle of a straight line close to across or to up and down puts it exactly so, from its other end.
-  const straight = it.drawing.shape === 'line' && (it.drawing.route ?? 'straight') === 'straight';
-  if (d.mode === 'from') return { from: straight ? snapToAxis(it.to, shift(it.from)) : shift(it.from), to: it.to };
-  return { from: it.from, to: straight ? snapToAxis(it.from, shift(it.to)) : shift(it.to) };
-}

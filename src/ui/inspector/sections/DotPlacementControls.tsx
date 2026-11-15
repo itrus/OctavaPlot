@@ -1,5 +1,5 @@
 import type { Chart } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { patchJitter } from '../../../state/commands';
 import { SLIDERS } from '../common/sliderRanges';
 import { Field, NumField, SelectInput } from '../common/controls';
@@ -11,7 +11,7 @@ type Placement = 'aligned' | 'jitter' | 'swarm';
 
 /** How the individual values sit sideways in their column: in a line, scattered by chance (the same every time), or as a beeswarm. */
 export function DotPlacementControls({ chart, disabled }: { chart: Chart; disabled: boolean }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const j = chart.jitter;
   const placement: Placement = !j.enabled ? 'aligned' : j.swarm ? 'swarm' : 'jitter';
   return (

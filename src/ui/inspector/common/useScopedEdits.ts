@@ -4,12 +4,12 @@ import { isGroupOverridden } from '../../../model/graph/style';
 import { isSummaryOverridden, validateSummaryPatch } from '../../../model/graph/summary';
 import { mixedStyleKeys, mixedSummaryKeys, type StyleScope } from '../../../model/graph/selection/scope';
 import type { Chart, ChartLayer, ChartStyle, Group, Id, SummarySpec } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import type { Overridden } from './controls';
 
 /** A change of style for a scope (a data set, several, or all), as one undo step that follows the same typing in the same place. */
 export function useRestyle(chart: Chart): (scope: StyleScope, patch: Partial<ChartStyle>) => void {
-  const { run } = useApp();
+  const { run } = useCommands();
   // A colour set by hand wins over the palette (a data set override is read after it), so the palette stays for the data sets that were not recoloured.
   return (scope, patch) => run('Change style', patchStyle(chart.id, scope, patch), `style:${scope}:${Object.keys(patch).join(',')}`);
 }
@@ -21,7 +21,7 @@ export function useRestyle(chart: Chart): (scope: StyleScope, patch: Partial<Cha
  * so they do not count as differing).
  */
 export function useScopedEdits(chart: Chart, layer: ChartLayer, scope: StyleScope, scopeIds: readonly Id[], inScope: ReadonlyArray<Pick<Group, 'id' | 'paletteIndex'>>) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const inScopeKey = inScope.map((g) => g.id).join();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const mixedStyle = useMemo(() => mixedStyleKeys(chart, layer, inScope), [chart, layer, inScopeKey]);

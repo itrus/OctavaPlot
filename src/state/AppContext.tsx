@@ -1,8 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import type { Command } from './commands';
+import { ProjectContext, CommandsContext, HistoryContext, SelectionContext, NavigationContext, StatusContext, RecoveryContext, PreferencesContext, GraphViewportContext, TableViewportContext, LayoutViewportContext } from './app/contexts';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { createEmptyProject, createExampleProject } from '../model/defaults';
 import { viewAfterRemoval } from '../model/project/viewOrder';
-import type { Project, Selection, ViewRef } from '../model/types';
-import type { Command } from './commands';
+import type { Project } from '../model/types';
+import type { Selection, ViewRef } from '../model/editor/types';
 import { historyReducer, initialHistory, scopeCoalesceKey } from './history';
 import { affectsRecovery, flushDecision, isConflict, protectionOf, recoveryStatusText, shouldWarnOnUnload, bannerVisible } from './recovery/recovery';
 import { currentSignature, newEditorId, writeRecovery } from './recovery/recoveryStore';
@@ -11,64 +13,7 @@ import { statusAfter, type StatusMemo } from './statusLine';
 import { loadSettings, newChartStart, saveSettings, sanitizeSettings, type Settings } from './settings';
 import { forgetPlaces, type InspectorTarget } from './inspectorNav';
 
-interface AppApi {
-  project: Project;
-  view: ViewRef;
-  setView: (v: ViewRef) => void;
-  selection: Selection;
-  setSelection: (s: Selection) => void;
-  /** Run a command as one undoable transaction. */
-  run: (label: string, command: Command, coalesceKey?: string) => void;
-  undo: () => void;
-  redo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  /** Replace the whole project (open file); clears history. */
-  replaceProject: (p: Project) => void;
-  /** Start a new project (example data, or blank tables when Settings says so) at the default chart size; settings are kept. Clears history. */
-  newProject: () => void;
-  /** True when the project has changes since it was last opened, created or saved to a file. */
-  hasUnsavedChanges: () => boolean;
-  /** Record that a project was just saved to a file: the one that was written (edits made while writing stay unsaved). */
-  markSaved: (written: Project) => void;
-  status: string;
-  setStatus: (s: string) => void;
-  autosaveOk: boolean;
-  /** The status-bar line about the browser recovery copy (empty when there is nothing to say), and whether it is a warning. */
-  recoveryText: { text: string; warning: boolean };
-  /** True while another tab has written the recovery copy and this tab has changes that could be lost: show the conflict banner. */
-  recoveryConflict: boolean;
-  /** Conflict: this tab's copy replaces the stored one, and this tab becomes the writer. */
-  keepThisTab: () => void;
-  /** Conflict: replace this tab's project with the stored copy. The caller confirms first. Returns false when the copy cannot be read. */
-  loadOtherTab: () => boolean;
-  /** Application preferences (autosave, export, default chart size). */
-  settings: Settings;
-  updateSettings: (patch: Partial<Settings>) => void;
-  /** Graph preview zoom, 0.25–2 (1 = 100%). */
-  zoom: number;
-  setZoom: (z: number) => void;
-  /** Data table zoom, 0.25–4 (1 = 100%); kept apart from the graph zoom. */
-  tableZoom: number;
-  setTableZoom: (z: number) => void;
-  /** Layout page zoom, 0.25–2 (1 = the whole page fits the window); kept apart from the others. */
-  layoutZoom: number;
-  setLayoutZoom: (z: number) => void;
-  /** Counts requests to refit the graph to the window (the Fit button). */
-  fitRequest: number;
-  requestFit: () => void;
-  /** The inspector page the last click on a chart element asked for; `n` changes on every request. */
-  inspectorNav: { target: InspectorTarget | null; n: number };
-  navigateInspector: (target: InspectorTarget) => void;
-}
-
-const Ctx = createContext<AppApi | null>(null);
-
-export function useApp(): AppApi {
-  const v = useContext(Ctx);
-  if (!v) throw new Error('useApp must be used inside <AppProvider>');
-  return v;
-}
+export { useProject, useCommands, useHistory, useSelection, useNavigation, useStatus, useRecovery, usePreferences, useGraphViewport, useTableViewport, useLayoutViewport } from './app/contexts';
 
 /**
  * The project to start with: the autosave (kept as a backup first, so a bad edit cannot replace the only copy), else a new one by
@@ -293,44 +238,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [protection, recovery, conflict, settings.autosave]);
   const recoveryConflict = bannerVisible({ conflict, changedSinceFile: project !== cleanProject.current, pending: project !== saved.current });
 
-  const api = useMemo<AppApi>(
-    () => ({
-      project,
-      view,
-      setView,
-      selection,
-      setSelection,
-      run,
-      undo,
-      redo,
-      canUndo: history.past.length > 0,
-      canRedo: history.future.length > 0,
-      replaceProject,
-      newProject,
-      hasUnsavedChanges,
-      markSaved,
-      status,
-      setStatus,
-      autosaveOk,
-      recoveryText,
-      recoveryConflict,
-      keepThisTab,
-      loadOtherTab,
-      settings,
-      updateSettings,
-      zoom,
-      setZoom,
-      tableZoom,
-      setTableZoom,
-      layoutZoom,
-      setLayoutZoom,
-      fitRequest,
-      requestFit,
-      inspectorNav,
-      navigateInspector,
-    }),
-    [project, view, selection, run, undo, redo, history.past.length, history.future.length, replaceProject, newProject, hasUnsavedChanges, markSaved, status, autosaveOk, recoveryText, recoveryConflict, keepThisTab, loadOtherTab, settings, updateSettings, zoom, tableZoom, layoutZoom, fitRequest, requestFit, inspectorNav, navigateInspector],
-  );
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
+  const projectApi = useMemo(() => ({ project, replaceProject, newProject, hasUnsavedChanges, markSaved }), [project, replaceProject, newProject, hasUnsavedChanges, markSaved]);
+  const commandsApi = useMemo(() => ({ run, setStatus }), [run, setStatus]);
+  const historyApi = useMemo(() => ({ undo, redo, canUndo, canRedo }), [undo, redo, canUndo, canRedo]);
+  const selectionApi = useMemo(() => ({ selection, setSelection }), [selection, setSelection]);
+  const navigationApi = useMemo(() => ({ view, setView, inspectorNav, navigateInspector }), [view, setView, inspectorNav, navigateInspector]);
+  const statusApi = useMemo(() => ({ status }), [status]);
+  const recoveryApi = useMemo(() => ({ autosaveOk, recoveryText, recoveryConflict, keepThisTab, loadOtherTab }), [autosaveOk, recoveryText, recoveryConflict, keepThisTab, loadOtherTab]);
+  const preferencesApi = useMemo(() => ({ settings, updateSettings }), [settings, updateSettings]);
+  const graphViewportApi = useMemo(() => ({ zoom, setZoom, fitRequest, requestFit }), [zoom, setZoom, fitRequest, requestFit]);
+  const tableViewportApi = useMemo(() => ({ tableZoom, setTableZoom }), [tableZoom, setTableZoom]);
+  const layoutViewportApi = useMemo(() => ({ layoutZoom, setLayoutZoom }), [layoutZoom, setLayoutZoom]);
 
-  return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
+  return (
+    <ProjectContext.Provider value={projectApi}>
+      <CommandsContext.Provider value={commandsApi}>
+        <HistoryContext.Provider value={historyApi}>
+          <SelectionContext.Provider value={selectionApi}>
+            <NavigationContext.Provider value={navigationApi}>
+              <StatusContext.Provider value={statusApi}>
+                <RecoveryContext.Provider value={recoveryApi}>
+                  <PreferencesContext.Provider value={preferencesApi}>
+                    <GraphViewportContext.Provider value={graphViewportApi}>
+                      <TableViewportContext.Provider value={tableViewportApi}>
+                        <LayoutViewportContext.Provider value={layoutViewportApi}>
+                          {children}
+                        </LayoutViewportContext.Provider>
+                      </TableViewportContext.Provider>
+                    </GraphViewportContext.Provider>
+                  </PreferencesContext.Provider>
+                </RecoveryContext.Provider>
+              </StatusContext.Provider>
+            </NavigationContext.Provider>
+          </SelectionContext.Provider>
+        </HistoryContext.Provider>
+      </CommandsContext.Provider>
+    </ProjectContext.Provider>
+  );
 }
