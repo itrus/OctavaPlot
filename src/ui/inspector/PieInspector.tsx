@@ -4,7 +4,7 @@ import { patchLook, patchStyle } from '../../state/commands';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { Chart, DataTable, PieLabelMode, PieOptions } from '../../model/types';
 import { useApp } from '../../state/AppContext';
-import type { InspectorPage } from '../../state/inspectorNav';
+import { inspectorShapeOf } from './common/nav';
 import { ColorInput, Field, GroupBox, NumField, SelectInput, TextInput, Check } from './common/controls';
 import { AnnotationsTab, DimensionsSection, LegendSection, PaletteField, TextSections } from './sections/SharedSections';
 import { LayersSection } from './sections/LayersSection';
@@ -16,12 +16,12 @@ import { displayName } from '../../chart/shared/parts/names';
 import { SLIDERS } from './common/sliderRanges';
 
 /** Pies and doughnuts have no axes or frame, so their formatting panel has fewer pages. */
-const PAGES: InspectorPage[] = ['graph', 'plot', 'legend', 'notes', 'export'];
+
 
 /** The formatting panel of pie and doughnut charts. */
 export function PieInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run, selection } = useApp();
-  const nav = useInspectorNav(chart.id, PAGES, ['datasets', 'frame']);
+  const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages, inspectorShapeOf(chart.type).lacks);
   const { shows } = nav;
   const layer = dataLayer(chart);
   const d = chart.pie;

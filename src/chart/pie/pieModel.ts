@@ -190,7 +190,9 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
     ? { cols: 1, rows: Math.max(1, rows.length), diameter: Math.min(plot.width * 0.92, Math.max(0, plot.height / Math.max(1, rows.length) - titleBand - barLine) * 5) }
     : pieGrid(Math.max(1, rows.length), plot.width, plot.height, roomX, roomY, titleBand);
   const cellW = plot.width / cols;
-  const cellH = plot.height / rowsDown;
+  // With several pies the block stands at the top, under the chart title, instead of being centred in the whole plot area (the title would be far from the pies).
+  // One pie keeps the centre. A pie's cell is as tall as its title, labels and diameter need.
+  const cellH = !bars && rows.length > 1 ? Math.min(plot.height / rowsDown, titleBand + 2 * roomY + diameter) : plot.height / rowsDown;
   const r = diameter / 2;
   // The height of a bar: a fifth of its length, as long as the row has room for it, its title and its labels.
   const barH = bars ? Math.min(diameter / 5, Math.max(0, cellH - titleBand - barLine)) : 0;

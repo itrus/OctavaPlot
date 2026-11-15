@@ -68,7 +68,7 @@ import { multiPointState, POINT_LABEL_KEYS, pointSelectionState } from './common
 import { mixedPointStyleKeys } from '../../model/graph/selection/multi';
 import { CalculationOptions,IntervalFields, LineAtField } from './sections/SummaryControls';
 import { displayName } from '../../chart/shared/parts/names';
-import type { InspectorPage } from '../../state/inspectorNav';
+import { inspectorShapeOf } from './common/nav';
 import { SLIDERS } from './common/sliderRanges';
 import { DotPlacementControls } from './sections/DotPlacementControls';
 
@@ -87,13 +87,12 @@ function DatasetSwatchChip({ style }: { style: ChartStyle }) {
 /** The value of the data set selector when several data sets are selected together. */
 const SEVERAL = '__several__';
 
-const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'analysis', 'notes', 'export'];
+
 /** The centre the bars and dots are drawn at, and its calculation options, are on the Plot page; Analysis stays for the charts that have a distribution to set. */
-const pagesOf = (type: Chart['type']): InspectorPage[] => (type === 'box' || type === 'violin' || type === 'floating' ? PAGES : PAGES.filter((p) => p !== 'analysis'));
 
 export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { selection, setSelection, run, setStatus } = useApp();
-  const nav = useInspectorNav(chart.id, pagesOf(chart.type));
+  const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages);
   const { shows } = nav;
   const layer = dataLayer(chart);
 

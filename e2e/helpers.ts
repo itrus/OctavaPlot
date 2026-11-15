@@ -55,3 +55,9 @@ export const openProject = (page: Page, json: string, name = 'test.oplot'): Prom
 /** Opens a page of the inspector's icon rail (the inspector starts on Graph). */
 export const railPage = (page: Page, name: 'Graph' | 'Plot' | 'Axes' | 'Legend' | 'Analysis' | 'Notes'): Promise<void> =>
   page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name }).click();
+
+/** Chooses an item of a menu of the menu bar: `menuItem(page, 'File', 'Save project')`. */
+export async function menuItem(page: Page, menu: string, item: string | RegExp): Promise<void> {
+  await page.getByRole('menubar').getByRole('menuitem', { name: menu, exact: true }).click();
+  await page.getByRole('menu', { name: menu }).getByRole('menuitem', { name: item }).click();
+}

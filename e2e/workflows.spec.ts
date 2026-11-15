@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { cell, drawing, navItem, openApp, openGraph, openTable, status } from './helpers';
+import { cell, drawing, menuItem, navItem, openApp, openGraph, openTable, status } from './helpers';
 
 test.describe('editing the data', () => {
   test('a typed value reaches the graph, and Undo takes it back', async ({ page }) => {
@@ -47,7 +47,7 @@ test.describe('graphs', () => {
     const graphs = page.locator('.nav-item').filter({ hasText: /BAR$/ });
     const count = await graphs.count();
 
-    await page.getByRole('button', { name: 'Duplicate' }).click();
+    await menuItem(page, 'Edit', 'Duplicate graph');
     await expect(graphs).toHaveCount(count + 1);
     await expect(status(page)).toContainText('Duplicated Graph 1.');
 
@@ -66,7 +66,7 @@ test.describe('files', () => {
     await openApp(page);
     await page.getByLabel('Project name').fill('Round trip');
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Save Project' }).click();
+    await menuItem(page, 'File', 'Save project');
     const file = await download;
     expect(file.suggestedFilename()).toMatch(/^Round_trip.*\.oplot$/);
     const path = await file.path();
@@ -76,7 +76,7 @@ test.describe('files', () => {
     expect(saved.charts.length).toBeGreaterThan(0);
 
     // Another project, then the saved one again through the file input of Open Project.
-    await page.getByRole('button', { name: 'New Project' }).click();
+    await menuItem(page, 'File', 'New project');
     await expect(status(page)).toHaveText('New project.');
     await page.locator('input[type="file"][accept*="oplot"]').setInputFiles({ name: file.suggestedFilename(), mimeType: 'application/json', buffer: Buffer.from(text) });
     await expect(page.getByLabel('Project name')).toHaveValue('Round trip');

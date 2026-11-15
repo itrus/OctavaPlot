@@ -15,6 +15,7 @@ import { downloadBlob } from '../../util/download';
 import { exportFileName } from '../../util/fileName';
 import { BatchExportDialog } from '../export/BatchExportDialog';
 import { useExportJob } from '../export/useExportJob';
+import { UndoRedo } from '../components/UndoRedo';
 
 /** The kind of page each folder holds. */
 const KIND = { tables: 'table', results: 'analysis', graphs: 'chart', layouts: 'layout' } as const satisfies Record<FolderKey, Exclude<ViewRef['kind'], 'folder'>>;
@@ -162,6 +163,8 @@ export function FolderView({ folder }: { folder: FolderKey }) {
         <span className="muted">{entries.length} {entries.length === 1 ? noun.one : noun.many}{count > 0 ? `, ${count} selected` : ''}</span>
       </header>
       <div className="folder-toolbar" role="toolbar" aria-label={`Actions for the selected ${noun.many}`}>
+        <UndoRedo />
+        <span className="topbar-sep" />
         <button onClick={() => setPicks(count === order.length ? NOTHING_PICKED : pickAll(order))} disabled={order.length === 0}>{count === order.length && count > 0 ? 'Clear selection' : 'Select all'}</button>
         <span className="topbar-sep" />
         <button onClick={() => open(chosen[0])} disabled={count !== 1}>Open</button>

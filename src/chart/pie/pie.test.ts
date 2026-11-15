@@ -136,3 +136,22 @@ describe('pie chart', () => {
     expect(parseProject(JSON.stringify(text)).charts[0].pie.labels).toBe('percent');
   });
 });
+
+describe('the pies under the chart title', () => {
+  it('stand close under it when there are several, however tall the chart is', () => {
+    const { table, chart } = setup();
+    const tall = { ...chart, heightPx: chart.widthPx * 2 };
+    const m = buildPieModel(tall, table);
+    expect(m.pies).toHaveLength(2);
+    // The title of the first pie is within a few lines of text from the top of the plot area, not in the middle of the chart's height.
+    const top = Math.min(...m.pies.map((p) => p.titleAt.y));
+    expect(top).toBeLessThan(m.heightPt * 0.25);
+  });
+  it('keep the centre when there is one pie', () => {
+    const { table, chart } = setup();
+    const one = buildPieModel(chart, { ...table, rowCount: 1 });
+    const two = buildPieModel(chart, table);
+    expect(one.pies).toHaveLength(1);
+    expect(one.pies[0].cy).toBeGreaterThan(two.pies[0].cy);
+  });
+});

@@ -9,7 +9,7 @@ import type { ChartVariant } from '../../model/graph/chartVariant';
 import { useApp } from '../../state/AppContext';
 import { newChartStart } from '../../state/settings';
 import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, unlinkChart, removeAnalysis, type NewTableOptions } from '../../state/commands';
-import { DeleteIcon } from '../components/icons';
+import { useCommand } from '../components/appCommands';
 import { navFold, navStep } from './navKeys';
 import { NewAnalysisDialog } from '../dialogs/NewAnalysisDialog';
 import { NewLayoutDialog, type NewLayoutOptions } from '../dialogs/NewLayoutDialog';
@@ -213,6 +213,12 @@ export function Navigator() {
     setOpen((o) => ({ ...o, [folderOf[view.kind]]: true }));
     setRenaming(view.id);
   };
+  // The Edit, Data and Analyze menus act through these.
+  useCommand('duplicate-item', duplicateCurrent);
+  useCommand('rename-item', renameCurrent);
+  useCommand('delete-item', deleteCurrent);
+  useCommand('new-table', () => setDialog('table'));
+  useCommand('new-analysis', () => setDialog('analysis'));
   const newItem = (label: string, onClick: () => void) => (
     <button className="nav-item nav-new" onClick={onClick}>
       <span className="nav-icon">⊕</span> {label}
@@ -276,13 +282,6 @@ export function Navigator() {
             </button>
           ))}
         </div>
-        {current && (
-          <div className="nav-actions" role="group" aria-label={`Actions for ${current.name}`}>
-            <button onClick={duplicateCurrent} title="Make a copy of the item on screen">Duplicate</button>
-            <button onClick={renameCurrent} title="Rename the item on screen (or double-click it, or press F2)">Rename</button>
-            <button onClick={deleteCurrent} disabled={view.kind === 'table' && project.dataTables.length <= 1} title={view.kind === 'table' ? 'Delete this table and the graphs and results that use it (can be undone)' : 'Delete this item (can be undone)'}><DeleteIcon /> Delete</button>
-          </div>
-        )}
       </div>
       {/* In the page body, not in the (sliding) panel, so the dialog is positioned against the window. */}
       {dialog === 'table' && createPortal(<NewTableDialog defaultSample={settings.newProjectSample} onCreate={createTable} onClose={() => setDialog(null)} />, document.body)}

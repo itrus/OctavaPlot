@@ -18,8 +18,7 @@ export function NewAnalysisDialog({ tables, initialTableId, onCreate, onClose }:
   const roving = useRoving(ANALYSIS_TYPES.map(() => true), ANALYSIS_TYPES.findIndex((a) => a.kind === kind), (i) => setKind(ANALYSIS_TYPES[i].kind), 'both');
   return (
     <Modal title="New analysis" confirmLabel="Create analysis" onConfirm={() => tableId && onCreate(tableId, kind)} onClose={onClose} confirmDisabled={!tableId}>
-      <p className="muted">Choose the analysis and the table it is made from. The results are calculated from the data, so they stay current as the data change.</p>
-      <div className="choice-grid" role="radiogroup" aria-label="Analysis" {...roving.groupProps}>
+      <div className="choice-grid choice-list" role="radiogroup" aria-label="Analysis" {...roving.groupProps}>
         {ANALYSIS_TYPES.map((a, i) => (
           <button key={a.kind} className={`choice-card${kind === a.kind ? ' selected' : ''}`} role="radio" aria-checked={kind === a.kind} {...roving.itemProps(i)} onClick={() => setKind(a.kind)}>
             <strong>{a.label}</strong>
@@ -27,7 +26,6 @@ export function NewAnalysisDialog({ tables, initialTableId, onCreate, onClose }:
           </button>
         ))}
       </div>
-      <p className="muted small">More analyses are planned.</p>
       <label className="choice-label">
         <span>Of table</span>
         <select value={tableId} onChange={(e) => setTableId(e.target.value)} aria-label="Data table" disabled={applicable.length === 0}>

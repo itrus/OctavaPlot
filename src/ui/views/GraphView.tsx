@@ -14,6 +14,7 @@ import { addAnnotation, addDrawing, composeCommands, patchAnnotation, patchDrawi
 import { createDrawing, draggedPoints, DRAWING_WIDTH, pointsOfDrag, presetById, type ShapeDrag } from '../../model/graph/drawingPresets';
 import { drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
 import { GraphicsMenu } from '../components/GraphicsMenu';
+import { UndoRedo } from '../components/UndoRedo';
 import type { Drawing } from '../../model/types';
 import { chartTextLook, createAnnotation } from '../../model/defaults';
 import { focusWhenShown } from '../inspector/common/pendingFocus';
@@ -381,6 +382,8 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   return (
     <div className="graph-view">
       <div className="toolbar">
+        <UndoRedo />
+        <span className="sep" aria-hidden="true" />
         <span className="switch-group tool-group" role="group" aria-label="Pointer tool">
           <button className={`switch icon-text${tool === 'select' ? ' on' : ''}`} aria-pressed={tool === 'select'} aria-label="Select" title="Select: click a part of the graph to select it and open its settings; drag a text, label or shape to move it (V)" onClick={() => setTool('select')}>
             <PointerIcon />

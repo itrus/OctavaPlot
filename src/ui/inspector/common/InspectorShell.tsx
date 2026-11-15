@@ -1,6 +1,6 @@
 import type { ReactNode, Ref, UIEvent } from 'react';
 import type { InspectorPage } from '../../../state/inspectorNav';
-import { AnalysisPageIcon, AxesPageIcon, ExportIcon, GraphPageIcon, LegendPageIcon, NotesPageIcon, PlotPageIcon } from '../../components/icons';
+import { GRAPH_PAGE_ICONS } from '../../components/icons';
 import { PlaceContext } from './controls';
 import { PAGES } from './nav';
 import { useRoving } from './roving';
@@ -13,16 +13,7 @@ export interface InspectorKit<P extends string> {
   icons: Record<P, () => ReactNode>;
 }
 
-const GRAPH_ICONS: Record<InspectorPage, () => ReactNode> = {
-  graph: GraphPageIcon,
-  plot: PlotPageIcon,
-  axes: AxesPageIcon,
-  legend: LegendPageIcon,
-  analysis: AnalysisPageIcon,
-  notes: NotesPageIcon,
-  export: ExportIcon,
-};
-const GRAPH_KIT: InspectorKit<InspectorPage> = { name: 'Graph', pages: PAGES, icons: GRAPH_ICONS };
+const GRAPH_KIT: InspectorKit<InspectorPage> = { name: 'Graph', pages: PAGES, icons: GRAPH_PAGE_ICONS };
 
 /** The icon rail beside the settings: one button per page the inspector has; Export, the last, stands apart at the foot. */
 function InspectorRail<P extends string>({ kit, pages, page, onPage }: { kit: InspectorKit<P>; pages: readonly P[]; page: P; onPage: (p: P) => void }) {

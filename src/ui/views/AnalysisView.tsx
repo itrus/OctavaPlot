@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { analysesOf, analysisKindApplies, analysisColumns, analysisTypeInfo } from '../../model/project/analysis';
 import { curveFitSheet, type Sheet } from '../../model/project/curveFit';
 import { FIT_LIMITS } from '../../model/options/fitOptions';
@@ -13,6 +13,8 @@ import { copyText, downloadBlob } from '../../util/download';
 import { exportFileName } from '../../util/fileName';
 import { NumField } from '../inspector/common/controls';
 import { ExportIcon } from '../components/icons';
+import { useCommand } from '../components/appCommands';
+import { UndoRedo } from '../components/UndoRedo';
 import { SheetTable, sheetText, useSheetSelection } from './ResultsSheet';
 import { survivalSheet } from './survivalSheet';
 
@@ -44,7 +46,7 @@ function descriptiveSheet(analysis: Analysis, table: Parameters<typeof analysisC
  * always current and are never stored. The cells can be selected and copied like those of a data table.
  */
 export function AnalysisView({ analysisId }: { analysisId: string }) {
-  const { project, run, setView, setStatus, settings } = useApp();
+  const { project, run, setView, setStatus, settings, resultsZoom } = useApp();
   const analysis = analysesOf(project).find((a) => a.id === analysisId);
   const table = analysis ? project.dataTables.find((t) => t.id === analysis.dataTableId) : undefined;
   const sheet = useMemo<Sheet | null>(() => {
@@ -74,10 +76,16 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
     run('New graph', composeCommands(addChart(id, table.id, newChartStart(settings), 'xyScatter'), patchLook(id, { fit: { analysisId: analysis.id, band: 'confidence', extend: false, showParameters: false } })));
     setView({ kind: 'chart', id });
   };
+  // The Data and Analyze menus act through these.
+  useCommand('export-csv', exportCsv);
+  useCommand('make-graph', () => curveFit && makeGraph());
+  useCommand('copy-results', () => void copy());
 
   return (
     <div className="analysis-view">
       <div className="toolbar">
+        <UndoRedo />
+        <span className="sep" />
         {curveFit && (
           <>
             <label className="inline-label">
@@ -109,13 +117,12 @@ export function AnalysisView({ analysisId }: { analysisId: string }) {
         </button>
         <button onClick={() => void copy()} title="Copy the selected cells, or all the results, as tab-separated text">Copy</button>
         {curveFit && <button onClick={makeGraph} title="Make a graph of the table that draws this curve and its band">Make graph</button>}
-        <span className="toolbar-info">of {table.name} · recalculated when the data change</span>
       </div>
       <div className="results-scroller" tabIndex={0} onKeyDown={selection.onKeyDown} onCopy={selection.onCopy} onMouseUp={selection.release} onMouseLeave={selection.release} aria-label="Results: select cells and press Ctrl+C to copy">
         {sheet.columns.length === 0 ? (
           <div className="empty">{curveFit ? 'The table has no Y series to fit.' : survival ? 'The table has no groups.' : 'The table has no columns to analyse.'}</div>
         ) : (
-          <SheetTable sheet={sheet} selection={selection} />
+          <div style={{ '--z': resultsZoom } as CSSProperties}><SheetTable sheet={sheet} selection={selection} /></div>
         )}
         <p className="muted small results-note">
           {survival

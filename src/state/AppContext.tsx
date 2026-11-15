@@ -51,6 +51,8 @@ interface AppApi {
   /** Data table zoom, 0.25–4 (1 = 100%); kept apart from the graph zoom. */
   tableZoom: number;
   setTableZoom: (z: number) => void;
+  resultsZoom: number;
+  setResultsZoom: (z: number) => void;
   /** Layout page zoom, 0.25–2 (1 = the whole page fits the window); kept apart from the others. */
   layoutZoom: number;
   setLayoutZoom: (z: number) => void;
@@ -107,6 +109,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [autosaveOk, setAutosaveOk] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [tableZoom, setTableZoom] = useState(1);
+  const [resultsZoom, setResultsZoom] = useState(1);
   const [layoutZoom, setLayoutZoom] = useState(1);
   const [fitRequest, setFitRequest] = useState(0);
   const requestFit = useCallback(() => setFitRequest((n) => n + 1), []);
@@ -288,7 +291,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const protection = protectionOf({ changedSinceFile: project !== cleanProject.current, recoveryHoldsThis: project === saved.current && !conflict });
   const recoveryText = useMemo(() => {
-    const text = recoveryStatusText({ protection, savedAt: recovery.savedAt, error: recovery.error, conflict, autosave: settings.autosave });
+    // Nothing has changed since the project was opened, created or saved to a file: the top bar says so.
+    const text = protection === 'file' ? 'All changes saved' : recoveryStatusText({ protection, savedAt: recovery.savedAt, error: recovery.error, conflict, autosave: settings.autosave });
     return { text, warning: conflict || recovery.error !== null };
   }, [protection, recovery, conflict, settings.autosave]);
   const recoveryConflict = bannerVisible({ conflict, changedSinceFile: project !== cleanProject.current, pending: project !== saved.current });
@@ -322,6 +326,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setZoom,
       tableZoom,
       setTableZoom,
+      resultsZoom,
+      setResultsZoom,
       layoutZoom,
       setLayoutZoom,
       fitRequest,
@@ -329,7 +335,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       inspectorNav,
       navigateInspector,
     }),
-    [project, view, selection, run, undo, redo, history.past.length, history.future.length, replaceProject, newProject, hasUnsavedChanges, markSaved, status, autosaveOk, recoveryText, recoveryConflict, keepThisTab, loadOtherTab, settings, updateSettings, zoom, tableZoom, layoutZoom, fitRequest, requestFit, inspectorNav, navigateInspector],
+    [project, view, selection, run, undo, redo, history.past.length, history.future.length, replaceProject, newProject, hasUnsavedChanges, markSaved, status, autosaveOk, recoveryText, recoveryConflict, keepThisTab, loadOtherTab, settings, updateSettings, zoom, tableZoom, resultsZoom, layoutZoom, fitRequest, requestFit, inspectorNav, navigateInspector],
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

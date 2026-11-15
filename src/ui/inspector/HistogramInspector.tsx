@@ -12,19 +12,19 @@ import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section
 import { FrameSection } from './sections/LookControls';
 import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';
-import type { InspectorPage } from '../../state/inspectorNav';
+import { inspectorShapeOf } from './common/nav';
 import { useInspectorNav } from './common/useInspectorNav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
 import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, PaletteField, TextSections } from './sections/SharedSections';
 import { AxisLimits } from './XyInspector';
 import { SLIDERS } from './common/sliderRanges';
 
-const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'notes', 'export'];
+
 
 /** The formatting panel of histograms and cumulative distributions of a column table. */
 export function HistogramInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run } = useApp();
-  const nav = useInspectorNav(chart.id, PAGES);
+  const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages);
   const { shows } = nav;
   const model = useMemo(() => buildHistogramModel(chart, table), [chart, table]);
   const layer = dataLayer(chart);

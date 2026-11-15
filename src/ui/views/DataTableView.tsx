@@ -7,7 +7,7 @@ import { newId } from '../../model/ids';
 import { addAnalysis, addGroup, changeTableKind, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setColumnTime, setExcluded, setFactor, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
 import { copyText, downloadBlob } from '../../util/download';
 import { exportFileName } from '../../util/fileName';
-import { AddColumnIcon, AddManyRowsIcon, CloseIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon, TableTypeIcon } from '../components/icons';
+import { AddColumnIcon, AddManyRowsIcon, CloseIcon, ExcludeIcon, FitCurveIcon, IncludeIcon, TableTypeIcon } from '../components/icons';
 import { isCsvFile, tableToCsv, type CsvExportMode } from '../data/csv';
 import { excludedCount } from '../../model/table/exclusion';
 import { ChangeTableTypeDialog } from '../dialogs/ChangeTableTypeDialog';
@@ -24,6 +24,9 @@ import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../../model/tab
 import { type CellBounds, blockToText, formatCellFor, parseCellFor, planPaste, selectionStrings } from '../data/cellText';
 import { planFill, planSeries, suggestSeries } from '../data/fillSeries';
 import { gridJump } from '../data/gridKeys';
+import { useCommand } from '../components/appCommands';
+import type { TableAction } from './tableMenu';
+import { UndoRedo } from '../components/UndoRedo';
 
 // Sizes at 100% zoom, in px; the table multiplies them by its zoom.
 const BASE_ROW_H = 24;
@@ -731,10 +734,34 @@ export function DataTableView({ table }: { table: DataTable }) {
     run('New curve fit', addAnalysis(id, table.id, 'curvefit'));
     setView({ kind: 'analysis', id });
   };
+  // The Data and Analyze menus act through these.
+  useCommand('import-csv', () => csvRef.current?.click());
+  useCommand('export-csv', () => (excludedCount(table) > 0 ? setDialog('exportCsv') : exportCsv()));
+  useCommand('fit-curve', () => table.kind === 'xy' && fitCurve());
+  useCommand('table-action', (a) => {
+    const act: Record<TableAction, () => void> = {
+      type: () => setDialog('kind'),
+      'add-column': () => run(kindText.add.replace('+ ', ''), addGroup(table.id)),
+      'row-above': () => insertRow('above'),
+      'row-below': () => insertRow('below'),
+      'row-duplicate': duplicateSelectedRows,
+      'row-delete': deleteSelectedRows,
+      'rows-1000': () => appendCount(1000),
+      'rows-append': () => setDialog('append'),
+      'fill-series': () => setDialog('series'),
+      exclude: () => excludeSelection(true),
+      include: () => excludeSelection(false),
+      'x-type': () => table.kind === 'xy' && setDialog('time'),
+      factor: () => table.kind === 'grouped' && setDialog('factor'),
+    };
+    act[a as TableAction]?.();
+  });
 
   return (
     <div className="table-view">
       <div className="toolbar">
+        <UndoRedo />
+        <span className="sep" />
         <button className="icon-text" onClick={() => setDialog('kind')} title={`Table type: ${kindText.label}. Change the type of this table, or how its series are entered (single values, replicates, values already calculated): its data stay, and the choice decides what the columns mean and which graphs it can have`}>
           <TableTypeIcon /> Table type
         </button>
@@ -773,13 +800,6 @@ export function DataTableView({ table }: { table: DataTable }) {
             Factor…
           </button>
         )}
-        <span className="sep" />
-        <button className="icon-text" onClick={() => csvRef.current?.click()} title="Import CSV: choose a .csv or .tsv file, check what it will become, then replace this table with it (Undo restores it)">
-          <ImportIcon /> Import CSV
-        </button>
-        <button className="icon-text" onClick={() => (excludedCount(table) > 0 ? setDialog('exportCsv') : exportCsv())} title="Export CSV: download this table as a .csv file (a table with excluded values asks how to write them)">
-          <ExportIcon /> Export CSV
-        </button>
         {table.kind === 'xy' && (
           <>
             <span className="sep" />

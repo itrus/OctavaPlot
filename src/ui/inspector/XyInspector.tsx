@@ -45,7 +45,7 @@ import { useInspectorNav } from './common/useInspectorNav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
 import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
 import { displayName } from '../../chart/shared/parts/names';
-import type { InspectorPage } from '../../state/inspectorNav';
+import { inspectorShapeOf } from './common/nav';
 import { SLIDERS } from './common/sliderRanges';
 
 const axisCtx = (axis: AxisConfig, scale: YAxisScale): AxisEditContext => ({ min: axis.min, max: axis.max, majorInterval: axis.majorInterval, domain: scale.domain, log: scale.log });
@@ -103,11 +103,11 @@ export function AxisLimits({ chart, which, scale, name, canScale = true, canReve
 /** The value of the data set selector when several are selected together. */
 const SEVERAL = '__several__';
 
-const PAGES: InspectorPage[] = ['graph', 'plot', 'axes', 'legend', 'analysis', 'notes', 'export'];
+
 
 export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { project, selection, setSelection, run } = useApp();
-  const nav = useInspectorNav(chart.id, PAGES);
+  const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages);
   const { shows } = nav;
 
   const layer = dataLayer(chart);

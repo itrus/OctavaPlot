@@ -7,7 +7,7 @@ import { patchAxis, patchLook } from '../../state/commands';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SelectInput, TextInput } from './common/controls';
 import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';
-import type { InspectorPage } from '../../state/inspectorNav';
+import { inspectorShapeOf } from './common/nav';
 import { useInspectorNav } from './common/useInspectorNav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
 import { NumberListField } from './common/NumberListField';
@@ -30,12 +30,12 @@ function MarkField({ label, value, onChange }: { label: string; value: HeatmapOp
 }
 
 /** A heat map has no axes of numbers, no frame and no legend: its panel has the graph, plot and notes pages. */
-const PAGES: InspectorPage[] = ['graph', 'plot', 'notes', 'export'];
+
 
 /** The formatting panel of heat maps of a grouped table. */
 export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run } = useApp();
-  const nav = useInspectorNav(chart.id, PAGES, ['datasets', 'frame', 'legend']);
+  const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages, inspectorShapeOf(chart.type).lacks);
   const { shows } = nav;
   const o = chart.heatmap;
   const set = (label: string, patch: Partial<HeatmapOptions>, key?: string) => run(label, patchLook(chart.id, { heatmap: { ...o, ...patch } }), key);

@@ -553,9 +553,9 @@ function PaletteOptions() {
 /** How many of the first colours of a palette stay clearly apart for colour-blind viewers (measured, see colorVision.ts). */
 function SafeLine({ colors }: { colors: readonly string[] }) {
   const n = useMemo(() => safeColours(colors), [colors]);
-  if (n >= COMPARED_COLOURS) return <div className="small vision vision-ok">Safe for the first {COMPARED_COLOURS} colours</div>;
+  if (n >= COMPARED_COLOURS) return <div className="small vision vision-ok">Colorblind friendly for the first {COMPARED_COLOURS} colours</div>;
   if (n < 2) return <div className="small muted vision">First two colours clash</div>;
-  return <div className="small muted vision">Safe for the first {n} colours</div>;
+  return <div className="small muted vision">Colorblind friendly for the first {n} colours</div>;
 }
 
 /** An info button beside the palette menu; it opens a window with the colours, what the palette is and its source. */
@@ -642,7 +642,6 @@ export function PaletteField({ chart, hint }: { chart: Chart; hint: string }) {
               <i key={i} style={{ background: c }} title={c} />
             ))}
           </span>
-          <SafeLine colors={palette.colors} />
         </div>
       )}
     </div>

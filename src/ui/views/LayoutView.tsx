@@ -15,9 +15,11 @@ import { drawingElements, drawingPatchForPoints, drawnPoints, nudgeDrawings, typ
 import { hitFromTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
 import { SceneElements } from '../../chart/shared/scene/SceneElements';
 import { GraphicsMenu } from '../components/GraphicsMenu';
+import { useCommand } from '../components/appCommands';
+import { UndoRedo } from '../components/UndoRedo';
 import { DrawingList } from '../inspector/sections/DrawingEditor';
 import { ArrangementSketch, FreeSketch } from '../components/ArrangementSketch';
-import { ExportIcon, GraphPageIcon, LegendPageIcon, NotesPageIcon, PanelsPageIcon, PointerIcon, SheetPageIcon, TextToolIcon } from '../components/icons';
+import { LAYOUT_PAGE_ICONS, PointerIcon, TextToolIcon } from '../components/icons';
 import { LayoutExportPanel } from '../export/LayoutExportPanel';
 import { InspectorShell, type InspectorKit } from '../inspector/common/InspectorShell';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, TextInput } from '../inspector/common/controls';
@@ -35,7 +37,7 @@ const LAYOUT_KIT: InspectorKit<LayoutInspectorPage> = {
     { id: 'notes', label: 'Notes', title: 'Notes: texts placed on the page', heading: 'Format Notes' },
     { id: 'export', label: 'Export', title: 'Export this page as a picture or a vector file', heading: 'Export Layout' },
   ],
-  icons: { page: SheetPageIcon, panels: PanelsPageIcon, graphs: GraphPageIcon, legend: LegendPageIcon, notes: NotesPageIcon, export: ExportIcon },
+  icons: LAYOUT_PAGE_ICONS,
 };
 
 /** What choosing Array starts with; the numbers across and down are then typed. */
@@ -130,6 +132,8 @@ function LayoutPage({ layout }: { layout: Layout }) {
   // Texts on the page: the pointer tool (Select picks and drags; Text places a new text where the page is clicked), the selected text and a text being dragged.
   // `draw:<preset>` draws a shape or line where the page is dragged. What is selected is kept here: texts and objects of the page, one or several.
   const [tool, setTool] = useState<string>('select');
+  // The Format menu chooses the page of the inspector.
+  useCommand('layout-page', (p) => LAYOUT_PAGES.includes(p as LayoutInspectorPage) && setInspPage(p as LayoutInspectorPage));
   const drawPreset = tool.startsWith('draw:') ? presetById(tool.slice(5)) : undefined;
   const [picked, setPicked] = useState<string[]>([]);
   const [noteDrag, setNoteDrag] = useState<NoteDrag | null>(null);
@@ -362,6 +366,8 @@ function LayoutPage({ layout }: { layout: Layout }) {
   return (
     <div className="graph-view">
       <div className="toolbar">
+        <UndoRedo />
+        <span className="sep" aria-hidden="true" />
         <span className="switch-group tool-group" role="group" aria-label="Pointer tool">
           <button className={`switch icon-text${tool === 'select' ? ' on' : ''}`} aria-pressed={tool === 'select'} aria-label="Select" title="Select: click a text on the page to select it and open its settings; drag it to move it. Panels are moved under Panels (V)" onClick={() => setTool('select')}>
             <PointerIcon />

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { InspectorPage } from '../../state/inspectorNav';
 
 /** Small 16 px line icons; they inherit the text colour and are hidden from assistive technology (buttons keep their text). */
 function Icon({ children }: { children: ReactNode }) {
@@ -226,3 +227,24 @@ export const RedoIcon = () => (
     <path d="M13 6.5H6.5a3.5 3.5 0 000 7H9" />
   </Icon>
 );
+
+/** The icon of each page of a graph's inspector: on its rail and in the Format menu. */
+export const GRAPH_PAGE_ICONS: Record<InspectorPage, () => ReactNode> = {
+  graph: GraphPageIcon,
+  plot: PlotPageIcon,
+  axes: AxesPageIcon,
+  legend: LegendPageIcon,
+  analysis: AnalysisPageIcon,
+  notes: NotesPageIcon,
+  export: ExportIcon,
+};
+
+/** The icon of each page of a layout's inspector: on its rail and in the Format menu. */
+export const LAYOUT_PAGE_ICONS: Record<'page' | 'panels' | 'graphs' | 'legend' | 'notes' | 'export', () => ReactNode> = {
+  page: SheetPageIcon,
+  panels: PanelsPageIcon,
+  graphs: GraphPageIcon,
+  legend: LegendPageIcon,
+  notes: NotesPageIcon,
+  export: ExportIcon,
+};
