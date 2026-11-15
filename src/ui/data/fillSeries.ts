@@ -1,13 +1,7 @@
 import type { DataTable } from '../../model/types';
 import { rowTitleAt } from '../../model/table/rows';
 import type { CellEdit } from '../../state/commands';
-
-interface FillBounds {
-  r0: number;
-  r1: number;
-  c0: number;
-  c1: number;
-}
+import type { CellBounds } from './cellText';
 
 type FillPlan =
   | { ok: false; message: string }
@@ -29,7 +23,7 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en
  * whether a value is excluded stays with its own cell. The Row title column (col -1) is filled down with the others but is
  * never a source for, or part of, a fill to the right: a value column cannot hold a title. Pure: it plans the edits.
  */
-export function planFill(table: DataTable, b: FillBounds, direction: 'down' | 'right'): FillPlan {
+export function planFill(table: DataTable, b: CellBounds, direction: 'down' | 'right'): FillPlan {
   const lastRow = Math.min(b.r1, table.rowCount - 1);
   const lastCol = Math.min(b.c1, table.groups.length - 1);
   const edits: CellEdit[] = [];
@@ -56,30 +50,41 @@ export function planFill(table: DataTable, b: FillBounds, direction: 'down' | 'r
 
 type SeriesPlan = { ok: false; message: string } | { ok: true; edits: CellEdit[]; message: string };
 
-/** The number with the rounding noise of a sum taken off (0.1 + 0.2 is 0.3). */
-const clean = (v: number): number => Number(v.toPrecision(12));
+/** The decimals a number was written with (its shortest text), exponent counted. */
+function decimalsOf(v: number): number {
+  const [mantissa, exponent = '0'] = String(v).toLowerCase().split('e');
+  return Math.max(0, (mantissa.split('.')[1]?.length ?? 0) - Number(exponent));
+}
+
+/**
+ * The number with the rounding noise of a sum taken off (0.1 + 0.2 is 0.3): rounded to the decimals the start and the step were written
+ * with, so a long number the user typed (a time in milliseconds) is not rounded away.
+ */
+const clean = (v: number, decimals = 12): number => (decimals > 100 || !Number.isFinite(v) ? v : Number(v.toFixed(decimals)));
 
 /**
  * Fill the selection with a series: `start`, then `start + step`, `start + 2 step` ... down the rows of each selected column
  * (`down`) or across the columns of each selected row (`across`). The Row title column is left alone. Pure: it plans the edits.
  */
-export function planSeries(table: DataTable, b: FillBounds, start: number, step: number, direction: 'down' | 'across'): SeriesPlan {
+export function planSeries(table: DataTable, b: CellBounds, start: number, step: number, direction: 'down' | 'across'): SeriesPlan {
   if (!Number.isFinite(start) || !Number.isFinite(step)) return { ok: false, message: 'The start and the step must be numbers.' };
   const c0 = Math.max(0, b.c0);
   const lastRow = Math.min(b.r1, table.rowCount - 1);
   const lastCol = Math.min(b.c1, table.groups.length - 1);
   const edits: CellEdit[] = [];
+  const decimals = Math.min(100, Math.max(decimalsOf(start), decimalsOf(step)));
+  if (!Number.isFinite(start + Math.max(0, lastRow - b.r0, lastCol - c0) * step)) return { ok: false, message: 'The series would pass the largest number a cell can hold.' };
   if (direction === 'down') {
-    for (let c = c0; c <= lastCol; c++) for (let r = b.r0; r <= lastRow; r++) edits.push({ row: r, col: c, value: clean(start + (r - b.r0) * step) });
+    for (let c = c0; c <= lastCol; c++) for (let r = b.r0; r <= lastRow; r++) edits.push({ row: r, col: c, value: clean(start + (r - b.r0) * step, decimals) });
   } else {
-    for (let r = b.r0; r <= lastRow; r++) for (let c = c0; c <= lastCol; c++) edits.push({ row: r, col: c, value: clean(start + (c - c0) * step) });
+    for (let r = b.r0; r <= lastRow; r++) for (let c = c0; c <= lastCol; c++) edits.push({ row: r, col: c, value: clean(start + (c - c0) * step, decimals) });
   }
   if (edits.length === 0) return { ok: false, message: 'Select the cells to fill with a series.' };
   return { ok: true, edits, message: `Filled a series: ${plural(edits.length, 'cell', 'cells')}.` };
 }
 
 /** The start and step the series dialog offers: the first selected value and its distance to the second, or 1 and 1. */
-export function suggestSeries(table: DataTable, b: FillBounds, direction: 'down' | 'across'): { start: number; step: number } {
+export function suggestSeries(table: DataTable, b: CellBounds, direction: 'down' | 'across'): { start: number; step: number } {
   const c0 = Math.max(0, b.c0);
   const at = (r: number, c: number) => table.groups[c]?.observations[r]?.value ?? null;
   const first = at(b.r0, c0);

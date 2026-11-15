@@ -19,10 +19,19 @@ describe('the one data layer of a graph', () => {
     const chart = raw.project.charts[0];
     chart.layers.push({ ...chart.layers[0], id: 'second', name: 'Second' }, { ...chart.layers[0], id: 'third', name: 'Third' });
     const { project, notes } = parseProjectWithNotes(JSON.stringify(raw));
-    expect(project.charts[0].layers.map((l) => l.id)).toEqual([chart.layers[0].id]);
+    expect(project.charts[0].layers).toHaveLength(1);
     expect(notes.some((n) => n.includes('layers') && n.includes('one layer') && n.includes('2'))).toBe(true);
     // Saved again, the graph has its one layer and reads without a note.
     expect(parseProjectWithNotes(stringifyProject(project)).notes).toEqual([]);
+  });
+
+  it('does not write an ID or a name for the layer, and reads a file that has them (older files do) without a note and without keeping them', () => {
+    const raw = saved();
+    expect('id' in raw.project.charts[0].layers[0] || 'name' in raw.project.charts[0].layers[0]).toBe(false);
+    Object.assign(raw.project.charts[0].layers[0], { id: 'layer_old1', name: 'Data' });
+    const { project, notes } = parseProjectWithNotes(JSON.stringify(raw));
+    expect(notes).toEqual([]);
+    expect('id' in project.charts[0].layers[0] || 'name' in project.charts[0].layers[0]).toBe(false);
   });
 
   it('says "was" for one layer that is not read', () => {

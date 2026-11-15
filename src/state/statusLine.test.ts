@@ -48,3 +48,14 @@ describe('the status line clears on the next action', () => {
     expect(statusAfter('B', cleared.seen, next).seen).toEqual({ text: 'B', ...next });
   });
 });
+
+describe('the same message set twice', () => {
+  it('is two messages when the caller counts them: the second is kept, not wiped as the first one cleared', () => {
+    const now = screen();
+    const first = statusAfter('New project.', null, now, 1);
+    const again = statusAfter('New project.', first.seen, now, 2);
+    expect(again.status).toBe('New project.');
+    expect(again.seen).toMatchObject({ seq: 2 });
+    expect(statusAfter('New project.', again.seen, { ...now, project: {} }, 2).status).toBe('');
+  });
+});

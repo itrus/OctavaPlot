@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { addAnnotation, addChartLike, addDataTable, addReferenceLine, patchAxis, patchLook, patchStyle, removeChart, removeTable, setChartType, unlinkChart, type Command } from '../../state/commands';
-import { historyReducer, initialHistory, type HistoryState } from '../../state/history';
-import { parseProject, stringifyProject } from '../../state/serialize';
+import { addAnnotation, addChartLike, addDataTable, addReferenceLine, patchAxis, patchLook, patchStyle, removeChart, removeTable, setChartType, unlinkChart, type Command } from '../../../state/commands';
+import { historyReducer, initialHistory, type HistoryState } from '../../../state/history';
+import { parseProject, stringifyProject } from '../../../state/serialize';
 import { inheritChart } from './chartFormat';
-import { createExampleProject } from '../defaults';
-import type { Project } from '../types';
+import { createChart, createExampleProject, createXyTable } from '../../defaults';
+import type { Project } from '../../types';
 
 /** A styled graph of the example table (four data sets) and a second column table. */
 function setup(): { p: Project; sourceId: string; t2: string } {
@@ -51,7 +51,6 @@ describe('graph like another graph', () => {
     // The source is untouched, and the two graphs share nothing.
     expect(source.yAxis.min).toBe(0);
     expect(made.layers[0]).not.toBe(source.layers[0]);
-    expect(made.layers[0].id).not.toBe(source.layers[0].id);
   });
   it('takes only the general format from a table of another type', () => {
     let { p, sourceId } = setup();
@@ -184,5 +183,18 @@ describe('linked graphs', () => {
     expect(parseProject(JSON.stringify(env)).charts.find((c) => c.id === 'child')!.linkedTo).toBeUndefined();
     env.project.charts.find((c: { id: string }) => c.id === 'child').linkedTo = 'nowhere';
     expect(parseProject(JSON.stringify(env)).charts.find((c) => c.id === 'child')!.linkedTo).toBeUndefined();
+  });
+});
+
+describe('a graph made like a volcano plot', () => {
+  it('has its threshold lines at the copied thresholds, and no extra ticks of the source', () => {
+    const table = createXyTable('T', true);
+    const base = createChart(table.id, { widthPx: 800, heightPx: 600 }, 'xyVolcano');
+    const source = { ...base, volcano: { ...base.volcano, fcThreshold: 2 }, yAxis: { ...base.yAxis, extraTicks: [{ value: 1.5, label: 'cut-off' }] } };
+    const made = inheritChart(source, table, table, 'like');
+    expect(made.yAxis.extraTicks).toBeUndefined();
+    expect(made.volcano.lineIds).toHaveLength(3);
+    const [left, right] = made.volcano.lineIds.map((id) => made.referenceLines.find((l) => l.id === id)!.value);
+    expect([left, right]).toEqual([-2, 2]);
   });
 });

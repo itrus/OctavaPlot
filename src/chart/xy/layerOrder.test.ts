@@ -30,7 +30,7 @@ describe('putting the data layers in another order', () => {
     const chart = make();
     const pointsId = idOf(chart, 'points');
     const before = sceneOrder(chart);
-    const z = (c: Chart, id: Id) => layersOf(c, table).find((l) => l.id === id)!.z;
+    const z = (c: Chart, id: Id) => layersOf(c, table).findIndex((l) => l.id === id);
     // The individual values (one layer for each series), which are not drawn while the means have symbols, lie right under the points: three places down puts them under an error bar layer.
     const steps = (p: Project, step: 1 | -1, n: number): Project => (n === 0 ? p : steps(project(chartOf(move(p, pointsId, step))), step, n - 1));
     const down = chartOf(steps(project(chart), -1, 3));

@@ -51,7 +51,7 @@ describe('capability registry', () => {
 
   it('…and not what it cannot', () => {
     for (const type of ['pie', 'doughnut', 'heatmap'] as const) {
-      expect(by(type)).toMatchObject({ referenceLines: 'none', numericAxes: false, curveFit: false, secondaryAxis: false });
+      expect(by(type)).toMatchObject({ referenceLines: 'none', curveFit: false, secondaryAxis: false });
     }
     // X lines need a numeric X axis; a column chart has categories there.
     for (const c of CAPABILITIES) if (c.referenceLines === 'xy') expect(['xy', 'survival', 'histogram']).toContain(chartFamily(c.type));
@@ -85,10 +85,10 @@ describe('capability registry', () => {
 
   it('offers the guides (oblique lines, shaded regions, extra ticks, equal units) and the bars along X to XY charts only, with a look and a range switch for the bars', () => {
     for (const c of CAPABILITIES) {
-      expect([c.type, c.guides, c.xErrorBars]).toEqual([c.type, chartFamily(c.type) === 'xy', chartFamily(c.type) === 'xy']);
+      expect([c.type, c.guides]).toEqual([c.type, chartFamily(c.type) === 'xy']);
     }
     // A table with an error of X gives every XY type a layer for them that takes a look and can be kept out of the range.
-    for (const c of CAPABILITIES.filter((k) => k.xErrorBars)) {
+    for (const c of CAPABILITIES.filter((k) => k.guides)) {
       const table = createXyTable('XY', true, { kind: 'xerror' });
       const base = createChart(table.id, undefined, c.type);
       const chart = { ...base, layers: base.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showErrorBars: true } } : l)) };

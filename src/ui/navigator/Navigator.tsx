@@ -22,6 +22,8 @@ const sameView = (a: ViewRef, b: ViewRef) => a.kind === b.kind && a.id === b.id;
 
 /** Sections that are not finished yet: shown with a lock and not reachable. */
 const LOCKED_SECTIONS: readonly string[] = [];
+/** Folders still in development: they carry an "alpha" label. */
+const ALPHA_FOLDERS: readonly FolderKey[] = ['results'];
 
 export function Navigator() {
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -146,6 +148,7 @@ export function Navigator() {
       </button>
       <button className="nav-folder" data-folder={key} onClick={() => setView({ kind: 'folder', id: key })} title={`See all ${FOLDER_TITLE[key].toLowerCase()} as pictures: select, rename, reorder or delete several`} aria-current={view.kind === 'folder' && view.id === key ? 'page' : undefined}>
         {FOLDER_TITLE[key]}
+        {ALPHA_FOLDERS.includes(key) && <span className="nav-badge nav-alpha" title="Still in development: it may change">alpha</span>}
       </button>
     </div>
   );
@@ -206,6 +209,13 @@ export function Navigator() {
       e.preventDefault();
       stops[to].focus();
     }
+  };
+  // Rename starts on the item on screen: its folder is opened first so that its row is there to edit.
+  const renameCurrent = () => {
+    if (view.kind === 'folder') return;
+    const folderOf = { table: 'tables', analysis: 'results', chart: 'graphs', layout: 'layouts' } as const;
+    setOpen((o) => ({ ...o, [folderOf[view.kind]]: true }));
+    setRenaming(view.id);
   };
   const newItem = (label: string, onClick: () => void) => (
     <button className="nav-item nav-new" onClick={onClick}>
@@ -273,6 +283,7 @@ export function Navigator() {
         {current && (
           <div className="nav-actions" role="group" aria-label={`Actions for ${current.name}`}>
             <button onClick={duplicateCurrent} title="Make a copy of the item on screen">Duplicate</button>
+            <button onClick={renameCurrent} title="Rename the item on screen (or double-click it, or press F2)">Rename</button>
             <button onClick={deleteCurrent} disabled={view.kind === 'table' && project.dataTables.length <= 1} title={view.kind === 'table' ? 'Delete this table and the graphs and results that use it (can be undone)' : 'Delete this item (can be undone)'}><DeleteIcon /> Delete</button>
           </div>
         )}

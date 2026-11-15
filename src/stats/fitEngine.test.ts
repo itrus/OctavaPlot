@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { InProcessWorker } from '../testing/fitEngines';
-import { FIT_ALGORITHM_VERSION, FIT_MODELS, fitCurve, fitFromSolution, isFailure, solveFit, type FitModelId, type FitResult } from './fit';
-import { DEFER_ABOVE_MS, WorkerFitEngine, mainThreadEngine, runFitRequest, shouldDeferFit, type FitRequest } from './fitEngine';
+import { FIT_ALGORITHM_VERSION, fitCurve, fitFromSolution, isFailure, solveFit, type FitResult } from './fit';
+import { FIT_MODELS, type FitModelId } from './fitModels';
+import { DEFER_ABOVE_MS, WorkerFitEngine, mainThreadEngine, shouldDeferFit } from './fitEngine';
+import { runFitRequest, type FitRequest } from './fitProtocol';
 
 const sample = (id: FitModelId, n: number) => {
   let seed = 11;
@@ -142,16 +144,14 @@ describe('the worker engine', () => {
 });
 
 describe('which fits are sent away', () => {
-  it('keeps small and cheap fits on the main thread and sends long ones away', () => {
+  it('keeps small and cheap line fits on the main thread and sends long ones away', () => {
     expect(shouldDeferFit('linear', 1000)).toBe(false);
-    expect(shouldDeferFit('hill_4pl', 100)).toBe(false);
-    expect(shouldDeferFit('hill_4pl', 2000)).toBe(true);
-    expect(shouldDeferFit('asymmetric_5pl', 500)).toBe(true);
+    expect(shouldDeferFit('polynomial', 1000)).toBe(false);
     expect(shouldDeferFit('linear', 100000)).toBe(true);
     expect(DEFER_ABOVE_MS).toBeLessThan(16);
   });
 
-  it('always sends the two-phase exponential away, whatever the number of points (its time depends on the data)', () => {
-    expect(shouldDeferFit('exp_two_phase', 6)).toBe(true);
+  it('always sends a nonlinear fit away, whatever the number of points (its time depends on the data)', () => {
+    for (const m of FIT_MODELS) if (m.id !== 'linear' && m.id !== 'polynomial') expect(shouldDeferFit(m.id, 6)).toBe(true);
   });
 });

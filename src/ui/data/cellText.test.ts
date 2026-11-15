@@ -17,6 +17,24 @@ describe('parseCell', () => {
   });
 });
 
+describe('parseCell: a true minus sign and the message about a point', () => {
+  it('reads U+2212 as the minus of a number, in the mantissa and in the exponent', () => {
+    expect(parseCell('−2.5')).toEqual({ ok: true, value: -2.5 });
+    expect(parseCell('1e−3')).toEqual({ ok: true, value: 0.001 });
+    expect(parseCell('−2,5', 'comma')).toEqual({ ok: true, value: -2.5 });
+  });
+  it('says "uses a decimal point" in comma mode only of a number written with one; other text is not a number', () => {
+    const point = parseCell('1.5', 'comma');
+    expect(point.ok).toBe(false);
+    if (!point.ok) expect(point.message).toMatch(/decimal point/);
+    for (const text of ['abc.def', '1.2.3', 'n.a.']) {
+      const r = parseCell(text, 'comma');
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.message).toBe(`"${text}" is not a number`);
+    }
+  });
+});
+
 describe('parseClipboardBlock without titles', () => {
   it('parses Excel-style tab/newline blocks with a trailing newline and blanks', () => {
     const r = parseClipboardBlock('1\t2\r\n3\t\r\n', false);
@@ -218,5 +236,17 @@ describe('planPaste size limit', () => {
   });
   it('refuses a titles paste past the limit too', () => {
     expect(planPaste(lines(100001), { r0: 0, r1: 0, c0: -1, c1: -1 }).ok).toBe(false);
+  });
+});
+
+describe('a copied block that ends in an empty cell', () => {
+  it('comes back with its last empty row (the reader takes one final line break for the end of the last row)', () => {
+    expect(parseClipboardBlock(blockToText(null, [[5], [6], [null]]), false)).toMatchObject({ ok: true, matrix: [[5], [6], [null]] });
+    expect(parseClipboardBlock(blockToText(['A', 'B', ''], [[], [], []]), true)).toMatchObject({ ok: true, titles: ['A', 'B', ''] });
+    expect(blockToText(null, [[1], [2]])).toBe('1\n2');
+  });
+  it('is refused by a paste that would end past the row limit of a table', () => {
+    expect(planPaste('1\n2', { r0: 99_999, r1: 99_999, c0: 0, c1: 0 })).toMatchObject({ ok: false });
+    expect(planPaste('1\n2', { r0: 99_998, r1: 99_998, c0: 0, c1: 0 })).toMatchObject({ ok: true });
   });
 });

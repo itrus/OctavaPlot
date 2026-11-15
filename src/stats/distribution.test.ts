@@ -73,6 +73,12 @@ describe('violin densities', () => {
     expect(densityBandwidth(s, 'light')).toBeCloseTo(h0 / 2, 12);
     expect(densityBandwidth(s, 'heavy')).toBeCloseTo(h0 * 2, 12);
   });
+  it('has a bandwidth for values of any magnitude (the squares of the deviations of values near 1e-200 underflow)', () => {
+    const tiny = [1e-200, 2e-200, 3e-200, 4e-200, 5e-200];
+    const h = densityBandwidth(tiny, 'medium');
+    expect(h).toBeGreaterThan(0);
+    expect(h / densityBandwidth(tiny.map((v) => v * 1e200), 'medium')).toBeCloseTo(1e-200, 0);
+  });
   it('has no density for constant data or fewer than 3 values', () => {
     expect(densityProfile([4, 4, 4, 4], { smoothing: 'medium', bandwidth: null, trim: 'sample' })).toBeNull();
     expect(densityProfile([1, 2], { smoothing: 'medium', bandwidth: null, trim: 'sample' })).toBeNull();

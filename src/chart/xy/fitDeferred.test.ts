@@ -114,8 +114,8 @@ describe('a graph with a fit that is made in the worker', () => {
     const chart = chartOf(t);
     buildXyModel(chart, t, twoPhase({ level: 0.95 }), { deferFits: true });
     expect(engine.requests).toHaveLength(2);
-    // The level is changed while both series are still being fitted.
-    const m = buildXyModel(chart, t, twoPhase({ level: 0.9 }), { deferFits: true });
+    // The model is changed while both series are still being fitted (a change of the level would not start a fit).
+    const m = buildXyModel(chart, t, twoPhase({ model: 'exp_decay' }), { deferFits: true });
     expect(m.fitsPending).toBe(2);
     expect(engine.requests.slice(0, 2).every((r) => r.aborted)).toBe(true);
     expect(engine.requests).toHaveLength(4);

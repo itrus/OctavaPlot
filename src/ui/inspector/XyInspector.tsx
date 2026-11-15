@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { useScopedEdits } from './common/useScopedEdits';
 import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext, type YAxisScale } from '../../chart/shared/axes/scales';
 import { buildAnyModelCached } from '../../chart/anyModel';
 import { useFitsVersion } from '../components/useFitsVersion';
@@ -6,7 +7,7 @@ import { capabilitiesOf } from '../../model/graph/capabilities';
 import { chartFamily, supportsHorizontal } from '../../model/graph/chartTypes';
 import { layoutOf, summaryFormatInfo, xySeries } from '../../model/table/tableLayout';
 import { hasFactors, seriesPaletteIndex, usesFactors } from '../../model/table/factors';
-import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/graph/summary';
+import { resolveSummary } from '../../model/graph/summary';
 import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from './common/summaryUi';
 import { tooltipFmt } from '../../chart/tooltip';
 import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, OffsetSection } from './sections/LookControls';
@@ -15,12 +16,12 @@ import { DataSetOrder } from './sections/DataSetOrder';
 import { AxisStyleControls } from './sections/AxisStyleControls';
 import { bindingOf, bindingSelectState } from '../../chart/shared/axes/axes';
 import { IntervalFields, LineAtField } from './sections/SummaryControls';
-import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { AxisBinding, AxisConfig, Chart, ChartStyle, DataTable, LineConnect, LineStyle, SummarySpec } from '../../model/types';
 import { useCommands, useProject, useSelection } from '../../state/AppContext';
 import { MAX_LEGEND_SIZES } from '../../chart/shared/scene/sizeLegend';
 import { NumberListField } from './common/NumberListField';
-import { clearGroupStyleSettings, clearGroupSummarySettings, composeCommands, patchAxis, patchChart, patchLook, patchStyle, patchSummary, patchSurvival } from '../../state/commands';
+import { patchAxis, patchChart, patchLook, patchStyle, patchSurvival } from '../../state/commands';
 import { LINE_STYLES } from '../../model/graph/look';
 import { analysesOf } from '../../model/project/analysis';
 import { resolveFit } from '../../model/options/fitOptions';
@@ -30,8 +31,8 @@ import { LayersSection } from './sections/LayersSection';
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { DataSetPicker } from './sections/DataSetPicker';
 import { DataSetReset } from './sections/DataSetReset';
-import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
-import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput, TextInput } from './common/controls';
+import { scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
+import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput, TextInput } from './common/controls';
 import { DotPlacementControls } from './sections/DotPlacementControls';
 import { VolcanoControls } from './sections/VolcanoControls';
 import { SymbolPicker } from './common/SymbolPicker';
@@ -162,33 +163,9 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const mixedBinding = inScopeBindings.some((b) => b !== inScopeBindings[0]);
   // The series the edits reach (hidden ones are not drawn, so they do not count as differing).
   const inScope = series.map((g, i) => ({ id: g.id, paletteIndex: seriesPaletteIndex(chart, series, i) })).filter((g) => scopeIds.includes(g.id) && !chart.hiddenGroupIds.includes(g.id));
-  const inScopeKey = inScope.map((g) => g.id).join();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const mixedStyle = useMemo(() => mixedStyleKeys(chart, layer, inScope), [chart, layer, inScopeKey]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const mixedSummary = useMemo(() => mixedSummaryKeys(layer, inScope.map((g) => g.id)), [layer, inScopeKey]);
-  // A setting these data sets have their own value for: the dot beside it is the way back to the graph's value; "mixed" when they differ.
-  const ov = (key: keyof ChartStyle): Overridden => {
-    const own = scopeIds.filter((id) => isGroupOverridden(layer, id, key));
-    const mixed = mixedStyle.has(key);
-    return own.length === 0 && !mixed ? false : { reset: own.length > 0 ? () => run('Reset setting', clearGroupStyleSettings(chart.id, own, [key])) : undefined, mixed };
-  };
-  const setStyle = (patch: Partial<ChartStyle>) => {
-    const recolours = 'symbolColor' in patch || 'lineColor' in patch || 'barFill' in patch;
-    const command = recolours && chart.paletteId !== null ? composeCommands(patchStyle(chart.id, scope, patch), patchChart(chart.id, { paletteId: null })) : patchStyle(chart.id, scope, patch);
-    run('Change style', command, `style:${scope}:${Object.keys(patch).join(',')}`);
-  };
+  const { ov, ovSum, setStyle, setSummary } = useScopedEdits(chart, layer, scope, scopeIds, inScope);
   // Summary of replicate values: the layer's for Global, the resolved one for a series.
   const spec: SummarySpec = !sample || scope === 'all' ? layer.summary : resolveSummary(layer, sample.id);
-  const ovSum = (key: keyof SummarySpec): Overridden => {
-    const own = scopeIds.filter((id) => isSummaryOverridden(layer, id, key));
-    const mixed = mixedSummary.has(key);
-    return own.length === 0 && !mixed ? false : { reset: own.length > 0 ? () => run('Reset setting', clearGroupSummarySettings(chart.id, own, [key])) : undefined, mixed };
-  };
-  const setSummary = (patch: Partial<SummarySpec>, label = 'Change summary') => {
-    if (!validateSummaryPatch(patch)) return;
-    run(label, patchSummary(chart.id, scope, patch), `summary:${scope}:${Object.keys(patch).join(',')}`);
-  };
   const errorOff = describeSummaryControls({ showErrorBars: st.showErrorBars, centre: spec.centre, spread: spec.spread }).errorOff;
   const stepSeries = (dir: 1 | -1) => {
     const i = selected ? series.indexOf(selected) : -1;

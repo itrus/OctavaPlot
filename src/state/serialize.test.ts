@@ -305,3 +305,14 @@ describe('the print width of earlier builds', () => {
     expect(stringifyProject(project)).not.toContain('printWidthMm');
   });
 });
+
+describe('a palette this version does not have', () => {
+  it('is replaced by the default palette, with a note, and a known one is kept', () => {
+    const p = createExampleProject();
+    const text = stringifyProject({ ...p, charts: p.charts.map((c) => ({ ...c, paletteId: 'gone' })) });
+    const r = parseProjectWithNotes(text);
+    expect(r.project.charts[0].paletteId).toBe('aaas');
+    expect(r.notes.some((n) => /palette/.test(n))).toBe(true);
+    expect(parseProjectWithNotes(stringifyProject(p)).notes).toEqual([]);
+  });
+});

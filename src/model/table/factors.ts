@@ -75,8 +75,8 @@ export function factorLayout(series: ReadonlyArray<SeriesLike>): FactorLayout | 
  * The palette slot of a series: its place inside its cluster when the chart clusters its series by factor (so a series keeps the colour
  * of its place in every cluster), else where it sat in its table. `firstColumns` are the first columns of the series, in order.
  */
-export function seriesPaletteIndex(chart: Pick<Chart, 'type' | 'groupedBy'>, firstColumns: ReadonlyArray<Pick<Group, 'factor' | 'seriesSlot'>>, i: number): number {
+export function seriesPaletteIndex(chart: Pick<Chart, 'type' | 'groupedBy'>, firstColumns: ReadonlyArray<Pick<Group, 'factor' | 'slot' | 'seriesSlot' | 'clusterSlot'>>, i: number): number {
   // With the columns grouped by series every series is a group of its own: no factor clusters, and each keeps its own colour.
   const layout = usesFactors(chart.type) && chart.groupedBy !== 'series' ? factorLayout(firstColumns.map((c) => ({ columns: [c] }))) : null;
-  return layout ? layout.position[i] : (firstColumns[i]?.seriesSlot ?? i);
+  return layout ? (firstColumns[i]?.clusterSlot ?? layout.position[i]) : (firstColumns[i]?.seriesSlot ?? firstColumns[i]?.slot ?? i);
 }

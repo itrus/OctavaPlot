@@ -3,7 +3,7 @@
  * a number outside its limits is held at the nearest limit. Used by the sanitize* functions of the settings.
  */
 
-export type Options<T extends string> = ReadonlyArray<{ value: T }>;
+type Options<T extends string> = ReadonlyArray<{ value: T }>;
 
 /** The values of a list of options. */
 export const valuesOf = <T extends string>(options: Options<T>): T[] => options.map((o) => o.value);
@@ -23,7 +23,7 @@ export const clampOrNull = (v: unknown, lo: number, hi: number, fallback: number
 export const numberOrNull = (v: unknown, fallback: number | null): number | null => (v === null ? null : typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 
 /** A string cut to `max` characters. */
-export const text = (v: unknown, max: number, fallback: string): string => (typeof v === 'string' ? v.slice(0, max) : fallback);
+export const text = (v: unknown, max: number, fallback: string): string => (typeof v === 'string' ? (v.length <= max ? v : Array.from(v).slice(0, max).join('')) : fallback);
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 

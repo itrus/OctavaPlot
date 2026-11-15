@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { useDismiss } from '../../components/useDismiss';
 import { createPortal } from 'react-dom';
 import { symbolPath } from '../../../chart/shared/parts/symbols';
 import { SYMBOL_SHAPES } from '../../../model/graph/look';
@@ -81,17 +82,7 @@ export function SymbolPicker({ shape, fillOpacity, disabled, onChange }: { shape
     const top = below + height <= window.innerHeight - 4 ? below : Math.max(4, b.top - 4 - height);
     setAt({ top, left: Math.max(4, Math.min(b.right - width, window.innerWidth - width - 4)) });
   }, [menu]);
-  useEffect(() => {
-    if (!menu) return;
-    const away = (e: PointerEvent) => !root.current?.contains(e.target as Node) && !pop.current?.contains(e.target as Node) && setMenu(false);
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setMenu(false);
-    document.addEventListener('pointerdown', away);
-    document.addEventListener('keydown', esc);
-    return () => {
-      document.removeEventListener('pointerdown', away);
-      document.removeEventListener('keydown', esc);
-    };
-  }, [menu]);
+  useDismiss(menu, [root, pop], () => setMenu(false));
   return (
     <div className="symbol-picker" ref={root}>
       <button className="symbol-trigger" disabled={disabled} aria-haspopup="true" aria-expanded={menu} onClick={() => setMenu(!menu)}>

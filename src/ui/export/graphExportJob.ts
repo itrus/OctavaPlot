@@ -1,19 +1,21 @@
-import { exportPixels, GRAPH_PNG_DPI } from '../../chart/export/pngDpi';
+import { exportPixels } from '../../chart/export/pngDpi';
 import type { Chart, DataTable, FitSettings } from '../../model/types';
 import { downloadBlob } from '../../util/download';
 import type { ExportFormat } from '../../state/settings';
 import type { ExportJob } from './exportJob';
 
 /** What one export of a graph needs besides the graph: the format and the name of the file. */
-export interface GraphExportRequest {
+interface GraphExportRequest {
   format: ExportFormat;
   /** The whole name of the file, with its extension and the date and time when Settings says so (see useExportFileName). */
   fileName: string;
+  /** The resolution of a PNG (SVG and PDF have none). */
+  dpi: number;
 }
 
-/** The export of a graph as a job for the export controller. The renderer (react-dom/server) is loaded on first use, not at startup. */
+/** The export of a graph as a job for the export controller. The export code is loaded on first use, not at startup. */
 export function graphExportJob(chart: Chart, table: DataTable, curve: FitSettings | undefined, req: GraphExportRequest): ExportJob {
-  const { format, fileName } = req;
+  const { format, fileName, dpi } = req;
   if (format === 'svg') {
     return {
       label: 'SVG',
@@ -42,20 +44,20 @@ export function graphExportJob(chart: Chart, table: DataTable, curve: FitSetting
       },
     };
   }
-  // A PNG is at the size of the graph, one pixel for each CSS pixel: only a page layout has a resolution to choose.
-  const { width: pw, height: ph } = exportPixels(chart, GRAPH_PNG_DPI);
+  // A PNG has the pixels the resolution gives the graph (96 dpi would be its size on screen).
+  const { width: pw, height: ph } = exportPixels(chart, dpi);
   return {
     label: 'PNG',
     pixels: { width: pw, height: ph },
     // Browsers limit the size of a canvas; a size above the limit fails or comes out blank.
-    tooBigMessage: `PNG export needs ${pw} × ${ph} px, more than the browser can make. Make the chart smaller, or export SVG.`,
+    tooBigMessage: `PNG export at ${dpi} dpi needs ${pw} × ${ph} px, more than the browser can make. Choose a lower resolution, or export SVG.`,
     work: async (phase) => {
       const { chartToPngBlob } = await import('../../chart/export/export');
       phase('rasterizing');
-      const blob = await chartToPngBlob(chart, table, curve);
+      const blob = await chartToPngBlob(chart, table, curve, dpi);
       phase('encoding');
       downloadBlob(blob, fileName);
-      return `Exported PNG, ${pw} × ${ph} px.`;
+      return `Exported PNG, ${pw} × ${ph} px (${dpi} dpi).`;
     },
   };
 }

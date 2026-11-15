@@ -5,18 +5,19 @@ import type { SymbolShape } from '../../../model/types';
 import { patchStyle } from '../../../state/commands';
 import { parseProject, stringifyProject } from '../../../state/serialize';
 import { chartToSvgString } from '../../export/export';
-import { SYMBOL_SHAPE_OPTIONS, symbolPath } from './symbols';
+import { SYMBOL_SHAPES } from '../../../model/graph/look';
+import { symbolPath } from './symbols';
 
 describe('symbols', () => {
   it('every offered shape has a path, centred where it is put, with no NaN', () => {
-    for (const o of SYMBOL_SHAPE_OPTIONS) {
+    for (const o of SYMBOL_SHAPES) {
       const d = symbolPath(o.value as SymbolShape, 100, 50, 10);
       expect(d.length, o.value).toBeGreaterThan(5);
       expect(d, o.value).not.toContain('NaN');
       const nums = [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
       expect(nums.every(Number.isFinite)).toBe(true);
     }
-    expect(SYMBOL_SHAPE_OPTIONS.map((o) => o.value)).toEqual(expect.arrayContaining(['triangleDown', 'hexagon', 'star', 'target', 'asterisk']));
+    expect(SYMBOL_SHAPES.map((o) => o.value)).toEqual(expect.arrayContaining(['triangleDown', 'hexagon', 'star', 'target', 'asterisk']));
   });
   it('the polygons stay within the size asked for', () => {
     for (const shape of ['triangleDown', 'hexagon', 'star'] as const) {

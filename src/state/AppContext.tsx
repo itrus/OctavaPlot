@@ -6,9 +6,9 @@ import { viewAfterRemoval } from '../model/project/viewOrder';
 import type { Project } from '../model/types';
 import type { Selection, ViewRef } from '../model/editor/types';
 import { historyReducer, initialHistory, scopeCoalesceKey } from './history';
-import { affectsRecovery, flushDecision, isConflict, protectionOf, recoveryStatusText, shouldWarnOnUnload, bannerVisible } from './recovery';
-import { currentSignature, newEditorId, writeRecovery } from './recoveryStore';
-import { backupAutosave, loadAutosave } from './serialize';
+import { affectsRecovery, flushDecision, isConflict, protectionOf, recoveryStatusText, shouldWarnOnUnload, bannerVisible } from './recovery/recovery';
+import { currentSignature, newEditorId, writeRecovery } from './recovery/recoveryStore';
+import { backupAutosave, loadAutosave, readAutosave } from './serialize';
 import { statusAfter, type StatusMemo } from './statusLine';
 import { loadSettings, newChartStart, saveSettings, sanitizeSettings, type Settings } from './settings';
 import { forgetPlaces, type InspectorTarget } from './inspectorNav';
@@ -19,16 +19,21 @@ export { useProject, useCommands, useHistory, useSelection, useNavigation, useSt
  * The project to start with: the autosave (kept as a backup first, so a bad edit cannot replace the only copy), else a new one by
  * the saved settings. A project that comes from the autosave was never saved as a file, and is said to be so.
  */
-const initialProject = (): { project: Project; recovered: boolean } => {
-  // Backed up even when it cannot be read (a file of a newer version, a damaged one): the first edit would otherwise overwrite the only copy.
-  backupAutosave();
-  const recovered = loadAutosave();
-  if (recovered) {
-    return { project: recovered, recovered: true };
+const initialProject = (): { project: Project; recovered: boolean; message: string } => {
+  // Kept apart even when it cannot be read (a file of a newer version, a damaged one): the first edit would otherwise overwrite the only copy.
+  // With Autosave off nothing is read back from the browser: a copy left from before is older than what was saved as a file.
+  const autosaveOn = loadSettings().autosave;
+  if (autosaveOn) backupAutosave();
+  const read = autosaveOn ? readAutosave() : ({ kind: 'none' } as const);
+  if (read.kind === 'restored') {
+    const n = read.notes.length;
+    const reset = n === 0 ? '' : ` ${n} stored value${n === 1 ? ' was' : 's were'} reset to defaults: ${read.notes[0]}${n > 1 ? ` (and ${n - 1} more)` : ''}`;
+    return { project: read.project, recovered: true, message: `Restored the project from the browser recovery copy.${reset} It is not saved as a file yet.` };
   }
   const s = loadSettings();
   const size = newChartStart(s);
-  return { project: s.newProjectSample ? createExampleProject(size) : createEmptyProject(size), recovered: false };
+  const message = read.kind === 'unreadable' ? 'The project kept in this browser could not be read by this version, so a new project was opened. The stored text was set aside and is not overwritten; it can be downloaded from the error screen.' : '';
+  return { project: s.newProjectSample ? createExampleProject(size) : createEmptyProject(size), recovered: false, message };
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -37,7 +42,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const project = history.present;
   const [view, setView] = useState<ViewRef>(() => ({ kind: 'table', id: project.dataTables[0].id }));
   const [selection, setSelection] = useState<Selection>({ kind: 'chart' });
-  const [status, setStatus] = useState(start.recovered ? 'Restored the project from the browser recovery copy. It is not saved as a file yet.' : '');
+  const [status, setStatusText] = useState(start.message);
+  // Every setting of the message counts, so that the same text set twice is two messages (the second is not taken for the first and wiped).
+  const [statusSeq, setStatusSeq] = useState(0);
+  const setStatus = useCallback((s: string) => {
+    setStatusText(s);
+    setStatusSeq((n) => n + 1);
+  }, []);
   const [autosaveOk, setAutosaveOk] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [tableZoom, setTableZoom] = useState(1);
@@ -106,10 +117,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // so that the message of an undo or redo, set in the same commit, wins over the clearing of the one before it.
   const statusSeen = useRef<StatusMemo<Project, Selection, ViewRef> | null>(null);
   useEffect(() => {
-    const next = statusAfter(status, statusSeen.current, { project, selection, view });
+    const next = statusAfter(status, statusSeen.current, { project, selection, view }, statusSeq);
     statusSeen.current = next.seen;
     if (next.status !== status) setStatus(next.status);
-  }, [status, project, selection, view]);
+  }, [status, statusSeq, setStatus, project, selection, view]);
 
   // Undo/redo can remove the thing the selection points at; keep the status line informative.
   useEffect(() => {
@@ -122,6 +133,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // tab wrote is not done, and the conflict banner asks what to do. The rules are in recovery.ts.
   const saved = useRef(project);
   const [retry, setRetry] = useState(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (retryTimer.current !== null) clearTimeout(retryTimer.current); }, []);
   const [editorId] = useState(newEditorId);
   const seenRef = useRef<string | null>(null);
   if (seenRef.current === null) seenRef.current = currentSignature();
@@ -144,13 +157,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAutosaveOk(true);
         setRecovery({ savedAt: r.savedAt, error: null });
         setConflict(false);
+        if (retryTimer.current !== null) clearTimeout(retryTimer.current);
+        retryTimer.current = null;
         return true;
       }
       if (r.kind === 'conflict') setConflict(true);
       else {
         setAutosaveOk(false);
         setRecovery((s) => ({ ...s, error: r.message }));
-        setTimeout(() => setRetry((n) => n + 1), 15000);
+        // One retry at a time: a timer for every failed write would multiply with every edit and never end.
+        if (retryTimer.current === null) retryTimer.current = setTimeout(() => ((retryTimer.current = null), setRetry((n) => n + 1)), 15000);
       }
       return false;
     },

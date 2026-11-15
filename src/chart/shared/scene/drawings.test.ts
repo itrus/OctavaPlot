@@ -5,12 +5,21 @@ import type { AnnotationPlacer } from './annotationPlace';
 import { belowSide, drawingElements, drawingGeometry, drawingPatchForPoints, linePath, nudgeDrawings, skippedDrawings } from './drawings';
 import type { SceneElement } from './sceneElement';
 
-const look = { color: '#000000', fontSizePt: 12 };
+// The look a new object takes in the app, width included (a drawing made without one is 1 pt wide, which the app never does).
+const look = { color: '#000000', fontSizePt: 12, widthPt: DRAWING_WIDTH.chart };
 const make = (id: string, over: Partial<Drawing> = {}): Drawing => ({ ...createDrawing(presetById(id)!, { xFrac: 0.1, yFrac: 0.5 }, { xFrac: 0.5, yFrac: 0.5 }, look, 'd1'), ...over });
 const numbers = (d: string) => (d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
 const flat = (nodes: readonly SceneElement[]): SceneElement[] => nodes.flatMap((n) => [n, ...flat(n.children ?? [])]);
 
 describe('the presets of the Graphics menu', () => {
+  it('are told apart by name when they differ only by their lock: a bracket across, a side bracket down', () => {
+    expect(drawingName(make('bracket'))).toBe('Bracket');
+    const down = { from: { xFrac: 0.5, yFrac: 0.1 }, to: { xFrac: 0.5, yFrac: 0.6 } };
+    expect(drawingName(make('right', down))).toBe('Side bracket, open to the left');
+    expect(drawingName(make('left', down))).toBe('Side bracket, open to the right');
+    expect(drawingName(make('rightText', down))).toBe('Side bracket, open to the left with text');
+  });
+
   it('are eleven shapes, eleven lines and the same eleven lines with a text, each with its own ID', () => {
     for (const g of ['shapes', 'lines', 'text'] as const) expect(DRAWING_PRESETS.filter((p) => p.group === g)).toHaveLength(11);
     expect(new Set(DRAWING_PRESETS.map((p) => p.id)).size).toBe(33);
@@ -75,7 +84,7 @@ describe('the shapes of a drawing object', () => {
     expect(g.heads).toMatch(/^M110,50L/);
     const lineEnd = numbers(g.d).slice(-2);
     expect(lineEnd[0]).toBeLessThan(110);
-    expect(lineEnd[0]).toBeGreaterThan(110 - 6);
+    expect(lineEnd[0]).toBeGreaterThan(110 - 12); // the head of a 4 pt line is about 10 pt long
     expect(drawingGeometry(make('double'), a, b).heads.match(/M/g)).toHaveLength(2);
   });
 
@@ -84,11 +93,11 @@ describe('the shapes of a drawing object', () => {
     expect(belowSide({ x: -1, y: 0 }).y).toBe(1);
     expect(belowSide({ x: 0, y: 1 }).x).toBe(-1);
     const bracket = drawingGeometry(make('bracket'), a, b);
-    expect(bracket.caps).toBe('M10,50L10,55M110,50L110,55');
+    expect(bracket.caps).toBe('M10,50L10,60M110,50L110,60');
     const cup = drawingGeometry(make('cup'), a, b);
-    expect(cup.caps).toBe('M10,50L10,42M110,50L110,42');
+    expect(cup.caps).toBe('M10,50L10,34M110,50L110,34');
     // A side bracket drawn down, open to the left: its ticks point left.
-    expect(drawingGeometry(make('right'), { x: 50, y: 0 }, { x: 50, y: 60 }).caps).toBe('M50,0L45,0M50,60L45,60');
+    expect(drawingGeometry(make('right'), { x: 50, y: 0 }, { x: 50, y: 60 }).caps).toBe('M50,0L40,0M50,60L40,60');
   });
 
   it('write the text of a line over its middle, or under it; beside a line that runs down', () => {
@@ -136,5 +145,20 @@ describe('the elements of drawing objects', () => {
     const anchored = make('line', { anchor: 'data', from: { xFrac: 0, yFrac: 0, x: 0, y: 0 }, to: { xFrac: 0, yFrac: 0, x: 0, y: 0 } });
     expect(drawingPatchForPoints(anchored, { x: 50, y: 20 }, { x: 100, y: 40 }, 200, 100, placer).to).toEqual({ xFrac: 0.5, yFrac: 0.4, x: 50, y: 10 });
     expect(nudgeDrawings([make('line')], 0.1, -0.1, 200, 100)[0].patch).toEqual({ from: { xFrac: 0.2, yFrac: 0.4 }, to: { xFrac: 0.6, yFrac: 0.4 } });
+  });
+});
+
+describe('objects made at the width the app makes them', () => {
+  it('are named by their preset, not by another with the same ends', () => {
+    const at = (id: string) => createDrawing(presetById(id)!, { xFrac: 0.1, yFrac: 0.5 }, { xFrac: 0.5, yFrac: 0.5 }, { ...look, widthPt: DRAWING_WIDTH.chart }, 'x');
+    expect(drawingName(at('tall'))).toBe('Tall bracket');
+    expect(drawingName(at('cup'))).toBe('Bracket open upwards');
+    expect(drawingName(at('bracket'))).toBe('Bracket');
+  });
+  it('are held to the page, and a locked bracket dragged the wrong way is not a line of no length', () => {
+    const near = createDrawing(presetById('bracket')!, { xFrac: 0.97, yFrac: 0.5 }, { xFrac: 1.07, yFrac: 0.5 }, look, 'x');
+    expect(near.to.xFrac).toBe(1);
+    const [a, b] = pointsOfDrag(presetById('bracket')!, { x: 100, y: 100 }, { x: 100, y: 140 });
+    expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeGreaterThan(3);
   });
 });

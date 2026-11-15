@@ -24,7 +24,7 @@ export function percentLabel(level: number): string {
 }
 
 /** Names a spread; range and IQR are never called a confidence interval. */
-export function describeSpread(spread: SpreadKind, level: number, centre: CentreKind = 'mean'): string {
+export function describeSpread(spread: SpreadKind, level: number | null, centre: CentreKind = 'mean'): string {
   switch (spread) {
     case 'none':
       return 'no spread';
@@ -33,7 +33,7 @@ export function describeSpread(spread: SpreadKind, level: number, centre: Centre
     case 'sem':
       return 'SEM';
     case 'ci':
-      return `${percentLabel(level)} confidence interval of the ${centreLower(centre)}`;
+      return `${level === null ? '' : percentLabel(level) + ' '}confidence interval of the ${centreLower(centre)}`;
     case 'range':
       return 'range (min to max)';
     case 'iqr':
@@ -55,7 +55,7 @@ function intervalLine(stats: GroupStats, fmt: (v: number) => string, errorHidden
   if (interval.status !== 'ok' || interval.lower === null || interval.upper === null) return null;
   const name =
     stats.effectiveSpread === 'ci'
-      ? `${percentLabel(stats.confidenceLevel)} CI`
+      ? `${stats.confidenceLevel === null ? '' : percentLabel(stats.confidenceLevel) + ' '}CI`
       : stats.effectiveSpread === 'gsd'
         ? 'Geometric SD limits'
         : SPREAD_NAME[stats.effectiveSpread];

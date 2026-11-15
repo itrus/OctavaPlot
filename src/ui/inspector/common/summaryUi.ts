@@ -155,13 +155,6 @@ export function describeCounts(stats: GroupStats, clippedEnds = 0): string {
   return parts.join(', ');
 }
 
-/** e.g. "Mean with SD", used only as a caption, never as a control label. */
-export function summaryCaption(spec: SummarySpec, showErrorBars: boolean): string {
-  const text = describeSummary(spec);
-  if (showErrorBars || effectiveSpreadOf(spec.centre, spec.spread) === 'none') return text;
-  return `${text} (error bars hidden)`;
-}
-
 const SPREAD_CODES: ReadonlyArray<string> = ['n-too-small', 'coverage', 'too-large', 'level-range', 'interval-invalid', 'ties', 'not-allowed'];
 
 /** True for notices about the interval; the others are about the centre. */

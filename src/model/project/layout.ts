@@ -1,9 +1,9 @@
+import { mmToPt, ptToMm } from '../units';
 import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, PageOrientation, PanelLabelStyle } from '../types';
 
 /** A4 in mm; the renderer's unit is the point (1 in = 72 pt). */
 const A4_MM = { width: 210, height: 297 } as const;
 
-export const mmToPt = (mm: number): number => (mm * 72) / 25.4;
 
 export const PERCENT_MIN = 10;
 export const PERCENT_MAX = 400;
@@ -42,7 +42,6 @@ export const slotCount = (a: LayoutArrangement): number => (a.kind === 'inset' ?
 export const sameArrangement = (a: LayoutArrangement, b: LayoutArrangement): boolean =>
   a.kind === 'inset' ? b.kind === 'inset' : a.kind === 'grid' ? b.kind === 'grid' && a.cols === b.cols && a.rows === b.rows : false;
 
-const PT_TO_MM = 25.4 / 72;
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
 /** Moves and resizes a box on the page, keeping it on the page and at least the smallest size. */
@@ -55,7 +54,7 @@ export function clampFrame(f: FrameMm, orientation: PageOrientation): FrameMm {
 
 /** The slots of any arrangement as free boxes (mm): what "Free placement" starts from. */
 export function framesOf(layout: Pick<Layout, 'orientation' | 'marginMm' | 'showTitle' | 'arrangement' | 'gapMm'>): FrameMm[] {
-  return slotRects(layout).map((r) => clampFrame({ x: r.x * PT_TO_MM, y: r.y * PT_TO_MM, w: r.w * PT_TO_MM, h: r.h * PT_TO_MM }, layout.orientation));
+  return slotRects(layout).map((r) => clampFrame({ x: ptToMm(r.x), y: ptToMm(r.y), w: ptToMm(r.w), h: ptToMm(r.h) }, layout.orientation));
 }
 
 /** The boxes of a free layout carried over to the other orientation, in proportion to the page. */
@@ -78,7 +77,7 @@ export function newFrame(frames: readonly FrameMm[], orientation: PageOrientatio
 const INSET_SHARE = 0.38;
 const TITLE_HEIGHT_MM = 12;
 
-export interface Rect {
+interface Rect {
   x: number;
   y: number;
   w: number;
@@ -197,7 +196,8 @@ export function arrangeLayout(layout: Layout, sizes: readonly NaturalSize[], ban
   });
   const placed = fits.filter((f): f is number => f !== null);
   const sc = layout.scaling;
-  const common = sc.mode === 'percent' ? Math.min(PERCENT_MAX, Math.max(PERCENT_MIN, sc.percent)) / 100 : sc.mode === 'smallest' && placed.length > 0 ? Math.min(...placed) : sc.mode === 'largest' && placed.length > 0 ? Math.max(...placed) : null;
+  // The two slots of an inset differ in size on purpose: matching the smallest would draw the large graph as small as the inset, so each fits its own slot.
+  const common = layout.arrangement.kind === 'inset' && (sc.mode === 'smallest' || sc.mode === 'largest') ? null : sc.mode === 'percent' ? Math.min(PERCENT_MAX, Math.max(PERCENT_MIN, sc.percent)) / 100 : sc.mode === 'smallest' && placed.length > 0 ? Math.min(...placed) : sc.mode === 'largest' && placed.length > 0 ? Math.max(...placed) : null;
   const placements = rects.map((rect, slot): Placement => {
     const size = sizes[slot];
     const label = panelLabel(layout.labelStyle, slot);
@@ -290,7 +290,7 @@ export function sanitizeLayout(raw: Partial<Record<keyof Layout, unknown>>, base
   };
 }
 
-/** A new layout with the defaults (landscape, white, no title, panels lettered A B C, equal scaling). */
+/** A new layout with the defaults (landscape, white, a title on top, panels lettered A B C, equal scaling). */
 export function defaultLayout(id: string, name: string, over: Partial<Pick<Layout, 'orientation' | 'background' | 'showTitle' | 'arrangement' | 'panels'>> = {}): Layout {
   const arrangement = over.arrangement ?? { kind: 'grid', cols: 2, rows: 1 };
   return {
@@ -303,7 +303,7 @@ export function defaultLayout(id: string, name: string, over: Partial<Pick<Layou
     scaling: { mode: 'smallest' },
     labelStyle: 'A',
     labelSizePt: 16,
-    showTitle: over.showTitle ?? false,
+    showTitle: over.showTitle ?? true,
     title: '',
     marginMm: 12,
     gapMm: 6,

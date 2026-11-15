@@ -13,7 +13,7 @@ export interface InspectorTarget {
  * scrolled, and which sections were open or shut. Going to a table and back puts the inspector there again, so the graph is found as
  * it was left. Kept for the session only, not in the project; each graph has its own place.
  */
-export interface InspectorPlace {
+interface InspectorPlace {
   page: InspectorPage;
   parts: Partial<Record<InspectorPage, NonNullable<InspectorTarget['part']>>>;
   scrollTop: number;

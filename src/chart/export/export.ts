@@ -1,13 +1,13 @@
-import { renderToStaticMarkup } from 'react-dom/server';
 import type { Chart, DataTable, FitSettings } from '../../model/types';
-import { buildAnyModel, ChartCanvas } from '../anyModel';
+import { buildAnyModel, drawingOf } from '../anyModel';
+import { chartMarkup } from './sceneMarkup';
 import { plainText } from '../../util/richText';
 import { exportPixels, GRAPH_PNG_DPI, svgToPngBlob } from './pngDpi';
 import { escapeXml, prefixIds as prefixIdsWith } from './prefixIds';
 import { svgToPdf } from './svgPdf';
 
 /**
- * Export renders the same declarative <ChartCanvas> without editor state, so
+ * Export writes the same scene as <ChartCanvas> without editor state (as text, see sceneMarkup.ts: the same bytes, no React renderer), so
  * selection outlines, hover helpers and hit-test attributes cannot leak in.
  * Output stays vector: paths, text and symbols.
  */
@@ -17,7 +17,7 @@ import { svgToPdf } from './svgPdf';
  */
 export function chartToSvgString(chart: Chart, table: DataTable, fit?: FitSettings, options: { metadata?: boolean } = {}): string {
   const any = buildAnyModel(chart, table, fit);
-  const markup = renderToStaticMarkup(<ChartCanvas chart={chart} any={any} cssWidth={`${chart.widthPx}px`} cssHeight={`${chart.heightPx}px`} />);
+  const markup = chartMarkup(chart, drawingOf(chart, any), `${chart.widthPx}px`, `${chart.heightPx}px`);
   const described = options.metadata ? describeSvg(prefixIds(markup, chart.id), chart, table, any.model.warnings) : markup;
   return `<?xml version="1.0" encoding="UTF-8"?>\n${described}\n`;
 }
@@ -44,10 +44,10 @@ function describeSvg(markup: string, chart: Chart, table: DataTable, notices: re
   return `${head}<title id="${base}-title">${escapeXml(title)}</title><desc id="${base}-desc">${escapeXml(desc)}</desc>${markup.slice(end + 1)}`;
 }
 
-/** Rasterise at the chart's own size, one pixel for each CSS pixel (GRAPH_PNG_DPI); the resolution is written into the file. */
-export async function chartToPngBlob(chart: Chart, table: DataTable, fit?: FitSettings): Promise<Blob> {
-  const { width, height } = exportPixels(chart, GRAPH_PNG_DPI);
-  return svgToPngBlob(chartToSvgString(chart, table, fit), width, height, GRAPH_PNG_DPI);
+/** Rasterise at a resolution (by default the chart's own size, one pixel for each CSS pixel: GRAPH_PNG_DPI); the resolution is written into the file. */
+export async function chartToPngBlob(chart: Chart, table: DataTable, fit?: FitSettings, dpi: number = GRAPH_PNG_DPI): Promise<Blob> {
+  const { width, height } = exportPixels(chart, dpi);
+  return svgToPngBlob(chartToSvgString(chart, table, fit), width, height, dpi);
 }
 
 /**

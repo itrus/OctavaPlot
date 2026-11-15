@@ -2,7 +2,7 @@ import { MAX_REPLICATES, MIN_REPLICATES, SUMMARY_FORMATS } from '../../model/tab
 import type { ReplicateLayout, SummaryFormat } from '../../model/types';
 
 /** How the Y series of an XY or a grouped table are entered: the choices of the "Options" of a new table and of a table whose type is changed. */
-export type LayoutMode = 'single' | 'replicates' | 'summary' | 'sized' | 'xerror';
+type LayoutMode = 'single' | 'replicates' | 'summary' | 'sized' | 'xerror';
 
 export interface LayoutChoice {
   mode: LayoutMode;

@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react';
+import { useScopedEdits } from './common/useScopedEdits';
 import { supportsHorizontal } from '../../model/graph/chartTypes';
 import { FILL_PATTERN_OPTIONS, describeBarFillUi } from '../../model/graph/fill';
-import { isGroupOverridden, resolveStyle, dataLayer } from '../../model/graph/style';
+import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { pairLinesBySubject } from '../../model/graph/layers';
-import { isSummaryOverridden, resolveSummary, validateSummaryPatch } from '../../model/graph/summary';
+import { resolveSummary } from '../../model/graph/summary';
 import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SummarySpec } from '../../model/types';
 import { AXIS_SHORT, AXIS_TAG, bindingOf, bindingSelectState } from '../../chart/shared/axes/axes';
 import { clippedEndpointCount, clippedEndpointMessage } from '../../chart/shared/parts/errorGeometry';
@@ -13,16 +14,13 @@ import { tooltipFmt } from '../../chart/tooltip';
 import { DIRECTION_HINT, centreChangeCompat, centreTitles, centreNoticeLines, describeCounts, describeSummaryControls, datasetRowText, intervalCaptionLines } from './common/summaryUi';
 import { useCommands, useSelection } from '../../state/AppContext';
 import {
-  clearGroupStyleSettings,
-  clearGroupSummarySettings,
   composeCommands,
   patchAxis,
   clearPointStyle,
-  patchChart,
+  patchDistribution,
   patchLegend,
   patchPointStyle,
   patchStyle,
-  patchSummary,
   patchLook,
 } from '../../state/commands';
 import { DistributionControls } from './sections/DistributionControls';
@@ -34,8 +32,8 @@ import { PaletteField, AnnotationsTab, DimensionsSection, LegendSection, OnThisG
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { DataSetPicker } from './sections/DataSetPicker';
 import { DataSetReset } from './sections/DataSetReset';
-import { mixedStyleKeys, mixedSummaryKeys, scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
-import { Check, ColorInput, type Overridden, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput, SubHeading, TextInput } from './common/controls';
+import { scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
+import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput, SubHeading, TextInput } from './common/controls';
 import { SymbolPicker } from './common/SymbolPicker';
 import {
   backgroundDisplay,
@@ -126,20 +124,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
   const spec: SummarySpec = !sample || scope === 'all' ? layer.summary : resolveSummary(layer, sample.id);
   // The data sets the edits reach (hidden ones are not drawn, so they do not count as differing).
   const inScope = table.groups.filter((g) => scopeIds.includes(g.id) && !chart.hiddenGroupIds.includes(g.id));
-  const inScopeKey = inScope.map((g) => g.id).join();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const mixedStyle = useMemo(() => mixedStyleKeys(chart, layer, inScope), [chart, layer, inScopeKey]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const mixedSummary = useMemo(() => mixedSummaryKeys(layer, inScope.map((g) => g.id)), [layer, inScopeKey]);
-  const ovSum = (key: keyof SummarySpec): Overridden => {
-    const own = scopeIds.filter((id) => isSummaryOverridden(layer, id, key));
-    const mixed = mixedSummary.has(key);
-    return own.length === 0 && !mixed ? false : { reset: own.length > 0 ? () => run('Reset setting', clearGroupSummarySettings(chart.id, own, [key])) : undefined, mixed };
-  };
-  const setSummary = (patch: Partial<SummarySpec>, label = 'Change summary') => {
-    if (!validateSummaryPatch(patch)) return;
-    run(label, patchSummary(chart.id, scope, patch), `summary:${scope}:${Object.keys(patch).join(',')}`);
-  };
+  const { ov, ovSum, setStyle, setSummary } = useScopedEdits(chart, layer, scope, scopeIds, inScope);
   const setCentre = (centre: SummarySpec['centre']) => {
     setSummary({ centre }, 'Change line at');
     // The stored spread is never rewritten; say so when it becomes inactive.
@@ -152,13 +137,6 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
   const clippedBars = (scope === 'all' ? model.groups : model.groups.filter((g) => scopeIds.includes(g.groupId))).flatMap((g) => (g.errorBar ? [g.errorBar] : []));
   const clippedEnds = clippedEndpointCount(clippedBars);
 
-  const setStyle = (patch: Partial<ChartStyle>) => {
-    const key = Object.keys(patch).join(',');
-    // Colouring by hand leaves the chart-wide palette behind.
-    const recolours = 'barFill' in patch || 'symbolColor' in patch;
-    const command = recolours && chart.paletteId !== null ? composeCommands(patchStyle(chart.id, scope, patch), patchChart(chart.id, { paletteId: null })) : patchStyle(chart.id, scope, patch);
-    run('Change style', command, `style:${scope}:${key}`);
-  };
   const editPoint = (pointId: Id) => (label: string, edit: PointEdit, coalesceKey?: string) =>
     run(
       label,
@@ -179,13 +157,6 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
       composeCommands(...multi.points.flatMap((p) => [...(edit.clear ? [clearPointStyle(chart.id, p.pointId, edit.clear)] : []), ...(edit.set ? [patchPointStyle(chart.id, p.pointId, edit.set)] : [])])),
       coalesceKey,
     );
-  // A setting this data set has its own value for: the dot beside it is the way back to the graph's value.
-  const ov = (key: keyof ChartStyle): Overridden => {
-    const own = scopeIds.filter((id) => isGroupOverridden(layer, id, key));
-    const mixed = mixedStyle.has(key);
-    return own.length === 0 && !mixed ? false : { reset: own.length > 0 ? () => run('Reset setting', clearGroupStyleSettings(chart.id, own, [key])) : undefined, mixed };
-  };
-
   // "<" / ">" step through the data sets; stepping off either end returns to Global.
   const stepGroup = (dir: 1 | -1) => {
     const n = table.groups.length;
@@ -369,7 +340,11 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
           <GroupBox
             title={isDist ? 'Points' : titles.symbols}
             checked={st.showSymbols}
-            onCheckedChange={(v) => setStyle({ showSymbols: v })}
+            onCheckedChange={(v) => {
+              setStyle({ showSymbols: v });
+              // Box plots, violins and floating bars draw only the values chosen in "Show values"; with None the box would switch on and show nothing.
+              if (v && isDist && chart.distribution.points === 'none') run('Points on the plot', patchDistribution(chart.id, { points: 'all' }));
+            }}
             overridden={ov('showSymbols')}
           >
             <Field label="Color" overridden={ov('symbolColor')}>

@@ -22,8 +22,8 @@ interface Format {
 const FORMATS: readonly Format[] = [
   { id: 'column', label: 'Column', kind: 'column', blurb: 'One column per group, with its replicate values in the rows: comparing groups.' },
   { id: 'grouped', label: 'Grouped', kind: 'grouped', blurb: 'Two category levels with replicates in subcolumns, for example Male / Female by Control / Treated.' },
-  { id: 'xy', label: 'XY', kind: 'xy', blurb: 'A numeric X column and one or more Y series: how Y changes with X.', gapBefore: true },
-  { id: 'contingency', label: 'Contingency', kind: 'contingency', gapBefore: true, blurb: 'Counts of subjects in each outcome: groups of subjects in the rows, outcomes in the columns.' },
+  { id: 'xy', label: 'XY', kind: 'xy', blurb: 'A numeric X column and one or more Y series: how Y changes with X.' },
+  { id: 'contingency', label: 'Contingency', kind: 'contingency', blurb: 'Counts of subjects in each outcome: groups of subjects in the rows, outcomes in the columns.' },
   { id: 'survival', label: 'Survival', kind: 'survival', blurb: 'Time to an event, with censoring, for each group: one row per subject.' },
 ];
 

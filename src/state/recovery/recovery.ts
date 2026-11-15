@@ -1,4 +1,4 @@
-import { AUTOSAVE_KEY } from './serialize';
+import { AUTOSAVE_BACKUP_KEY, AUTOSAVE_KEY, AUTOSAVE_UNREADABLE_KEY } from '../serialize';
 
 /**
  * The rules for the browser recovery copy, with no browser in them: how well the work is kept, when to write on leaving
@@ -110,3 +110,12 @@ export const affectsRecovery = (key: string | null): boolean => key === null || 
 
 /** The conflict banner is shown while this tab has changes that are not in a file, or are waiting to be written. */
 export const bannerVisible = (s: { conflict: boolean; changedSinceFile: boolean; pending: boolean }): boolean => s.conflict && (s.changedSinceFile || s.pending);
+
+/** Removes every copy of the project that the browser keeps: the recovery copy, its stamp, the start-up backup and text set aside as unreadable. */
+export function clearBrowserCopies(): void {
+  try {
+    for (const key of [AUTOSAVE_KEY, AUTOSAVE_BACKUP_KEY, AUTOSAVE_UNREADABLE_KEY, AUTOSAVE_META_KEY]) localStorage.removeItem(key);
+  } catch {
+    /* storage is unavailable: nothing is kept */
+  }
+}

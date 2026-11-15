@@ -33,6 +33,8 @@ const MAX_ENTRIES = 20000;
 interface Entry {
   value: unknown;
   cost: number;
+  /** The kind of the identity: a fit is the dearest result and is handed to the screen through this cache, so it goes last. */
+  kind: string;
 }
 const cache = new Map<string, Entry>();
 let used = 0;
@@ -93,12 +95,17 @@ export function storeCalc(id: CalcIdentity, value: unknown): void {
     used -= old.cost;
   }
   if (cost > BUDGET) return;
-  cache.set(key, { value, cost });
+  cache.set(key, { value, cost, kind: id.kind });
   used += cost;
-  for (const [oldest, e] of cache) {
-    if (used <= BUDGET && cache.size <= MAX_ENTRIES) break;
-    cache.delete(oldest);
-    used -= e.cost;
+  // The oldest results go first, but a fit only when nothing else is left to drop: a worker's fit reaches the screen through this cache,
+  // and thousands of summaries stored after it must not push it out before the redraw asks for it.
+  for (const keepFits of [true, false]) {
+    for (const [oldest, e] of cache) {
+      if (used <= BUDGET && cache.size <= MAX_ENTRIES) break;
+      if (keepFits && e.kind === 'fit' && oldest !== key) continue;
+      cache.delete(oldest);
+      used -= e.cost;
+    }
   }
 }
 
@@ -120,4 +127,24 @@ export function cachedCalc<T>(id: CalcIdentity, compute: () => T): T {
 export function clearCalcCache(): void {
   cache.clear();
   used = 0;
+}
+
+/**
+ * Results that depend only on an array of observations and a few settings, kept for as long as the array lives. Commands
+ * replace the arrays of the table and never change them, so a style-only edit finds the result it needs.
+ */
+const memoCaches = new WeakMap<ReadonlyArray<unknown>, Map<string, unknown>>();
+const MEMO_LIMIT = 32;
+
+export function memoFor<T>(source: ReadonlyArray<unknown>, key: string, compute: () => T): T {
+  let byKey = memoCaches.get(source);
+  if (!byKey) {
+    byKey = new Map();
+    memoCaches.set(source, byKey);
+  }
+  if (byKey.has(key)) return byKey.get(key) as T;
+  const value = compute();
+  if (byKey.size >= MEMO_LIMIT) byKey.clear();
+  byKey.set(key, value);
+  return value;
 }

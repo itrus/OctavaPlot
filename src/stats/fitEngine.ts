@@ -7,47 +7,12 @@
  * Nothing here is a function in what travels between threads: a request is flat numbers, a reply is a `FitSolution` (plain data) or
  * a failure. The `FitResult` with its curve and band is made from the solution by `fitFromSolution` on the receiving side.
  */
-import { FIT_ALGORITHM_VERSION, isFailure, solveFit, type FitFailure, type FitModelId, type FitSolution } from './fit';
-
-export interface FitRequest {
-  /** The points as x0, y0, x1, y1 ... */
-  data: Float64Array;
-  model: FitModelId;
-  degree?: number;
-  level: number;
-}
-
-/** Where and how a result was made: kept beside it so a number can be traced (the algorithm version is part of its identity). */
-export interface FitProvenance {
-  algorithm: number;
-  engine: 'main' | 'worker';
-  model: FitModelId;
-  /** Points handed over (before the fit leaves out those it cannot use). */
-  points: number;
-  level: number;
-  /** Time taken by the numerical part, in ms, where it ran. */
-  ms: number;
-}
-
-export interface FitReply {
-  outcome: FitSolution | FitFailure;
-  provenance: FitProvenance;
-  /** What the fit says about itself (did not settle, ill-conditioned, points left out); empty when all is well. */
-  diagnostics: string[];
-}
+import type { FitModelId } from './fitModels';
+import { runFitRequest, type FitAnswer, type FitMessage, type FitReply, type FitRequest } from './fitProtocol';
 
 export interface CalculationEngine {
   /** Calculate one fit. An aborted request rejects with an AbortError; an engine that cannot work rejects with an Error. */
   fit(request: FitRequest, signal?: AbortSignal): Promise<FitReply>;
-}
-
-/** The numerical part, shared by every engine and by the worker's message handler. */
-export function runFitRequest(request: FitRequest, engine: FitProvenance['engine']): FitReply {
-  const t0 = performance.now();
-  const points = Array.from({ length: request.data.length >> 1 }, (_, i) => ({ x: request.data[2 * i], y: request.data[2 * i + 1] }));
-  const outcome = solveFit(points, { model: request.model, degree: request.degree, level: request.level });
-  const diagnostics = isFailure(outcome) ? [outcome.message] : outcome.message ? [outcome.message] : [];
-  return { outcome, diagnostics, provenance: { algorithm: FIT_ALGORITHM_VERSION, engine, model: request.model, points: points.length, level: request.level, ms: performance.now() - t0 } };
 }
 
 /** The reference engine: the fit is made on the calling thread (a promise only so that it can stand where the worker does). */
@@ -57,20 +22,6 @@ export const mainThreadEngine: CalculationEngine = {
 
 export const abortError = (): Error => Object.assign(new Error('The fit was cancelled.'), { name: 'AbortError' });
 export const isAbort = (e: unknown): boolean => e instanceof Error && e.name === 'AbortError';
-
-// --- the message protocol of the worker ---------------------------------------------------------------------------
-
-export interface FitMessage {
-  id: number;
-  request: FitRequest;
-}
-export interface FitAnswer {
-  id: number;
-  reply: FitReply;
-}
-
-/** What the worker does with one message. The worker file only calls this, so tests run exactly the worker's code in-process. */
-export const handleFitMessage = (m: FitMessage): FitAnswer => ({ id: m.id, reply: runFitRequest(m.request, 'worker') });
 
 /** The part of a Worker the engine uses; a test can stand in for it. */
 export interface WorkerLike {
@@ -190,20 +141,22 @@ export function defaultFitEngine(): CalculationEngine {
 }
 
 /**
- * Whether a fit is worth sending away, by what it is expected to cost on the main thread. The costs are measured (node, 11th Gen
- * Intel Core i7-1185G7): milliseconds for each point, rounded up. The two-phase exponential is always sent away: its time depends
- * on the data far more than on n (10 ms to 430 ms for 16 to 60 points). The limit is half a frame at 60 fps.
+ * Whether a fit is worth sending away, by what it is expected to cost on the main thread. A line and a polynomial are solved in one
+ * pass, so their cost follows the number of points (measured in node, 11th Gen Intel Core i7-1185G7: milliseconds for each point,
+ * rounded up). A nonlinear fit is iterative and its time depends on the data far more than on n (a decay model on a rising line
+ * costs 0.4 to 1.7 s at 1,100 points; the two-phase exponential 10 to 430 ms at 16 to 60 points), so every one is sent away.
+ * The limit is half a frame at 60 fps.
  */
 const MS_PER_POINT: Record<FitModelId, number> = {
   linear: 0.001,
   polynomial: 0.0015,
-  exp_decay: 0.007,
-  exp_association: 0.007,
+  exp_decay: Infinity,
+  exp_association: Infinity,
   exp_two_phase: Infinity,
-  gaussian_peak: 0.007,
-  hyperbola: 0.007,
-  hill_4pl: 0.012,
-  asymmetric_5pl: 0.02,
+  gaussian_peak: Infinity,
+  hyperbola: Infinity,
+  hill_4pl: Infinity,
+  asymmetric_5pl: Infinity,
 };
 export const DEFER_ABOVE_MS = 8;
 export const shouldDeferFit = (model: FitModelId, points: number): boolean => MS_PER_POINT[model] * points > DEFER_ABOVE_MS;

@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react';
 
-export type Orientation = 'horizontal' | 'vertical' | 'both';
+type Orientation = 'horizontal' | 'vertical' | 'both';
 
 /**
  * The item a key press moves to in a tab list or radio group, or null when the key is not one of its keys.

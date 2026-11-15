@@ -4,6 +4,8 @@ import type { BarLabelMode, BarLabels, BarLayout, Id, InsideBarLabel, InsideLabe
 /** Settings of the columns of a column chart: the space between them, their baseline and the labels above them. */
 
 export const BAR_LIMITS = { spacingPct: { min: 0, max: 500 } } as const;
+/** The limits of the bar-label text: the validator below and the inspector field read the same numbers. */
+export const BAR_LABEL_LIMITS = { sizePt: { min: 4, max: 48 }, decimals: { min: 0, max: 10 } } as const;
 
 /** The automatic spacing in percent of a column's width: gap between columns 3/7 and the outer margins 2/7 (the old band padding 0.3 and 0.2). */
 export const AUTO_BAR_GAP_PCT = 300 / 7;
@@ -66,11 +68,11 @@ export function sanitizeBarLabels(raw: unknown, base: BarLabels): BarLabels {
   const inside = sanitizeInside(b.inside, base.inside);
   return {
     show: oneOf(LABEL_MODES, b.show, base.show),
-    decimals: b.decimals === null ? null : typeof b.decimals === 'number' && Number.isFinite(b.decimals) ? Math.round(clamp(b.decimals, 0, 10, 0)) : base.decimals,
+    decimals: b.decimals === null ? null : typeof b.decimals === 'number' && Number.isFinite(b.decimals) ? Math.round(clamp(b.decimals, BAR_LABEL_LIMITS.decimals.min, BAR_LABEL_LIMITS.decimals.max, 0)) : base.decimals,
     thousands: bool(b.thousands, base.thousands),
     prefix: text(b.prefix, 24, base.prefix),
     suffix: text(b.suffix, 24, base.suffix),
-    sizePt: clamp(b.sizePt, 4, 48, base.sizePt),
+    sizePt: clamp(b.sizePt, BAR_LABEL_LIMITS.sizePt.min, BAR_LABEL_LIMITS.sizePt.max, base.sizePt),
     color: optionalHex(b.color, base.color),
     ...(inside ? { inside } : {}),
   };

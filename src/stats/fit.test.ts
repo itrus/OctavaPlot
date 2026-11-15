@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { fitCurve, fitModelById, FIT_MODELS, isFailure, type FitResult } from './fit';
+﻿import { describe, expect, it } from 'vitest';
+import { fitCurve, isFailure, type FitResult } from './fit';
+import { fitModelById, FIT_MODELS } from './fitModels';
 
 const pts = (xs: number[], f: (x: number) => number) => xs.map((x) => ({ x, y: f(x) }));
 const ok = (r: ReturnType<typeof fitCurve>): FitResult => {
@@ -359,5 +360,57 @@ describe('two-phase decay against the NIST certified values (MGH17)', () => {
     const t95 = 2.048407142;
     const t99 = 2.763262455;
     close(r.halfWidth(150, 'confidence', 0.99)! / r.halfWidth(150, 'confidence', 0.95)!, t99 / t95, 1e-6);
+  });
+});
+
+describe('gaussian peak', () => {
+  it('fits a dip (an inverted peak) exactly, as well as a peak', () => {
+    const xs = Array.from({ length: 21 }, (_, i) => -5 + i * 0.5);
+    const dip = ok(fitCurve(pts(xs, (x) => 10 - 6 * Math.exp(-0.5 * ((x - 0.5) / 1.2) ** 2)), { model: 'gaussian_peak' }));
+    expect(dip.rss).toBeLessThan(1e-12);
+    expect(value(dip, 0)).toBeCloseTo(10, 6);
+    expect(value(dip, 1)).toBeCloseTo(-6, 6);
+    expect(value(dip, 2)).toBeCloseTo(0.5, 6);
+    expect(value(dip, 3)).toBeCloseTo(1.2, 6);
+    const peak = ok(fitCurve(pts(xs, (x) => -10 + 6 * Math.exp(-0.5 * ((x - 0.5) / 1.2) ** 2)), { model: 'gaussian_peak' }));
+    expect(peak.rss).toBeLessThan(1e-12);
+  });
+});
+
+describe('a fit called converged is at a stationary point (five-parameter logistic)', () => {
+  // Independent of the fit: the analytic gradient of bottom + (top - bottom) / (1 + (c / x)^h)^s with respect to its five parameters.
+  const gradient = (x: number, [b, t, c, h, s]: number[]) => {
+    const u = (c / x) ** h;
+    const d = 1 + u;
+    const ds = d ** -s;
+    return [1 - ds, ds, (-(t - b) * s * ds * u * h) / (d * c), (-(t - b) * s * ds * u * Math.log(c / x)) / d, -(t - b) * ds * Math.log(d)];
+  };
+  /** The largest cosine between the residual and a column of the Jacobian: 0 at a least-squares minimum. */
+  const worstCosine = (xs: number[], ys: number[], p: number[]) => {
+    const r = xs.map((x, i) => ys[i] - fitModelById('asymmetric_5pl').fn(x, p));
+    const rows = xs.map((x) => gradient(x, p));
+    const rn = Math.hypot(...r);
+    return Math.max(...p.map((_, k) => Math.abs(rows.reduce((s, row, i) => s + row[k] * r[i], 0)) / (Math.hypot(...rows.map((row) => row[k])) * rn)));
+  };
+  const rng = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
+
+  it('has a gradient that is nearly zero wherever the fit says it settled, on data the curve can be told from', () => {
+    const rnd = rng(5);
+    const normal = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(2 * Math.PI * rnd());
+    let converged = 0;
+    const worst: number[] = [];
+    for (let k = 0; k < 120; k++) {
+      const truth = [1 + 4 * rnd(), 20 + 80 * rnd(), 10 ** (-1 + 2 * rnd()), 0.8 + 1.7 * rnd(), 0.5 + 1.5 * rnd()];
+      const n = 16 + (k % 9);
+      const xs = Array.from({ length: n }, (_, i) => 10 ** (-2.5 + (5 * i) / (n - 1)));
+      const ys = xs.map((x) => fitModelById('asymmetric_5pl').fn(x, truth) + 0.02 * (truth[1] - truth[0]) * normal());
+      const r = fitCurve(xs.map((x, i) => ({ x, y: ys[i] })), { model: 'asymmetric_5pl' });
+      if (isFailure(r) || !r.converged) continue;
+      converged++;
+      worst.push(worstCosine(xs, ys, r.params.map((q) => q.value)));
+    }
+    // The check is not vacuous: most of the sets settle, and for those the gradient is below 1e-4 (2e-6 in the sets looked at).
+    expect(converged).toBeGreaterThan(60);
+    expect(Math.max(...worst)).toBeLessThan(1e-4);
   });
 });

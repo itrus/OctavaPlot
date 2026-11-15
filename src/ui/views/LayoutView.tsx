@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { drawLayout } from '../../chart/export/layoutExport';
 import { clampFrame, FREE_MAX, GAP_MM_MAX, GRID_MAX, LABEL_PT_MAX, LEGEND_PT_MAX, LEGEND_PT_MIN, LABEL_PT_MIN, MARGIN_MM_MAX, pageMm, PERCENT_MAX, PERCENT_MIN, standardArrangements, sameArrangement } from '../../model/project/layout';
 import type { Annotation, Drawing, FrameMm, Layout, LayoutArrangement, LayoutLegend, LayoutScaling, PanelLabelStyle } from '../../model/types';
+import { ptToMm } from '../../model/units';
 import { createAnnotation, FONT_FAMILY, PAGE_TEXT_LOOK } from '../../model/defaults';
 import { annotationBox } from '../../chart/shared/scene/annotations';
 import { AnnotationEditor } from '../inspector/sections/AnnotationEditor';
@@ -82,7 +83,6 @@ interface Drag {
   aspect: number | null;
 }
 
-const PT_TO_MM = 25.4 / 72;
 
 /** A text of the page being dragged: where the pointer started, where the text was then, and where it is now (fractions of the page). */
 interface NoteDrag {
@@ -175,7 +175,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
   const frames = a.kind === 'free' ? a.frames : [];
   const slot = Math.min(selected, Math.max(0, frames.length - 1));
 
-  const set = (label: string, patch: Partial<Omit<Layout, 'id' | 'panels'>>) => run(label, patchLayout(layout.id, patch));
+  const set = (label: string, patch: Partial<Omit<Layout, 'id' | 'panels'>>, key?: string) => run(label, patchLayout(layout.id, patch), key);
 
   // The texts of the page are kept on the layout; each change is one undoable step (changes with the same key merge, as typing does).
   const setNotes = (label: string, list: Annotation[], key?: string) => run(label, patchLayout(layout.id, { annotations: list }), key);
@@ -314,7 +314,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
     const g = drawing.arranged.placements[i]?.graph;
     const f = frames[i];
     if (!f) return { x: 0, y: 0, w: 1, h: 1 };
-    return g ? intersect({ x: g.x * PT_TO_MM, y: g.y * PT_TO_MM, w: g.w * PT_TO_MM, h: g.h * PT_TO_MM }, f) : f;
+    return g ? intersect({ x: ptToMm(g.x), y: ptToMm(g.y), w: ptToMm(g.w), h: ptToMm(g.h) }, f) : f;
   };
   /** Height / width of the graph of a panel when it lies whole inside its box, otherwise null. */
   const aspectOf = (i: number): number | null => {
@@ -362,7 +362,7 @@ function LayoutPage({ layout }: { layout: Layout }) {
   };
 
   return (
-    <div className="graph-view layout-view">
+    <div className="graph-view">
       <div className="toolbar">
         <span className="switch-group tool-group" role="group" aria-label="Pointer tool">
           <button className={`switch icon-text${tool === 'select' ? ' on' : ''}`} aria-pressed={tool === 'select'} aria-label="Select" title="Select: click a text on the page to select it and open its settings; drag it to move it. Panels are moved under Panels (V)" onClick={() => setTool('select')}>
@@ -472,11 +472,11 @@ function LayoutPage({ layout }: { layout: Layout }) {
               </Field>
             )}
             <Field label="Title on top of the page">
-              <Check checked={layout.showTitle} onChange={(v) => set('Page title', { showTitle: v })} ariaLabel="Title on top of the page" />
+              <Check checked={layout.showTitle} onChange={(v) => set('Page title', v && layout.title.trim() === '' ? { showTitle: v, title: layout.name } : { showTitle: v })} ariaLabel="Title on top of the page" />
             </Field>
             {layout.showTitle && (
               <Field label="Title">
-                <TextInput value={layout.title} onChange={(v) => set('Page title text', { title: v })} placeholder="Title" />
+                <TextInput value={layout.title} onChange={(v) => set('Page title text', { title: v }, 'layout:title')} placeholder="Title" />
               </Field>
             )}
             <NumField label="Margin" unit="mm" step={1} min={0} max={MARGIN_MM_MAX} value={layout.marginMm} disabled={a.kind === 'free'} note={a.kind === 'free' ? 'Free placement ignores the margin: place the boxes where you want them.' : null} onCommit={(v) => set('Page margin', { marginMm: v })} />
@@ -607,7 +607,6 @@ function LayoutPage({ layout }: { layout: Layout }) {
                       run(ids.length === 1 ? 'Delete shape' : 'Delete shapes', removeDrawings(owner, ids));
                       setPicked(picked.filter((x) => !ids.includes(x)));
                     }}
-                    size={{ widthPt: W, heightPt: H }}
                     fontLabel="Arial"
                   />
                 </Section>
@@ -618,9 +617,11 @@ function LayoutPage({ layout }: { layout: Layout }) {
                   {notes.length === 0 && <div className="muted small">No texts. Choose Text on the toolbar and click the page where the text should go, or use the button above. A text can be dragged on the page.</div>}
                   {notes.map((n) => (
                     <div key={n.id} className={`annotation-card${picked.includes(n.id) ? ' selected' : ''}`}>
-                      <button className="list-item" onClick={(e) => (!(e.ctrlKey || e.metaKey || e.shiftKey) && picked.length === 1 && picked[0] === n.id ? setPicked([]) : pick(n.id, e.ctrlKey || e.metaKey || e.shiftKey))}>
-                        {n.text.split('\n')[0] || '(empty)'}
-                      </button>
+                      {!picked.includes(n.id) && (
+                        <button className="list-item" onClick={(e) => (!(e.ctrlKey || e.metaKey || e.shiftKey) && picked.length === 1 && picked[0] === n.id ? setPicked([]) : pick(n.id, e.ctrlKey || e.metaKey || e.shiftKey))}>
+                          {n.text.split('\n')[0] || '(empty)'}
+                        </button>
+                      )}
                       {picked.includes(n.id) && (
                         <AnnotationEditor
                           annotation={n}

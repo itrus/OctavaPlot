@@ -1,9 +1,11 @@
-import { chartTypeInfo, defaultChartTypeFor } from './chartTypes';
-import { createChart } from '../defaults';
-import { newId } from '../ids';
-import { withoutLegendOrder } from './legendEntries';
-import { xySeries } from '../table/tableLayout';
-import type { AxisConfig, Chart, ChartLayer, DataTable, Id, SummarySpec } from '../types';
+import { chartTypeInfo } from '../chartTypes';
+import { defaultChartTypeFor } from '../chartGallery';
+import { createChart } from '../../defaults';
+import { withoutLegendOrder } from '../legendEntries';
+import { xySeries } from '../../table/tableLayout';
+import { followThresholds } from '../../options/volcanoOptions';
+import { usesSeriesBlocks } from '../chartTypes';
+import type { AxisConfig, Chart, ChartLayer, DataTable, Id, SummarySpec } from '../../types';
 
 /**
  * Which data set of `table` takes the style of which data set of `sourceTable`: matched by position. For an XY or survival
@@ -15,13 +17,27 @@ export function dataSetMap(sourceTable: DataTable, table: DataTable): Map<Id, Id
     const target = table.groups[i];
     if (target) to.set(g.id, target.id);
   });
-  if (table.kind === 'xy' || table.kind === 'survival') {
+  if (usesSeriesBlocks(table.kind)) {
     const [from, into] = [xySeries(sourceTable), xySeries(table)];
     from.forEach((s, i) => {
       if (into[i]) to.set(s.id, into[i].id);
     });
   }
   return to;
+}
+
+/**
+ * Where a part of one graph (an ID of the form `${series or data set}:${kind}`) is on another graph: the part of the data set that takes its style (`to`),
+ * or, for a part that belongs to the whole graph (the lines joining paired rows, the table at risk, titles), the one of the other graph;
+ * null for one that belongs to a single value.
+ */
+export function layerIdMap(sourceChartId: Id, chartId: Id, to: ReadonlyMap<Id, Id>): (k: Id) => Id | null {
+  return (k) => {
+    if (k.startsWith(`${sourceChartId}:`)) return `${chartId}:${k.slice(sourceChartId.length + 1)}`;
+    const cut = k.indexOf(':');
+    const target = cut > 0 ? to.get(k.slice(0, cut)) : undefined;
+    return target ? `${target}${k.slice(cut)}` : null;
+  };
 }
 
 /**
@@ -38,7 +54,13 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
   const sameKind = sourceTable.kind === table.kind;
   const type = sameKind && chartTypeInfo(source.type)?.tableKind === table.kind ? source.type : defaultChartTypeFor(table.kind);
   const fresh = { ...createChart(table.id, { widthPx: source.widthPx, heightPx: source.heightPx }, type), id, name: table.name, title: table.name };
-  const axis = (from: AxisConfig, to: AxisConfig): AxisConfig => ({ ...from, title: to.title, min: null, max: null, majorInterval: null, breaks: [], scale: to.scale, reverse: to.reverse });
+  // Extra ticks are values on this graph's axis (a threshold, a cut-off): like the range and the breaks they belong to the data.
+  const axis = (from: AxisConfig, to: AxisConfig): AxisConfig => {
+    const { extraTicks: _ticks, ...kept } = from;
+    return { ...kept, title: to.title, min: null, max: null, majorInterval: null, breaks: [], scale: to.scale, reverse: to.reverse };
+  };
+  // The threshold lines the new graph made for itself stay its own and are moved to the copied thresholds.
+  const volcano = { ...source.volcano, lineIds: fresh.volcano.lineIds };
   const portable: Chart = {
     ...fresh,
     aspect: source.aspect,
@@ -65,11 +87,7 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
 
   const to = dataSetMap(sourceTable, table);
   /** An ID of the form `${series or data set}:${kind}` follows its series; one that belongs to a single value does not. */
-  const mapId = (k: Id): Id | null => {
-    const cut = k.indexOf(':');
-    const target = cut > 0 ? to.get(k.slice(0, cut)) : undefined;
-    return target ? `${target}${k.slice(cut)}` : null;
-  };
+  const mapId = layerIdMap(source.id, id, to);
   const mapKeys = <T,>(rec: Record<Id, T>): Record<Id, T> => Object.fromEntries(Object.entries(rec).flatMap(([k, v]) => (to.has(k) ? [[to.get(k)!, structuredClone(v)] as const] : [])));
   // Keys of single objects: `${groupId}:bar`, `:mean`, `:box` ... follow their data set; the ID of a single value does not.
   const mapObjects = <T,>(rec: Record<Id, T>): Record<Id, T> => Object.fromEntries(Object.entries(rec).flatMap(([k, v]) => {
@@ -79,7 +97,6 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
   const layers: ChartLayer[] = source.layers.map((l) => {
     return {
       ...structuredClone(l),
-      id: newId('layer'),
       groupOverrides: mapKeys(l.groupOverrides),
       objectOverrides: mapObjects(l.objectOverrides),
       groupSummary: mapKeys<Partial<SummarySpec>>(l.groupSummary),
@@ -93,7 +110,8 @@ export function inheritChart(source: Chart, sourceTable: DataTable, table: DataT
     lineOrder: source.lineOrder,
     lineConnect: source.lineConnect,
     traceOffset: source.traceOffset,
-    volcano: { ...source.volcano, lineIds: [] },
+    volcano,
+    referenceLines: followThresholds(fresh.referenceLines, volcano),
     ...(source.sizeLegend ? { sizeLegend: { values: [...source.sizeLegend.values] } } : {}),
     groupedBy: source.groupedBy,
     bars: { ...source.bars },

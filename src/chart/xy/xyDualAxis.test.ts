@@ -316,9 +316,10 @@ describe('a chart without the right axis is drawn as it was', () => {
     expect(svg(back)).toBe(svg(plain));
   });
 
-  // Recorded before the right axis was built (the drawings of 29 Oct 2026, numbers rounded to three decimals). If a change to the drawing
-  // of XY charts is meant, record these again: print hash(svg(setup(type))) for each type.
-  const RECORDED: Record<string, string> = { xyScatter: 'd2f50e5f', xyLine: '8769a407', xyLineSymbols: '30adbfce', xyBars: '9e1d0753', xySpikes: '17fcbbe0', xyArea: '27d0418a' };
+  // Recorded before the right axis was built (the drawings of 29 Oct 2026, numbers rounded to three decimals), and again on 15 Nov 2026
+  // for the rounded default sizes (27 pt numbers, 11 pt ticks) and the value axis starting at 0. If a change to the drawing of XY charts
+  // is meant, record these again: print hash(svg(setup(type))) for each type.
+  const RECORDED: Record<string, string> = { xyScatter: 'ce439d1c', xyLine: '12718d82', xyLineSymbols: 'f278b2d1', xyBars: '4a1931f7', xySpikes: '667034f1', xyArea: 'ae63d586' };
   for (const [type, expected] of Object.entries(RECORDED)) {
     it(`${type}: the recorded drawing`, () => {
       expect(hash(svg(setup(type as ChartType)))).toBe(expected);

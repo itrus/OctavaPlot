@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { CloseIcon } from '../components/icons';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
+import { clearBrowserCopies } from '../../state/recovery/recovery';
 import { usePreferences, useRecovery } from '../../state/AppContext';
 import { EXPORT_DPI_CHOICES, type ExportDpi, type ExportFormat } from '../../state/settings';
 import { DialogShell, trapTab } from './DialogShell';
@@ -38,7 +39,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             hint="Keep a copy of the project in this browser while you work"
             note={settings.autosave && !autosaveOk ? 'Autosave is unavailable: the browser refused to store the project.' : null}
           >
-            <Check checked={settings.autosave} onChange={(v) => updateSettings({ autosave: v })} ariaLabel="Autosave" />
+            <Check checked={settings.autosave} onChange={(v) => {
+              // Switching off stops the writing; what was written before would stay in the browser, so it is deleted (after asking).
+              if (!v && !window.confirm('Switch Autosave off?\n\nThe copy of the project kept in this browser will be deleted. Work that is not saved as a file can then not be recovered.')) return;
+              if (!v) clearBrowserCopies();
+              updateSettings({ autosave: v });
+            }} ariaLabel="Autosave" />
           </Field>
           <Field label="Start new tables with sample data" hint="On: a new project, and the New Data Table dialog, start with sample data. Off: they start with blank tables (the dialog still lets you choose).">
             <Check checked={settings.newProjectSample} onChange={(v) => updateSettings({ newProjectSample: v })} ariaLabel="Start new tables with sample data" />

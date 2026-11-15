@@ -1,5 +1,5 @@
-/** Family names every browser resolves itself: they are never missing. */
-const GENERIC = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded']);
+/** Family names every browser resolves itself: a font check never calls them missing, and a glyph check cannot judge them (what is drawn is up to the system). */
+export const GENERIC = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded']);
 
 type FontStatus = 'available' | 'missing' | 'generic';
 

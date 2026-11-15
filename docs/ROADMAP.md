@@ -2,7 +2,7 @@
 
 OctavaPlot is a scientific figure editor: composable graphical layers, trustworthy calculations, and exact output. It is not a statistics suite. Calculations exist only to draw or annotate a chart.
 
-The calculation rules, presets and acceptance fixtures are in [docs/calculation-contracts.md](calculation-contracts.md). Where each part of the code is, is in the [README](../README.md#structure).
+The calculation rules, presets and acceptance fixtures are in [docs/calculation-contracts.md](calculation-contracts.md). Where each part of the code is, is in the [README](../README.md#structure-of-the-source).
 
 ## Decisions
 
@@ -12,7 +12,7 @@ The calculation rules, presets and acceptance fixtures are in [docs/calculation-
 - **Project model:** a project holds several data tables, graphs and Results sheets. The single-chart boundary of the old specification no longer applies.
 - **Layers:** a graph has one data layer (its style and summary settings) and a list of *layers*, its parts (the bars, the error bars, the fit, a reference line, an annotation ...), derived from the graph and its table. What the user decides about a part is kept on the graph by the part's ID: hidden, kept out of the axis range, its own look, its place in the order. There is no `enabled` switch: hiding never changes a calculation, and taking observations out of one is exclusion.
 - **Calculation interface:** calculations sit behind a small replaceable `CalculationEngine` interface (request in, result with diagnostics and provenance out). A synchronous local implementation comes first; a SciPy/Pyodide engine is an option only if a fit cannot be validated in TypeScript.
-- **Out of scope:** ANOVA, mixed and generalized models, multiple-comparison workflows beyond labelled brackets, power analysis, report builders, model selection. The To do item "Statistics taken from R" ([BACKLOG.md](BACKLOG.md#to-do)) widens this: what it takes up is decided item by item, with a contract and reference values from R first.
+- **Out of scope:** ANOVA, mixed and generalized models, multiple-comparison workflows beyond labels the user types (a bracket drawn with Graphics), power analysis, report builders, model selection. The To do item "Statistics taken from R" ([BACKLOG.md](BACKLOG.md#to-do)) widens this: what it takes up is decided item by item, with a contract and reference values from R first.
 - **Dropped by decision, 1 November 2026:** everything that was still open apart from three items, which were then built (brackets that can be dragged, a size legend for bubbles, a vector PDF). That includes the postponed statistics and families (dot apportionment as a graph, ROC, residual plots, Q-Q and Bland-Altman, the exact binomial interval, Holm and BH, fit validation against outside references for the models other than the two-phase one), the axis alignment of layout panels, a worker pool, a cancel button and the fits of the Results sheet in a worker, a look for the bodies of bars, boxes and violins, boxes and violins at numeric X, the new families of P4, and the open items of P3 and P5 (small screens in full, accessibility beyond what is done, results in more texts, further browser checks). They are not planned work; a later change of mind starts from BACKLOG.md ("Dropped and not adopted").
 - **Settled:** the resolution of a PNG is chosen for a layout page only, in its Export dialog; a graph's PNG is at its own size, and the print width of a graph (`printWidthMm`, with its warnings for small text and thin lines) was removed on 8 November 2026 (a file that has it is read, and the value is not kept); the export of a graph is a page of the inspector (the export of a layout page and the batch export keep their dialogs); a subject is a free-text `subject` on each observation (the units differ between conditions of a nested design), and a factor is a text on the first column of a series; fonts in exports are diagnosed, not embedded: an SVG names the font, and a PDF uses the standard fonts nearest to it (decided 1 November 2026, when the vector PDF was built; a character none of them has is written as "?" and said in the status line).
 
@@ -28,7 +28,7 @@ The calculation rules, presets and acceptance fixtures are in [docs/calculation-
 
 ## Status
 
-Phases P0 to P5 are built as far as BACKLOG.md records. For each feature it says what was tested in code and what was also tried in a browser; a line that does not say "Browser" was not. Also in place: a calculation cache keyed by identity (`src/stats/calcCache.ts`), PDF and layout export, linked graphs, a folder overview with thumbnails and multi-select (Navigator), and tags for tables and graphs. Dead code is checked with `npx knip`.
+Phases P0 to P5 are built as far as BACKLOG.md records. For each feature it says what was tested in code and what was also tried in a browser; a line that does not say "Browser" was not. Also in place: a calculation cache keyed by identity (`src/stats/calcCache.ts`), PDF and layout export, linked graphs, a folder overview with thumbnails and multi-select (Navigator), and tags for tables and graphs. Dead code should be checked with `npx knip`, which is not installed yet (BACKLOG, Tooling); until then it is found with scripts.
 
 ## Version 0.1 (22 October to 14 November 2026)
 
@@ -47,14 +47,11 @@ Version 0.1 was built in 63 commits over about three weeks, from an empty reposi
 | 8 Nov | Layout inspector, thumbnails on the Type tab, a round of fixes; the graph's print width removed. |
 | 14 Nov | Shapes and lines (33 presets, on graphs and layout pages, drawn the same in SVG, PNG and PDF); comparison brackets and subjects removed. |
 
-In numbers (1 November 2026 count, see "Size"): about 34.5 kLoC of source, 27.7 kLoC of tests, 57 graphs in the gallery, 48 browser tests. Phases P0 to P5 were built as far as BACKLOG.md records; items dropped by decision are listed under "Decisions".
+In numbers (14 November 2026 count, see "Size"): about 38.3 kLoC of source, 28.7 kLoC of tests, 57 graphs in the gallery, 63 browser tests. Phases P0 to P5 were built as far as BACKLOG.md records; items dropped by decision are listed under "Decisions".
 
 ## To do
 
-1. Beta-testing.
-2. Statistics taken from R.
-
-Details are in [BACKLOG.md](BACKLOG.md#to-do).
+The to-do list is in [BACKLOG.md](BACKLOG.md#to-do), the one place where the status is kept (what is open, how far each feature was checked, the known issues, the change log). This file holds the decisions, the architecture rules, the testing approach, the performance table and the history of version 0.1.
 
 ## Testing
 
@@ -65,7 +62,7 @@ Details are in [BACKLOG.md](BACKLOG.md#to-do).
 - **Data integrity:** malformed CSV, ragged paste, missing values. No silent conversion or loss.
 - **State:** undo and redo, failed save, migrations (the version chain with injected steps, and three files written by earlier commits).
 - **Architecture:** the layers, the shared parts and the folder sizes (`src/architecture.test.ts`).
-- **Browser (Playwright):** `e2e/` (`npm run e2e`): 48 tests in the installed Google Chrome, each in a fresh profile (`graphObjects.spec.ts`, formerly `brackets.spec.ts`, 1 November 2026: the size legend and its switch, and a PDF that holds shapes and text and no picture; the bracket tests went with the comparison brackets on 14 November 2026). Built (27 October 2026): editing a cell and Undo, exclusion, Duplicate with its status message, saving and opening a project, the size and resolution of a PNG export, the keyboard of the grid, the chart, the Navigator, Fill series, the focus of the Export dialog, several data sets together (Mixed, reset), dragging an annotation, an annotation anchored to data, the legend offset and the narrow window; and (31 October 2026, `families.spec.ts`) every one of the 57 graphs of the gallery, built from the catalogue on its table type's sample data, opened in the browser: each draws with no page error and no number that is not one in its markup (a smoke test, not a comparison of the drawing). Also (`layouts.spec.ts`, 31 October 2026) the page layouts: every standard arrangement of both orientations, an array across and down, swapping and emptying a panel, turning the page, title, panel labels and scaling, the master legend, free placement (typed boxes, add and remove, a dragged box) and the SVG, PNG and PDF exports.
+- **Browser (Playwright):** `e2e/` (`npm run e2e`): 63 tests in 12 files in the installed Google Chrome (57 run by default; the 6 measurements run with `npm run perf`), each in a fresh profile (`graphObjects.spec.ts`, formerly `brackets.spec.ts`, 1 November 2026: the size legend and its switch, and a PDF that holds shapes and text and no picture; the bracket tests went with the comparison brackets on 14 November 2026). Built (27 October 2026): editing a cell and Undo, exclusion, Duplicate with its status message, saving and opening a project, the size and resolution of a PNG export, the keyboard of the grid, the chart, the Navigator, Fill series, the focus of the Export dialog, several data sets together (Mixed, reset), dragging an annotation, an annotation anchored to data, the legend offset and the narrow window; and (31 October 2026, `families.spec.ts`) every one of the 57 graphs of the gallery, built from the catalogue on its table type's sample data, opened in the browser: each draws with no page error and no number that is not one in its markup (a smoke test, not a comparison of the drawing). Also (`layouts.spec.ts`, 31 October 2026) the page layouts: every standard arrangement of both orientations, an array across and down, swapping and emptying a panel, turning the page, title, panel labels and scaling, the master legend, free placement (typed boxes, add and remove, a dragged box) and the SVG, PNG and PDF exports.
 
 ## Performance targets (provisional, on a defined reference laptop)
 
@@ -114,6 +111,8 @@ Done 28 October 2026. The design, so the next change does not undo it:
 
 ## Done so far
 
+The entries are dated and are history: a thing they describe may have been removed since (subjects and comparison brackets, 14 November 2026; see "Version 0.1" and BACKLOG).
+
 - Annotations, the bar labels of column and grouped charts (a layer for each data set), the point labels of column charts, the editor's selection marks, the pie legend and the heat map labels as scene elements with stable ids, drawn by one renderer for every family (steps 1a to 1e).
 - The export dialog, font diagnostics and the P0 defect fixes listed in [docs/BACKLOG.md](BACKLOG.md).
 - Glyph checks in the export dialog; a numeric legend offset; fill down and right in the data grid; a row limit and tests for CSV import (27 October 2026).
@@ -129,4 +128,4 @@ Done 28 October 2026. The design, so the next change does not undo it:
 
 ## Size
 
-The code base is about 34.5 kLoC in `src` (242 `.ts` and `.tsx` source files with 34 491 lines, tests left out) and about 27.7 kLoC of tests (214 test files: 204 `*.test.ts(x)` files in `src` with 26 551 lines, and the 10 `.ts` files of `e2e/` with 1 154 lines: eight specs, the helpers and the Playwright configuration), counted on 1 November 2026 on the working tree, which holds changes that are not committed yet. `src/styles.css` (616 lines) is not in these counts; `scripts/loc-history.mjs`, which counts `.ts`, `.tsx`, `.css`, `.html` and `.rs` over the whole repository (the e2e files count as source there), gives its own figures per commit (`docs/loc-history.csv`). The planning assumption is 65-85 kLoC with tests, up to 100 kLoC for advanced plotting. It is a budget, not a goal. Consolidating duplicated chart-specific models should lower net growth.
+The code base is about 38.3 kLoC in `src` (272 `.ts` and `.tsx` source files with 38 317 lines, tests left out; the 6 helpers of `src/testing` count as source) and about 28.7 kLoC of tests (220 test files: 206 `*.test.ts(x)` files in `src` with 27 194 lines, and the 14 `.ts` files of `e2e/` with 1 555 lines: twelve specs, the helpers and the Playwright configuration), counted on 14 November 2026 on the working tree, which holds changes that are not committed yet. `src/styles.css` (700 lines) is not in these counts; `scripts/loc-history.mjs`, which counts `.ts`, `.tsx`, `.css`, `.html` and `.rs` over the whole repository (the e2e files count as source there), gives its own figures per commit (`docs/loc-history.csv`). The planning assumption is 65-85 kLoC with tests, up to 100 kLoC for advanced plotting. It is a budget, not a goal. Consolidating duplicated chart-specific models should lower net growth.

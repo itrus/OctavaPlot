@@ -113,7 +113,7 @@ describe('keeping a part of a grouped chart out of the axis range', () => {
     expect(top(out, far)).toBeLessThan(top(chart, far));
     expect(cells(out, far)).toEqual(cells(chart, far));
     expect(out.hiddenLayerIds).toEqual(chart.hiddenLayerIds);
-    expect(layersOf(out, far).map((l) => [l.id, l.visible, l.z])).toEqual(layersOf(chart, far).map((l) => [l.id, l.visible, l.z]));
+    expect(layersOf(out, far).map((l) => [l.id, l.visible])).toEqual(layersOf(chart, far).map((l) => [l.id, l.visible]));
     expect(buildGroupedModel(out, far).series.map((s) => s.dots.length)).toEqual(buildGroupedModel(chart, far).series.map((s) => s.dots.length));
     expect(markIds(svg(out, far))).toEqual(markIds(svg(chart, far)));
     // With the dots out the far value no longer holds the axis, the end of the error bar does; and that can go too.

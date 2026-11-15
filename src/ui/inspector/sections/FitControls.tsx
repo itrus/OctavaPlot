@@ -3,7 +3,7 @@ import type { XyModel } from '../../../chart/xy/xyModel';
 import { analysesOf } from '../../../model/project/analysis';
 import { newId } from '../../../model/ids';
 import type { Chart, ChartFit, DataTable } from '../../../model/types';
-import { fitModelById } from '../../../stats/fit';
+import { fitModelById } from '../../../stats/fitModels';
 import { useCommands, useNavigation, useProject, useSelection } from '../../../state/AppContext';
 import { addAnalysis, addAnnotation, composeCommands, patchLook } from '../../../state/commands';
 import { Check, Field, GroupBox, SelectInput } from '../common/controls';
@@ -44,7 +44,7 @@ export function FitSection({ chart, table, model }: { chart: Chart; table: DataT
           onChange={(v) => set('Fitted curve', { analysisId: v === '' ? null : v })}
         />
       </Field>
-      <div className="row-buttons">
+      <div className="button-row">
         <button onClick={create} title="Add a curve fit of this table to the Results and draw it here">New curve fit</button>
         {chosen && <button onClick={() => setView({ kind: 'analysis', id: chosen.id })} title="Open the results to change the model or see the numbers">Open results</button>}
       </div>
@@ -84,7 +84,7 @@ export function FitSection({ chart, table, model }: { chart: Chart; table: DataT
           </div>
         ))}
       {on && fitted.some((s) => s.fit?.summary) && (
-        <div className="row-buttons">
+        <div className="button-row">
           <button onClick={pasteText} title="Put the parameters on the graph as text that can be edited, moved and deleted like any annotation">Paste parameters as text</button>
         </div>
       )}

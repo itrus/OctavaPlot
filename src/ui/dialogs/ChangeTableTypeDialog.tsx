@@ -31,7 +31,7 @@ export function ChangeTableTypeDialog({ table, project, onChange, onClose }: { t
         {KINDS.map((k) => {
           const info = tableTypeInfo(k);
           return (
-            <label key={k} className="dlg-radio dlg-radio-block">
+            <label key={k} className="dlg-radio">
               <input type="radio" name="table-type" checked={kind === k} onChange={() => setKind(k)} />
               <span>
                 <strong>{info.label}</strong>

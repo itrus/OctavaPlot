@@ -86,7 +86,7 @@ describe('the navigator folders', () => {
     const out = nav();
     for (const title of ['Data Tables', 'Results', 'Graphs', 'Layouts']) {
       expect(out).toContain(`aria-label="Fold ${title}"`);
-      expect(out).toMatch(new RegExp(`<button class="nav-folder"[^>]*>${title}</button>`));
+      expect(out).toMatch(new RegExp(`<button class="nav-folder"[^>]*>${title}(?:<span[^>]*>[^<]*</span>)?</button>`));
     }
     expect(out.split('aria-expanded="true"').length - 1).toBe(4);
   });

@@ -8,6 +8,7 @@ import { DeleteIcon, RedoIcon, UndoIcon } from '../../components/icons';
 import { ColorInput, Field, GroupBox, NumField, SelectInput } from '../common/controls';
 import { takeFocusRequest } from '../common/pendingFocus';
 import { SLIDERS } from '../common/sliderRanges';
+import { SymbolButton } from '../../components/SymbolButton';
 
 /** Texts that are often written above a comparison, a row for each set of marks: one click writes them. */
 const QUICK_TEXTS: ReadonlyArray<readonly string[]> = [
@@ -50,6 +51,12 @@ export function wrapScript(text: string, start: number, end: number, mark: '^' |
   return inner === '' ? { text: next, start: a + 2, end: a + 2 } : { text: next, start: a + 2, end: a + 2 + inner.length };
 }
 
+/** The first line of a text, shortened to fit a heading (empty text gives ''). */
+export function briefText(text: string, max = 28): string {
+  const first = text.split('\n')[0];
+  return first.length > max ? `${first.slice(0, max - 1)}…` : first;
+}
+
 /**
  * The settings of one text annotation: the text with quick texts, its style (bold, italic, underline, superscript and subscript, with
  * undo and redo at hand), size, font, colour and opacity, alignment and line spacing, its anchor and place, and Delete.
@@ -86,8 +93,9 @@ export function AnnotationEditor({ annotation: a, placer, resultHint, fontLabel,
   const align: AnnotationAlign = a.align ?? 'left';
 
   return (
-    <GroupBox title="Text">
+    <GroupBox title={`Text: ${briefText(a.text) || '(empty)'}`}>
       <Field label="Text" hint={`${resultHint ? `${resultHint} ` : ''}Sub- and superscripts are written _{...} and ^{...} (the buttons below do it for the selected letters).`}>
+        <span className="text-symbol-wrap">
         <textarea
           rows={2}
           aria-label="Annotation text"
@@ -102,6 +110,8 @@ export function AnnotationEditor({ annotation: a, placer, resultHint, fontLabel,
           }}
           onChange={(e) => set('Edit annotation text', { text: e.target.value }, 'text')}
         />
+        <SymbolButton className="symbol-top" box={() => textRef.current} />
+        </span>
       </Field>
       <Field label="Quick text" hint="Write one of these as the whole text">
         <QuickTexts value={a.text} onPick={(t) => set('Annotation text', { text: t })} />

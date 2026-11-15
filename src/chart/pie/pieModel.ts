@@ -117,17 +117,24 @@ export function slicePath(cx: number, cy: number, r: number, rInner: number, a0:
   return `M${p(r, a0)}A${n2(r)},${n2(r)} 0 ${large} ${sweep} ${p(r, a1)}L${p(rInner, a1)}A${n2(rInner)},${n2(rInner)} 0 ${large} ${1 - sweep} ${p(rInner, a0)}Z`;
 }
 
+/** How much smaller than the largest possible a pie may be so that the arrangement with fewer lines is taken: pies side by side are preferred. */
+const SIDE_BY_SIDE_TOLERANCE = 0.85;
+
 /**
- * How many pies go across and down so that each gets the most room. `roomX` and `roomY` are what a pie needs beside
- * and above or below it for its labels, `band` what its title and total need above and below it; the diameter is what is left.
+ * How many pies go across and down so that each gets the most room, taking pies side by side (fewer lines) when that costs little: one
+ * line of two rather than two lines of one, unless the pies would be more than 15 % smaller. `roomX` and `roomY` are what a pie needs
+ * beside and above or below it for its labels, `band` what its title and total need above and below it; the diameter is what is left.
  */
 export function pieGrid(count: number, width: number, height: number, roomX = 0, roomY = 0, band = 0): { cols: number; rows: number; diameter: number } {
-  let best = { cols: 1, rows: Math.max(1, count), diameter: -Infinity };
+  const options: Array<{ cols: number; rows: number; diameter: number }> = [];
   for (let cols = 1; cols <= Math.max(1, count); cols++) {
     const rows = Math.ceil(count / cols);
-    const diameter = Math.min(width / cols - 2 * roomX, height / rows - band - 2 * roomY);
-    if (diameter > best.diameter + 1e-9) best = { cols, rows, diameter };
+    options.push({ cols, rows, diameter: Math.min(width / cols - 2 * roomX, height / rows - band - 2 * roomY) });
   }
+  const largest = Math.max(...options.map((o) => o.diameter));
+  // Of the arrangements that are nearly as large as the best one, the one with the fewest lines (then the largest pies).
+  const ok = options.filter((o) => largest <= 0 || o.diameter >= largest * SIDE_BY_SIDE_TOLERANCE - 1e-9);
+  const best = ok.reduce((m, o) => (o.rows < m.rows || (o.rows === m.rows && o.diameter > m.diameter + 1e-9) ? o : m));
   return { ...best, diameter: Math.max(0, best.diameter) };
 }
 

@@ -12,7 +12,8 @@ import { duplicateItems, moveItems, nudgeItems, removeItems, renameItem, sortIte
 import { Thumb, type ThumbItem } from './FolderThumbs';
 import { NOTHING_PICKED, pick, pickAll, pickedInOrder, prune, type PickState } from './folderSelection';
 import { DeleteIcon, ExportIcon } from '../components/icons';
-import { downloadBlob, exportFileName } from '../../util/download';
+import { downloadBlob } from '../../util/download';
+import { exportFileName } from '../../util/fileName';
 import { BatchExportDialog } from '../export/BatchExportDialog';
 import { useExportJob } from '../export/useExportJob';
 
@@ -72,7 +73,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
       pixels: tooBig,
       tooBigMessage: 'A graph of the batch needs more pixels than the browser can make. Make it smaller, or choose SVG.',
       work: async (phase) => {
-        // The renderer behind export (react-dom/server) is loaded on first use, not at startup.
+        // The export code is loaded on first use, not at startup.
         const { chartToSvgString, chartToPngBlob, chartToPdf } = await import('../../chart/export/export');
         phase('rasterizing');
         // What a PDF could not write as it is (a character outside its fonts, ...), once per note with the graphs it concerns, as a single export says it.

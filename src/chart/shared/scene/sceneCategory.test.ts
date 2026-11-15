@@ -69,7 +69,7 @@ describe('the chrome of bars and grouped charts in the scene', () => {
     const narrow = names(chromeOf(barP((c) => ({ ...c, widthPx: 260, xAxis: { ...c.xAxis, tickFontSizePt: 30 } }))));
     expect(narrow.length).toBeGreaterThan(0);
     expect(narrow.every((n) => n.attrs!.some(([k, v]) => k === 'transform' && String(v).startsWith('rotate(-45')))).toBe(true);
-    expect(names(chromeOf(barP())).every((n) => !hasAttr(n, 'transform'))).toBe(true);
+    expect(names(chromeOf(barP((c) => ({ ...c, widthPx: 1200 })))).every((n) => !hasAttr(n, 'transform'))).toBe(true);
     const horizontal = chromeOf(barP((c) => ({ ...c, orientation: 'horizontal' })));
     expect(names(horizontal).length).toBeGreaterThan(0);
     expect(names(horizontal).every((n) => hasAttr(n, 'text-anchor', 'end') && hasAttr(n, 'dy'))).toBe(true);

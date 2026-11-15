@@ -20,7 +20,7 @@ export function sanitizeLabelStyle<T extends ChartStyle>(style: T): T {
     typeof v === 'number' && Number.isFinite(v) ? clamp(v, lo, hi) : fallback;
   out.pointLabelFontSizePt = num(
     style.pointLabelFontSizePt,
-    22.4,
+    22,
     LABEL_FONT_LIMITS.min,
     LABEL_FONT_LIMITS.max,
   );

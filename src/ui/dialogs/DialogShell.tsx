@@ -43,3 +43,17 @@ export function DialogShell({ children }: { children: ReactNode }) {
   }, []);
   return createPortal(children, document.body);
 }
+
+/**
+ * A dialog that closes on a click outside it and on Escape, with Tab kept inside: the backdrop and the shell in one. The dialog itself
+ * (an element with role="dialog") is its child.
+ */
+export function ModalBackdrop({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  return (
+    <DialogShell>
+      <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onKeyDown={(e) => (e.key === 'Escape' ? onClose() : trapTab(e))}>
+        {children}
+      </div>
+    </DialogShell>
+  );
+}

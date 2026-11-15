@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../model/defaults';
-import { importCsv, tableToCsv } from '../ui/data/csv';
+import { tableToCsv } from '../ui/data/csv';
+import { importCsv } from '../ui/data/csvTestKit';
 import { composeCommands, replaceTableData, setCells, setExcluded } from './commands';
 
 describe('importing a CSV with exclusion columns', () => {

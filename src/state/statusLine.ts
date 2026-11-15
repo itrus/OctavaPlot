@@ -4,6 +4,8 @@ export interface StatusMemo<P = unknown, S = unknown, V = unknown> {
   project: P;
   selection: S;
   view: V;
+  /** Which setting of the message this is, when the caller counts them: the same text set twice is two messages. */
+  seq?: number;
 }
 
 /**
@@ -13,9 +15,9 @@ export interface StatusMemo<P = unknown, S = unknown, V = unknown> {
  *
  * `seen` is what was remembered when the message appeared (null before one); the result says what the line shows now and what to remember.
  */
-export function statusAfter<P, S, V>(status: string, seen: StatusMemo<P, S, V> | null, now: { project: P; selection: S; view: V }): { status: string; seen: StatusMemo<P, S, V> | null } {
+export function statusAfter<P, S, V>(status: string, seen: StatusMemo<P, S, V> | null, now: { project: P; selection: S; view: V }, seq?: number): { status: string; seen: StatusMemo<P, S, V> | null } {
   if (status === '') return { status, seen: null };
-  if (seen === null || seen.text !== status) return { status, seen: { text: status, ...now } };
+  if (seen === null || seen.text !== status || seen.seq !== seq) return { status, seen: { text: status, ...now, ...(seq === undefined ? {} : { seq }) } };
   const acted = seen.project !== now.project || seen.selection !== now.selection || seen.view !== now.view;
   return acted ? { status: '', seen: null } : { status, seen };
 }

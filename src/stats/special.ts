@@ -7,7 +7,10 @@ const LANCZOS = [
   1.5056327351493116e-7,
 ];
 
-/** ln Gamma(x), Lanczos g = 7, n = 9. Intended for x > 0; reflection for x < 0.5; poles give Infinity; NaN gives NaN. */
+/**
+ * ln |Gamma(x)|: Lanczos g = 7, n = 9 from x = 0.5 up; below that the reflection formula (a fractional df under 1 reaches it). 0 gives
+ * Infinity; a negative integer gives a very large number, not Infinity; NaN gives NaN.
+ */
 export function lnGamma(x: number): number {
   if (Number.isNaN(x)) return NaN;
   if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - lnGamma(1 - x);
@@ -76,6 +79,60 @@ export function studentTUpperTail(t: number, df: number): number {
   return 0.5 * regIncBeta(df / (df + t2), df / 2, 0.5, t2 / (df + t2));
 }
 
+/** P(Z > z) for z >= 0 as half the regularised upper incomplete gamma Q(1/2, z^2/2): series below 1.5, continued fraction above. */
+function normalUpperTail(z: number): number {
+  const x = (z * z) / 2;
+  if (x === 0) return 0.5;
+  const lead = Math.exp(-x + 0.5 * Math.log(x) - 0.5 * Math.log(Math.PI)); // x^a e^-x / Gamma(a) with a = 1/2
+  if (x < 1.5) {
+    let term = 2; // 1 / a
+    let sum = term;
+    for (let n = 1; n < 200; n++) {
+      term *= x / (0.5 + n);
+      sum += term;
+      if (term < sum * 1e-17) break;
+    }
+    return 0.5 * (1 - lead * sum); // P(1/2, x) = lead * sum
+  }
+  const tiny = 1e-300;
+  let b = x + 0.5;
+  let c = 1 / tiny;
+  let d = 1 / b;
+  let h = d;
+  for (let i = 1; i < 300; i++) {
+    const an = -i * (i - 0.5);
+    b += 2;
+    d = an * d + b;
+    if (Math.abs(d) < tiny) d = tiny;
+    c = b + an / c;
+    if (Math.abs(c) < tiny) c = tiny;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 1e-16) break;
+  }
+  return 0.5 * lead * h; // Q(1/2, x) = lead * h
+}
+
+/** From this df up the t quantile is the Cornish-Fisher series in 1/df (A&S 26.7.5): the incomplete beta loses digits there. */
+const T_QUANTILE_SERIES_DF = 1e4;
+
+/** The upper t quantile at large df: the normal quantile refined by Newton steps, plus four terms of the series. */
+function studentTQuantileLarge(q: number, df: number): number {
+  let z = -normalQuantile(q);
+  for (let i = 0; i < 2; i++) {
+    const phi = Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
+    z += (normalUpperTail(z) - q) / phi; // Newton on Q(z) = q, where Q' = -phi
+  }
+  const v = df;
+  return (
+    z +
+    (z ** 3 + z) / (4 * v) +
+    (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * v ** 2) +
+    (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * v ** 3)
+  );
+}
+
 /**
  * The t > 0 with P(T > t) = q, for 0 < q < 0.5 and finite df > 0; NaN otherwise (including q that is
  * not representable below 0.5, e.g. q = (1 - 1e-17) / 2). The caller passes q = (1 - C) / 2.
@@ -84,6 +141,7 @@ export function studentTQuantileUpper(q: number, df: number): number {
   if (!(q > 0 && q < 0.5) || !(df > 0) || !Number.isFinite(df)) return NaN;
   if (df === 1) return 1 / Math.tan(Math.PI * q);
   if (df === 2) return (1 - 2 * q) / Math.sqrt(2 * q * (1 - q));
+  if (df >= T_QUANTILE_SERIES_DF) return studentTQuantileLarge(q, df);
   const lnq = Math.log(q);
   const lnC = lnGamma((df + 1) / 2) - lnGamma(df / 2) - 0.5 * Math.log(df * Math.PI);
   const pdf = (t: number): number => Math.exp(lnC - ((df + 1) / 2) * Math.log1p((t * t) / df));

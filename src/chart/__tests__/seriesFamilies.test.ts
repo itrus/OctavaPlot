@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CHART_TYPES, chartFamily, chartTypesFor, defaultChartTypeFor } from '../../model/graph/chartTypes';
+import { CHART_TYPES, chartFamily, chartTypesFor } from '../../model/graph/chartTypes';
+import { defaultChartTypeFor } from '../../model/graph/chartGallery';
 import { createChart, createExampleProject } from '../../model/defaults';
 import { xySeries } from '../../model/table/tableLayout';
 import type { ChartType, Project, TableKind } from '../../model/types';

@@ -305,7 +305,7 @@ describe('shaded regions', () => {
     const p = addReferenceLine('c', { id: 'r1', axis: 'y', value: 3, color: '#cc0000', widthPt: 1, style: 'solid', opacity: 1, label: '', showLabel: false })(addRegion('c', region({ from: 4, to: 2 }))(setupPlain([[0, 0], [10, 8]])));
     const ls = layersOf(chartOf(p), tableOf(p));
     const [g, r] = [ls.find((l) => l.id === 'g1:region')!, ls.find((l) => l.id === 'r1:referenceLine')!];
-    expect(g.z).toBeLessThan(r.z);
+    expect(ls.indexOf(g)).toBeLessThan(ls.indexOf(r));
     expect(g.rangeContribution).toBe(false);
     expect(layerRows(chartOf(p), tableOf(p)).find((x) => x.layer.id === 'g1:region')).toMatchObject({ label: 'Shaded region: X from 2 to 4', inRange: null, takes: null });
     // A region far outside the data does not stretch the axis.
@@ -371,8 +371,11 @@ describe('extra ticks', () => {
   it('are saved and restored; unusable ones are dropped, and no extra ticks is no setting', () => {
     const p = patchAxis('c', 'yAxis', { extraTicks: [{ value: 1.5, label: 'a' }] })(setupPlain([[0, 0]]));
     expect(chartOf(parseProject(stringifyProject(p))).yAxis.extraTicks).toEqual([{ value: 1.5, label: 'a' }]);
-    const junk = patchAxis('c', 'yAxis', { extraTicks: [{ value: Number.NaN, label: 'x' }, { value: 2, label: 'ok' }, { value: 2, label: 'twice' }] })(setupPlain([[0, 0]]));
+    const junk = patchAxis('c', 'yAxis', { extraTicks: [{ value: Number.NaN, label: 'x' }, { value: 2, label: 'ok' }] })(setupPlain([[0, 0]]));
     expect(chartOf(junk).yAxis.extraTicks).toEqual([{ value: 2, label: 'ok' }]);
+    // An edit that repeats a value is refused as a whole: it must not delete the tick that was not touched.
+    const twice = setupPlain([[0, 0]]);
+    expect(patchAxis('c', 'yAxis', { extraTicks: [{ value: 2, label: 'ok' }, { value: 2, label: 'twice' }] })(twice)).toBe(twice);
     expect('extraTicks' in chartOf(patchAxis('c', 'yAxis', { extraTicks: [] })(p)).yAxis).toBe(false);
     expect('extraTicks' in chartOf(parseProject(stringifyProject(setupPlain([[0, 0]])))).yAxis).toBe(false);
   });

@@ -52,7 +52,7 @@ function GridStyleSection({ chart }: { chart: Chart }) {
       <Field label="Major colour">
         <ColorInput value={g.color} ariaLabel="Major gridline colour" onChange={(v) => set('Major gridline colour', { color: v })} />
       </Field>
-      <NumField {...SLIDERS.line} label="Major thickness" unit="pt" value={g.widthPt} min={GRID_LIMITS.widthPt.min} max={20} onCommit={(v) => set('Major gridline thickness', { widthPt: v }, 'grid:w')} />
+      <NumField {...SLIDERS.line} label="Major thickness" unit="pt" value={g.widthPt} min={GRID_LIMITS.widthPt.min} max={GRID_LIMITS.widthPt.max} onCommit={(v) => set('Major gridline thickness', { widthPt: v }, 'grid:w')} />
       <NumField {...SLIDERS.fraction} label="Major opacity" value={g.opacity} min={0} max={1} onCommit={(v) => set('Major gridline opacity', { opacity: v }, 'grid:o')} hint="0 = transparent, 1 = opaque" />
       <Field label="Major pattern">
         <SelectInput<LineStyle> value={g.style} options={styles} onChange={(v) => set('Major gridline pattern', { style: v })} />
@@ -60,7 +60,7 @@ function GridStyleSection({ chart }: { chart: Chart }) {
       <Field label="Minor colour">
         <ColorInput value={g.minorColor} ariaLabel="Minor gridline colour" onChange={(v) => set('Minor gridline colour', { minorColor: v })} />
       </Field>
-      <NumField {...SLIDERS.line} label="Minor thickness" unit="pt" value={g.minorWidthPt} min={GRID_LIMITS.widthPt.min} max={20} onCommit={(v) => set('Minor gridline thickness', { minorWidthPt: v }, 'grid:mw')} />
+      <NumField {...SLIDERS.line} label="Minor thickness" unit="pt" value={g.minorWidthPt} min={GRID_LIMITS.widthPt.min} max={GRID_LIMITS.widthPt.max} onCommit={(v) => set('Minor gridline thickness', { minorWidthPt: v }, 'grid:mw')} />
       <NumField {...SLIDERS.fraction} label="Minor opacity" value={g.minorOpacity} min={0} max={1} onCommit={(v) => set('Minor gridline opacity', { minorOpacity: v }, 'grid:mo')} hint="0 = transparent, 1 = opaque" />
       <Field label="Minor pattern">
         <SelectInput<LineStyle> value={g.minorStyle} options={styles} onChange={(v) => set('Minor gridline pattern', { minorStyle: v })} />
@@ -122,7 +122,8 @@ export function ColumnLayoutSection({ chart, spacing, baseline, numericX }: { ch
   );
 }
 
-const LABEL_DECIMALS = ['auto', '0', '1', '2', '3', '4', '5', '6'] as const;
+/** Auto and 0 to 10: the whole range that the setting accepts (a value above the menu would show as Auto). */
+const LABEL_DECIMALS = ['auto', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const;
 
 /** Chart types that can write a value or a sample size above their bars. */
 export const hasBarLabels = (type: Chart['type']): boolean => type === 'bar' || type === 'scatter' || type === 'mean' || type === 'groupedBar' || type === 'contingencyBars';
@@ -157,7 +158,7 @@ export function BarLabelSection({ chart }: { chart: Chart }) {
       </Field>
       <Field label="Decimals">
         <SelectInput<(typeof LABEL_DECIMALS)[number]>
-          value={l.decimals === null || l.decimals > 6 ? 'auto' : (String(l.decimals) as (typeof LABEL_DECIMALS)[number])}
+          value={l.decimals === null ? 'auto' : (String(l.decimals) as (typeof LABEL_DECIMALS)[number])}
           disabled={l.show !== 'value' && inside.show !== 'value'}
           options={LABEL_DECIMALS.map((d) => ({ value: d, label: d === 'auto' ? 'Auto' : d }))}
           onChange={(v) => set('Bar label decimals', { decimals: v === 'auto' ? null : Number(v) })}
@@ -205,7 +206,7 @@ export function DirectionSection({ chart }: { chart: Chart }) {
   );
 }
 
-/** Whether lines and error bars are drawn over or under the symbols and bars (Prism: "Line and error go"). */
+/** Whether lines and error bars are drawn over or under the symbols and bars. */
 export function LineOrderSection({ chart }: { chart: Chart }) {
   const { run } = useCommands();
   return (

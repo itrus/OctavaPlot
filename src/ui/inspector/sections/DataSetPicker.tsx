@@ -11,9 +11,9 @@ export function DataSetPicker({ sets, selection, setSelection, noun = 'data sets
   const chosen = selection.kind === 'groups' ? selection.groupIds : selection.kind === 'group' ? [selection.groupId] : [];
   if (sets.length < 2) return null;
   return (
-    <details className="dataset-multi" open={selection.kind === 'groups' || undefined}>
+    <details open={selection.kind === 'groups' || undefined}>
       <summary title={`Choose several ${noun} to change together. Ctrl or Shift on the chart does the same.`}>Edit several {noun} together…</summary>
-      <div className="dataset-multi-list" role="group" aria-label={`${noun} edited together`}>
+      <div role="group" aria-label={`${noun} edited together`}>
         {sets.map((s) => (
           <label key={s.id}>
             <input type="checkbox" checked={chosen.includes(s.id)} onChange={() => setSelection(toggleGroupSelection(selection, s.id, order))} />

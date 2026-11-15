@@ -4,6 +4,7 @@ import type { Annotation, Chart, DataTable, Project } from '../types';
 import { addAnnotation, addChart, addDataTable, addDrawing, addReferenceLine } from '../../state/commands';
 import { createDrawing, presetById } from './drawingPresets';
 import { buildAnyModel, chartTexts } from '../../chart/anyModel';
+import { layerRows } from './layers';
 import { fillResultTokens, resolveChartTokens, resultValue } from './resultTokens';
 
 /**
@@ -83,6 +84,25 @@ describe('tokens in a text', () => {
     expect(fillResultTokens('n = {{n}}', one).text).toBe('n = 8');
     expect(fillResultTokens('Mouse_3 {x} {{ }} {single}', t)).toEqual({ text: 'Mouse_3 {x} {{ }} {single}', problems: [] });
   });
+  it('can name a data set that holds braces (rich text: H_{2}O)', () => {
+    const named: DataTable = { ...t, groups: t.groups.map((g, i) => (i === 0 ? { ...g, name: 'H_{2}O' } : g)) };
+    expect(fillResultTokens('{{n H_{2}O}} and {{mean H_{2}O|1}}', named)).toEqual({ text: '8 and 5.0', problems: [] });
+  });
+  it('says so, once, of a pair of braces that was meant as a token and is not one, and leaves it as typed', () => {
+    const r = fillResultTokens('{{mean-Control}} {{mean-Control}} {{ }} {{9}}', t);
+    expect(r.text).toBe('{{mean-Control}} {{mean-Control}} {{ }} {{9}}');
+    expect(r.problems).toEqual(['{{mean-Control}} is not a result token: write it like {{mean Control}} or {{sd Control|2}}.']);
+  });
+  it('gives a minimum and a maximum with the digits the data have, not five', () => {
+    const big: DataTable = { ...t, groups: t.groups.map((g, i) => (i === 0 ? { ...g, observations: fill([1234567, 2, 3])(g) } : g)) };
+    expect(fillResultTokens('{{max Control}} {{min Control}} {{mean Control}}', big).text).toBe('1234567 2 411520'); // the mean of 1234567, 2 and 3 is 411524: five digits
+  });
+  it('says which data set is used when two have the same name', () => {
+    const twin: DataTable = { ...t, groups: t.groups.map((g, i) => (i === 1 ? { ...g, name: 'Control' } : g)) };
+    const r = fillResultTokens('{{n Control}}', twin);
+    expect(r.text).toBe('8');
+    expect(r.problems).toEqual(['2 data sets are called "Control": the first is used (in {{n Control}}).']);
+  });
   it('fill before rich text is read, so a result can stand in a superscript', () => {
     expect(fillResultTokens('10^{{{n Control}}}', t).text).toBe('10^{8}');
   });
@@ -93,6 +113,15 @@ describe('the chart with its tokens filled in', () => {
   const note = (text: string): Annotation => ({ id: 'a1', text, xFrac: 0.2, yFrac: 0.1, fontSizePt: 12, color: '#000000', opacity: 1 });
   const chart = (over: Partial<Chart> = {}): Chart => ({ ...createExampleProject().charts[0], dataTableId: t.id, annotations: [], referenceLines: [], ...over });
   const line = (over: object = {}) => ({ id: 'r1', axis: 'y' as const, value: 3, color: '#000000', widthPt: 2, style: 'dashed' as const, opacity: 1, label: '', showLabel: true, ...over });
+
+  it('names a line bound to a result in the Layers list by the result it is at now, not by the value stored with it', () => {
+    const c = chart({ referenceLines: [line({ value: 99, valueFrom: { stat: 'mean', groupId: control(t) } })] });
+    const row = layerRows(c, t).find((r) => r.layer.kind === 'referenceLine')!;
+    expect(row.label).toBe('Reference line: Y = 5 (the mean of Control)');
+    const gone = layerRows(chart({ referenceLines: [line({ value: 99, valueFrom: { stat: 'sd', groupId: t.groups[2].id } })] }), t).find((r) => r.layer.kind === 'referenceLine')!;
+    expect(gone.label).toMatch(/not available/);
+    expect(layerRows(chart({ referenceLines: [line({ value: 3 })] }), t).find((r) => r.layer.kind === 'referenceLine')!.label).toBe('Reference line: Y = 3');
+  });
 
   it('is the very same chart when nothing has a token', () => {
     const c = chart({ annotations: [note('plain')], referenceLines: [line({ label: 'target' })] });
@@ -144,5 +173,24 @@ describe('a graph shows the results, and shows new ones when the data change', (
     const changed = withTable(p, { ...t2, groups: t2.groups.map((g, i) => (i === 0 ? { ...g, observations: g.observations.map((o, k) => (k === 0 ? { ...o, value: 12 } : o)) } : g)) });
     expect(texts(changed)).toContain('mean 6.25');
     expect(changed.charts[0]).toBe(p.charts[0]);
+  });
+});
+
+describe('a table whose series have several columns', () => {
+  it('names a data set as the chart does (the series), and takes its result from all its replicates', async () => {
+    const { createXyTable } = await import('../defaults');
+    const table = createXyTable('T', false, { kind: 'replicates', n: 3 });
+    const xs = table.groups[0];
+    const [a1, a2, a3] = table.groups.slice(1, 4);
+    const set = (g: typeof xs, values: number[]) => ({ ...g, observations: g.observations.map((o, i) => ({ ...o, value: values[i] ?? null })) });
+    const filled: DataTable = {
+      ...table,
+      groups: table.groups.map((g) => (g.id === a1.id ? set(g, [1, 2]) : g.id === a2.id ? set(g, [3, 4]) : g.id === a3.id ? set(g, [5, 6]) : g.id === xs.id ? set(g, [1, 2]) : g)),
+    };
+    const name = filled.groups[1].title;
+    expect(name).not.toBe('');
+    const r = fillResultTokens(`n = {{n ${name}}}, mean = {{mean ${name}}}`, filled);
+    expect(r).toEqual({ text: 'n = 6, mean = 3.5', problems: [] });
+    expect(fillResultTokens('{{n Y1}}', filled).problems).toHaveLength(1);
   });
 });

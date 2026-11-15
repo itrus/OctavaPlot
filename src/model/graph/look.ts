@@ -21,7 +21,7 @@ export const FONT_FAMILIES: ReadonlyArray<{ value: string; label: string }> = [
   { value: "'Courier New', Courier, monospace", label: 'Courier New' },
 ];
 
-/** The symbol shapes, in the order of the shape picker. */
+/** The symbol shapes (the picker groups them its own way, see SymbolPicker). */
 export const SYMBOL_SHAPES: ReadonlyArray<{ value: SymbolShape; label: string }> = [
   { value: 'circle', label: 'Circle' },
   { value: 'square', label: 'Square' },

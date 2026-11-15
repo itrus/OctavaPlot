@@ -33,5 +33,6 @@ export default defineConfig({
     },
   },
   // The default 5 s is too short for the heaviest tests (the source scan, a fit, the gallery round trip) when the machine is busy.
-  test: { environment: 'node', include: ['src/**/*.test.{ts,tsx}'], testTimeout: 30_000 },
+  // The files share one process (see src/testing/isolation.ts, which resets the module-level state between tests).
+  test: { environment: 'node', include: ['src/**/*.test.{ts,tsx}'], testTimeout: 30_000, isolate: false, setupFiles: ['src/testing/isolation.ts'] },
 });

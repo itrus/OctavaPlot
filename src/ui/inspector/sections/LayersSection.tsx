@@ -15,10 +15,19 @@ import { SLIDERS } from '../common/sliderRanges';
  * and be kept out of the axis range; which ones, and what they are called, is decided in model/graph/layers.ts, not here.
  */
 export function LayersSection({ chart, table }: { chart: Chart; table: DataTable }) {
+  // The rows are worked out in the body, which the section draws only while it is open (about 14 ms at 200 series, on every edit otherwise).
+  return (
+    <Section title="Layers" defaultOpen={false}>
+      <LayersBody chart={chart} table={table} />
+    </Section>
+  );
+}
+
+function LayersBody({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run } = useCommands();
   const rows = layerRows(chart, table, (id, fallback) => displayName(chart, id, fallback));
   return (
-    <Section title="Layers" defaultOpen={false}>
+    <>
       {rows.map((r) => {
         const takes = r.takes;
         const base = takes ? layerBaseStyle(chart, table, r.layer) : null;
@@ -73,6 +82,6 @@ export function LayersSection({ chart, table }: { chart: Chart; table: DataTable
         </div>
       )}
       <div className="muted small">Hidden layers still count: n, error bars and fits are calculated as before, and the axis range is not changed by hiding.</div>
-    </Section>
+    </>
   );
 }

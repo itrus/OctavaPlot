@@ -1,6 +1,7 @@
 import { meanOf, neumaierSum, scaledMoments, sdOf } from './moments';
 import { medianCiRank, studentTQuantileUpper } from './special';
 import { quantile6 } from './distribution';
+import { cachedCalc } from './calcCache';
 
 /** An interval, or null when it cannot be computed. */
 interface Interval {
@@ -54,6 +55,19 @@ function tInterval(xs: ReadonlyArray<number>, level: number): Interval | null {
   const se = sdOf(xs, m) / Math.sqrt(n);
   const t = studentTQuantileUpper((1 - level) / 2, n - 1);
   return Number.isFinite(t) ? { lower: m - t * se, upper: m + t * se } : null;
+}
+
+/** Raise when the numbers describeValues gives change, so that no cached result of the old algorithm is shown. */
+export const DESCRIPTIVE_ALGORITHM_VERSION = 1;
+
+/**
+ * describeValues kept by its identity (the values and the level), for a caller that asks again and again about the same array of values
+ * (a text of a graph with result tokens is drawn on every edit). The array must not be changed afterwards. Short lists are computed
+ * directly, which is quicker than hashing them. The result is shared: do not change it.
+ */
+export function describeValuesCached(values: ReadonlyArray<number | null>, level = 0.95): Descriptive {
+  if (values.length < 64) return describeValues(values, level);
+  return cachedCalc({ kind: 'descriptive', algorithm: DESCRIPTIVE_ALGORITHM_VERSION, data: values, method: 'describe', level }, () => describeValues(values, level));
 }
 
 /** Descriptive statistics of `values` (nulls are missing), with confidence intervals at `level` (0 < level < 1). */
@@ -155,28 +169,17 @@ export function descriptiveRows(level: number): DescriptiveRow[] {
     { key: 'max', label: 'Maximum', value: (d) => d.max },
     { key: 'range', label: 'Range', value: (d) => d.range },
     blank('b2'),
-    { key: 'p10', label: '10% Percentile', value: (d) => d.p10 },
-    { key: 'p90', label: '90% Percentile', value: (d) => d.p90 },
-    blank('b3'),
-    { key: 'medianCiHead', label: `${L} CI of median` },
-    { key: 'medianCoverage', label: 'Actual confidence level', indent: true, format: 'percent', value: (d) => (d.medianCoverage === null ? null : d.medianCoverage * 100) },
-    { key: 'medianLo', label: 'Lower confidence limit', indent: true, value: (d) => d.medianCi?.lower ?? null },
-    { key: 'medianHi', label: 'Upper confidence limit', indent: true, value: (d) => d.medianCi?.upper ?? null },
-    blank('b4'),
     { key: 'mean', label: 'Mean', value: (d) => d.mean },
-    { key: 'sd', label: 'Std. Deviation', value: (d) => d.sd },
-    { key: 'sem', label: 'Std. Error of Mean', value: (d) => d.sem },
-    blank('b5'),
-    { key: 'meanLo', label: `Lower ${L} CI of mean`, value: (d) => d.meanCi?.lower ?? null },
-    { key: 'meanHi', label: `Upper ${L} CI of mean`, value: (d) => d.meanCi?.upper ?? null },
-    blank('b6'),
-    { key: 'cv', label: 'Coefficient of variation', format: 'percent', value: (d) => d.cv },
+    { key: 'sd', label: 'Std. Deviation', indent: true, value: (d) => d.sd },
+    { key: 'sem', label: 'Std. Error of Mean', indent: true, value: (d) => d.sem },
+    { key: 'meanLo', label: `Lower ${L} CI of mean`, indent: true, value: (d) => d.meanCi?.lower ?? null },
+    { key: 'meanHi', label: `Upper ${L} CI of mean`, indent: true, value: (d) => d.meanCi?.upper ?? null },
+    { key: 'cv', label: 'Coefficient of variation', indent: true, format: 'percent', value: (d) => d.cv },
     blank('b7'),
     { key: 'geo', label: 'Geometric mean', value: (d) => d.geoMean },
-    { key: 'geoSd', label: 'Geometric SD factor', value: (d) => d.geoSdFactor },
-    blank('b8'),
-    { key: 'geoLo', label: `Lower ${L} CI of geo. mean`, value: (d) => d.geoMeanCi?.lower ?? null },
-    { key: 'geoHi', label: `Upper ${L} CI of geo. mean`, value: (d) => d.geoMeanCi?.upper ?? null },
+    { key: 'geoSd', label: 'Geometric SD factor', indent: true, value: (d) => d.geoSdFactor },
+    { key: 'geoLo', label: `Lower ${L} CI of geo. mean`, indent: true, value: (d) => d.geoMeanCi?.lower ?? null },
+    { key: 'geoHi', label: `Upper ${L} CI of geo. mean`, indent: true, value: (d) => d.geoMeanCi?.upper ?? null },
     blank('b9'),
     { key: 'skew', label: 'Skewness', value: (d) => d.skewness },
     { key: 'kurt', label: 'Kurtosis', value: (d) => d.kurtosis },

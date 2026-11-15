@@ -27,7 +27,7 @@ import type {
   SummarySpec,
   SurvivalOptions,
 } from './types';
-import { untitledProjectName } from '../util/stamp';
+import { untitledProjectName } from '../util/fileName';
 
 export const FONT_FAMILY = 'Arial, Helvetica, sans-serif';
 export const INITIAL_ROWS = 1000;
@@ -116,13 +116,13 @@ const DEFAULT_HISTOGRAM: HistogramOptions = { binning: 'auto', binWidth: null, f
 /** Pies and doughnuts (spec 14): the first part starts at the top, clockwise, labels with the share to one decimal. */
 const DEFAULT_PIE: PieOptions = { startAngle: 0, direction: 'clockwise', hole: 0.5, labels: 'percent', percentDigits: 1, showTotal: false, totalPrefix: 'Total = ', dotShape: 'circle', dotSize: 0.8 };
 /** Labels on bars are off until asked for. */
-export const DEFAULT_BAR_LABELS: BarLabels = { show: 'none', decimals: null, thousands: false, prefix: '', suffix: '', sizePt: 22.4, color: null };
+export const DEFAULT_BAR_LABELS: BarLabels = { show: 'none', decimals: null, thousands: false, prefix: '', suffix: '', sizePt: 22, color: null };
 /** Automatic column layout: the spacing the column charts always had. */
 const DEFAULT_BARS: BarLayout = { gapPct: null, beforePct: null, afterPct: null, baseline: null };
 /** Gridlines: thin and light, and lighter still for the minor ones (P). */
 const DEFAULT_GRID: GridStyle = { color: '#d0d0d0', widthPt: 1, style: 'solid', minorColor: '#e6e6e6', minorWidthPt: 0.5, minorStyle: 'solid', opacity: 1, minorOpacity: 1 };
-/** Major tick length, pt (spec 20.2); the layout constant has the same value. */
-export const TICK_LENGTH_PT = 11.2;
+/** Major tick length, pt (spec 20.2). */
+export const TICK_LENGTH_PT = 11;
 
 export const DEFAULT_STYLE: ChartStyle = {
   showBars: true,
@@ -168,14 +168,14 @@ export const DEFAULT_STYLE: ChartStyle = {
   pointLabelOffsetYPt: 6,
   pointLabelCollision: 'keep',
   pointLabelLeader: false,
-  pointLabelFontSizePt: 22.4,
+  pointLabelFontSizePt: 22,
   pointLabelBold: false,
   pointLabelItalic: false,
   pointLabelColor: null,
   pointLabelDecimals: null,
 };
 
-/** Default summary (P). Prism "Mean with SD" is not a default (spec 23 L1548). */
+/** Default summary (P). A "Mean with SD" chart is not a default (spec 23 L1548). */
 export const DEFAULT_SUMMARY: SummarySpec = {
   centre: 'mean',
   spread: 'none',
@@ -242,7 +242,7 @@ const defaultAxis = (title: string): AxisConfig => ({
   tickLabelOffsetPt: 0,
   visible: true,
   lineWidthPt: AXIS_LINE_PT,
-  tickFontSizePt: 26.6,
+  tickFontSizePt: 27,
   titleFontSizePt: 28,
   min: null,
   max: null,
@@ -291,8 +291,6 @@ export const PAGE_TEXT_LOOK = { color: '#000000', fontSizePt: 12 } as const;
 export function createChart(dataTableId: string, size?: ChartStart, type: ChartType = 'bar'): Chart {
   const titles = axisTitlesFor(type);
   const layer: ChartLayer = {
-    id: newId('layer'),
-    name: 'Data',
     style: initialLayerStyle(type),
     groupOverrides: {},
     objectOverrides: {},
@@ -314,7 +312,7 @@ export function createChart(dataTableId: string, size?: ChartStart, type: ChartT
     paletteId: DEFAULT_PALETTE_ID,
     title: 'Graph 1',
     showTitle: true,
-    titleFontSizePt: 33.6,
+    titleFontSizePt: 34,
     fontFamily: FONT_FAMILY,
     textColor: '#000000',
     titleBold: true,
@@ -343,9 +341,9 @@ export function createChart(dataTableId: string, size?: ChartStart, type: ChartT
     pie: { ...DEFAULT_PIE },
     xAxis: defaultAxis(titles.x),
     yAxis: defaultAxis(titles.y),
-    // Sizes 26.6/28 are inherited from the left axis (P, not D).
+    // Sizes 27/28 are inherited from the left axis (P, not D).
     y2Axis: defaultAxis(''),
-    legend: { visible: true, keyShape: 'rectangle', position: 'right', fontSizePt: 22.4, hiddenGroupIds: [] },
+    legend: { visible: true, keyShape: 'rectangle', position: 'right', fontSizePt: 22, hiddenGroupIds: [] },
     displayNames: {},
     jitter: { ...DEFAULT_JITTER },
     defaults: { ...DEFAULT_STYLE },
@@ -458,7 +456,7 @@ export function createXyTable(name: string, example: boolean, layout: ReplicateL
   return layout.kind === 'single' ? table : { ...table, layout };
 }
 
-/** Rows of a grouped or contingency table: categories are few, so it starts with a handful rather than twenty. */
+/** Rows of a grouped or contingency table: categories are few, so it starts with a handful rather than INITIAL_ROWS. */
 const CATEGORY_ROWS = 6;
 
 /**

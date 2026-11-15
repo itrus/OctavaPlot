@@ -3,7 +3,8 @@ import { createExampleProject } from '../../model/defaults';
 import { xySeries } from '../../model/table/tableLayout';
 import type { DataTable, Project } from '../../model/types';
 import { addDataTable, replaceTableData, setFactor } from '../../state/commands';
-import { importCsv, tableToCsv } from './csv';
+import { tableToCsv } from './csv';
+import { importCsv } from './csvTestKit';
 
 const tableOf = (p: Project) => p.dataTables.find((t) => t.id === 't')!;
 /** A column table of Group A = 1, 2, 3 and Group B = 4, 5, 6. */

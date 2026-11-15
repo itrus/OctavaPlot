@@ -6,7 +6,7 @@ import { FONT_FAMILY } from '../../../model/defaults';
 import { measureText } from './text';
 import { AXIS_TITLE_GAP, Y_TICK_LABEL_GAP, computeLayout, type LayoutInput } from './layout';
 
-// Without a canvas measureText is len * fontSize * 0.58 (bold), so widths are exact.
+// Without a canvas measureText is len * fontSize * 0.58 (bold), so widths are exact. The numbers below follow from the default axis sizes (27 pt numbers, 11 pt ticks).
 const chart = createChart('t');
 const axis = (patch: Partial<AxisConfig> = {}): AxisConfig => ({ ...chart.y2Axis, ...patch });
 
@@ -28,8 +28,8 @@ function input(patch: Partial<LayoutInput> = {}): LayoutInput {
 describe('computeLayout right axis', () => {
   it('baseline plot is unchanged and y2Title is null', () => {
     const l = computeLayout(input());
-    expect(l.plot.x).toBeCloseTo(97.028, 3);
-    expect(l.plot.width).toBeCloseTo(688.972, 3);
+    expect(l.plot.x).toBeCloseTo(97.06, 3);
+    expect(l.plot.width).toBeCloseTo(688.94, 3);
     expect(l.y2Title).toBeNull();
   });
 
@@ -42,25 +42,25 @@ describe('computeLayout right axis', () => {
 
   it('reserves ticks and the widest bold label', () => {
     const l = computeLayout(input({ y2Axis: axis(), y2TickLabels: ['1', '100'] }));
-    expect(l.plot.width).toBeCloseTo(625.488, 3);
+    expect(l.plot.width).toBeCloseTo(624.96, 3);
     expect(l.y2Title).toBeNull();
   });
 
   it('a blank title reserves no title space', () => {
     const l = computeLayout(input({ y2Axis: axis({ title: '   ' }), y2TickLabels: ['100'] }));
-    expect(l.plot.width).toBeCloseTo(625.488, 3);
+    expect(l.plot.width).toBeCloseTo(624.96, 3);
     expect(l.y2Title).toBeNull();
   });
 
   it('missing tick labels reserve the tick and gap only', () => {
     const l = computeLayout(input({ y2Axis: axis() }));
-    expect(l.plot.width).toBeCloseTo(688.972 - (TICK_LENGTH + Y_TICK_LABEL_GAP), 3);
-    expect(l.plot.width).toBeCloseTo(671.772, 3);
+    expect(l.plot.width).toBeCloseTo(688.94 - (TICK_LENGTH + Y_TICK_LABEL_GAP), 3);
+    expect(l.plot.width).toBeCloseTo(671.94, 3);
   });
 
   it('a titled right axis adds the title block and places y2Title', () => {
     const l = computeLayout(input({ y2Axis: axis({ title: 'Right' }), y2TickLabels: ['100'] }));
-    expect(l.plot.width).toBeCloseTo(575.088, 3);
+    expect(l.plot.width).toBeCloseTo(574.56, 3);
     expect(l.y2Title!.x).toBeCloseTo(777.6, 3);
     expect(l.y2Title!.y).toBeCloseTo(l.plot.y + l.plot.height / 2, 6);
   });
@@ -68,27 +68,27 @@ describe('computeLayout right axis', () => {
   it('uses its own font sizes', () => {
     const l = computeLayout(input({ y2Axis: axis({ title: 'R', tickFontSizePt: 20, titleFontSizePt: 40 }), y2TickLabels: ['100'] }));
     const block = TICK_LENGTH + Y_TICK_LABEL_GAP + 3 * 20 * 0.58 + AXIS_TITLE_GAP + 48;
-    expect(688.972 - l.plot.width).toBeCloseTo(block, 3);
+    expect(688.94 - l.plot.width).toBeCloseTo(block, 3);
     expect(l.y2Title!.x).toBeCloseTo(l.plot.x + l.plot.width + block - 12, 3);
   });
 
   it('tick font size widens the block', () => {
     const a = computeLayout(input({ y2Axis: axis(), y2TickLabels: ['100'] }));
     const b = computeLayout(input({ y2Axis: axis({ tickFontSizePt: 40 }), y2TickLabels: ['100'] }));
-    expect(a.plot.width - b.plot.width).toBeCloseTo(23.316, 3);
+    expect(a.plot.width - b.plot.width).toBeCloseTo(22.62, 3);
   });
 
   it('sits 20 pt inside a right legend', () => {
     const legend = { visible: true, keyShape: 'rectangle' as const, position: 'right' as const, fontSizePt: 22.4, hiddenGroupIds: [] };
     const l = computeLayout(input({ legend, legendLabels: ['A'], y2Axis: axis(), y2TickLabels: ['100'] }));
-    expect(l.legend!.rect.x).toBeCloseTo(l.plot.x + l.plot.width + (TICK_LENGTH + Y_TICK_LABEL_GAP + 46.284) + 20, 3);
+    expect(l.legend!.rect.x).toBeCloseTo(l.plot.x + l.plot.width + (TICK_LENGTH + Y_TICK_LABEL_GAP + 46.98) + 20, 3);
   });
 
   it('a top legend adds no right-axis space', () => {
     const legend = { visible: true, keyShape: 'rectangle' as const, position: 'top' as const, fontSizePt: 22.4, hiddenGroupIds: [] };
     const without = computeLayout(input({ legend, legendLabels: ['A'] }));
     const withAxis = computeLayout(input({ legend, legendLabels: ['A'], y2Axis: axis(), y2TickLabels: ['100'] }));
-    expect(without.plot.width - withAxis.plot.width).toBeCloseTo(63.484, 3);
+    expect(without.plot.width - withAxis.plot.width).toBeCloseTo(63.98, 3);
     expect(withAxis.plot.y).toBe(without.plot.y);
   });
 
@@ -109,7 +109,7 @@ describe('computeLayout right axis', () => {
   it('works with the left axis hidden', () => {
     const l = computeLayout(input({ yAxis: { ...chart.yAxis, visible: false }, y2Axis: axis(), y2TickLabels: ['100'] }));
     expect(l.plot.x).toBe(14);
-    expect(l.plot.width).toBeCloseTo(800 - 14 - 14 - 63.484, 3);
+    expect(l.plot.width).toBeCloseTo(800 - 14 - 14 - 63.98, 3);
     expect(l.yTitle).toBeNull();
   });
 });

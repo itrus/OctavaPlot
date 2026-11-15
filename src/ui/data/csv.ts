@@ -1,5 +1,7 @@
-import type { DataTable } from '../../model/types';
+import type { DataTable, ImportedTable } from '../../model/types';
 import { MAX_TABLE_ROWS, sanitizeRowTitle } from '../../model/table/rows';
+import { xySeries } from '../../model/table/tableLayout';
+import { usesSeriesBlocks } from '../../model/graph/chartTypes';
 import { formatCellFor, parseCellFor } from './cellText';
 import { detectTimeColumn, parseTimeBatch, type TimeColumn } from '../../util/timeColumn';
 import type { DecimalSeparator } from '../../model/types';
@@ -41,8 +43,15 @@ export function tableToCsv(table: DataTable, separator: DecimalSeparator = 'auto
   const quote = quoter(delimiter);
   const marked = table.groups.map((g) => mode === 'withExclusions' && g.observations.some((o) => o.excluded));
     const withFactor = table.groups.map((g) => (g.factor ?? '') !== '');
+  // In a table whose series have sub-columns (replicates, mean and SD) the column is called Y1, Y2 ...: the name of the series goes before it,
+  // or the file cannot say which series a column belongs to.
+  const headings = new Map<string, string>();
+  if (usesSeriesBlocks(table.kind)) for (const s of xySeries(table)) if (s.columns.length > 1) s.columns.forEach((g) => headings.set(g.id, `${s.name} ${g.name}`));
   const header = [ROW_TITLE_HEADER];
-  table.groups.forEach((g, c) => header.push(g.name, ...(marked[c] ? [g.name + EXCLUDED_SUFFIX, g.name + EXCLUDED_REASON_SUFFIX] : []), ...(withFactor[c] ? [g.name + FACTOR_SUFFIX] : [])));
+  table.groups.forEach((g, c) => {
+    const name = headings.get(g.id) ?? g.name;
+    header.push(name, ...(marked[c] ? [name + EXCLUDED_SUFFIX, name + EXCLUDED_REASON_SUFFIX] : []), ...(withFactor[c] ? [name + FACTOR_SUFFIX] : []));
+  });
   const lines = [header.map(quote).join(delimiter)];
   const isBlank = (r: number) => (table.rows[r]?.title ?? '') === '' && table.groups.every((g) => (g.observations[r]?.value ?? null) === null);
   // The table keeps spare empty rows for typing into; they are not data and would export as lines of bare commas.
@@ -63,7 +72,7 @@ export function tableToCsv(table: DataTable, separator: DecimalSeparator = 'auto
 
 /** Split CSV text into records of fields. Handles quoted fields, doubled quotes, embedded line breaks and a BOM. */
 export function parseCsv(text: string, delimiter: CsvDelimiter = ','): string[][] {
-  const src = text.replace(/^﻿/, '');
+  const src = text.replace(/^\uFEFF/, '');
   const records: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -115,7 +124,7 @@ export function parseCsv(text: string, delimiter: CsvDelimiter = ','): string[][
 export function detectDelimiter(text: string, fallback: CsvDelimiter = ','): CsvDelimiter {
   const counts: Record<CsvDelimiter, number> = { ',': 0, ';': 0, '\t': 0 };
   let inQuotes = false;
-  for (const c of text.replace(/^﻿/, '')) {
+  for (const c of text.replace(/^\uFEFF/, '')) {
     if (c === '"') inQuotes = !inQuotes;
     else if (inQuotes) continue;
     else if (c === '\n' || c === '\r') break;
@@ -126,36 +135,16 @@ export function detectDelimiter(text: string, fallback: CsvDelimiter = ','): Csv
   return best;
 }
 
-interface ImportedTable {
-  names: string[];
-  /** One title per row, or null when the file has no row title column. */
-  titles: string[] | null;
-  values: Array<Array<number | null>>;
-  /** Per row and column: the exclusion (with its reason) the file marks, or null. Only present when the file has exclusion columns. */
-  excluded?: Array<Array<{ reason: string } | null>>;
-  /** Per column: the factor the file names ('' for none). Only present when the file has factor columns. */
-  factors?: string[];
-  /** Per column: the type the values were read as (a date, a time, a duration; undefined = a number). Only present when a column has one. */
-  times?: Array<TimeColumn | undefined>;
-  /** What reading did that the file did not ask for: times with a UTC offset converted to UTC. */
-  notes?: string[];
-}
-
-type CsvImport = { ok: true; data: ImportedTable } | { ok: false; message: string };
-
 /** Column label for messages: the group name, else its position. */
 const colLabel = (name: string, c: number) => (name.trim() !== '' ? `"${name.trim()}"` : `column ${c + 1}`);
 
 const DELIMITER_NAME: Record<CsvDelimiter, string> = { ',': 'Comma', ';': 'Semicolon', '\t': 'Tab' };
 
 /** What to say about a header that did not split: the file uses another delimiter than the one in use; null when it holds none. */
-function wrongDelimiter(header: string, delimiter: CsvDelimiter, inDialog: boolean): string | null {
+function wrongDelimiter(header: string, delimiter: CsvDelimiter): string | null {
   const found = ([',', ';', '\t'] as const).find((d) => d !== delimiter && header.includes(d));
   if (!found) return null;
-  if (inDialog) return `The header line does not split with this delimiter, but it holds ${found === '\t' ? 'tabs' : DELIMITER_NAME[found].toLowerCase() + 's'}: choose ${DELIMITER_NAME[found]} as the delimiter.`;
-  if (found === '\t') return 'This file looks tab-separated. Use a CSV file, or paste the cells into the table.';
-  if (found === ';') return 'This file looks semicolon-separated. Set the decimal separator to comma in Settings to read it, or paste the cells into the table.';
-  return 'This file looks comma-separated. With the decimal separator set to comma, CSV files use semicolons: change the setting, or paste the cells into the table.';
+  return `The header line does not split with this delimiter, but it holds ${found === '\t' ? 'tabs' : DELIMITER_NAME[found].toLowerCase() + 's'}: choose ${DELIMITER_NAME[found]} as the delimiter.`;
 }
 
 /** A cell that cannot be read as a number: where it is and what is wrong. */
@@ -215,11 +204,20 @@ function dataColumns(header: string[], offset: number): CsvColumn[] {
 /** Whether the first column holds row titles: automatic goes by the header "Row title". */
 export type FirstColumn = 'auto' | 'titles' | 'values';
 
+/** The records of the last file split, kept: the dialog reads the same text again when only the decimal separator or a column choice changes (the split is half the time). */
+let lastSplit: { text: string; delimiter: CsvDelimiter; records: string[][] } | null = null;
+function splitRecords(text: string, delimiter: CsvDelimiter): string[][] {
+  if (lastSplit && lastSplit.delimiter === delimiter && lastSplit.text === text) return lastSplit.records;
+  const records = parseCsv(text, delimiter);
+  lastSplit = { text, delimiter, records };
+  return records;
+}
+
 /** Read every cell of a file. A fault of the file as a whole is an `error`; bad cells are collected, not fatal. */
-function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimiter, firstColumn: FirstColumn, inDialog: boolean, times: ReadonlyArray<TimeColumn | undefined> = []): { error: string } | { read: CsvRead } {
+function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimiter, firstColumn: FirstColumn, times: ReadonlyArray<TimeColumn | undefined> = []): { error: string } | { read: CsvRead } {
   let records: string[][];
   try {
-    records = parseCsv(text, delimiter);
+    records = splitRecords(text, delimiter);
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }
@@ -229,7 +227,7 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
   const header = records[0];
   // A header that does not split is a differently delimited file; say so instead of failing on its first value.
   if (header.length === 1) {
-    const hint = wrongDelimiter(header[0], delimiter, inDialog);
+    const hint = wrongDelimiter(header[0], delimiter);
     if (hint) return { error: hint };
   }
   const hasTitles = firstColumn === 'auto' ? header[0]?.trim().toLowerCase() === ROW_TITLE_HEADER.toLowerCase() : firstColumn === 'titles';
@@ -292,19 +290,6 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
   }
   problems.sort((x, y) => x.line - y.line || x.column - y.column);
   return { read: { hasTitles, names, titles: hasTitles ? body.map((rec) => sanitizeRowTitle(rec[0] ?? '')) : null, values, texts, positions: cols.map((c) => c.at), ...(marks ? { excluded } : {}), ...(hasFactors ? { factors } : {}), notes, problems } };
-}
-
-/**
- * Interpret CSV text as table data. The first line holds the group names; a first column headed "Row title" holds row titles.
- * Fields are separated as `csvDelimiter` says unless a delimiter is given.
- */
-export function importCsv(text: string, separator: DecimalSeparator = 'auto', delimiter: CsvDelimiter = csvDelimiter(separator), firstColumn: FirstColumn = 'auto', times: ReadonlyArray<TimeColumn | undefined> = []): CsvImport {
-  const result = readCsv(text, separator, delimiter, firstColumn, false, times);
-  if ('error' in result) return { ok: false, message: result.error };
-  const { read } = result;
-  const bad = read.problems[0];
-  if (bad) return { ok: false, message: `Line ${bad.line}, ${bad.label}: ${bad.message}. Use numbers or leave the cell empty.` };
-  return { ok: true, data: importedOf(read, times) };
 }
 
 /** What a read file becomes as table data. */
@@ -375,7 +360,7 @@ type CsvPreview =
 /** What a file becomes under these choices, without changing anything. Pure. */
 export function previewCsv(text: string, options: CsvPreviewOptions): CsvPreview {
   const times = options.times ?? [];
-  const result = readCsv(text, options.separator, options.delimiter, options.firstColumn, true, times);
+  const result = readCsv(text, options.separator, options.delimiter, options.firstColumn, times);
   if ('error' in result) return { ok: false, message: result.error };
   const { read } = result;
   const shown = Math.min(PREVIEW_COLUMNS, read.names.length);
@@ -396,7 +381,8 @@ export function previewCsv(text: string, options: CsvPreviewOptions): CsvPreview
     problems: read.problems,
     data: read.problems.length === 0 ? importedOf(read, times) : null,
     suggestedTime: times[0] ? null : detectTimeColumn(read.texts.map((r) => r[0])),
-    notes: read.notes,
+    // A file that is not UTF-8 (a CSV saved by Excel in the code page of Windows) is read with the replacement character in place of every letter outside ASCII.
+    notes: text.includes('\uFFFD') ? [...read.notes, 'The file is not UTF-8: some characters could not be read and are shown as a replacement character. Save it as CSV UTF-8 and open it again.'] : read.notes,
   };
 }
 

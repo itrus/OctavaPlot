@@ -78,6 +78,17 @@ export function suppliedStatistic(format: SummaryFormat, values: ReadonlyArray<n
   if (!s || s.centre === null) return { value: null, unavailable: null };
   const missing: CellResult = { value: null, unavailable: 'supplied' };
   const half = s.interval.lower !== null && s.interval.upper !== null ? (s.interval.upper - s.interval.lower) / 2 : null;
+  // The number that was typed, not the half of mean + error minus mean - error, which loses digits that depend on the mean.
+  const info = summaryFormatInfo(format);
+  const typed = (name: string): number | null => {
+    const i = info.columns.indexOf(name);
+    const v = i >= 0 ? values[i] : null;
+    return v === null || v === undefined || !Number.isFinite(v) ? null : v;
+  };
+  if (half !== null && ((kind === 'sd' && info.error === 'sd') || (kind === 'sem' && info.error === 'sem') || (kind === 'cv' && info.error === 'cv'))) {
+    const entered = typed(info.error === 'sd' ? 'SD' : info.error === 'sem' ? 'SEM' : '%CV');
+    if (entered !== null && entered >= 0) return { value: entered, unavailable: null };
+  }
   if (kind === 'n') return s.n > 0 ? { value: s.n, unavailable: null } : missing;
   if (kind === 'sd' || kind === 'cv') {
     if (s.spread !== 'sd' || half === null) return missing;

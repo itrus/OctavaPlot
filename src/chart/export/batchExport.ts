@@ -1,6 +1,6 @@
 import { prepareChartInput } from '../../model/table/preparedChart';
 import type { Chart, DataTable, FitSettings, Id, Project } from '../../model/types';
-import { exportFileName } from '../../util/download';
+import { exportFileName } from '../../util/fileName';
 import { zipStore, type ZipFile } from '../../util/zip';
 import { exportPixels, fitsCanvas, GRAPH_PNG_DPI } from './pngDpi';
 

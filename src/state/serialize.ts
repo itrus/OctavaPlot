@@ -2,11 +2,11 @@ import { checkSettings } from '../model/options/settingSchema';
 import { CHART_SCHEMA, STYLE_SCHEMA } from '../model/project/chartSchema';
 import { ANNOTATION_LINE_SPACING, CHART_PX_MAX, createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
 import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../model/options/pointLabelOptions';
-import { CHART_TYPES, chartTypeInfo, defaultChartTypeFor } from '../model/graph/chartTypes';
-import { leadingColumns } from '../model/graph/chartTypes';
-import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../model/table/tableLayout';
+import { CHART_TYPES, chartTypeInfo } from '../model/graph/chartTypes';
+import { defaultChartTypeFor } from '../model/graph/chartGallery';
 import { sanitizeFillKeys } from '../model/graph/fill';
 import { sanitizeAxis } from '../model/graph/axis';
+import { DEFAULT_PALETTE_ID, paletteById } from '../model/graph/palettes';
 import { analysisTypeInfo } from '../model/project/analysis';
 import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
@@ -15,134 +15,25 @@ import { FONT_FAMILIES, sanitizeLook, SYMBOL_SHAPES } from '../model/graph/look'
 import { drawingFraction } from '../model/options/drawingOptions';
 import { clampDrawing, DRAWING_LIMITS } from '../model/graph/drawingPresets';
 import { sanitizeOrder } from '../model/table/groupOrder';
-import { canonicalObservationId, canonicalRowId, MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
 import { RESULT_STATS } from '../model/graph/resultTokens';
 import { defaultLayout, sanitizeLayout } from '../model/project/layout';
-import { timeColumnOf, type TimeColumn } from '../util/timeColumn';
-import { writeProject } from './tableFile/tableCodec';
+import { parseTable, writeProject } from './tableFile/tableCodec';
+import { arr, fail, isObj, obj, str, type Obj } from './tableFile/fileChecks';
 import { FILE_FORMAT, FILE_VERSION, migrateRead, migrateShape, upgradeToCurrent } from './migrate';
-import type { Analysis, Chart, ChartLayer, Drawing, DrawingPoint, LineEnd, LineStyle, Layout, ChartType, ReplicateLayout, SummaryFormat, SurvivalOptions, TableKind, DataRow, DataTable, Group, Id, Observation, Project, ResultStat, SummarySpec } from '../model/types';
+import type { Analysis, Chart, ChartLayer, Drawing, DrawingPoint, LineEnd, LineStyle, Layout, ChartType, SurvivalOptions, DataTable, Id, Project, ResultStat, SummarySpec } from '../model/types';
 
 /** The envelope of a project file (.oplot): this format, and the version written (earlier ones are read: see migrate.ts). */
 const FORMAT = FILE_FORMAT;
 const VERSION = FILE_VERSION;
 /** Autosave in the browser's storage; the same text as a file. */
 export const AUTOSAVE_KEY = 'octavaplot:project:autosave';
+/** Where recovery text that this build cannot read is kept; see backupAutosave. */
+export const AUTOSAVE_UNREADABLE_KEY = 'octavaplot:project:autosave:unreadable';
 export const AUTOSAVE_BACKUP_KEY = 'octavaplot:project:autosave:backup';
 
 export function stringifyProject(project: Project): string {
   return writeProject(project, { format: FORMAT, version: VERSION });
-}
-
-type Obj = Record<string, unknown>;
-const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
-
-function fail(path: string, what: string): never {
-  throw new Error(`Invalid project file: ${path} ${what}.`);
-}
-const str = (v: unknown, path: string): string => (typeof v === 'string' ? v : fail(path, 'must be a string'));
-const num = (v: unknown, path: string): number => (typeof v === 'number' && Number.isFinite(v) ? v : fail(path, 'must be a finite number'));
-const arr = (v: unknown, path: string): unknown[] => (Array.isArray(v) ? v : fail(path, 'must be an array'));
-const obj = (v: unknown, path: string): Obj => (isObj(v) ? v : fail(path, 'must be an object'));
-
-/** A stored list holds only the cells that are not empty, each as `[index, ...]`, in ascending order of index. */
-function storedEntries(raw: unknown, path: string, size: number, min: number, max: number): Array<{ index: number; entry: unknown[]; path: string }> {
-  const out: Array<{ index: number; entry: unknown[]; path: string }> = [];
-  let previous = -1;
-  arr(raw, path).forEach((e, i) => {
-    const ep = `${path}[${i}]`;
-    const entry = arr(e, ep);
-    if (entry.length < min || entry.length > max) fail(ep, `must have ${min} to ${max} entries`);
-    const index = entry[0];
-    if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= size) fail(`${ep}[0]`, `must be a row index from 0 to ${size - 1}`);
-    if (index <= previous) fail(`${ep}[0]`, 'must be larger than the index before it');
-    previous = index;
-    out.push({ index, entry, path: ep });
-  });
-  return out;
-}
-
-/**
- * Gives each place that the file did not name its canonical ID or, if an ID of the file has that one (a moved row or value
- * that was stored), that ID followed by as many plus signs as it takes to be free. An ID the file names twice is refused.
- */
-function fillIds(named: Array<string | undefined>, canonical: (i: number) => string, path: string, taken: Set<string>): string[] {
-  const out: string[] = [];
-  named.forEach((id, i) => {
-    if (id === undefined) return;
-    if (taken.has(id)) fail(`${path}[${i}]`, `has the ID ${id}, which another one has too`);
-    taken.add(id);
-    out[i] = id;
-  });
-  named.forEach((id, i) => {
-    if (id !== undefined) return;
-    let made = canonical(i);
-    while (taken.has(made)) made += '+';
-    taken.add(made);
-    out[i] = made;
-  });
-  return out;
-}
-
-/** Rows are stored as `[index, title]` or `[index, title, id]`: only those with a title or an ID that is not the canonical one of their place. */
-function parseRows(raw: unknown, path: string, rowCount: number): DataRow[] {
-  const named: Array<string | undefined> = Array.from({ length: rowCount }, () => undefined);
-  const titles: string[] = Array.from({ length: rowCount }, () => '');
-  if (raw !== undefined) {
-    for (const { index, entry, path: ep } of storedEntries(raw, path, rowCount, 2, 3)) {
-      if (typeof entry[1] !== 'string') fail(`${ep}[1]`, 'must be a string');
-      if (entry.length === 3) {
-        named[index] = str(entry[2], `${ep}[2]`);
-        if (named[index] === '') fail(`${ep}[2]`, 'must not be empty');
-      }
-      titles[index] = sanitizeRowTitle(entry[1]);
-    }
-  }
-  return fillIds(named, canonicalRowId, path, new Set()).map((id, i) => ({ id, title: titles[i] }));
-}
-
-/**
- * The values of a column: `[index, value]`, or `[index, value, {id, excluded, excludedReason}]` for a cell with
- * something to say besides its value. A cell that is not listed is empty: null, not excluded. A `subject` that older files
- * stored on a cell is ignored (subjects were removed). The ID of a cell
- * is stored unless it is the canonical one of its place.
- */
-function parseObservations(raw: unknown, path: string, rowCount: number, groupId: string, taken: Set<string>): Observation[] {
-  const named: Array<string | undefined> = Array.from({ length: rowCount }, () => undefined);
-  const cells: Array<Omit<Observation, 'id'>> = Array.from({ length: rowCount }, () => ({ value: null }));
-  for (const { index, entry, path: ep } of storedEntries(raw, path, rowCount, 2, 3)) {
-    const value = entry[1] === null ? null : num(entry[1], `${ep}[1]`);
-    const o = entry.length === 3 ? obj(entry[2], `${ep}[2]`) : {};
-    if (o.id !== undefined) {
-      named[index] = str(o.id, `${ep}[2].id`);
-      if (named[index] === '') fail(`${ep}[2].id`, 'must not be empty');
-    }
-    // An excluded value is kept, with its reason, but not used (model/table/exclusion.ts).
-    cells[index] = { value, ...(o.excluded === true ? { excluded: true as const, ...(typeof o.excludedReason === 'string' && o.excludedReason !== '' ? { excludedReason: o.excludedReason } : {}) } : {}) };
-  }
-  return fillIds(named, (i) => canonicalObservationId(groupId, i), path, taken).map((id, i) => ({ id, ...cells[i] }));
-}
-
-/**
- * A stored layout. Absent or {"kind":"single"} means a single Y value. Anything else that is not a valid replicate or
- * summary layout is refused: reading it as single values would change what the columns mean.
- */
-function parseLayout(raw: unknown, path: string): ReplicateLayout | undefined {
-  if (raw === undefined || raw === null) return undefined;
-  if (!isObj(raw)) fail(path, 'must be an object');
-  if (raw.kind === 'single') return undefined;
-  if (raw.kind === 'replicates') {
-    if (typeof raw.n === 'number' && Number.isInteger(raw.n) && raw.n >= MIN_REPLICATES && raw.n <= MAX_REPLICATES) return { kind: 'replicates', n: raw.n };
-    fail(`${path}.n`, `must be a whole number from ${MIN_REPLICATES} to ${MAX_REPLICATES}`);
-  }
-  if (raw.kind === 'sized') return { kind: 'sized' };
-  if (raw.kind === 'xerror') return { kind: 'xerror' };
-  if (raw.kind === 'summary') {
-    if (SUMMARY_FORMATS.some((f) => f.id === raw.format)) return { kind: 'summary', format: raw.format as SummaryFormat };
-    fail(`${path}.format`, `must be one of ${SUMMARY_FORMATS.map((f) => f.id).join(', ')}`);
-  }
-  fail(`${path}.kind`, 'must be single, replicates, summary, sized or xerror');
 }
 
 /** Stored survival options merged over the defaults; a level outside 0 to 1 or an unknown method falls back. */
@@ -156,54 +47,6 @@ function parseSurvival(raw: unknown): SurvivalOptions {
     eventSymbols: typeof r.eventSymbols === 'boolean' ? r.eventSymbols : DEFAULT_SURVIVAL.eventSymbols,
     errorBars: typeof r.errorBars === 'boolean' ? r.errorBars : DEFAULT_SURVIVAL.errorBars,
   };
-}
-
-/** The type of a column, `{"kind":"date","unit":"d"}`; a kind or unit that is not one, or a unit that does not belong to the kind, refuses the file. */
-function parseTime(raw: unknown, path: string): TimeColumn {
-  const col = timeColumnOf(raw);
-  if (!col) fail(path, 'must be {"kind": date, "unit": d}, {"kind": datetime, "unit": s} or {"kind": duration, "unit": s, min, h or d}');
-  return col;
-}
-
-const TABLE_KINDS: readonly TableKind[] = ['column', 'xy', 'grouped', 'contingency', 'survival'];
-
-function parseTable(raw: unknown, path: string): DataTable {
-  const t = obj(raw, path);
-  const rowCount = num(t.rowCount, `${path}.rowCount`);
-  if (!Number.isInteger(rowCount) || rowCount < 0) fail(`${path}.rowCount`, 'must be a non-negative integer');
-  // Declared sizes are checked before anything is allocated for them.
-  if (rowCount > MAX_TABLE_ROWS) fail(`${path}.rowCount`, `is ${rowCount.toLocaleString('en-US')}; a table holds at most ${MAX_TABLE_ROWS.toLocaleString('en-US')} rows`);
-  const columns = arr(t.groups, `${path}.groups`).length;
-  if (rowCount * columns > MAX_TABLE_CELLS) fail(path, `declares ${rowCount.toLocaleString('en-US')} rows in ${columns} columns; a table holds at most ${MAX_TABLE_CELLS.toLocaleString('en-US')} cells`);
-  const ids = new Set<string>();
-  const obsIds = new Set<string>();
-  const groups: Group[] = arr(t.groups, `${path}.groups`).map((rg, gi) => {
-    const gp = `${path}.groups[${gi}]`;
-    const g = obj(rg, gp);
-    const id = str(g.id, `${gp}.id`);
-    if (ids.has(id)) fail(`${gp}.id`, 'is duplicated');
-    ids.add(id);
-    const observations = parseObservations(g.observations, `${gp}.observations`, rowCount, id, obsIds);
-    return {
-      id,
-      name: str(g.name, `${gp}.name`),
-      title: typeof g.title === 'string' ? g.title : '',
-      paletteIndex: Number.isInteger(g.paletteIndex) && (g.paletteIndex as number) >= 0 ? (g.paletteIndex as number) : gi,
-      ...(typeof g.factor === 'string' && g.factor.trim() !== '' ? { factor: g.factor.trim() } : {}),
-      ...(g.time !== undefined ? { time: parseTime(g.time, `${gp}.time`) } : {}),
-      observations,
-    };
-  });
-  const kind: TableKind = TABLE_KINDS.find((k) => k === t.kind) ?? 'column';
-  const lead = leadingColumns(kind);
-  if (groups.length < lead) fail(`${path}.groups`, `a ${kind} table needs its first column (${kind === 'survival' ? 'time' : 'X'})`);
-  // A column type is read for the X column of an XY table only: what a date or a duration means anywhere else is not built, and reading it as plain numbers would change its meaning.
-  groups.forEach((g, gi) => {
-    if (g.time && !(kind === 'xy' && gi === 0)) fail(`${path}.groups[${gi}].time`, 'is only read for the X column of an XY table');
-  });
-  const layout = kind === 'xy' || kind === 'grouped' ? parseLayout(t.layout, `${path}.layout`) : undefined;
-  if (layout && (groups.length - lead) % seriesWidth(layout) !== 0) fail(`${path}.groups`, `do not fit the table layout: the columns must come in blocks of ${seriesWidth(layout)}`);
-  return { id: str(t.id, `${path}.id`), name: str(t.name, `${path}.name`), kind, ...(layout ? { layout } : {}), rowCount, rows: parseRows(t.rows, `${path}.rows`, rowCount), groups };
 }
 
 /** Enum-valued style keys; an invalid stored value is dropped (the default applies) and noted. */
@@ -307,8 +150,6 @@ function parseLayer(l: Obj, lp: string, notes: string[]): ChartLayer {
     summary = sanitizeSummary(undefined);
   }
   return {
-    id: str(l.id, `${lp}.id`),
-    name: typeof l.name === 'string' ? l.name : 'Data',
     style,
     groupOverrides,
     objectOverrides,
@@ -575,7 +416,7 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
     survival: parseSurvival(c.survival),
     extraGroups: parseExtraGroups(c.extraGroups, `${path}.extraGroups`, tables, notes),
     aspect: c.aspect === '4:3' || c.aspect === '3:4' || c.aspect === '1:1' ? c.aspect : 'free',
-    paletteId: typeof c.paletteId === 'string' ? c.paletteId : null,
+    paletteId: typeof c.paletteId === 'string' ? (paletteById(c.paletteId) ? c.paletteId : (notes.push(`${path}.paletteId names a palette this version does not have ("${c.paletteId}"); the default palette is used.`), DEFAULT_PALETTE_ID)) : null,
     ...sanitizeLook(c, base),
     xAxis: sanitizeAxis({ ...base.xAxis, ...(isObj(c.xAxis) ? c.xAxis : {}) }, base.xAxis),
     yAxis: sanitizeAxis({ ...base.yAxis, ...(isObj(c.yAxis) ? c.yAxis : {}) }, base.yAxis),
@@ -685,7 +526,7 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
     const lp = `project.layouts[${li}]`;
     const o = obj(l, lp);
     const id = str(o.id, `${lp}.id`);
-    const made = sanitizeLayout(o, defaultLayout(id, typeof o.name === 'string' && o.name.trim() !== '' ? o.name.trim() : 'Layout'));
+    const made = sanitizeLayout(o, defaultLayout(id, typeof o.name === 'string' && o.name.trim() !== '' ? o.name.trim() : 'Layout', { showTitle: false }));
     const panels = made.panels.map((pid, pi) => {
       if (pid === null || chartIds.has(pid)) return pid;
       notes.push(`${lp}.panels[${pi}] referred to a graph that is missing and was emptied.`);
@@ -722,20 +563,44 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
 
 export const parseProject = (text: string): Project => parseProjectWithNotes(text).project;
 
-export function loadAutosave(): Project | null {
+/** What the recovery copy kept in the browser holds: nothing, a project (with what was reset on reading it), or text this build cannot read. */
+export type AutosaveRead = { kind: 'none' } | { kind: 'restored'; project: Project; notes: string[] } | { kind: 'unreadable' };
+
+export function readAutosave(): AutosaveRead {
+  let text: string | null = null;
   try {
-    const text = localStorage.getItem(AUTOSAVE_KEY);
-    return text ? parseProject(text) : null;
+    text = localStorage.getItem(AUTOSAVE_KEY);
   } catch {
-    return null;
+    return { kind: 'none' };
+  }
+  if (!text) return { kind: 'none' };
+  try {
+    return { kind: 'restored', ...parseProjectWithNotes(text) };
+  } catch {
+    return { kind: 'unreadable' };
   }
 }
 
-/** Keeps a copy of the autosave as it was when the app started, apart from the one that the next edits will overwrite. */
+export function loadAutosave(): Project | null {
+  const r = readAutosave();
+  return r.kind === 'restored' ? r.project : null;
+}
+
+/**
+ * Keeps a copy of the autosave as it was when the app started, apart from the one that the next edits will overwrite. Text that this build
+ * cannot read (a newer version, an earlier shape of the tables, a damaged copy) goes under a key of its own, which no later start replaces:
+ * it may be the only copy of someone's work.
+ */
 export function backupAutosave(): void {
   try {
     const text = localStorage.getItem(AUTOSAVE_KEY);
-    if (text) localStorage.setItem(AUTOSAVE_BACKUP_KEY, text);
+    if (!text) return;
+    try {
+      parseProject(text);
+      localStorage.setItem(AUTOSAVE_BACKUP_KEY, text);
+    } catch {
+      localStorage.setItem(AUTOSAVE_UNREADABLE_KEY, text);
+    }
   } catch {
     /* storage is unavailable: nothing to protect */
   }

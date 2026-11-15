@@ -1,4 +1,4 @@
-import { chartPx2Pt } from '../../model/units';
+import { chartPx2Pt, pxToMm } from '../../model/units';
 import { checkFonts, type FontCheck } from './fontCheck';
 import { checkGlyphs, type GlyphCheck } from './glyphCheck';
 import { exportPixels, fitsCanvas, GRAPH_PNG_DPI } from './pngDpi';
@@ -60,7 +60,7 @@ const round = (v: number, digits: number): number => Math.round(v * 10 ** digits
 
 export function buildExportReport(input: ExportReportInput): ExportReport {
   const { widthPx, heightPx } = input;
-  const mm = (px: number) => round((px * 25.4) / 96, 2);
+  const mm = (px: number) => round(pxToMm(px), 2);
   const fonts = [...new Set(input.fontFamilies)].map((list) => checkFonts(list, input.isFontAvailable));
   const groups = input.textGroups ?? [];
   const pixels = input.format === 'png' ? exportPixels({ widthPx, heightPx }, input.dpi ?? GRAPH_PNG_DPI) : null;

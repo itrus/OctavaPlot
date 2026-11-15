@@ -1,3 +1,4 @@
+import { turned } from '../shared/parts/orientation';
 import type { LayerKind, LayerSpec } from '../../model/graph/layers';
 import type { Chart } from '../../model/types';
 import { n2 } from '../../model/units';
@@ -42,7 +43,6 @@ export function compileColumnMarks(chart: Chart, model: ColumnModel, preview = f
   // The preview of a graph of very many dots draws the dots of one look as one shape (see denseDots.ts); an export never does.
   const dense = preview && isDense(drawnDotCount(chart, model));
   /** Shapes of the vertical drawing: under the matrix of a horizontal chart, as they are otherwise. */
-  const turned = (children: SceneElement[]): SceneElement[] => (orient.matrix ? [el('g', [['transform', orient.matrix]], { children })] : children);
 
   const distOf = (g: GroupGeom): SceneElement[] => {
     if (!g.dist) return [];
@@ -144,7 +144,7 @@ export function compileColumnMarks(chart: Chart, model: ColumnModel, preview = f
   const out: SceneElement[] = [];
   let run: { pass: 'body' | 'lines' | 'points'; items: SceneElement[] } | null = null;
   const flush = () => {
-    if (run) out.push(...(run.pass === 'points' ? run.items : turned(run.items)));
+    if (run) out.push(...(run.pass === 'points' ? run.items : turned(orient, run.items)));
     run = null;
   };
   for (const layer of model.layers) {

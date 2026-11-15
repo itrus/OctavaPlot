@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { useRoving } from '../inspector/common/roving';
 import { buildAnyModel, ChartCanvas } from '../../chart/anyModel';
 
-import { applyVariant, previewFit, type ChartVariant } from '../../model/graph/chartVariant';
+import { previewFit, startChart, type ChartVariant } from '../../model/graph/chartVariant';
 import { GALLERY, availableItems, type GalleryItem } from '../../model/graph/chartGallery';
-import { inheritChart } from '../../model/graph/chartFormat';
+import { inheritChart } from '../../model/graph/link/chartFormat';
 import { chartTypeInfo, tableTypeInfo } from '../../model/graph/chartTypes';
 import { createChart } from '../../model/defaults';
 import type { Chart, ChartType, DataTable, Id, TableKind } from '../../model/types';
@@ -19,7 +19,7 @@ const FAMILY_ORDER: TableKind[] = ['xy', 'column', 'grouped', 'contingency', 'su
 function Preview({ table, type, variant }: { table: DataTable; type: ChartType; variant?: ChartVariant }) {
   const drawn = useMemo(() => {
     try {
-      const chart = applyVariant({ ...createChart(table.id, { widthPx: 1024, heightPx: 768 }, type), title: table.name }, variant);
+      const chart = startChart({ ...createChart(table.id, { widthPx: 1024, heightPx: 768 }, type), title: table.name }, table, variant);
       return { chart, any: buildAnyModel(chart, table, previewFit(chart, variant)) };
     } catch {
       return null;
@@ -69,7 +69,6 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
   const all = availableItems(family);
   const selected: GalleryItem = all.find((i) => i.id === chosen) ?? first;
   const selectedTab = tabs.find((t) => t.items.includes(selected));
-  const tablesOfFamily = tables.filter((t) => t.kind === family);
   const canCreate = selected.type !== null;
   const shape = tableTypeInfo(family).layout;
 
@@ -126,7 +125,6 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
       </span>
       {mode === 'like' && source && sourceTable ? (
         <>
-          <p className="muted">The new graph takes the format of an existing graph and shows the table you choose. Data sets are matched by position: the third data set of the graph styles the third of the new table.</p>
           <div className="gallery-top">
             <label className="choice-label">
               <span>Like graph</span>
@@ -140,19 +138,24 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
             </label>
             {tableSelect}
           </div>
-          <p className="muted small">
-            {sourceTable.kind === table.kind
-              ? 'Taken over: size, chart type and its options, fonts, colours, frame, grid, axis look, legend and the style of each data set. Not taken over: data, titles, axis ranges, reference lines, annotations and the fitted curve.'
-              : `The table is of another type than ${sourceTable.name}, so only the general format is taken over: size, fonts, colours, frame, grid, axis look and legend. The graph type is the table's usual one.`}
-          </p>
-          <label className="choice-label">
-            <input type="checkbox" checked={linked} onChange={(e) => setLinked(e.target.checked)} />
-            <span>Keep the graphs linked: later changes to the format of “{source.name}” also reach the new graph, except for details you have changed on the new graph itself</span>
-          </label>
-          <div className="gallery-preview-box">
-            <div className="gallery-preview-title">Preview</div>
-            <div className="gallery-preview">
-              <PreviewLike source={source} sourceTable={sourceTable} table={table} />
+          <div className="gallery-lower">
+            <div className="gallery-preview-box">
+              <div className="gallery-preview-title">Preview</div>
+              <div className="gallery-preview">
+                <PreviewLike source={source} sourceTable={sourceTable} table={table} />
+              </div>
+            </div>
+            <div className="gallery-detail">
+            <p className="muted">The new graph takes the format of an existing graph and shows the table you choose. Data sets are matched by position: the third data set of the graph styles the third of the new table.</p>
+            <p className="muted small">
+              {sourceTable.kind === table.kind
+                ? 'Taken over: size, chart type and its options, fonts, colours, frame, grid, axis look, legend and the style of each data set. Not taken over: data, titles, axis ranges, reference lines, annotations and the fitted curve.'
+                : `The table is of another type than ${sourceTable.name}, so only the general format is taken over: size, fonts, colours, frame, grid, axis look and legend. The graph type is the table's usual one.`}
+            </p>
+            <label className="choice-label">
+              <input type="checkbox" checked={linked} onChange={(e) => setLinked(e.target.checked)} />
+              <span>Keep the graphs linked: later changes to the format of “{source.name}” also reach the new graph, except for details you have changed on the new graph itself</span>
+            </label>
             </div>
           </div>
         </>
@@ -172,7 +175,6 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
         </label>
         {tableSelect}
       </div>
-      {tablesOfFamily.length > 1 && <p className="muted small">{tablesOfFamily.length} {FAMILY_LABEL[family].toLowerCase()} tables: choose which one above.</p>}
 
       {tabs.length > 1 && (
         <div className="format-tabs" role="tablist" aria-label="Graph kind" {...rovingTabs.groupProps}>
@@ -209,18 +211,19 @@ export function NewGraphDialog({ tables, charts, initialTableId, initialChartId,
         })}
       </div>
 
-      <div className="gallery-detail">
-        <strong>{selected.label}</strong>
-        {selectedTab && selectedTab.id !== tab.id && <span className="muted small"> · in “{selectedTab.label}”</span>}
-        <span className="muted small"> · {FAMILY_LABEL[family]} graph</span>
-        <p className="muted">{selected.description}</p>
-        <p className="muted small">Table needed: {shape}</p>
-      </div>
-
-      <div className="gallery-preview-box">
-        <div className="gallery-preview-title">Preview</div>
-        <div className="gallery-preview">
-          {selected.type && <Preview table={table} type={selected.type} variant={selected.variant} />}
+      <div className="gallery-lower">
+        <div className="gallery-preview-box">
+          <div className="gallery-preview-title">Preview</div>
+          <div className="gallery-preview">
+            {selected.type && <Preview table={table} type={selected.type} variant={selected.variant} />}
+          </div>
+        </div>
+        <div className="gallery-detail">
+          <strong>{selected.label}</strong>
+          {selectedTab && selectedTab.id !== tab.id && <span className="muted small"> · in “{selectedTab.label}”</span>}
+          <span className="muted small"> · {FAMILY_LABEL[family]} graph</span>
+          <p className="muted">{selected.description}</p>
+          <p className="muted small">Table needed: {shape}</p>
         </div>
       </div>
       </>

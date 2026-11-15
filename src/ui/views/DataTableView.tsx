@@ -5,7 +5,8 @@ import { useCommands, useNavigation, usePreferences, useProject, useTableViewpor
 import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import { newId } from '../../model/ids';
 import { addAnalysis, addGroup, changeTableKind, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setColumnTime, setExcluded, setFactor, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
-import { copyText, downloadBlob, exportFileName } from '../../util/download';
+import { copyText, downloadBlob } from '../../util/download';
+import { exportFileName } from '../../util/fileName';
 import { AddColumnIcon, AddManyRowsIcon, CloseIcon, ExcludeIcon, ExportIcon, FitCurveIcon, ImportIcon, IncludeIcon, TableTypeIcon } from '../components/icons';
 import { isCsvFile, tableToCsv, type CsvExportMode } from '../data/csv';
 import { excludedCount } from '../../model/table/exclusion';
@@ -20,7 +21,7 @@ import { FactorDialog } from '../dialogs/FactorDialog';
 import { RowsMenu } from './RowsMenu';
 import { leadingColumns, usesSeriesBlocks } from '../../model/graph/chartTypes';
 import { layoutOf, subLabels, tableSeriesWidth, xySeries } from '../../model/table/tableLayout';
-import { blockToText, formatCellFor, parseCellFor, planPaste, selectionStrings } from '../data/cellText';
+import { type CellBounds, blockToText, formatCellFor, parseCellFor, planPaste, selectionStrings } from '../data/cellText';
 import { planFill, planSeries, suggestSeries } from '../data/fillSeries';
 import { gridJump } from '../data/gridKeys';
 
@@ -52,7 +53,7 @@ const editText = (table: DataTable, row: number, col: number, separator: Decimal
 /** What a cell of a typed column wants written, for the message of a refused edit. */
 const valueWord = (time: TimeColumn | undefined): string => (!time ? 'a number' : time.kind === 'date' ? 'a date such as 2025-03-04' : time.kind === 'datetime' ? 'a date and time such as 2025-03-04T10:30:00' : 'a duration such as 1:30:00');
 
-const bounds = (s: Sel) => ({
+const bounds = (s: Sel): CellBounds => ({
   r0: Math.min(s.ar, s.fr),
   r1: Math.max(s.ar, s.fr),
   c0: Math.min(s.ac, s.fc),
@@ -110,6 +111,86 @@ const Cell = memo(function Cell(p: CellProps) {
       ) : (
         p.text
       )}
+    </div>
+  );
+});
+
+interface GridRowProps {
+  row: number;
+  table: DataTable;
+  separator: DecimalSeparator;
+  rowH: number;
+  rowNumW: number;
+  titleW: number;
+  colW: number;
+  /** The row is within the selected rows, and then the selected columns are c0 to c1 (0 and 0 otherwise, so a row outside the selection does not change with it). */
+  rowIn: boolean;
+  c0: number;
+  c1: number;
+  /** The column of the active cell when it is in this row; null otherwise. */
+  activeCol: number | null;
+  /** The cell being edited, or the invalid one, when it is in this row. */
+  editing: Editing | null;
+  invalid: Editing | null;
+  setSel: (s: Sel) => void;
+  onDown: CellProps['onDown'];
+  onEnter: CellProps['onEnter'];
+  onDouble: CellProps['onDouble'];
+  onEditChange: CellProps['onEditChange'];
+  onEditKey: CellProps['onEditKey'];
+  onEditBlur: CellProps['onEditBlur'];
+}
+
+/**
+ * One row of the grid. It is written again only when something about it changed (its data, its part of the selection, its editing), so
+ * moving the selection one row down writes the rows it leaves and enters, not every row on the screen.
+ */
+const GridRow = memo(function GridRow(p: GridRowProps) {
+  const { row: r, table, rowIn, c0, c1, activeCol, editing, invalid } = p;
+  const nCols = table.groups.length;
+  return (
+    <div className="grid-row" style={{ height: p.rowH }} role="row" aria-rowindex={r + 2}>
+      <div role="rowheader" className={`rownum${rowIn ? ' in-range' : ''}`} style={{ width: p.rowNumW }} onClick={() => p.setSel({ ar: r, ac: 0, fr: r, fc: nCols - 1 })}>
+        {r + 1}
+      </div>
+      <Cell
+        key="row-title"
+        row={r}
+        col={-1}
+        width={p.titleW}
+        text={rowTitleAt(table, r)}
+        inRange={rowIn && c0 < 0}
+        active={activeCol === -1}
+        editing={editing && editing.col === -1 ? editing : null}
+        invalid={false}
+        onDown={p.onDown}
+        onEnter={p.onEnter}
+        onDouble={p.onDouble}
+        onEditChange={p.onEditChange}
+        onEditKey={p.onEditKey}
+        onEditBlur={p.onEditBlur}
+      />
+      {table.groups.map((g, c) => (
+        <Cell
+          key={g.id}
+          row={r}
+          col={c}
+          width={p.colW}
+          text={formatCellFor(g.observations[r].value, p.separator, g.time)}
+          inRange={rowIn && c >= c0 && c <= c1}
+          active={activeCol === c}
+          editing={editing && editing.col === c ? editing : null}
+          invalid={!!(invalid && invalid.col === c)}
+          excluded={g.observations[r].excluded === true}
+          reason={g.observations[r].excludedReason}
+          onDown={p.onDown}
+          onEnter={p.onEnter}
+          onDouble={p.onDouble}
+          onEditChange={p.onEditChange}
+          onEditKey={p.onEditKey}
+          onEditBlur={p.onEditBlur}
+        />
+      ))}
     </div>
   );
 });
@@ -252,7 +333,9 @@ export function DataTableView({ table }: { table: DataTable }) {
         run('Edit row title', setRowTitles(table.id, [{ row: ed.row, title: ed.text }]));
       }
     } else {
-      const parsed = parseCellFor(ed.text, settings.decimalSeparator, table.groups[ed.col]?.time);
+      // Leaving the editor with the text it opened with changes nothing: a time or a duration is shown to a microsecond and would read back as another number.
+      const untouched = ed.text === editText(table, ed.row, ed.col, settings.decimalSeparator);
+      const parsed: ReturnType<typeof parseCellFor> = untouched ? { ok: true, value: table.groups[ed.col]?.observations[ed.row]?.value ?? null } : parseCellFor(ed.text, settings.decimalSeparator, table.groups[ed.col]?.time);
       if (!parsed.ok) {
         setMessage({ kind: 'error', text: `Row ${ed.row + 1}, ${table.groups[ed.col]?.name ?? 'column'}: ${parsed.message}. Enter ${valueWord(table.groups[ed.col]?.time)} or leave the cell empty.` });
         if (mode === 'blur') {
@@ -821,26 +904,25 @@ export function DataTableView({ table }: { table: DataTable }) {
             })}
           </div>
           <div className="grid-rows" style={{ top: HEADER_H + first * ROW_H }}>
-          {rowIdx.map((r) => (
-            <div className="grid-row" style={{ height: ROW_H }} key={r} role="row" aria-rowindex={r + 2}>
-              <div
-                role="rowheader"
-                className={`rownum${r >= r0 && r <= r1 ? ' in-range' : ''}`}
-                style={{ width: ROWNUM_W }}
-                onClick={() => setSel({ ar: r, ac: 0, fr: r, fc: nCols - 1 })}
-              >
-                {r + 1}
-              </div>
-              <Cell
-                key="row-title"
+          {rowIdx.map((r) => {
+            const rowIn = r >= r0 && r <= r1;
+            return (
+              <GridRow
+                key={r}
                 row={r}
-                col={-1}
-                width={TITLE_W}
-                text={rowTitleAt(table, r)}
-                inRange={r >= r0 && r <= r1 && c0 < 0}
-                active={r === sel.fr && sel.fc === -1}
-                editing={editing && editing.row === r && editing.col === -1 ? editing : null}
-                invalid={false}
+                table={table}
+                separator={settings.decimalSeparator}
+                rowH={ROW_H}
+                rowNumW={ROWNUM_W}
+                titleW={TITLE_W}
+                colW={COL_W}
+                rowIn={rowIn}
+                c0={rowIn ? c0 : 0}
+                c1={rowIn ? c1 : 0}
+                activeCol={r === sel.fr ? sel.fc : null}
+                editing={editing && editing.row === r ? editing : null}
+                invalid={invalidCell && invalidCell.row === r ? invalidCell : null}
+                setSel={setSel}
                 onDown={onDown}
                 onEnter={onEnter}
                 onDouble={onDouble}
@@ -848,32 +930,8 @@ export function DataTableView({ table }: { table: DataTable }) {
                 onEditKey={onEditKey}
                 onEditBlur={onEditBlur}
               />
-              {table.groups.map((g, c) => {
-                const isEditing = editing && editing.row === r && editing.col === c ? editing : null;
-                return (
-                  <Cell
-                    key={g.id}
-                    row={r}
-                    col={c}
-                    width={COL_W}
-                    text={formatCellFor(g.observations[r].value, settings.decimalSeparator, g.time)}
-                    inRange={r >= r0 && r <= r1 && c >= c0 && c <= c1}
-                    active={r === sel.fr && c === sel.fc}
-                    editing={isEditing}
-                    invalid={!!(invalidCell && invalidCell.row === r && invalidCell.col === c)}
-                    excluded={g.observations[r].excluded === true}
-                    reason={g.observations[r].excludedReason}
-                    onDown={onDown}
-                    onEnter={onEnter}
-                    onDouble={onDouble}
-                    onEditChange={onEditChange}
-                    onEditKey={onEditKey}
-                    onEditBlur={onEditBlur}
-                  />
-                );
-              })}
-            </div>
-          ))}
+            );
+          })}
           </div>
         </div>
       </div>

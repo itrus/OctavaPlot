@@ -28,14 +28,17 @@ export function autoBinWidth(sorted: readonly number[]): number {
   return niceWidth(range / bins);
 }
 
+/** The most bins a width can make (a width far below the range would otherwise make millions). */
+const MAX_BINS = 2000;
+
 /** Removes floating-point noise (0.30000000000000004) only; 15 digits keep edges of large values apart. */
 const clean = (v: number): number => Number(v.toPrecision(15));
 
 /**
  * Equal-width bin edges that cover the values: the first edge a multiple of the width (or of `anchor`, an edge that is
- * known to be one) not above the smallest value, the last far enough to include the largest. At most `maxBins` bins.
+ * known to be one) not above the smallest value, the last far enough to include the largest. At most MAX_BINS bins.
  */
-export function binEdges(sorted: readonly number[], width: number, anchor: number | null = null, maxBins = 2000): number[] {
+export function binEdges(sorted: readonly number[], width: number, anchor: number | null = null): number[] {
   if (sorted.length === 0 || !(width > 0)) return [0, 1];
   const lo = sorted[0];
   const hi = sorted[sorted.length - 1];
@@ -52,7 +55,7 @@ export function binEdges(sorted: readonly number[], width: number, anchor: numbe
     const e = clean(raw);
     return e > prev ? e : raw > prev ? raw : null;
   };
-  while (edges[edges.length - 1] <= hi + width * 1e-9 && edges.length <= maxBins) {
+  while (edges[edges.length - 1] <= hi + width * 1e-9 && edges.length <= MAX_BINS) {
     const e = next(edges.length);
     if (e === null) break;
     edges.push(e);
@@ -70,14 +73,14 @@ interface BinCounts {
 }
 
 /**
- * Count the values into bins [left, right), the last bin also taking its right edge when `finalInclusive` (spec 11.1).
+ * Count the values into bins [left, right), the last bin also taking its right edge (spec 11.1).
  */
-export function countBins(sorted: readonly number[], edges: readonly number[], finalInclusive = true): BinCounts {
+export function countBins(sorted: readonly number[], edges: readonly number[]): BinCounts {
   const bins = edges.length - 1;
   const counts = new Array<number>(Math.max(0, bins)).fill(0);
   let outside = 0;
   for (const v of sorted) {
-    if (v < edges[0] || v > edges[bins] || (v === edges[bins] && !finalInclusive)) {
+    if (v < edges[0] || v > edges[bins]) {
       outside++;
       continue;
     }

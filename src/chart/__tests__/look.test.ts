@@ -82,9 +82,9 @@ describe('colours, frame and grid style', () => {
     const out = chartToSvgString(p.charts[0], table);
     const none = chartToSvgString(patchAxis(id, 'yAxis', { tickDirection: 'none' })(p).charts[0], table);
     expect(none).not.toBe(out);
-    expect(out).toContain('h-11.2');
-    expect(chartToSvgString(patchAxis(id, 'yAxis', { tickDirection: 'in' })(p).charts[0], table)).toContain('h11.2');
-    expect(chartToSvgString(patchAxis(id, 'yAxis', { tickDirection: 'both' })(p).charts[0], table)).toContain('h-22.4');
+    expect(out).toContain('h-11');
+    expect(chartToSvgString(patchAxis(id, 'yAxis', { tickDirection: 'in' })(p).charts[0], table)).toContain('h11');
+    expect(chartToSvgString(patchAxis(id, 'yAxis', { tickDirection: 'both' })(p).charts[0], table)).toContain('h-22');
   });
   it('are kept in a saved file, and invalid stored values fall back', () => {
     const { p } = setup();
@@ -114,7 +114,7 @@ describe('colours, frame and grid style', () => {
       for (const k of ['xAxis', 'yAxis', 'y2Axis']) for (const f of ['scale', 'reverse', 'minorTicks', 'tickDirection', 'tickLengthPt', 'prefix', 'showMinorGrid']) delete c[k][f];
     }
     const back = parseProject(JSON.stringify(text));
-    expect(back.charts[0].yAxis).toMatchObject({ scale: 'linear', reverse: false, tickDirection: 'out', tickLengthPt: 11.2, prefix: '' });
+    expect(back.charts[0].yAxis).toMatchObject({ scale: 'linear', reverse: false, tickDirection: 'out', tickLengthPt: 11, prefix: '' });
     expect(back.charts[0].frame).toBe('none');
     expect(back.charts[0].pageColor).toBe('#ffffff');
   });

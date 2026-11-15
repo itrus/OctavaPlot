@@ -46,14 +46,14 @@ describe('origin of an XY chart', () => {
     expect(svg).toContain(`M${r2(m.xScale(0))},${r2(m.layout.plot.y)}V`);
     expect(svg).toContain(`M${r2(m.layout.plot.x)},${r2(m.yScale(0))}H`);
     // The X axis line is no longer on the bottom edge, and its ticks start on the new line.
-    expect(svg).toContain(`M${r2(m.xScale(0))},${r2(m.yScale(0))}v11.2`);
+    expect(svg).toContain(`M${r2(m.xScale(0))},${r2(m.yScale(0))}v11`);
     expect(chartToSvgString(p.charts[0], table)).not.toContain(`M${r2(m.layout.plot.x)},${r2(m.yScale(0))}H`);
   });
   it('keeps the numbers where they are', () => {
     const { p, table } = setup();
     const c = patchLook(p.charts[0].id, { origin: { x: 0, y: 0 } })(p).charts[0];
     const m = buildXyModel(c, table);
-    const label = `x="${r2(m.layout.plot.x - 11.2 - 6)}"`;
+    const label = `x="${r2(m.layout.plot.x - 11 - 6)}"`;
     expect(chartToSvgString(c, table)).toContain(label);
   });
   it('stays at the edge for a value outside the axis', () => {

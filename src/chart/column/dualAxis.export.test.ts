@@ -142,7 +142,7 @@ describe('right axis rendering', () => {
   const modelOf = (p: Project) => buildColumnModel(p.charts[0], p.dataTables[0]);
   const withY2 = (p: Project, patch: Partial<Project['charts'][0]['y2Axis']>) => patchAxis(p.charts[0].id, 'y2Axis', patch)(p);
   const rightTicks = (svg: string, x: string) =>
-    [...svg.matchAll(/<path d="M([\d.]+),([\d.]+)h11.2"/g)].filter((m) => m[1] === x);
+    [...svg.matchAll(/<path d="M([\d.]+),([\d.]+)h11"/g)].filter((m) => m[1] === x);
   const rightLabels = (svg: string) => [...svg.matchAll(/<text x="([\d.]+)"[^>]*text-anchor="start"[^>]*>([^<]*)<\/text>/g)];
 
   it('draws the line and one outward tick per right tick at the high edge', () => {
@@ -160,7 +160,7 @@ describe('right axis rendering', () => {
     const m = modelOf(p);
     const labels = rightLabels(svgOf(p));
     expect(labels.map((l) => l[2])).toEqual(m.y2!.ticks.map(m.y2!.tickLabel));
-    const x = n2(m.layout.plot.x + m.layout.plot.width + 11.2 + 6);
+    const x = n2(m.layout.plot.x + m.layout.plot.width + 11 + 6);
     for (const l of labels) expect(Number(l[1])).toBeCloseTo(Number(x), 2);
     expect(svgOf(p)).toContain('font-weight="bold"');
   });

@@ -2,7 +2,8 @@ import type { Sheet, SheetRow } from './resultSheet';
 import { cachedCalc, peekCalc, type CalcIdentity } from '../../stats/calcCache';
 import { shouldDeferFit } from '../../stats/fitEngine';
 import { deferredFitResult } from '../../stats/fitService';
-import { FIT_ALGORITHM_VERSION, fitCurve, fitModelById, isFailure, type FitFailure, type FitModelId, type FitResult } from '../../stats/fit';
+import { FIT_ALGORITHM_VERSION, FIT_SOLVE_LEVEL, confidenceLimits, fitCurve, isFailure, type FitFailure, type FitResult } from '../../stats/fit';
+import { fitModelById, type FitModelId } from '../../stats/fitModels';
 import { withoutExcluded } from '../table/exclusion';
 import { layoutOf, xySeries } from '../table/tableLayout';
 import type { Analysis, DataTable, Id } from '../types';
@@ -45,7 +46,7 @@ type FitInput = { model: FitModelId; degree?: number; level: number };
 /** The numbers of a set of observations as one list, made once for each array so the cache can know it by identity. */
 const flatOf = new WeakMap<Obs, number[]>();
 
-/** What a fit is keyed by: the points, model, degree where it matters, level and algorithm version (the same for every path that makes it). */
+/** What a fit is keyed by: the points, model, degree where it matters and algorithm version (the same for every path that makes it). The level is not part of it: limits and bands are derived from the fit at any level. */
 function fitIdentity(obs: Obs, fit: FitInput): CalcIdentity {
   let data = flatOf.get(obs);
   if (!data) {
@@ -55,7 +56,7 @@ function fitIdentity(obs: Obs, fit: FitInput): CalcIdentity {
   }
   // The degree matters only to a polynomial, and the fit clamps it: write it as the fit reads it.
   const degree = fit.model === 'polynomial' ? Math.min(6, Math.max(2, Math.round(fit.degree ?? 2))) : null;
-  return { kind: 'fit', algorithm: FIT_ALGORITHM_VERSION, data, method: fit.model, params: [degree], level: fit.level };
+  return { kind: 'fit', algorithm: FIT_ALGORITHM_VERSION, data, method: fit.model, params: [degree] };
 }
 
 /**
@@ -66,7 +67,7 @@ function fitIdentity(obs: Obs, fit: FitInput): CalcIdentity {
 export function cachedFit(obs: Obs, fit: FitInput): FitResult | FitFailure {
   return cachedCalc<FitResult | FitFailure>(fitIdentity(obs, fit), () => {
     fitStats.calculated++;
-    return fitCurve(obs, { model: fit.model, degree: fit.degree, level: fit.level });
+    return fitCurve(obs, { model: fit.model, degree: fit.degree, level: FIT_SOLVE_LEVEL });
   });
 }
 
@@ -83,7 +84,7 @@ export function deferredFit(obs: Obs, fit: FitInput, slot: string): FitStatus {
   const kept = peekCalc<FitResult | FitFailure>(id);
   if (kept !== undefined) return { state: 'ready', value: kept };
   if (!shouldDeferFit(fit.model, obs.length)) return { state: 'ready', value: cachedFit(obs, fit) };
-  const value = deferredFitResult(id, slot, () => ({ data: Float64Array.from(id.data as number[]), model: fit.model, degree: fit.degree, level: fit.level }));
+  const value = deferredFitResult(id, slot, () => ({ data: Float64Array.from(id.data as number[]), model: fit.model, degree: fit.degree, level: FIT_SOLVE_LEVEL }));
   return value === undefined ? { state: 'pending' } : { state: 'ready', value };
 }
 
@@ -105,6 +106,7 @@ export function curveFitSheet(table: DataTable, analysis: Analysis): Sheet {
   const model = fitModelById(analysis.model ?? 'linear');
   const fits = fitsOf(table, analysis);
   const pct = `${Number((analysis.level * 100).toPrecision(3))}%`;
+  const limitsOf = (r: FitResult, i: number) => (r.params[i] ? confidenceLimits(r.params[i], r.df, analysis.level) : null);
   const each = (f: (r: FitResult) => string, otherwise = ''): string[] => fits.map((x) => (x.result ? f(x.result) : otherwise));
   /** A row of numbers: rounded for the screen, whole for copying. */
   const numbers = (key: string, label: string, pick: (r: FitResult) => number | null | undefined, indent = false): SheetRow => ({ key, label, indent, cells: each((r) => num(pick(r))), exact: each((r) => full(pick(r))) });
@@ -124,8 +126,8 @@ export function curveFitSheet(table: DataTable, analysis: Analysis): Sheet {
   names.forEach((name, i) => {
     rows.push(numbers(`p${i}`, name, (r) => r.params[i]?.value));
     rows.push(numbers(`p${i}se`, 'Std. error', (r) => r.params[i]?.se, true));
-    rows.push(numbers(`p${i}lo`, `${pct} CI lower limit`, (r) => r.params[i]?.lower, true));
-    rows.push(numbers(`p${i}hi`, `${pct} CI upper limit`, (r) => r.params[i]?.upper, true));
+    rows.push(numbers(`p${i}lo`, `${pct} CI lower limit`, (r) => limitsOf(r, i)?.lower, true));
+    rows.push(numbers(`p${i}hi`, `${pct} CI upper limit`, (r) => limitsOf(r, i)?.upper, true));
   });
   rows.push(gap('g3'));
   rows.push({ key: 'notes', label: 'Notes', cells: fits.map((f) => f.failure ?? f.result?.message ?? '') });

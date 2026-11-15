@@ -1,3 +1,4 @@
+import { chartTypeInfo } from './chartTypes';
 import type { ChartVariant } from './chartVariant';
 import type { ChartType, TableKind } from '../types';
 
@@ -26,20 +27,27 @@ interface GalleryTab {
 
 const item = (id: string, label: string, description: string, type: ChartType | null, spec?: string, variant?: ChartVariant): GalleryItem => ({ id, label, description, type, spec, ...(variant ? { variant } : {}) });
 
+/** A graph of a chart type as it is, with the name and the description of the type (chartTypes.ts), so that the gallery and the type list say the same. */
+const typed = (id: string, type: ChartType, spec?: string): GalleryItem => {
+  const info = chartTypeInfo(type);
+  if (!info) throw new Error(`No chart type ${type}`);
+  return { id, label: info.label, description: info.description, type, spec };
+};
+
 export const GALLERY: Record<TableKind, GalleryTab[]> = {
   xy: [
     {
       id: 'xy',
       label: 'XY',
       items: [
-        item('xyScatter', 'Points only', 'Symbols at (X, Y); no connecting line.', 'xyScatter'),
-        item('xyLineSymbols', 'Points and connecting line', 'Points joined in the order of the table, each marked.', 'xyLineSymbols'),
-        item('xyLine', 'Connecting line', 'Points joined in the order of the table; no symbols.', 'xyLine'),
-        item('xy.bars', 'Bars at numeric X', 'Bars placed at X values, with a baseline.', 'xyBars', 'xy.bars'),
-        item('xy.area', 'Area under the curve', 'A filled area below, above or between curves.', 'xyArea', 'xy.area'),
-        item('xy.spikes', 'Spikes', 'Thin lines from the baseline up to each point.', 'xySpikes', 'xy.spikes'),
+        typed('xyScatter', 'xyScatter'),
+        typed('xyLineSymbols', 'xyLineSymbols'),
+        typed('xyLine', 'xyLine'),
+        typed('xy.bars', 'xyBars', 'xy.bars'),
+        typed('xy.area', 'xyArea', 'xy.area'),
+        typed('xy.spikes', 'xySpikes', 'xy.spikes'),
         item('xy.bubble', 'Bubbles', 'Symbols whose area follows a second column: make the table with "Y and size".', 'xyBubble', 'xy.bubble', { bubbles: true }),
-        item('xy.volcano', 'Volcano plot', 'Fold change (log2) against significance: the X column holds the log2 fold change, the Y column the p-values, the row titles the names.', 'xyVolcano', 'xy.volcano'),
+        typed('xy.volcano', 'xyVolcano', 'xy.volcano'),
         item('xy.offset', 'Offset traces', 'Several series stacked with a fixed offset and a scale bar.', 'xyOffset', 'xy.offset_traces', { offsetTraces: true }),
         item('curve.fit', 'Points with a fitted curve', 'A fitted line with its confidence band; choose another model in the panel.', 'xyScatter', 'curve.fit', { fit: { model: 'linear', band: 'confidence' } }),
       ],
@@ -47,65 +55,65 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
   ],
   column: [
     {
-      id: 'individual',
-      label: 'Individual values',
+      id: 'summary',
+      label: 'Mean/median & error',
       items: [
-        item('scatter', 'Scatter dot plot', 'Every value as a dot, grouped by column, with an optional line at the mean.', 'scatter'),
-        item('cat.aligned', 'Aligned dots', 'Dots in a column without spreading them sideways.', 'scatter', 'category.aligned', { jitter: false }),
-        item('cat.swarm', 'Beeswarm', 'Every value as a dot, placed sideways by its value so that none touches another.', 'scatter', 'category.swarm', { swarm: true }),
-        item('paired', 'Before and after', 'The values of each row joined by a line.', 'paired', 'category.paired'),
+        typed('bar', 'bar'),
+        typed('mean', 'mean'),
+        item('barsH', 'Horizontal bars', 'The bar chart turned on its side.', 'bar', 'category.bar', { orientation: 'horizontal' }),
       ],
     },
     {
-      id: 'frequency',
-      label: 'Histogram and distribution',
+      id: 'individual',
+      label: 'Individual values',
       items: [
-        item('histogram', 'Histogram', 'How many values fall in each bin of the value axis.', 'histogram'),
-        item('ecdf', 'Cumulative distribution', 'The share of the values at or below each value, as steps.', 'ecdf'),
+        typed('scatter', 'scatter'),
+        item('cat.aligned', 'Aligned dots', 'Dots in a column without spreading them sideways.', 'scatter', 'category.aligned', { jitter: false }),
+        item('cat.swarm', 'Beeswarm', 'Every value as a dot, placed sideways by its value so that none touches another.', 'scatter', 'category.swarm', { swarm: true }),
+        typed('paired', 'paired', 'category.paired'),
       ],
     },
     {
       id: 'box',
       label: 'Box and violin',
       items: [
-        item('box', 'Box and whiskers', 'Quartiles, median and whiskers of each column.', 'box', 'distribution.box'),
-        item('floating', 'Floating bars (min to max)', 'A bar from the smallest to the largest value, with a line at the mean or median.', 'floating', 'category.range'),
-        item('violin', 'Violin plot', 'The distribution of each column as a smoothed density.', 'violin', 'distribution.violin'),
+        typed('box', 'box', 'distribution.box'),
+        typed('floating', 'floating', 'category.range'),
+        typed('violin', 'violin', 'distribution.violin'),
         item('boxH', 'Horizontal box', 'The box plot turned on its side.', 'box', 'distribution.box', { orientation: 'horizontal' }),
         item('violinH', 'Horizontal violin', 'The violin plot turned on its side.', 'violin', 'distribution.violin', { orientation: 'horizontal' }),
       ],
     },
     {
-      id: 'summary',
-      label: 'Mean/median & error',
+      id: 'frequency',
+      label: 'Histogram and distribution',
       items: [
-        item('bar', 'Bar chart', 'One bar per column, with optional points and error bars.', 'bar'),
-        item('mean', 'Mean with error bars', 'A mean marker per column with its spread.', 'mean'),
-        item('barsH', 'Horizontal bars', 'The bar chart turned on its side.', 'bar', 'category.bar', { orientation: 'horizontal' }),
+        typed('histogram', 'histogram'),
+        typed('ecdf', 'ecdf'),
       ],
     },
   ],
   grouped: [
+    {
+      id: 'summary',
+      label: 'Summary data',
+      items: [
+        typed('groupedBar', 'groupedBar'),
+        typed('groupedLine', 'groupedLine'),
+        typed('groupedStacked', 'groupedStacked', 'category.stacked'),
+        item('grp.barsH', 'Horizontal interleaved bars', 'Interleaved bars turned on their side.', 'groupedBar', 'category.grouped', { orientation: 'horizontal' }),
+        item('grp.stackedH', 'Horizontal stacked bars', 'Stacked bars turned on their side.', 'groupedStacked', 'category.stacked', { orientation: 'horizontal' }),
+        item('grp.forest', 'Forest plot', 'Estimates with their intervals, one row for each study, as typed (nothing is pooled): make the table with "Mean (or median), Upper/Lower limits". A dashed line marks no effect at 0.', 'groupedLine', 'special.forest', { forest: 'difference' }),
+        item('grp.forestRatio', 'Forest plot, ratios', 'The same for ratios (odds, risk or hazard ratios): a log axis, and the dashed line marks no effect at 1.', 'groupedLine', 'special.forest', { forest: 'ratio' }),
+        typed('grp.floating', 'groupedFloating', 'category.range'),
+      ],
+    },
     {
       id: 'individual',
       label: 'Individual values',
       items: [
         item('grp.scatterI', 'Interleaved scatter', 'Dots of every series side by side within each category.', 'groupedBar', 'category.grouped', { dotsOnly: true }),
         item('grp.scatterS', 'Separated scatter', 'Dots of each series in its own group of columns, one column for each category.', 'groupedBar', 'category.grouped', { dotsOnly: true, separated: true }),
-      ],
-    },
-    {
-      id: 'summary',
-      label: 'Summary data',
-      items: [
-        item('groupedBar', 'Interleaved bars', 'Bars side by side within each category, with error bars.', 'groupedBar'),
-        item('groupedLine', 'Lines over categories', 'One line per series joining its means across the categories.', 'groupedLine'),
-        item('groupedStacked', 'Stacked bars', 'The series stacked in one bar per category.', 'groupedStacked', 'category.stacked'),
-        item('grp.barsH', 'Horizontal interleaved bars', 'Interleaved bars turned on their side.', 'groupedBar', 'category.grouped', { orientation: 'horizontal' }),
-        item('grp.stackedH', 'Horizontal stacked bars', 'Stacked bars turned on their side.', 'groupedStacked', 'category.stacked', { orientation: 'horizontal' }),
-        item('grp.forest', 'Forest plot', 'Estimates with their intervals, one row for each study, as typed (nothing is pooled): make the table with "Mean (or median), Upper/Lower limits". A dashed line marks no effect at 0.', 'groupedLine', 'special.forest', { forest: 'difference' }),
-        item('grp.forestRatio', 'Forest plot, ratios', 'The same for ratios (odds, risk or hazard ratios): a log axis, and the dashed line marks no effect at 1.', 'groupedLine', 'special.forest', { forest: 'ratio' }),
-        item('grp.floating', 'Floating bars (min to max)', 'A bar from the smallest to the largest value of each series, with a line at the mean or median.', 'groupedFloating', 'category.range'),
       ],
     },
     {
@@ -122,7 +130,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'three',
       label: 'Three-way',
       items: [
-        item('three.bars', 'Three-way bars', 'Two grouping levels inside each category: name the factor of each series (Factor…) and the series that share one are drawn together.', 'groupedBar', 'category.nested'),
+        typed('three.bars', 'groupedBar', 'category.nested'),
         item('three.dots', 'Three-way dots', 'Individual values for two grouping levels: enter replicates, and name the factor of each series (Factor…).', 'groupedBar', 'category.nested', { dotsOnly: true }),
       ],
     },
@@ -130,8 +138,8 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'box',
       label: 'Box and violin',
       items: [
-        item('grp.box', 'Grouped box and whiskers', 'A box plot for every series in each category.', 'groupedBox', 'distribution.box'),
-        item('grp.violin', 'Grouped violin', 'A violin for every series in each category.', 'groupedViolin', 'distribution.violin'),
+        typed('grp.box', 'groupedBox', 'distribution.box'),
+        typed('grp.violin', 'groupedViolin', 'distribution.violin'),
       ],
     },
   ],
@@ -140,16 +148,16 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'contingency',
       label: 'Contingency',
       items: [
-        item('contingencyBars', 'Side-by-side bars', 'Counts: one bar per outcome within each row.', 'contingencyBars'),
-        item('contingencyStacked', 'Stacked bars', 'Counts: the outcomes stacked in one bar per row.', 'contingencyStacked'),
-        item('contingencyPercent', '100% stacked bars', 'Each row\'s outcomes as a share of its own total.', 'contingencyPercent'),
+        typed('contingencyBars', 'contingencyBars'),
+        typed('contingencyStacked', 'contingencyStacked'),
+        typed('contingencyPercent', 'contingencyPercent'),
         item('cont.sideH', 'Horizontal side-by-side bars', 'Side-by-side bars turned on their side.', 'contingencyBars', 'category.counts', { orientation: 'horizontal' }),
         item('cont.stackH', 'Horizontal stacked bars', 'Stacked bars turned on their side.', 'contingencyStacked', 'category.stacked', { orientation: 'horizontal' }),
         item('cont.pctH', 'Horizontal 100% bars', '100% stacked bars turned on their side.', 'contingencyPercent', 'category.normalised_stack', { orientation: 'horizontal' }),
-        item('pie', 'Pie charts', 'The outcomes of each row as parts of a circle.', 'pie', 'whole.pie'),
-        item('doughnut', 'Doughnut charts', 'Pie charts with a hole and a total in the middle.', 'doughnut', 'whole.doughnut'),
-        item('slices', 'Slices', 'The outcomes of each row as parts of one bar, as wide as their share.', 'slices', 'whole.slices'),
-        item('dotGrid', '10 × 10 dot plot', 'One dot for each percent of a row, in a grid of 10 by 10, coloured by outcome.', 'dotGrid', 'whole.dots'),
+        typed('pie', 'pie', 'whole.pie'),
+        typed('doughnut', 'doughnut', 'whole.doughnut'),
+        typed('slices', 'slices', 'whole.slices'),
+        typed('dotGrid', 'dotGrid', 'whole.dots'),
       ],
     },
   ],
@@ -158,8 +166,8 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'survival',
       label: 'Survival',
       items: [
-        item('survival', 'Survival curve', 'The Kaplan-Meier estimate as a staircase, with a mark at each censored subject.', 'survival'),
-        item('cumulativeEvent', 'Cumulative events', 'One minus the survival estimate: the fraction that has had the event.', 'cumulativeEvent'),
+        typed('survival', 'survival'),
+        typed('cumulativeEvent', 'cumulativeEvent'),
         item('surv.symbols', 'Staircase with symbols at every event', 'Symbols at all points, not only the censored ones.', 'survival', 'curve.survival', { survival: { eventSymbols: true } }),
         item('surv.se', 'Survival with SE error bars', 'The standard error of the estimate at each event time.', 'survival', 'curve.survival', { survival: { errorBars: true } }),
         item('cum.se', 'Cumulative events with error bars', 'Error bars on the cumulative curve.', 'cumulativeEvent', 'curve.cumulative_event', { survival: { errorBars: true } }),
@@ -172,3 +180,5 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
 export const galleryItems = (kind: TableKind): GalleryItem[] => GALLERY[kind].flatMap((t) => t.items);
 export const availableItems = (kind: TableKind): GalleryItem[] => galleryItems(kind).filter((i) => i.type !== null);
 
+/** The graph a new one of a table type starts as: the first of the New Graph gallery, so that the dialog and the program agree on what "the default" is. */
+export const defaultChartTypeFor = (kind: TableKind): ChartType => availableItems(kind)[0].type as ChartType;

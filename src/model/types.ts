@@ -1,4 +1,4 @@
-import type { FitModelId } from '../stats/fit';
+import type { FitModelId } from '../stats/fitModels';
 import type { TimeColumn } from '../util/timeColumn';
 
 /** Typed project model. Everything here is plain JSON-serialisable data. */
@@ -22,8 +22,16 @@ export interface Group {
   title: string;
   /** Stable index into the theme palette, assigned at creation. */
   paletteIndex: number;
+  /**
+   * Tables of series (XY, grouped, contingency, survival), on the first column of a series: the palette slot of the series, kept when another series is
+   * removed so that its colour does not move. Absent = the place of the series in the table (what older files and a table nobody has removed from have).
+   * Stored in the file. Column, pie and histogram charts use `paletteIndex` of each column in the same way.
+   */
+  slot?: number;
   /** Set only on the columns a graph is drawn from: where the series of this column sat in its table, so its colour stays with it when the series are reordered or hidden. */
   seriesSlot?: number;
+  /** Set with `seriesSlot` on the first column of a series of a table with factors: its place inside its factor cluster among all the series of the table (hidden ones counted), so hiding a series does not move the colours of the others. */
+  clusterSlot?: number;
   /**
    * Grouped tables: the second grouping level of the series this column starts (set on the first column of a series, as `seriesSlot` is).
    * Series that name the same factor are drawn together inside each category (see model/table/factors.ts). Free text; absent = none.
@@ -262,9 +270,23 @@ export interface ChartStyle {
   pointLabelDecimals: number | null;
 }
 
+/** What a file or a paste gives a table: the names, the row titles and the values by row and column, with what the file says besides. */
+export interface ImportedTable {
+  names: string[];
+  /** One title per row, or null when the file has no row title column. */
+  titles: string[] | null;
+  values: Array<Array<number | null>>;
+  /** Per row and column: the exclusion (with its reason) the file marks, or null. Only present when the file has exclusion columns. */
+  excluded?: Array<Array<{ reason: string } | null>>;
+  /** Per column: the factor the file names ('' for none). Only present when the file has factor columns. */
+  factors?: string[];
+  /** Per column: the type the values were read as (a date, a time, a duration; undefined = a number). Only present when a column has one. */
+  times?: Array<TimeColumn | undefined>;
+  /** What reading did that the file did not ask for: times with a UTC offset converted to UTC. */
+  notes?: string[];
+}
+
 export interface ChartLayer {
-  id: Id;
-  name: string;
   /** Layer overrides on top of chart defaults. */
   style: Partial<ChartStyle>;
   /** Keyed by group ID. */

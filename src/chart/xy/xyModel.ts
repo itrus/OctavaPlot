@@ -1,4 +1,5 @@
 import { capabilitiesOf } from '../../model/graph/capabilities';
+import { omittedRangeWarnings } from '../shared/axes/axisScale';
 import { isXyChartType } from '../../model/graph/chartTypes';
 import { layerLook, layersOf, type LayerKind, type LayerSpec } from '../../model/graph/layers';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
@@ -219,7 +220,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
 
   // 1. Per series and row: the centre and, where there is a spread, its stats.
   const raw = xySeries(table).map((s, i) => {
-    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? i });
+    const style = resolveStyle(chart, layer, { id: s.id, paletteIndex: s.columns[0].seriesSlot ?? s.columns[0].slot ?? i });
     // A binding stored for a type that cannot use the right axis (offset traces) is kept in the project and ignored here.
     const binding: AxisBinding = canBind ? bindingOf(style) : 'primary';
     const spec = resolveSummary(layer, s.id);
@@ -328,7 +329,8 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   /** What a Y axis is made from: the values of its series, and the limits and ticks set for it. A baseline of 0 is always in range, as for bars. */
   const yInput = (binding: AxisBinding) => {
     const [cfg, values] = [binding === 'secondary' ? chart.y2Axis : chart.yAxis, allYBy(binding)];
-    return { values, includeZero: cfg.scale === 'linear' && (fromBaseline || nearZero(values)), min: cfg.min, max: cfg.max, majorInterval: cfg.majorInterval, tickCountHint: tickCountY };
+    // The Y axis starts at 0 unless a value is negative.
+    return { values, includeZero: cfg.scale === 'linear' && (fromBaseline || values.every((v) => v >= 0)), min: cfg.min, max: cfg.max, majorInterval: cfg.majorInterval, tickCountHint: tickCountY };
   };
   const axisInput = {
     x: { values: allX, includeZero: !timeX && xCfg.scale === 'linear' && nearZero(allX), min: chart.xAxis.min, max: chart.xAxis.max, majorInterval: chart.xAxis.majorInterval, tickCountHint: Math.max(3, Math.min(10, Math.round(W / 120))) },
@@ -508,9 +510,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   });
   if (noSize > 0) warnings.push(`${noSize} point${noSize === 1 ? ' has' : 's have'} no size above 0 and ${noSize === 1 ? 'is' : 'are'} not drawn as ${noSize === 1 ? 'a bubble' : 'bubbles'}.`);
   if (offAxis > 0) warnings.push(`${offAxis} point${offAxis === 1 ? ' has' : 's have'} a value of 0 or less on a log axis and ${offAxis === 1 ? 'is' : 'are'} not drawn.`);
-  if (inGap > 0) warnings.push(`${inGap} value${inGap === 1 ? ' lies' : 's lie'} inside an omitted range of the axis and ${inGap === 1 ? 'is' : 'are'} not drawn.`);
-  if (gapErrorBars > 0) warnings.push(`${gapErrorBars} error bar${gapErrorBars === 1 ? ' has' : 's have'} an end inside an omitted range of the axis and ${gapErrorBars === 1 ? 'is' : 'are'} not drawn.`);
-  if (gapXErrorBars > 0) warnings.push(`${gapXErrorBars} error bar${gapXErrorBars === 1 ? ' has' : 's have'} an end inside an omitted range of the X axis and ${gapXErrorBars === 1 ? 'is' : 'are'} not drawn.`);
+  warnings.push(...omittedRangeWarnings({ values: inGap, errorBars: gapErrorBars, xErrorBars: gapXErrorBars }));
   if (clipped > 0) warnings.push(clipped === 1 ? '1 error bar end lies outside the axis range and is clipped.' : `${clipped} error bar ends lie outside the axis range and are clipped.`);
   const skippedTotal = series.reduce((n, s) => n + s.skipped, 0);
   if (skippedTotal > 0) warnings.push(`${skippedTotal} row${skippedTotal === 1 ? ' has' : 's have'} an X or Y value missing and ${skippedTotal === 1 ? 'is' : 'are'} not drawn.`);

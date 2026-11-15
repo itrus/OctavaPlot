@@ -19,7 +19,7 @@ describe('label defaults', () => {
     expect(DEFAULT_STYLE.pointLabelOffsetYPt).toBe(6);
     expect(DEFAULT_STYLE.pointLabelCollision).toBe('keep');
     expect(DEFAULT_STYLE.pointLabelLeader).toBe(false);
-    expect(DEFAULT_STYLE.pointLabelFontSizePt).toBe(22.4);
+    expect(DEFAULT_STYLE.pointLabelFontSizePt).toBe(22);
     expect(DEFAULT_STYLE.pointLabelBold).toBe(false);
     expect(DEFAULT_STYLE.pointLabelItalic).toBe(false);
     expect(DEFAULT_STYLE.pointLabelColor).toBeNull();
@@ -138,7 +138,7 @@ describe('sanitizeLabelStyle', () => {
     expect(s.pointLabelDecimals).toBe(3);
     expect(sanitizeLabelStyle(style({ pointLabelDecimals: 99 })).pointLabelDecimals).toBe(10);
     expect(sanitizeLabelStyle(style({ pointLabelFontSizePt: 0 })).pointLabelFontSizePt).toBe(8);
-    expect(sanitizeLabelStyle(style({ pointLabelFontSizePt: Number.NaN })).pointLabelFontSizePt).toBe(22.4);
+    expect(sanitizeLabelStyle(style({ pointLabelFontSizePt: Number.NaN })).pointLabelFontSizePt).toBe(22);
   });
 });
 

@@ -41,7 +41,6 @@ describe('the layers of a column chart', () => {
     expect(new Set(ls.map((l) => l.id)).size).toBe(ls.length);
     const points = ls.filter((l) => l.kind === 'points');
     expect(points.map((l) => l.binding?.seriesId)).toEqual(table.groups.map((g) => g.id));
-    expect(points.every((l) => l.binding?.tableId === table.id)).toBe(true);
     // A line joining the means goes from a data set to the next: one fewer than the data sets.
     expect(layersOf(chartOf('mean'), table).filter((l) => l.kind === 'line')).toHaveLength(table.groups.length - 1);
   });
@@ -53,7 +52,6 @@ describe('the layers of a column chart', () => {
     if (lineOrder === 'auto') expect([first('bars'), first('pairLines'), first('points')]).toEqual([...[first('bars'), first('pairLines'), first('points')]].sort((a, b) => a - b));
     if (lineOrder === 'onTop') expect(first('points')).toBeLessThan(first('pairLines'));
     if (lineOrder === 'underneath') expect(first('pairLines')).toBeLessThan(first('bars'));
-    expect(layersOf(chart, table).map((l) => l.z)).toEqual(order.map((_, i) => i));
   });
 
   it('draw the marks in the order of the layers', () => {

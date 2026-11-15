@@ -1,4 +1,3 @@
-import { availableItems } from './chartGallery';
 import type { ChartType, TableKind } from '../types';
 
 /**
@@ -12,7 +11,6 @@ interface TableTypeInfo {
   /** What the columns mean. */
   layout: string;
   /** What it is for. */
-  useFor: string;
 }
 
 const TABLE_TYPES: readonly TableTypeInfo[] = [
@@ -20,31 +18,26 @@ const TABLE_TYPES: readonly TableTypeInfo[] = [
     kind: 'column',
     label: 'Column table',
     layout: 'Each column is a group; the rows are its replicate values.',
-    useFor: 'Bar charts, dot plots and means with error bars: comparing groups.',
   },
   {
     kind: 'xy',
     label: 'XY table',
     layout: 'The first column is X (numbers); every other column is a Y series measured at those X values.',
-    useFor: 'Scatter and line charts: how Y changes with X.',
   },
   {
     kind: 'grouped',
     label: 'Grouped table',
     layout: 'Each row is a category (for example Male, Female); each group of columns is a series (Control, Treated), with replicates in subcolumns.',
-    useFor: 'Grouped bar charts and lines: comparing series across categories.',
   },
   {
     kind: 'contingency',
     label: 'Contingency table',
     layout: 'Each row is a group of subjects (Treated, Control); each column is an outcome (Cured, Not cured); the cells are counts.',
-    useFor: 'Counts or proportions of subjects in each outcome.',
   },
   {
     kind: 'survival',
     label: 'Survival table',
     layout: 'The first column is the time; each other column is a group, holding 1 for an event and 0 for a censored subject on that subject\'s row.',
-    useFor: 'Survival (Kaplan-Meier) and cumulative-event curves.',
   },
 ];
 
@@ -58,7 +51,7 @@ interface ChartTypeInfo {
 
 export const CHART_TYPES: readonly ChartTypeInfo[] = [
   { type: 'bar', tableKind: 'column', label: 'Bar chart', description: 'One bar per group, with optional points and error bars.' },
-  { type: 'scatter', tableKind: 'column', label: 'Scatter dot plot', description: 'Every value as a dot, grouped by column.' },
+  { type: 'scatter', tableKind: 'column', label: 'Scatter dot plot', description: 'Every value as a dot, grouped by column, with an optional line at the mean.' },
   { type: 'mean', tableKind: 'column', label: 'Mean with error bars', description: 'A mean marker per group with its spread.' },
   { type: 'box', tableKind: 'column', label: 'Box and whiskers', description: 'Quartiles, median and whiskers of each column.' },
   { type: 'floating', tableKind: 'column', label: 'Floating bars (min to max)', description: 'A bar from the smallest to the largest value of each column, with a line at the mean or median.' },
@@ -95,8 +88,6 @@ export const CHART_TYPES: readonly ChartTypeInfo[] = [
 
 export const chartTypeInfo = (type: ChartType): ChartTypeInfo | undefined => CHART_TYPES.find((c) => c.type === type);
 export const chartTypesFor = (kind: TableKind): ChartTypeInfo[] => CHART_TYPES.filter((c) => c.tableKind === kind);
-/** The graph a new one of a table type starts as: the first of the New Graph gallery, so that the dialog and the program agree on what "the default" is. */
-export const defaultChartTypeFor = (kind: TableKind): ChartType => availableItems(kind)[0].type as ChartType;
 export const tableTypeInfo = (kind: TableKind): TableTypeInfo => TABLE_TYPES.find((t) => t.kind === kind) ?? TABLE_TYPES[0];
 
 /** How a chart type is drawn: which model and drawing it uses, and so which inspector. */
