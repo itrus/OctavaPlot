@@ -206,7 +206,7 @@ export function DirectionSection({ chart }: { chart: Chart }) {
   );
 }
 
-/** Whether lines and error bars are drawn over or under the symbols and bars (Prism: "Line and error go"). */
+/** Whether lines and error bars are drawn over or under the symbols and bars. */
 export function LineOrderSection({ chart }: { chart: Chart }) {
   const { run } = useApp();
   return (

@@ -2,7 +2,7 @@
 
 Carried over from the earlier specification. These are the behavioural rules for calculations, the preset IDs used in the New Graph gallery, and the acceptance fixtures. See [ROADMAP.md](ROADMAP.md) for scope and phases.
 
-Labels: **D** = documented by a public source (GraphPad Prism user guide, ggprism, R manuals). **P** = proposal for this app, not a verified default. **U** = unverified. Every default is P unless marked D. Units are `pt` and `px` (1 px = 0.75 pt); browser zoom and device pixel ratio affect rasterisation only.
+Labels: **D** = documented by a public source (published user guides, R packages and manuals). **P** = proposal for this app, not a verified default. **U** = unverified. Every default is P unless marked D. Units are `pt` and `px` (1 px = 0.75 pt); browser zoom and device pixel ratio affect rasterisation only.
 
 ## 1. Principles
 

@@ -44,7 +44,8 @@ Deployed from `main` by GitHub Actions. Data stays in your browser's `localStora
 11. [Limitations and verification](#limitations-and-verification)
 12. [Colour palettes](#colour-palettes)
 13. [Compliance note](#compliance-note)
-14. [To do](#to-do) · [License](#license)
+14. [Version history](#version-history)
+15. [To do](#to-do) · [License](#license)
 
 ## Run
 
@@ -401,6 +402,15 @@ Notes: Gephi's engine is generative, so it is a seeded port giving ten fixed col
 ## Compliance note
 
 Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. Autosave can be switched off in Settings; switching it off deletes the copy kept in the browser (after asking). A project saved as a file stays wherever the file is kept.
+
+## Version history
+
+| Version | Dates | Commits | Code | What it is |
+|---|---|---|---|---|
+| v0.1 | 22 Oct – 14 Nov 2026 (to f978e1b) | 63 | 66.8 kLoC (40.0 source + 26.8 tests) | From an empty repository to the full editor: 5 table types, 57 gallery graphs (34 chart types), curve fits in a Web Worker, `.oplot` files, layouts, SVG/PNG/PDF export, forest plots, heat maps, shapes and rich text. 63 browser tests |
+| v0.2 | from 14 Nov 2026 (in progress) | 4 so far (f978e1b, the transition, to HEAD) | 68.3 kLoC (40.9 source + 27.4 tests), +1.5 kLoC since v0.1 | Current results: audit fixes with regression tests, symbol picker, export panels, new-graph and layout dialogs, axis and chart defaults |
+
+Day-by-day history of v0.1: [docs/ROADMAP.md](docs/ROADMAP.md#version-01-22-october-to-14-november-2026). Open items: [docs/BACKLOG.md](docs/BACKLOG.md).
 
 ## To do
 

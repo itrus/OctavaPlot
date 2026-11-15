@@ -1,6 +1,6 @@
 # OctavaPlot backlog
 
-Status register of the project: what is open, what is built and how far it was checked, what is known to be missing, and the defects that were fixed. It is the companion of [ROADMAP.md](ROADMAP.md), which holds the decisions, the architecture rules and the performance table. Item IDs (`OP-`, `DOC-`, `P8-`) come from two outside reviews, `OctavaPlot_Improvement_Plan.md` and `OctavaPlot_Prism8_Plotting_Addendum.md`, checked against the source of 27 October 2026.
+Status register of the project: what is open, what is built and how far it was checked, what is known to be missing, and the defects that were fixed. It is the companion of [ROADMAP.md](ROADMAP.md), which holds the decisions, the architecture rules and the performance table. Item IDs (`OP-`, `DOC-`, `P8-`) come from two outside reviews, `OctavaPlot_Improvement_Plan.md` and a plotting addendum, checked against the source of 27 October 2026.
 
 Contents: [To do](#to-do) · [How to read the status](#how-to-read-the-status) · [Status by area](#status-by-area) · [Known issues](#known-issues) · [Not yet tried in a browser](#not-yet-tried-in-a-browser) · [Performance](#performance) · [Fixed defects](#fixed-defects) · [Dropped and not adopted](#dropped-and-not-adopted) · [Change log](#change-log)
 
@@ -201,8 +201,8 @@ Removed by decision on 14 November 2026: **subjects**. The free-text `subject` o
 
 Not adopted from the outside reviews:
 
-- Prism-style workarounds: repeated medians to fake a box, estimate and limits as three "replicates", a dummy graph for a legend, 1.99/2.00 range limits.
-- Silent downsampling of exports, and any claim of Prism parity in packing, violins or splines.
+- Workarounds from other tools: repeated medians to fake a box, estimate and limits as three "replicates", a dummy graph for a legend, 1.99/2.00 range limits.
+- Silent downsampling of exports, and any claim of parity with other tools in packing, violins or splines.
 - ANOVA, post-hoc and model-selection workflows (roadmap: out of scope).
 - Replacing zero by a tiny value before a log axis.
 - "Property tests" for OP-015 and OP-001 as separate work: they are tests of the fixed code.

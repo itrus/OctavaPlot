@@ -175,7 +175,7 @@ export const DEFAULT_STYLE: ChartStyle = {
   pointLabelDecimals: null,
 };
 
-/** Default summary (P). Prism "Mean with SD" is not a default (spec 23 L1548). */
+/** Default summary (P). A "Mean with SD" chart is not a default (spec 23 L1548). */
 export const DEFAULT_SUMMARY: SummarySpec = {
   centre: 'mean',
   spread: 'none',
