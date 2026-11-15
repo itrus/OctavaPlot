@@ -64,6 +64,30 @@ function Shell() {
   const fileRef = useRef<HTMLInputElement>(null);
   // Panels are only hidden (never unmounted), so their selections and edits survive a collapse.
   const [navOpen, setNavOpen] = useState(true);
+  // The logo and app name row can be folded away; the choice is remembered in this browser.
+  const [headOpen, setHeadOpen] = useState(() => {
+    try {
+      return localStorage.getItem('octavaplot.head') !== 'closed';
+    } catch {
+      return true;
+    }
+  });
+  // Full screen follows the browser's own state, so F11 and Esc keep the View menu's tick right.
+  const [fullscreen, setFullscreen] = useState(() => !!document.fullscreenElement);
+  useEffect(() => {
+    const on = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', on);
+    return () => document.removeEventListener('fullscreenchange', on);
+  }, []);
+  const toggleHead = () => {
+    const next = !headOpen;
+    setHeadOpen(next);
+    try {
+      localStorage.setItem('octavaplot.head', next ? 'open' : 'closed');
+    } catch {
+      /* storage blocked: the choice just is not remembered */
+    }
+  };
   const [inspectorOpen, setInspectorOpen] = useState(true);
   // Panel widths (px), changed with the splitters; a narrow window starts with the panels folded away.
   const [navW, setNavW] = useState(250);
@@ -248,6 +272,16 @@ function Shell() {
     openRecovery: () => setRecoveryOpen(true),
     openShortcuts: () => setShortcutsOpen(true),
     openAbout: () => setInfoOpen(true),
+    zoomable: !!(chart || table || onLayout || onResults),
+    resetZoom: () => {
+      setActiveZoom(1);
+      if (chart) requestFit();
+    },
+    fullscreen,
+    toggleFullscreen: () => {
+      const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+      p.catch(() => setStatus('This browser did not allow full screen.'));
+    },
   };
   shortcutRef.current = (a) => runShortcut(a, menuContext);
   const menus = buildMenus(menuContext);
@@ -257,12 +291,15 @@ function Shell() {
       className="app"
       data-nav={navOpen ? 'open' : 'closed'}
       data-insp={hasInspector && inspectorOpen ? 'open' : 'closed'}
+      data-head={headOpen ? 'open' : 'closed'}
       style={{ '--nav-w': navOpen ? `${navW}px` : '0px', '--insp-w': hasInspector && inspectorOpen ? `${inspW}px` : '0px', '--nav-px': `${navW}px`, '--insp-px': `${inspW}px` } as CSSProperties}
     >
+      <img className={headOpen ? 'brand-logo' : 'brand-logo brand-logo-small'} src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width={headOpen ? 56 : 22} height={headOpen ? 56 : 22} />
       <header className="topbar">
-        <img className="brand-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width={24} height={24} />
         <strong className="brand">OctavaPlot</strong>
         <span className="app-version" title={`OctavaPlot ${__APP_VERSION__}${__APP_COMMIT__ ? ` (build ${__APP_COMMIT__})` : ''}`}>v{__APP_VERSION__}</span>
+      </header>
+      <MenuBar menus={menus}>
         <span className="topbar-sep" />
         <label className="project-name-field" title="Project name: the suggested file name when saving">
           <span>Project</span>
@@ -292,8 +329,16 @@ function Shell() {
             if (f) void openProject(f);
           }}
         />
-      </header>
-      <MenuBar menus={menus} />
+      </MenuBar>
+      <button
+        className="icon-only head-toggle"
+        onClick={toggleHead}
+        aria-pressed={headOpen}
+        aria-label={headOpen ? 'Hide the logo and app name' : 'Show the logo and app name'}
+        title={headOpen ? 'Hide the logo and app name' : 'Show the logo and app name'}
+      >
+        <span aria-hidden="true">{headOpen ? '⌃' : '⌄'}</span>
+      </button>
       <MemoNavigator />
       {navOpen && <Splitter side="nav" width={navW} min={180} max={480} onWidth={setNavW} label="Resize the navigation panel" />}
       {hasInspector && inspectorOpen && <Splitter side="insp" width={inspW} min={260} max={640} onWidth={setInspW} label="Resize the inspector" />}

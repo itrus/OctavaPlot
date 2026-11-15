@@ -74,12 +74,25 @@ input[type='color'] { width: 38px; height: 22px; padding: 0 1px; border: 1px sol
 .project-name-field { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; color: var(--muted); }
 .project-name { width: 30ch; max-width: 32vw; min-width: 120px; text-overflow: ellipsis; }
 .app-version { color: var(--muted); font-size: 11.5px; margin: 0 4px 0 -2px; }
-.brand-logo { display: block; flex: none; }
+/* The logo spans the top bar and the menu bar rows (36px + 30px) at the left; both rows leave room for it. */
+.brand-logo { position: absolute; left: 10px; top: 5px; z-index: 2; display: block; width: 56px; height: 56px; pointer-events: none; }
 .topbar-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
 .save-state { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 46ch; flex: 0 1 auto !important; }
 
 /* The menu bar: its own row under the top bar. */
 .menubar { grid-area: menu; display: flex; align-items: stretch; gap: 0; padding: 0 6px; background: #fff; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.topbar, .menubar { padding-left: 78px; }
+.topbar { border-bottom: 0; } /* no line between the title row and the menu row */
+.app[data-head='closed'] { grid-template-rows: 0 30px minmax(0, 1fr) 30px; }
+.app[data-head='closed'] .topbar { display: none; }
+.app[data-head='closed'] .menubar { padding-left: 38px; }
+.brand-logo-small { left: 10px; top: 4px; width: 22px; height: 22px; } /* folded: a small icon stays at the left of the menu row */
+.menubar-extra { display: flex; align-items: center; gap: 6px; flex: 1 1 0; min-width: 0; margin-left: 4px; padding-right: 34px; }
+.menubar-extra .project-name-field { flex: 0 1 auto; min-width: 0; }
+.menubar-extra .project-name { min-width: 60px; }
+/* The fold button: pinned to the right end of the menu row. */
+.head-toggle { grid-area: menu; justify-self: end; align-self: center; margin-right: 6px; z-index: 3; min-width: 26px; height: 24px; padding: 0 6px; line-height: 1; }
+/* Folded: the logo and app name row goes, and the menu bar is the top row. */
 .menubar-title { border: 0; background: transparent; padding: 0 10px; border-radius: 0; font: inherit; flex: none; }
 .menubar-title:hover, .menubar-title.open { background: var(--accent-soft); }
 .menu-pop { position: fixed; z-index: 60; min-width: 230px; max-height: calc(100vh - 80px); overflow-y: auto; background: #fff; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); padding: 4px; display: flex; flex-direction: column; }
@@ -663,9 +676,11 @@ input[type='color'].mixed { opacity: 0.45; }
 
 /* The top bar on a narrow window: the name and version give way, and what is used most (the panel toggles, Save, Undo and Redo, Settings) comes first, so it is reachable without scrolling the bar. */
 @media (max-width: 900px) {
-  .topbar .brand, .topbar .app-version, .topbar .topbar-sep, .topbar .project-name-field > span { display: none; }
-  .topbar .brand-logo, .topbar .project-name-field { order: 10; }
-  .topbar .project-name { min-width: 70px; width: 18ch; }
+  .topbar .brand, .topbar .app-version, .menubar .project-name-field > span { display: none; }
+  .brand-logo:not(.brand-logo-small) { display: none; }
+  .topbar, .menubar { padding-left: 10px; }
+  .app[data-head='closed'] .menubar { padding-left: 38px; }
+  .menubar .project-name { min-width: 70px; width: 18ch; }
 }
 @media (max-width: 600px) {
   /* Icons only: the buttons keep their names for screen readers and tooltips. */

@@ -25,7 +25,7 @@ function visibleEntries(entries: MenuEntry[]): MenuEntry[] {
   return shown.filter((e, i) => e.kind !== 'separator' || (i > 0 && i < shown.length - 1 && shown[i - 1].kind !== 'separator'));
 }
 
-export function MenuBar({ menus }: { menus: MenuSpec[] }) {
+export function MenuBar({ menus, children }: { menus: MenuSpec[]; children?: ReactNode }) {
   const [open, setOpen] = useState<number | null>(null);
   const [at, setAt] = useState({ left: 0, top: 0 });
   const root = useRef<HTMLDivElement>(null);
@@ -119,6 +119,7 @@ export function MenuBar({ menus }: { menus: MenuSpec[] }) {
           {m.label}
         </button>
       ))}
+      {children && <div className="menubar-extra">{children}</div>}
       {spec && (
         <div ref={pop} className="menu-pop" role="menu" aria-label={spec.label} onKeyDown={onMenuKey} style={{ left: at.left - shift, top: at.top }}>
           {spec.entries.map((e, k) =>

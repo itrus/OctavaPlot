@@ -40,6 +40,11 @@ export interface MenuContext {
   openRecovery: () => void;
   openShortcuts: () => void;
   openAbout: () => void;
+  /** True on a page that has a zoom (a table, a graph, a layout, a result). */
+  zoomable: boolean;
+  resetZoom: () => void;
+  fullscreen: boolean;
+  toggleFullscreen: () => void;
 }
 
 const item = (label: string, onSelect: () => void, more: Partial<Extract<MenuEntry, { label: string; onSelect: () => void }>> = {}): MenuEntry => ({ label, onSelect, ...more });
@@ -198,6 +203,9 @@ export function buildMenus(c: MenuContext): MenuSpec[] {
       entries: [
         item('Navigator', () => c.setNavOpen(!c.navOpen), { shortcut: 'Ctrl+B', checked: c.navOpen, title: c.navOpen ? 'Hide the navigation panel' : 'Show the navigation panel' }),
         item('Formatting panel', () => c.setInspectorOpen(!c.inspectorOpen), { shortcut: 'Ctrl+Alt+B', checked: c.hasInspector && c.inspectorOpen, hidden: !c.hasInspector }),
+        sep,
+        item('Full screen', c.toggleFullscreen, { checked: c.fullscreen, title: c.fullscreen ? 'Leave full screen' : 'Fill the screen with the app' }),
+        item('100%', c.resetZoom, { hidden: !c.zoomable, title: c.chart ? 'Fit the graph to the window (100%)' : c.onLayout ? 'Fit the page to the window (100%)' : 'Back to 100%' }),
       ],
     },
     {
