@@ -4,23 +4,18 @@ import { AppProvider, useCommands, useGraphViewport, useHistory, useLayoutViewpo
 import { openedStatus, refusedStatus, PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile } from './state/projectFile';
 import { Navigator } from './ui/navigator/Navigator';
 import { Splitter } from './ui/components/Splitter';
-import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIcon, FitWindowIcon, ImportIcon, ExportIcon, FitCurveIcon, DeleteIcon, GRAPH_PAGE_ICONS, LAYOUT_PAGE_ICONS, ResetIcon, TableTypeIcon, AddColumnIcon, ExcludeIcon, IncludeIcon } from './ui/components/icons';
-import { MenuBar, type MenuEntry, type MenuSpec } from './ui/components/MenuBar';
-import { fireCommand } from './ui/components/appCommands';
+import { FitWindowIcon } from './ui/components/icons';
+import { MenuBar } from './ui/components/MenuBar';
+import { buildMenus, runShortcut, type MenuContext } from './ui/appMenus';
 import { shortcutOf, type ShortcutAction } from './ui/components/appShortcuts';
 import { ShortcutsDialog } from './ui/dialogs/ShortcutsDialog';
-import { LAYOUT_FORMAT_PAGES } from './ui/views/layoutPages';
-import { ADD_COLUMN_LABEL, type TableAction } from './ui/views/tableMenu';
-import { inspectorShapeOf, PAGES as INSPECTOR_PAGES } from './ui/inspector/common/nav';
-import type { InspectorTarget } from './state/inspectorNav';
-import { resetAllDataSets, setProjectName } from './state/commands';
+import { setProjectName } from './state/commands';
 import { InfoDialog } from './ui/dialogs/InfoDialog';
 import { SettingsDialog } from './ui/dialogs/SettingsDialog';
 import { RepairNotesDialog } from './ui/dialogs/RepairNotesDialog';
 import { LOAD_OTHER_TAB_WARNING, RecoveryConflictBanner } from './ui/components/RecoveryConflictBanner';
 import { WheelRange } from './ui/components/WheelRange';
 import { isTextEntryTarget } from './ui/components/shortcutGuard';
-import { isSaveShortcut } from './ui/components/saveShortcut';
 import { downloadBlob } from './util/download';
 import { exportFileName } from './util/fileName';
 
@@ -108,39 +103,24 @@ function Shell() {
   // ...and so does the handler of the other shortcuts (appShortcuts.ts).
   const shortcutRef = useRef<(a: ShortcutAction) => boolean>(() => false);
 
-  // Global Ctrl/Cmd+S, and undo/redo except while typing in a text field (native text undo applies there).
+  // Every shortcut (appShortcuts.ts) is read here; what each does is set in shortcutRef at each render.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.isComposing) return;
-      // Saving is not a text-editing key, so it works in a cell editor or any input too. The browser's own "Save page" never opens.
-      if (isSaveShortcut(e)) {
+      const action = shortcutOf(e, isTextEntryTarget(e.target));
+      if (!action) return;
+      // The browser's own "Save page" never opens; the project is saved unless a dialog is open or the key is held down.
+      if (action === 'save') {
         e.preventDefault();
         if (!e.repeat && !document.querySelector('.modal-backdrop')) void saveRef.current();
         return;
       }
-      const typing = isTextEntryTarget(e.target);
-      if (!document.querySelector('.modal-backdrop')) {
-        const action = shortcutOf(e, typing);
-        if (action && shortcutRef.current(action)) {
-          e.preventDefault();
-          return;
-        }
-      }
-      if (typing) return;
       if (document.querySelector('.modal-backdrop')) return; // a dialog is open: its shortcuts are not the project's
-      if (!(e.ctrlKey || e.metaKey)) return;
-      const k = e.key.toLowerCase();
-      if (k === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
-        e.preventDefault();
-        redo();
-      }
+      if (shortcutRef.current(action)) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo]);
+  }, []);
 
   const saveProject = async () => {
     // What is written is this snapshot: edits made while the file is being written stay unsaved.
@@ -205,168 +185,36 @@ function Shell() {
   // The chart draws the data sets that are on it, which may include some from other tables.
   const prepared = useMemo(() => (chart ? prepareChartInput(project, chart) : undefined), [project, chart]);
 
-  // ---- The menu bar. Each item either acts here or fires a command that the view owning the thing listens for (see appCommands.ts).
+  // The menu bar and the shortcuts (appMenus.tsx): what is on screen, and how the shell answers.
   const analysis = view.kind === 'analysis' ? (project.analyses ?? []).find((a) => a.id === view.id) : undefined;
-  const itemNoun = table ? 'table' : chart ? 'graph' : onLayout ? 'layout' : analysis ? 'result' : null;
-  const canEditPage = chart !== undefined || onLayout;
-  const showInspector = () => setInspectorOpen(true);
-  const askUndo = canUndo ? undefined : 'Nothing to undo';
-  const item = (label: string, onSelect: () => void, more: Partial<Extract<MenuEntry, { label: string; onSelect: () => void }>> = {}): MenuEntry => ({ label, onSelect, ...more });
-  /** Groups of items with a line between them. */
-  const grouped = (...lists: MenuEntry[][]): MenuEntry[] => lists.filter((l) => l.length > 0).flatMap((l, i) => (i === 0 ? l : [sep, ...l]));
-  const sep: MenuEntry = { kind: 'separator' };
-
-  // Format in a table: the buttons of the table's toolbar (the toolbar keeps them too).
-  const act = (a: TableAction) => () => fireCommand('table-action', a);
-  const tableEntries: MenuEntry[] = table
-    ? grouped(
-        [
-        item('Table type…', act('type'), { icon: <TableTypeIcon />, title: 'Change the type of this table, or how its series are entered' }),
-        item(ADD_COLUMN_LABEL[table.kind], act('add-column'), { icon: <AddColumnIcon /> }),
-        ],
-        [
-        item('Insert row above', act('row-above'), { shortcut: 'Alt+Shift+↑' }),
-        item('Insert row below', act('row-below'), { shortcut: 'Alt+Shift+↓' }),
-        item('Duplicate selected rows', act('row-duplicate'), { shortcut: 'Alt+Shift+D' }),
-        item('Delete selected rows', act('row-delete'), { shortcut: 'Alt+Delete' }),
-        item('Append 1000 rows', act('rows-1000')),
-        item('Append rows…', act('rows-append')),
-        item('Fill series…', act('fill-series'), { title: 'Fill the selected cells with start, start + step, start + 2 step ...' }),
-        ],
-        [
-        item('Exclude', act('exclude'), { icon: <ExcludeIcon />, title: 'Keep the selected values in the table but leave them out of every chart and calculation' }),
-        item('Include', act('include'), { icon: <IncludeIcon />, title: 'Use the selected values again' }),
-        ...(table.kind === 'xy' ? [item('X type…', act('x-type'), { title: 'Say that the X column holds dates, times or durations' })] : []),
-        ...(table.kind === 'grouped' ? [item('Factor…', act('factor'), { title: 'Name the second grouping level of the selected series' })] : []),
-        ],
-      )
-    : [];
-
-  const formatEntries: MenuEntry[] = chart
-    ? (() => {
-        const shape = inspectorShapeOf(chart.type);
-        const pageItems = shape.pages
-          .filter((id) => id !== 'export')
-          .map((id): { many: boolean; entries: MenuEntry[] } => {
-            const page = INSPECTOR_PAGES.find((p) => p.id === id);
-            if (!page) return { many: false, entries: [] };
-            const parts = page.parts.filter((p) => !shape.lacks.includes(p.id));
-            const Icon = GRAPH_PAGE_ICONS[id];
-            const go = (part?: InspectorTarget['part']) => () => {
-              navigateInspector({ page: id, part });
-              showInspector();
-            };
-            return parts.length > 1 ? { many: true, entries: parts.map((p) => item(`${page.label}: ${p.label}`, go(p.id), { icon: <Icon /> })) } : { many: false, entries: [item(page.label, go(parts[0]?.id), { title: page.title, icon: <Icon /> })] };
-          });
-        // A page with several tabs is a group of its own; the pages with one setting are listed together.
-        const lists: MenuEntry[][] = [];
-        pageItems.forEach((p, i) => (p.many || i === 0 || pageItems[i - 1].many ? lists.push(p.entries) : lists[lists.length - 1].push(...p.entries)));
-        return grouped(...lists);
-      })()
-    : onLayout
-      ? LAYOUT_FORMAT_PAGES.map((p) => {
-          const Icon = LAYOUT_PAGE_ICONS[p.id];
-          return item(
-            p.label,
-            () => {
-              fireCommand('layout-page', p.id);
-              showInspector();
-            },
-            { icon: <Icon /> },
-          );
-        })
-      : table
-        ? tableEntries
-        : [];
-
-  const openProjectDialog = () => confirmDiscard('Opening another project') && fileRef.current?.click();
-  const exportHere = () => {
-    if (chart) navigateInspector({ page: 'export' });
-    else if (onLayout) fireCommand('layout-page', 'export');
-    else return;
-    showInspector();
+  const menuContext: MenuContext = {
+    table,
+    chart,
+    analysis,
+    onLayout,
+    itemNoun: table ? 'table' : chart ? 'graph' : onLayout ? 'layout' : analysis ? 'result' : null,
+    tableCount: project.dataTables.length,
+    hasInspector,
+    canUndo,
+    canRedo,
+    navOpen,
+    inspectorOpen,
+    setNavOpen,
+    setInspectorOpen,
+    startNewProject,
+    openProject: () => confirmDiscard('Opening another project') && fileRef.current?.click(),
+    saveProject: () => void saveProject(),
+    undo,
+    redo,
+    run,
+    setStatus,
+    navigateInspector,
+    openSettings: () => setSettingsOpen(true),
+    openShortcuts: () => setShortcutsOpen(true),
+    openAbout: () => setInfoOpen(true),
   };
-  shortcutRef.current = (a) => {
-    if (a === 'new') startNewProject();
-    else if (a === 'open') openProjectDialog();
-    else if (a === 'export') {
-      if (!canEditPage) return false;
-      exportHere();
-    } else if (a === 'settings') setSettingsOpen(true);
-    else if (a === 'shortcuts') setShortcutsOpen(true);
-    else if (a === 'navigator') setNavOpen(!navOpen);
-    else if (a === 'inspector') {
-      if (!hasInspector) return false;
-      setInspectorOpen(!inspectorOpen);
-    } else if (a === 'duplicate') {
-      if (!itemNoun) return false;
-      fireCommand('duplicate-item');
-    } else if (a === 'rename') {
-      if (!itemNoun) return false;
-      setNavOpen(true);
-      fireCommand('rename-item');
-    }
-    return true;
-  };
-
-  const menus: MenuSpec[] = [
-    {
-      label: 'File',
-      entries: [
-        item('New project', startNewProject, { shortcut: 'Ctrl+Alt+N', icon: <NewProjectIcon /> }),
-        item('Open project…', openProjectDialog, { shortcut: 'Ctrl+O', icon: <OpenProjectIcon /> }),
-        item('Save project', () => void saveProject(), { shortcut: 'Ctrl+S', icon: <SaveProjectIcon />, title: 'Save the project to a file (you choose the name)' }),
-        ...(chart
-          ? [sep, item('Export figure…', exportHere, { shortcut: 'Ctrl+E', icon: <ExportIcon />, title: 'Export this graph as a picture or a vector file' })]
-          : onLayout
-            ? [sep, item('Export layout…', exportHere, { shortcut: 'Ctrl+E', icon: <ExportIcon />, title: 'Export this page as a picture or a vector file' })]
-            : []),
-        sep,
-        item('Settings…', () => setSettingsOpen(true), { shortcut: 'Ctrl+,', icon: <SettingsIcon /> }),
-      ],
-    },
-    {
-      label: 'Edit',
-      entries: [
-        item('Undo', undo, { shortcut: 'Ctrl+Z', disabled: !canUndo, title: askUndo }),
-        item('Redo', redo, { shortcut: 'Ctrl+Y', disabled: !canRedo, title: canRedo ? undefined : 'Nothing to redo' }),
-        sep,
-        item('New data table…', () => { setNavOpen(true); fireCommand('new-table'); }),
-        item(`Duplicate ${itemNoun ?? 'item'}`, () => fireCommand('duplicate-item'), { shortcut: 'Ctrl+Shift+D', hidden: !itemNoun, title: 'Make a copy of the item on screen' }),
-        item(`Rename ${itemNoun ?? 'item'}`, () => { setNavOpen(true); fireCommand('rename-item'); }, { shortcut: 'F2', hidden: !itemNoun, title: 'Rename the item on screen' }),
-        item(`Delete ${itemNoun ?? 'item'}`, () => fireCommand('delete-item'), { icon: <DeleteIcon />, hidden: !itemNoun, disabled: table !== undefined && project.dataTables.length <= 1, title: table ? (project.dataTables.length <= 1 ? 'The last table cannot be deleted' : 'Delete this table and the graphs and results that use it (can be undone)') : 'Delete this item (can be undone)' }),
-        sep,
-        item('Import CSV…', () => fireCommand('import-csv'), { icon: <ImportIcon />, hidden: !table }),
-        item('Export CSV', () => fireCommand('export-csv'), { icon: <ExportIcon />, hidden: !table && !analysis }),
-        item('Copy results', () => fireCommand('copy-results'), { hidden: !analysis, title: 'Copy the selected cells, or all the results, as tab-separated text' }),
-        item('Reset graph settings', () => { if (!chart) return; run('Reset settings', resetAllDataSets(chart.id)); setStatus('Settings reset to defaults.'); }, { icon: <ResetIcon />, hidden: !chart, title: "Reset the whole graph to a new graph's settings: data set styles, axes, grid, legend, fonts, colours, size. Kept: the title and axis titles, which data sets are shown and their order, annotations and the chosen fit. Reference lines are removed. Undo restores everything." }),
-      ],
-    },
-    {
-      label: 'View',
-      entries: [
-        item('Navigator', () => setNavOpen(!navOpen), { shortcut: 'Ctrl+B', checked: navOpen, title: navOpen ? 'Hide the navigation panel' : 'Show the navigation panel' }),
-        item('Formatting panel', () => setInspectorOpen(!inspectorOpen), { shortcut: 'Ctrl+Alt+B', checked: hasInspector && inspectorOpen, hidden: !hasInspector }),
-      ],
-    },
-    {
-      label: 'Analyze',
-      entries: [
-        item('New analysis…', () => { setNavOpen(true); fireCommand('new-analysis'); }),
-        item('Fit curve', () => fireCommand('fit-curve'), { icon: <FitCurveIcon />, hidden: table?.kind !== 'xy', title: 'A line, a curve or a dose-response model for the Y series' }),
-        item('Make graph from curve fit', () => fireCommand('make-graph'), { hidden: analysis?.kind !== 'curvefit' }),
-      ],
-    },
-    { label: 'Format', entries: formatEntries, disabled: formatEntries.length === 0, title: 'Nothing to format here: open a table, a graph or a layout' },
-    {
-      label: 'Help',
-      entries: [
-        item('OctavaPlot on GitHub', () => window.open('https://github.com/itrus/OctavaPlot', '_blank', 'noopener,noreferrer'), { title: 'The code, the issue tracker and the releases' }),
-        item('Keyboard shortcuts…', () => setShortcutsOpen(true), { shortcut: 'Ctrl+/', title: 'Every key of the app' }),
-        item('About OctavaPlot…', () => setInfoOpen(true), { icon: <InfoIcon />, title: 'About OctavaPlot and credits' }),
-      ],
-    },
-  ];
+  shortcutRef.current = (a) => runShortcut(a, menuContext);
+  const menus = buildMenus(menuContext);
 
   return (
     <div

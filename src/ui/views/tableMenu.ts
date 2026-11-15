@@ -1,6 +1,6 @@
 import type { TableKind } from '../../model/types';
 
-/** What the Format menu calls adding a column to each kind of table (the same words as the table toolbar's button in DataTableView.tsx). */
+/** What adding a column is called for each kind of table: on the table toolbar and in the Format menu. */
 export const ADD_COLUMN_LABEL: Record<TableKind, string> = {
   column: 'Add group',
   xy: 'Add Y series',

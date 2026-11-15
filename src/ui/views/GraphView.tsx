@@ -16,6 +16,7 @@ import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById } from '../../mo
 import { drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
 import { GraphicsMenu } from '../components/GraphicsMenu';
 import { UndoRedo } from '../components/UndoRedo';
+import { fitScale, useAvailableSize } from '../components/useAvailableSize';
 import type { Drawing } from '../../model/types';
 import { chartTextLook, createAnnotation } from '../../model/defaults';
 import { focusWhenShown } from '../inspector/common/pendingFocus';
@@ -25,8 +26,6 @@ import { inspectorTargetFor } from '../inspector/common/nav';
 import type { Box } from '../../chart/shared/parts/labels';
 
 /** Space kept around the chart inside the canvas, in px. */
-const CANVAS_PAD = 24;
-const SCROLLBAR_ROOM = 17;
 
 export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const { chart, table, fit: curve } = prepared;
@@ -60,18 +59,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const owner = { chartId: chart.id };
 
   // Zoom 100% means the whole chart fits the window; the slider zooms relative to that.
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const [avail, setAvail] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    // Outer size less room for the scrollbars: it must not change when a scrollbar appears, or the chart would refit and rescale.
-    const measure = () => setAvail({ w: el.offsetWidth - SCROLLBAR_ROOM, h: el.offsetHeight - SCROLLBAR_ROOM });
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const { ref: scrollerRef, avail } = useAvailableSize();
   // A chart opens at "fit", and goes back to it when its dimensions change (a typed size, a preset, an aspect lock, undo).
   useEffect(() => setZoom(1), [chart.id, chart.widthPx, chart.heightPx, setZoom]);
   // The fit scale (screen px per chart px) is taken when a chart opens, when its dimensions change, when the window is
@@ -83,7 +71,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   useEffect(() => {
     if (avail.w <= 0 || avail.h <= 0) return;
     const { w, h } = sizeRef.current;
-    setFit(Math.max(0.05, Math.min((avail.w - 2 * CANVAS_PAD) / w, (avail.h - 2 * CANVAS_PAD) / h)));
+    setFit(fitScale(avail, w, h));
   }, [chart.id, chart.widthPx, chart.heightPx, avail.w, avail.h, fitRequest]);
   const cssW = chart.widthPx * fit * zoom;
   const cssH = chart.heightPx * fit * zoom;

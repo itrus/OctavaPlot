@@ -3,7 +3,7 @@ import { insertSymbol, SYMBOL_GROUPS, symbolOf } from '../../util/richText';
 import { ModalBackdrop } from '../dialogs/DialogShell';
 
 /** What the button says on hover: how the text of a graph is written. */
-export const SYMBOL_HINT =
+const SYMBOL_HINT =
   'Choose a symbol from a list. Text of a graph is written H_{2}O (subscript), m^{2} or x^{-1} (superscript) and symbols by name: \\mu \\alpha \\Delta \\pm \\times \\deg, with {} to end a name (\\mu{}m). Text without a backslash or a brace is written as typed.';
 
 type Box = HTMLInputElement | HTMLTextAreaElement;

@@ -6,6 +6,7 @@ import { n2 } from '../../model/units';
 import { SELECT_COLOR } from '../shared/scene/annotations';
 import type { GroupedModel } from './groupedModel';
 import { el, type SceneElement } from '../shared/scene/sceneElement';
+import { drawLayerPasses, type DrawPass } from '../shared/parts/layerPasses';
 import { svgId } from '../shared/scene/svgIds';
 import { barLabelElement, insideBarLabelElement } from '../shared/parts/barLabelElements';
 import { symbolPath } from '../shared/parts/symbols';
@@ -23,7 +24,7 @@ import { symbolPath } from '../shared/parts/symbols';
  * error bars) and the symbols. Layers that follow each other in the same pass share one matrix group on a horizontal chart; the
  * symbols are not turned.
  */
-const PASS: Partial<Record<LayerKind, 'body' | 'lines' | 'points'>> = { bars: 'body', meanLine: 'body', line: 'lines', errorBars: 'lines', points: 'points', rawPoints: 'points' };
+const PASS: Partial<Record<LayerKind, DrawPass>> = { bars: 'body', meanLine: 'body', line: 'lines', errorBars: 'lines', points: 'points', rawPoints: 'points' };
 
 export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneElement[] {
   const { series, orient } = model;
@@ -89,22 +90,7 @@ export function compileGroupedMarks(chart: Chart, model: GroupedModel): SceneEle
   };
 
   // The layers in drawing order; the ones that follow each other in the same pass are one run.
-  const out: SceneElement[] = [];
-  let run: { pass: 'body' | 'lines' | 'points'; items: SceneElement[] } | null = null;
-  const flush = () => {
-    if (run) out.push(...(run.pass === 'points' ? run.items : turned(orient, run.items)));
-    run = null;
-  };
-  for (const layer of model.layers) {
-    const pass = PASS[layer.kind];
-    if (!pass || hidden.has(layer.id)) continue;
-    if (!run || run.pass !== pass) {
-      flush();
-      run = { pass, items: [] };
-    }
-    run.items.push(...elementsOf(layer));
-  }
-  flush();
+  const out = drawLayerPasses(model.layers, PASS, hidden, orient, elementsOf);
 
   // The frame round the bars of the selected series (the editor only).
   const selection = turned(

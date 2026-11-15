@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 const DELAY_MS = 400;
 
 /** A size in KB (ten thousand KB or more in MB), as the panels write it. */
-export function formatKb(bytes: number): string {
+function formatKb(bytes: number): string {
   const kb = Math.max(1, Math.round(bytes / 1024));
   return kb >= 10000 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
 }

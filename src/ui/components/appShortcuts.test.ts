@@ -28,3 +28,27 @@ describe('app shortcuts', () => {
     expect(shortcutOf(key('KeyO', 'o', { ctrlKey: true }), true)).toBe('open');
   });
 });
+
+describe('save, undo and redo', () => {
+  const ctrl = { ctrlKey: true };
+  it('save: Ctrl+S on Windows and Cmd+S on macOS, in either case, also while typing', () => {
+    expect(shortcutOf(key('KeyS', 's', ctrl), false)).toBe('save');
+    expect(shortcutOf(key('KeyS', 'S', ctrl), false)).toBe('save');
+    expect(shortcutOf(key('KeyS', 's', { metaKey: true }), false)).toBe('save');
+    expect(shortcutOf(key('KeyS', 's', ctrl), true)).toBe('save');
+  });
+  it('save refuses S alone, other keys, and Alt or Shift held with it', () => {
+    expect(shortcutOf(key('KeyS', 's'), false)).toBeNull();
+    expect(shortcutOf(key('KeyA', 'a', ctrl), false)).toBeNull();
+    expect(shortcutOf(key('KeyS', 's', { ctrlKey: true, shiftKey: true }), false)).toBeNull();
+    expect(shortcutOf(key('KeyS', 's', { metaKey: true, shiftKey: true }), false)).toBeNull();
+    expect(shortcutOf(key('KeyS', 's', { ctrlKey: true, altKey: true }), false)).toBeNull();
+  });
+  it('undo and redo: Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z, left to a text field while it has the focus', () => {
+    expect(shortcutOf(key('KeyZ', 'z', ctrl), false)).toBe('undo');
+    expect(shortcutOf(key('KeyY', 'y', ctrl), false)).toBe('redo');
+    expect(shortcutOf(key('KeyZ', 'Z', { ctrlKey: true, shiftKey: true }), false)).toBe('redo');
+    expect(shortcutOf(key('KeyZ', 'z', ctrl), true)).toBeNull();
+    expect(shortcutOf(key('KeyY', 'y', ctrl), true)).toBeNull();
+  });
+});

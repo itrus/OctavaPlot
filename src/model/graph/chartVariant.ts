@@ -70,7 +70,7 @@ export function applyVariant(chart: Chart, variant: ChartVariant | undefined): C
  * A graph of a table that holds the individual values (replicates) starts by showing them, and without error bars: grouped bars show their
  * values as dots, and the XY graphs of means show every replicate behind the mean. (A column bar chart starts that way whatever its table, see createChart.)
  */
-export function showIndividualValues(chart: Chart, table: DataTable): Chart {
+function showIndividualValues(chart: Chart, table: DataTable): Chart {
   if (table.layout?.kind !== 'replicates') return chart;
   const grouped = chart.type === 'groupedBar';
   const xy = chart.type === 'xyScatter' || chart.type === 'xyLine' || chart.type === 'xyLineSymbols' || chart.type === 'xyBars';

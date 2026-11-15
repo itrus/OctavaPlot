@@ -214,17 +214,17 @@ export const TextToolIcon = () => (
   </Icon>
 );
 
-/** Arrows round to the left and right: undo and redo. */
+/** Curved arrows, counterclockwise and clockwise: undo and redo. */
 export const UndoIcon = () => (
   <Icon>
-    <path d="M5.5 4L3 6.5 5.5 9" />
-    <path d="M3 6.5h6.5a3.5 3.5 0 010 7H7" />
+    <path d="M3 3v4h4" />
+    <path d="M3.4 7A5.2 5.2 0 1 1 4.6 11.6" />
   </Icon>
 );
 export const RedoIcon = () => (
   <Icon>
-    <path d="M10.5 4L13 6.5 10.5 9" />
-    <path d="M13 6.5H6.5a3.5 3.5 0 000 7H9" />
+    <path d="M13 3v4H9" />
+    <path d="M12.6 7A5.2 5.2 0 1 0 11.4 11.6" />
   </Icon>
 );
 

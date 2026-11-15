@@ -148,7 +148,7 @@ function fillIds(named: Array<string | undefined>, canonical: (i: number) => str
 }
 
 /** Rows are stored as `[index, title]` or `[index, title, id]`: only those with a title or an ID that is not the canonical one of their place. */
-export function parseRows(raw: unknown, path: string, rowCount: number): DataRow[] {
+function parseRows(raw: unknown, path: string, rowCount: number): DataRow[] {
   const named: Array<string | undefined> = Array.from({ length: rowCount }, () => undefined);
   const titles: string[] = Array.from({ length: rowCount }, () => '');
   if (raw !== undefined) {
@@ -170,7 +170,7 @@ export function parseRows(raw: unknown, path: string, rowCount: number): DataRow
  * stored on a cell is ignored (subjects were removed). The ID of a cell
  * is stored unless it is the canonical one of its place.
  */
-export function parseObservations(raw: unknown, path: string, rowCount: number, groupId: string, taken: Set<string>): Observation[] {
+function parseObservations(raw: unknown, path: string, rowCount: number, groupId: string, taken: Set<string>): Observation[] {
   const named: Array<string | undefined> = Array.from({ length: rowCount }, () => undefined);
   const cells: Array<Omit<Observation, 'id'>> = Array.from({ length: rowCount }, () => ({ value: null }));
   for (const { index, entry, path: ep } of storedEntries(raw, path, rowCount, 2, 3)) {

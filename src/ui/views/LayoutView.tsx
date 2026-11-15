@@ -18,6 +18,8 @@ import { SceneElements } from '../../chart/shared/scene/SceneElements';
 import { GraphicsMenu } from '../components/GraphicsMenu';
 import { useCommand } from '../components/appCommands';
 import { UndoRedo } from '../components/UndoRedo';
+import { LAYOUT_INSPECTOR_PAGES, type LayoutInspectorPage } from './layoutPages';
+import { fitScale, useAvailableSize } from '../components/useAvailableSize';
 import { DrawingList } from '../inspector/sections/DrawingEditor';
 import { ArrangementSketch, FreeSketch } from '../components/ArrangementSketch';
 import { LAYOUT_PAGE_ICONS, PointerIcon, TextToolIcon } from '../components/icons';
@@ -25,27 +27,17 @@ import { LayoutExportPanel } from '../export/LayoutExportPanel';
 import { InspectorShell, type InspectorKit } from '../inspector/common/InspectorShell';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, TextInput } from '../inspector/common/controls';
 
-type LayoutInspectorPage = 'page' | 'panels' | 'graphs' | 'legend' | 'notes' | 'export';
-const LAYOUT_PAGES: readonly LayoutInspectorPage[] = ['page', 'panels', 'graphs', 'legend', 'notes', 'export'];
-/** The rail of the inspector of a layout, as the graph has one: the sheet, the boxes on it, the master legend, and Export at the foot. */
+const LAYOUT_PAGES: readonly LayoutInspectorPage[] = LAYOUT_INSPECTOR_PAGES.map((p) => p.id);
+/** The rail of the inspector of a layout, as the graph has one. */
 const LAYOUT_KIT: InspectorKit<LayoutInspectorPage> = {
   name: 'Layout',
-  pages: [
-    { id: 'page', label: 'Page', title: 'Page: orientation, background, title, margin and panel labels', heading: 'Format Page' },
-    { id: 'panels', label: 'Panels', title: 'Panels: how the graphs are arranged on the page', heading: 'Format Panels' },
-    { id: 'graphs', label: 'Graphs', title: 'Graphs: the graph in each panel and the size of the graphs', heading: 'Format Graphs' },
-    { id: 'legend', label: 'Legend', title: 'Legend of the page', heading: 'Format Legend' },
-    { id: 'notes', label: 'Notes', title: 'Notes: texts placed on the page', heading: 'Format Notes' },
-    { id: 'export', label: 'Export', title: 'Export this page as a picture or a vector file', heading: 'Export Layout' },
-  ],
+  pages: LAYOUT_INSPECTOR_PAGES,
   icons: LAYOUT_PAGE_ICONS,
 };
 
 /** What choosing Array starts with; the numbers across and down are then typed. */
 const ARRAY_START: LayoutArrangement = { kind: 'grid', cols: 3, rows: 2 };
 
-const CANVAS_PAD = 24;
-const SCROLLBAR_ROOM = 17;
 
 const LABEL_STYLES: ReadonlyArray<{ value: PanelLabelStyle; label: string }> = [
   { value: 'A', label: 'A, B, C' },
@@ -156,19 +148,9 @@ function LayoutPage({ layout }: { layout: Layout }) {
   useEffect(() => setHost(document.querySelector('.app')), []);
 
   // The page is shown whole, as large as the window allows.
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const [avail, setAvail] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const measure = () => setAvail({ w: el.offsetWidth - SCROLLBAR_ROOM, h: el.offsetHeight - SCROLLBAR_ROOM });
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const { ref: scrollerRef, avail } = useAvailableSize();
   // Zoom 100% means the whole page fits the window; the slider in the status bar zooms relative to that, as it does for a graph.
-  const fit = avail.w > 0 && avail.h > 0 ? Math.max(0.05, Math.min((avail.w - 2 * CANVAS_PAD) / drawing.widthPt, (avail.h - 2 * CANVAS_PAD) / drawing.heightPt)) : 0.5;
+  const fit = avail.w > 0 && avail.h > 0 ? fitScale(avail, drawing.widthPt, drawing.heightPt) : 0.5;
   const scale = fit * layoutZoom;
   // A page opens at "fit", and goes back to it when it is turned.
   useEffect(() => setLayoutZoom(1), [layout.id, layout.orientation, setLayoutZoom]);

@@ -58,7 +58,7 @@ function tInterval(xs: ReadonlyArray<number>, level: number): Interval | null {
 }
 
 /** Raise when the numbers describeValues gives change, so that no cached result of the old algorithm is shown. */
-export const DESCRIPTIVE_ALGORITHM_VERSION = 1;
+const DESCRIPTIVE_ALGORITHM_VERSION = 1;
 
 /**
  * describeValues kept by its identity (the values and the level), for a caller that asks again and again about the same array of values

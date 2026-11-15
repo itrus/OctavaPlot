@@ -255,15 +255,6 @@ export function nudgeDrawings(drawings: readonly Drawing[], dx: number, dy: numb
   });
 }
 
-/** Anchor an object to the data where it is drawn now, or put it back on the page there. Null when it cannot be done. */
-export function changeDrawingAnchor(d: Drawing, to: 'page' | 'data', width: number, height: number, placer: AnnotationPlacer): Partial<Drawing> | null {
-  if (to === (d.anchor === 'data' ? 'data' : 'page')) return {};
-  const [a, b] = drawnPoints(d, width, height, placer);
-  if (to === 'page') return { anchor: undefined, ...drawingPatchForPoints({ ...d, anchor: undefined }, a, b, width, height) };
-  if (!placer.supportsData) return null;
-  return { anchor: 'data', ...drawingPatchForPoints({ ...d, anchor: 'data' }, a, b, width, height, placer) };
-}
-
 /** The objects anchored to values that cannot be drawn (outside the axis range, or on a chart with no axes). */
 export function skippedDrawings(drawings: readonly Drawing[], placer: AnnotationPlacer): Drawing[] {
   return drawings.filter((d) => d.anchor === 'data' && placer.skipped([spotOf(d, d.from), spotOf(d, d.to)]).length > 0);

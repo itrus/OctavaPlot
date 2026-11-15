@@ -8,14 +8,18 @@ interface KeyLike {
   shiftKey: boolean;
 }
 
-export type ShortcutAction = 'new' | 'open' | 'export' | 'settings' | 'shortcuts' | 'navigator' | 'inspector' | 'duplicate' | 'rename';
+export type ShortcutAction = 'save' | 'undo' | 'redo' | 'new' | 'open' | 'export' | 'settings' | 'shortcuts' | 'navigator' | 'inspector' | 'duplicate' | 'rename';
 
 /**
- * The shortcuts of the whole app besides Save and Undo/Redo (see saveShortcut.ts and App.tsx). Letters are matched by key position (`code`), so
+ * The shortcuts of the whole app (App.tsx runs them). Letters are matched by key position (`code`), so
  * they work on any keyboard layout. `inText` false: the key is left alone while a text field has the focus (Ctrl+B, F2 and the like belong to the text there).
  * Ctrl+N, T and W are not offered: the browser keeps them, so New project is Ctrl+Alt+N. Ctrl+D is the table's Fill down, so Duplicate is Ctrl+Shift+D.
  */
 const BINDINGS: ReadonlyArray<{ action: ShortcutAction; inText: boolean; test: (e: KeyLike, mod: boolean) => boolean }> = [
+  // Save is not a text-editing key, so it works in a cell editor or any input too; Undo and Redo are left to the text field while it has the focus (native text undo applies there).
+  { action: 'save', inText: true, test: (e, mod) => mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 's' },
+  { action: 'undo', inText: false, test: (e, mod) => mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'z' },
+  { action: 'redo', inText: false, test: (e, mod) => mod && !e.altKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')) },
   { action: 'new', inText: false, test: (e, mod) => mod && e.altKey && !e.shiftKey && e.code === 'KeyN' },
   { action: 'open', inText: true, test: (e, mod) => mod && !e.altKey && !e.shiftKey && e.code === 'KeyO' },
   { action: 'export', inText: true, test: (e, mod) => mod && !e.altKey && !e.shiftKey && e.code === 'KeyE' },

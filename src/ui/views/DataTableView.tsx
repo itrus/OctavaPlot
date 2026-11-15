@@ -25,7 +25,7 @@ import { type CellBounds, blockToText, formatCellFor, parseCellFor, planPaste, s
 import { planFill, planSeries, suggestSeries } from '../data/fillSeries';
 import { gridJump } from '../data/gridKeys';
 import { useCommand } from '../components/appCommands';
-import type { TableAction } from './tableMenu';
+import { ADD_COLUMN_LABEL, type TableAction } from './tableMenu';
 import { UndoRedo } from '../components/UndoRedo';
 
 // Sizes at 100% zoom, in px; the table multiplies them by its zoom.
@@ -199,12 +199,12 @@ const GridRow = memo(function GridRow(p: GridRowProps) {
 });
 
 /** What each kind of table calls its parts, for the toolbar, the header and the hint under the grid. */
-const KIND_TEXT: Record<TableKind, { label: string; noun: string; add: string; leadName: string; columnName: string; hint: string; tags: { lead: [string, string]; rest: [string, string] } | null }> = {
-  column: { label: 'Column table', noun: 'groups', add: '+ Add group', leadName: 'Group name', columnName: 'Group name', hint: '', tags: null },
-  xy: { label: 'XY table', noun: 'Y series', add: '+ Add Y series', leadName: 'X column name', columnName: 'Series name', hint: 'First column = X (numbers), every other column is a Y series. ', tags: { lead: ['X', 'The X values'], rest: ['Y', 'A Y series'] } },
-  grouped: { label: 'Grouped table', noun: 'groups', add: '+ Add group', leadName: 'Group name', columnName: 'Group name', hint: 'Each row is a category: type its name in the Row title column. Each group of columns is a series. ', tags: null },
-  contingency: { label: 'Contingency table', noun: 'outcomes', add: '+ Add outcome', leadName: 'Outcome name', columnName: 'Outcome name', hint: 'Each row is a group of subjects (its name in the Row title column); each column is an outcome; the cells are counts. ', tags: null },
-  survival: { label: 'Survival table', noun: 'groups', add: '+ Add group', leadName: 'Time column name', columnName: 'Group name', hint: 'One row per subject: the time in the first column, then 1 (event) or 0 (censored) in the column of the subject\'s group. ', tags: { lead: ['T', 'The time of each subject'], rest: ['G', 'A group: 1 = event, 0 = censored'] } },
+const KIND_TEXT: Record<TableKind, { label: string; noun: string; leadName: string; columnName: string; hint: string; tags: { lead: [string, string]; rest: [string, string] } | null }> = {
+  column: { label: 'Column table', noun: 'groups', leadName: 'Group name', columnName: 'Group name', hint: '', tags: null },
+  xy: { label: 'XY table', noun: 'Y series', leadName: 'X column name', columnName: 'Series name', hint: 'First column = X (numbers), every other column is a Y series. ', tags: { lead: ['X', 'The X values'], rest: ['Y', 'A Y series'] } },
+  grouped: { label: 'Grouped table', noun: 'groups', leadName: 'Group name', columnName: 'Group name', hint: 'Each row is a category: type its name in the Row title column. Each group of columns is a series. ', tags: null },
+  contingency: { label: 'Contingency table', noun: 'outcomes', leadName: 'Outcome name', columnName: 'Outcome name', hint: 'Each row is a group of subjects (its name in the Row title column); each column is an outcome; the cells are counts. ', tags: null },
+  survival: { label: 'Survival table', noun: 'groups', leadName: 'Time column name', columnName: 'Group name', hint: 'One row per subject: the time in the first column, then 1 (event) or 0 (censored) in the column of the subject\'s group. ', tags: { lead: ['T', 'The time of each subject'], rest: ['G', 'A group: 1 = event, 0 = censored'] } },
 };
 
 export function DataTableView({ table }: { table: DataTable }) {
@@ -745,7 +745,7 @@ export function DataTableView({ table }: { table: DataTable }) {
   useCommand('table-action', (a) => {
     const act: Record<TableAction, () => void> = {
       type: () => setDialog('kind'),
-      'add-column': () => run(kindText.add.replace('+ ', ''), addGroup(table.id)),
+      'add-column': () => run(ADD_COLUMN_LABEL[table.kind], addGroup(table.id)),
       'row-above': () => insertRow('above'),
       'row-below': () => insertRow('below'),
       'row-duplicate': duplicateSelectedRows,
@@ -770,8 +770,8 @@ export function DataTableView({ table }: { table: DataTable }) {
           <TableTypeIcon /> Table type
         </button>
         <span className="sep" />
-        <button className="icon-text" onClick={() => run(kindText.add.replace('+ ', ''), addGroup(table.id))} title={kindText.add.replace('+ ', '')}>
-          <AddColumnIcon /> {kindText.add.replace('+ ', '')}
+        <button className="icon-text" onClick={() => run(ADD_COLUMN_LABEL[table.kind], addGroup(table.id))} title={ADD_COLUMN_LABEL[table.kind]}>
+          <AddColumnIcon /> {ADD_COLUMN_LABEL[table.kind]}
         </button>
         <RowsMenu
           label="Rows"

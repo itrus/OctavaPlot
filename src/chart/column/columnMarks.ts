@@ -1,4 +1,3 @@
-import { turned } from '../shared/parts/orientation';
 import type { LayerKind, LayerSpec } from '../../model/graph/layers';
 import type { Chart } from '../../model/types';
 import { n2 } from '../../model/units';
@@ -8,6 +7,7 @@ import { barMarkElement } from '../shared/parts/fillElements';
 import type { ColumnModel, GroupGeom, PointGeom } from './columnModel';
 import { DENSE_CELL_PT, isDense } from '../shared/scene/denseDots';
 import { el, type SceneElement } from '../shared/scene/sceneElement';
+import { drawLayerPasses, type DrawPass } from '../shared/parts/layerPasses';
 import { svgId } from '../shared/scene/svgIds';
 import { symbolPath } from '../shared/parts/symbols';
 import { cachedFor } from '../shared/parts/stable';
@@ -27,7 +27,7 @@ import { cachedFor } from '../shared/parts/stable';
 /** Two dots drawn alike: what one shape can hold for a run of them. */
 const sameLook = (a: PointGeom, b: PointGeom): boolean => a.color === b.color && a.borderColor === b.borderColor && a.borderWidth === b.borderWidth && a.size === b.size && a.shape === b.shape;
 
-const PASS: Partial<Record<LayerKind, 'body' | 'lines' | 'points'>> = { bars: 'body', distribution: 'body', pairLines: 'lines', line: 'lines', errorBars: 'lines', meanLine: 'lines', points: 'points' };
+const PASS: Partial<Record<LayerKind, DrawPass>> = { bars: 'body', distribution: 'body', pairLines: 'lines', line: 'lines', errorBars: 'lines', meanLine: 'lines', points: 'points' };
 
 /** How many dots the model draws: those of the data sets whose points layer is shown (a hidden layer draws nothing, so nothing is simplified). */
 export function drawnDotCount(chart: Chart, model: ColumnModel): number {
@@ -141,22 +141,7 @@ export function compileColumnMarks(chart: Chart, model: ColumnModel, preview = f
   };
 
   // The layers in drawing order; the ones that follow each other in the same pass are one run.
-  const out: SceneElement[] = [];
-  let run: { pass: 'body' | 'lines' | 'points'; items: SceneElement[] } | null = null;
-  const flush = () => {
-    if (run) out.push(...(run.pass === 'points' ? run.items : turned(orient, run.items)));
-    run = null;
-  };
-  for (const layer of model.layers) {
-    const pass = PASS[layer.kind];
-    if (!pass || hidden.has(layer.id)) continue;
-    if (!run || run.pass !== pass) {
-      flush();
-      run = { pass, items: [] };
-    }
-    run.items.push(...elementsOf(layer));
-  }
-  flush();
+  const out = drawLayerPasses(model.layers, PASS, hidden, orient, elementsOf);
   return [el('g', [['clip-path', 'url(#plot-clip)']], { children: out })];
 }
 

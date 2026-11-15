@@ -1,5 +1,5 @@
 /** Structural types of settings. Bounds and enum membership belong to the option sanitizers. */
-export type SettingKind = 'number' | 'string' | 'boolean' | 'array' | 'nullableNumber' | 'nullableString' | 'nullableColor';
+type SettingKind = 'number' | 'string' | 'boolean' | 'array' | 'nullableNumber' | 'nullableString' | 'nullableColor';
 export interface SettingSchema { readonly [key: string]: SettingKind | SettingSchema }
 
 /** Check schema keys against model keys and their value types at compile time. */
