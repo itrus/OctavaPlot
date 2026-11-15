@@ -72,16 +72,16 @@ describe('rich text: Greek letters, symbols and escapes', () => {
 
 describe('rich text: the symbol list', () => {
   it('every symbol of the list is a name that resolves to one character', () => {
-    for (const g of SYMBOL_GROUPS) for (const n of g.names) expect(plainText(`\${n}`), n).toBe(symbolOf(n));
+    for (const g of SYMBOL_GROUPS) for (const n of g.names) expect(plainText(`\\${n}`), n).toBe(symbolOf(n));
     expect(SYMBOL_GROUPS.flatMap((g) => g.names).every((n) => symbolOf(n) !== '')).toBe(true);
   });
   it('inserts a name at the cursor, or in place of the selection', () => {
-    expect(insertSymbol('10  m', 3, 3, 'mu')).toEqual({ text: '10 \mu m', caret: 7 });
-    expect(insertSymbol('x abc', 2, 5, 'pm')).toEqual({ text: 'x \pm', caret: 5 });
+    expect(insertSymbol('10  m', 3, 3, 'mu')).toEqual({ text: '10 \\mu m', caret: 6 });
+    expect(insertSymbol('x abc', 2, 5, 'pm')).toEqual({ text: 'x \\pm', caret: 5 });
   });
   it('ends the name with {} when a letter follows, so that it does not run into it', () => {
     const out = insertSymbol('m', 0, 0, 'mu');
-    expect(out.text).toBe('\mu{}m');
+    expect(out.text).toBe('\\mu{}m');
     expect(plainText(out.text)).toBe('μm');
   });
 });

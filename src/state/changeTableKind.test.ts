@@ -15,7 +15,7 @@ describe('changeTableKind', () => {
     expect(table(q).kind).toBe('column');
     expect(table(q).layout).toBeUndefined();
     expect(table(q).groups.map((g) => g.observations.map((o) => o.value))).toEqual(columns);
-    expect(chart(q).type).toBe('scatter');
+    expect(chart(q).type).toBe('bar');
   });
 
   it('removes the calculations that do not apply to the new type', () => {

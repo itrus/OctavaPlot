@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import type { ChartType } from '../../model/types';
-import { patchStyle, patchSummary, setChartType } from '../../state/commands';
+import { patchAxis, patchStyle, patchSummary, setChartType } from '../../state/commands';
 import { chartToSvgString } from './export';
 
 /**
@@ -79,9 +79,10 @@ function frozenExample(type: ChartType) {
       showTitle: false,
       legend: { ...c.legend, visible: false },
       paletteId: 'classic',
-      xAxis: { ...c.xAxis, lineWidthPt: 2.1 * LEGACY_SCALE },
-      yAxis: { ...c.yAxis, lineWidthPt: 2.1 * LEGACY_SCALE },
-      y2Axis: { ...c.y2Axis, lineWidthPt: 2.1 * LEGACY_SCALE },
+      // The sizes of the numbers and ticks the goldens were made with, before the defaults were rounded (27 pt numbers, 11 pt ticks).
+      xAxis: { ...c.xAxis, lineWidthPt: 2.1 * LEGACY_SCALE, tickFontSizePt: 26.6, tickLengthPt: 11.2 },
+      yAxis: { ...c.yAxis, lineWidthPt: 2.1 * LEGACY_SCALE, tickFontSizePt: 26.6, tickLengthPt: 11.2 },
+      y2Axis: { ...c.y2Axis, lineWidthPt: 2.1 * LEGACY_SCALE, tickFontSizePt: 26.6, tickLengthPt: 11.2 },
       // The line weights and grey palette the goldens were made with, before the weights were harmonised.
       defaults: { ...c.defaults, barBorderWidthPt: 2, barPatternWidthPt: 1, symbolBorderWidthPt: 1.5, errorLineWidthPt: 2, lineWidthPt: 3 },
     })),
@@ -89,6 +90,8 @@ function frozenExample(type: ChartType) {
   p = setChartType(p.charts[0].id, type)(p);
   // The goldens predate the SD being the default spread of a bar chart and a mean chart.
   p = patchSummary(p.charts[0].id, 'all', { spread: 'none' })(p);
+  // The goldens predate the value axis starting at 0 for every chart: the ranges they were drawn with are set here.
+  if (type !== 'bar') p = patchAxis(p.charts[0].id, 'yAxis', { min: 1, max: type === 'scatter' ? 2.6 : 2.4 })(p);
   // The bar golden predates symbols being on by default for bar charts.
   if (type === 'bar') p = patchStyle(p.charts[0].id, 'all', { showSymbols: false })(p);
   return p;
