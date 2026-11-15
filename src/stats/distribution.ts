@@ -64,7 +64,7 @@ export function boxSummary(values: ReadonlyArray<number | null | undefined>, rul
   const q1 = quantile6(s, 0.25);
   const median = quantile6(s, 0.5);
   const q3 = quantile6(s, 0.75);
-  const mean = s.reduce((a, b) => a + b, 0) / n;
+  const mean = meanOf(s);
   let low = s[0];
   let high = s[n - 1];
   const pct = WHISKER_RULES.find((r) => r.value === rule)?.p;

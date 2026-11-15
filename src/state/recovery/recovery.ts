@@ -105,6 +105,9 @@ export function signatureOf(metaRaw: string | null, text: string | null): string
  */
 export const isConflict = (seen: string, current: string): boolean => current !== EMPTY && current !== seen;
 
+/** The stored copy has gone (deleted here or in another tab): nothing protects the project any more. */
+export const isGone = (current: string): boolean => current === EMPTY;
+
 /** A storage event for these keys (or for a cleared store, key null) can change the recovery copy. */
 export const affectsRecovery = (key: string | null): boolean => key === null || key === AUTOSAVE_KEY || key === AUTOSAVE_META_KEY;
 

@@ -136,3 +136,30 @@ describe('the table as written in a file', () => {
     expect(roundTrip(p)).toEqual(p);
   });
 });
+
+describe('the kind of a table in a file', () => {
+  const withKind = (kind: unknown): string => {
+    const env = JSON.parse(stringifyProject(createExampleProject())) as Any;
+    if (kind === undefined) delete env.project.dataTables[0].kind;
+    else env.project.dataTables[0].kind = kind;
+    return JSON.stringify(env);
+  };
+
+  it('refuses a kind that is not known, naming where it is', () => {
+    expect(() => parseProject(withKind('typo'))).toThrow(/kind/);
+  });
+
+  it('reads an absent kind as a column table', () => {
+    expect(parseProject(withKind(undefined)).dataTables[0].kind).toBe('column');
+  });
+});
+
+describe('the size of all tables in a file', () => {
+  it('refuses tables that pass the limit together though each passes it alone', () => {
+    const env = JSON.parse(stringifyProject(createExampleProject())) as Any;
+    const t = env.project.dataTables[0];
+    const wide = { ...t, rowCount: 100000, groups: Array.from({ length: 150 }, (_, i) => ({ ...t.groups[0], id: `g${i}`, observations: [] })) };
+    env.project.dataTables = [wide, { ...wide, id: 'b' }, { ...wide, id: 'c' }];
+    expect(() => parseProject(JSON.stringify(env))).toThrow(/together/);
+  });
+});

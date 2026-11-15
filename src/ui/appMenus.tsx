@@ -37,6 +37,7 @@ export interface MenuContext {
   setStatus: (text: string) => void;
   navigateInspector: (target: InspectorTarget) => void;
   openSettings: () => void;
+  openRecovery: () => void;
   openShortcuts: () => void;
   openAbout: () => void;
 }
@@ -163,6 +164,7 @@ export function buildMenus(c: MenuContext): MenuSpec[] {
         item('Export figure…', () => exportHere(c), { shortcut: 'Ctrl+E', icon: <ExportIcon />, hidden: !chart, title: 'Export this graph as a picture or a vector file' }),
         item('Export layout…', () => exportHere(c), { shortcut: 'Ctrl+E', icon: <ExportIcon />, hidden: !onLayout, title: 'Export this page as a picture or a vector file' }),
         sep,
+        item('Recovery copies…', c.openRecovery, { title: 'Download the project copies this browser keeps, including text that could not be read' }),
         item('Settings…', c.openSettings, { shortcut: 'Ctrl+,', icon: <SettingsIcon /> }),
       ],
     },

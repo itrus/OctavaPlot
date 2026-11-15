@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SummarySpec } from '../model/types';
 import { describeValues } from './descriptive';
+import { sdOf, scaledMoments } from './moments';
 import { computeGroupStats, summarize } from './summary';
 
 const spec: SummarySpec = { centre: 'mean', spread: 'sd', confidenceLevel: 0.95, smallSamplePolicy: 'drawCentre', invalidPolicy: 'omit' };
@@ -46,5 +47,19 @@ describe('values all equal', () => {
     expect(d.skewness).toBeNull();
     expect(d.kurtosis).toBeNull();
     expect(summarize(Array.from({ length: 18 }, () => v)).sd).toBe(0);
+  });
+});
+
+describe('spread of values near the largest number', () => {
+  it('gives the SD when a deviation from the mean would overflow', () => {
+    const sd = sdOf([-1.7e308, 1.7e308, 1.7e308, 1.7e308], 8.5e307);
+    expect(Number.isFinite(sd)).toBe(true);
+    expect(sd / 1.7e308).toBeCloseTo(1, 6);
+  });
+
+  it('keeps the moments finite there, and the plain case unchanged', () => {
+    const m = scaledMoments([-1.7e308, 1.7e308, 1.7e308, 1.7e308], 8.5e307);
+    expect(m && Number.isFinite(m.m2) && m.m2 > 0).toBe(true);
+    expect(sdOf([1, 2, 3, 4], 2.5)).toBeCloseTo(Math.sqrt(5 / 3), 12);
   });
 });

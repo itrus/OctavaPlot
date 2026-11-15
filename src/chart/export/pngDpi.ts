@@ -11,7 +11,8 @@ export const exportPixels = (chart: { widthPx: number; heightPx: number }, dpi: 
 });
 
 /** Browsers limit the size of a canvas; a size above these limits fails or comes out blank. */
-export const fitsCanvas = (width: number, height: number): boolean => Math.max(width, height) <= 16000 && width * height <= 200_000_000;
+export const fitsCanvas = (width: number, height: number): boolean =>
+  Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && Math.max(width, height) <= 16000 && width * height <= 200_000_000;
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 

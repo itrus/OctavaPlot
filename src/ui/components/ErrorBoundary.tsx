@@ -1,23 +1,22 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { downloadBlob } from '../../util/download';
-import { AUTOSAVE_BACKUP_KEY, AUTOSAVE_KEY, AUTOSAVE_UNREADABLE_KEY } from '../../state/serialize';
+import { listBrowserCopies, type BrowserCopy } from '../../state/recovery/copies';
 
-/** The most recent copy of the project kept in the browser, for the recovery download; null when there is none. */
-function storedProject(): string | null {
+const copiesNow = (): BrowserCopy[] => {
   try {
-    return localStorage.getItem(AUTOSAVE_KEY) ?? localStorage.getItem(AUTOSAVE_BACKUP_KEY) ?? localStorage.getItem(AUTOSAVE_UNREADABLE_KEY);
+    return listBrowserCopies();
   } catch {
-    return null;
+    return [];
   }
-}
+};
 
 interface State {
   error: Error | null;
 }
 
 /**
- * Catches a failure while drawing, so a project that cannot be shown does not leave a blank page and lose the work: the
- * last autosaved copy can be downloaded before reloading.
+ * Catches a failure while drawing, so a project that cannot be shown does not leave a blank page and lose the work: every copy
+ * kept in the browser can be downloaded, each on its own, before reloading.
  */
 export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { error: null };
@@ -30,26 +29,22 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     console.error('OctavaPlot failed to draw:', error, info.componentStack);
   }
 
-  private download = () => {
-    const text = storedProject();
-    if (!text) return;
-    downloadBlob(new Blob([text], { type: 'application/json' }), 'octavaplot-recovered.oplot');
-  };
-
   render(): ReactNode {
     if (!this.state.error) return this.props.children;
-    const hasCopy = storedProject() !== null;
+    const copies = copiesNow();
     return (
       <div role="alert" style={{ padding: 24, maxWidth: 640, font: '14px/1.5 system-ui, sans-serif' }}>
         <h1 style={{ fontSize: 18 }}>Something went wrong while drawing</h1>
         <p>{this.state.error.message}</p>
         <p>
-          {hasCopy
-            ? 'Your last autosaved project is still stored in this browser. Download it before reloading.'
-            : 'No autosaved copy of the project was found in this browser.'}
+          {copies.length > 0
+            ? 'These copies of the project are stored in this browser. Download what you need before reloading.'
+            : 'No copy of the project was found in this browser.'}
         </p>
-        <p style={{ display: 'flex', gap: 8 }}>
-          <button onClick={this.download} disabled={!hasCopy}>Download the autosaved project</button>
+        <p style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {copies.map((c) => (
+            <button key={c.id} onClick={() => downloadBlob(new Blob([c.text], { type: 'application/json' }), c.filename)}>Download: {c.label}</button>
+          ))}
           <button onClick={() => window.location.reload()}>Reload</button>
         </p>
       </div>

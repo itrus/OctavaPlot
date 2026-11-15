@@ -214,3 +214,10 @@ describe('the header and the size of a file', () => {
     for (const bad of ['NaN', 'Infinity', '-Infinity', 'inf']) expect(importCsv('A\n' + bad).ok).toBe(false);
   });
 });
+
+describe('CSV size limits', () => {
+  it('stops splitting once there are more records than allowed', () => {
+    expect(() => parseCsv('a\n1\n2\n3\n', ',', 3)).toThrow(/at most 1 rows/);
+    expect(parseCsv('a\n1\n2\n\n\n', ',', 3)).toHaveLength(3); // blank lines are not counted
+  });
+});

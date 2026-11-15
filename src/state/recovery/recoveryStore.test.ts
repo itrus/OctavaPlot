@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import type { Project } from '../../model/types';
-import { affectsRecovery, AUTOSAVE_META_KEY, isConflict } from './recovery';
+import { affectsRecovery, AUTOSAVE_META_KEY, isConflict, isGone } from './recovery';
 import { currentSignature, newEditorId, writeRecovery } from './recoveryStore';
-import { AUTOSAVE_KEY, loadAutosave, parseProject, stringifyProject } from '../serialize';
+import { AUTOSAVE_BACKUP_KEY, AUTOSAVE_KEY, AUTOSAVE_UNREADABLE_KEY, backupAutosave, loadAutosave, parseProject, stringifyProject } from '../serialize';
 
 /** One shared store, as two tabs of one browser have. */
 function sharedStorage(initial: Record<string, string> = {}, failKeys: string[] = []) {
@@ -103,5 +103,89 @@ describe('two tabs and one recovery copy', () => {
   });
   it('editor ids differ', () => {
     expect(newEditorId()).not.toBe(newEditorId());
+  });
+});
+
+describe('the start-up backup', () => {
+  it('keeps a readable copy as the backup', () => {
+    const data = sharedStorage({ [AUTOSAVE_KEY]: stringifyProject(named('A')) });
+    expect(backupAutosave()).toBe('kept');
+    expect(data.get(AUTOSAVE_BACKUP_KEY)).toBe(data.get(AUTOSAVE_KEY));
+  });
+
+  it('sets unreadable text aside', () => {
+    const data = sharedStorage({ [AUTOSAVE_KEY]: 'not a project' });
+    expect(backupAutosave()).toBe('kept');
+    expect(data.get(AUTOSAVE_UNREADABLE_KEY)).toBe('not a project');
+  });
+
+  it('never replaces other unreadable text that was set aside earlier', () => {
+    const data = sharedStorage({ [AUTOSAVE_KEY]: 'second', [AUTOSAVE_UNREADABLE_KEY]: 'first' });
+    expect(backupAutosave()).toBe('held');
+    expect(data.get(AUTOSAVE_UNREADABLE_KEY)).toBe('first');
+    expect(data.get(AUTOSAVE_KEY)).toBe('second');
+  });
+
+  it('holds when unreadable text cannot be set aside', () => {
+    const data = sharedStorage({ [AUTOSAVE_KEY]: 'not a project' }, [AUTOSAVE_UNREADABLE_KEY]);
+    expect(backupAutosave()).toBe('held');
+    expect(data.get(AUTOSAVE_KEY)).toBe('not a project');
+  });
+
+  it('does not hold for a readable copy whose backup cannot be written', () => {
+    sharedStorage({ [AUTOSAVE_KEY]: stringifyProject(named('A')) }, [AUTOSAVE_BACKUP_KEY]);
+    expect(backupAutosave()).toBe('kept');
+  });
+});
+
+describe('a deleted recovery copy', () => {
+  it('is seen as gone, not as a conflict', () => {
+    const data = sharedStorage();
+    writeRecovery(named('A'), 'tab-a', currentSignature());
+    const seen = currentSignature();
+    data.clear();
+    expect(isGone(currentSignature())).toBe(true);
+    expect(isConflict(seen, currentSignature())).toBe(false);
+    expect(writeRecovery(named('A'), 'tab-a', seen).kind).toBe('ok');
+  });
+});
+
+describe('the copies the browser keeps', () => {
+  it('lists each copy on its own, with whether it can be read', async () => {
+    const { listBrowserCopies } = await import('./copies');
+    sharedStorage({ [AUTOSAVE_KEY]: stringifyProject(named('A')), [AUTOSAVE_BACKUP_KEY]: stringifyProject(named('B')), [AUTOSAVE_UNREADABLE_KEY]: 'damaged' });
+    const copies = listBrowserCopies();
+    expect(copies.map((c) => c.id)).toEqual(['current', 'backup', 'unreadable']);
+    expect(copies.map((c) => c.readable)).toEqual([true, true, false]);
+    expect(copies[0].text).not.toBe(copies[1].text);
+    expect(copies[2].filename).toMatch(/\.txt$/);
+  });
+
+  it('lists nothing when storage is empty', async () => {
+    const { listBrowserCopies } = await import('./copies');
+    sharedStorage();
+    expect(listBrowserCopies()).toEqual([]);
+  });
+});
+
+describe('a write that another tab overtook', () => {
+  it('is a conflict, not a protected project', () => {
+    const data = sharedStorage();
+    const p = named('A');
+    let first = true;
+    // Another tab writes the text key in between this tab's write and its check.
+    const real = localStorage.setItem.bind(localStorage);
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => data.get(k) ?? null,
+      removeItem: (k: string) => void data.delete(k),
+      setItem: (k: string, v: string) => {
+        real(k, v);
+        if (k === AUTOSAVE_META_KEY && first) {
+          first = false;
+          data.set(AUTOSAVE_KEY, stringifyProject(named('other tab')));
+        }
+      },
+    });
+    expect(writeRecovery(p, 'tab-a', currentSignature()).kind).toBe('conflict');
   });
 });

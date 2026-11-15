@@ -6,7 +6,7 @@ import { viewAfterRemoval } from '../model/project/viewOrder';
 import type { Project } from '../model/types';
 import type { Selection, ViewRef } from '../model/editor/types';
 import { historyReducer, initialHistory, scopeCoalesceKey } from './history';
-import { affectsRecovery, flushDecision, isConflict, protectionOf, recoveryStatusText, shouldWarnOnUnload, bannerVisible } from './recovery/recovery';
+import { affectsRecovery, flushDecision, isConflict, isGone, protectionOf, recoveryStatusText, shouldWarnOnUnload, bannerVisible } from './recovery/recovery';
 import { currentSignature, newEditorId, writeRecovery } from './recovery/recoveryStore';
 import { backupAutosave, loadAutosave, readAutosave } from './serialize';
 import { statusAfter, type StatusMemo } from './statusLine';
@@ -19,21 +19,21 @@ export { useProject, useCommands, useHistory, useSelection, useNavigation, useSt
  * The project to start with: the autosave (kept as a backup first, so a bad edit cannot replace the only copy), else a new one by
  * the saved settings. A project that comes from the autosave was never saved as a file, and is said to be so.
  */
-const initialProject = (): { project: Project; recovered: boolean; message: string } => {
+const initialProject = (): { project: Project; recovered: boolean; message: string; held: boolean } => {
   // Kept apart even when it cannot be read (a file of a newer version, a damaged one): the first edit would otherwise overwrite the only copy.
   // With Autosave off nothing is read back from the browser: a copy left from before is older than what was saved as a file.
   const autosaveOn = loadSettings().autosave;
-  if (autosaveOn) backupAutosave();
+  const held = (autosaveOn ? backupAutosave() : 'none') === 'held';
   const read = autosaveOn ? readAutosave() : ({ kind: 'none' } as const);
   if (read.kind === 'restored') {
     const n = read.notes.length;
     const reset = n === 0 ? '' : ` ${n} stored value${n === 1 ? ' was' : 's were'} reset to defaults: ${read.notes[0]}${n > 1 ? ` (and ${n - 1} more)` : ''}`;
-    return { project: read.project, recovered: true, message: `Restored the project from the browser recovery copy.${reset} It is not saved as a file yet.` };
+    return { project: read.project, recovered: true, message: `Restored the project from the browser recovery copy.${reset} It is not saved as a file yet.`, held };
   }
   const s = loadSettings();
   const size = newChartStart(s);
-  const message = read.kind === 'unreadable' ? 'The project kept in this browser could not be read by this version, so a new project was opened. The stored text was set aside and is not overwritten; it can be downloaded from the error screen.' : '';
-  return { project: s.newProjectSample ? createExampleProject(size) : createEmptyProject(size), recovered: false, message };
+  const message = held ? 'The project kept in this browser could not be read by this version, and could not be set aside. A new project was opened, but Autosave is paused so that the stored text is not overwritten: download it from File > Recovery copies, or switch Autosave off in Settings to delete it.' : read.kind === 'unreadable' ? 'The project kept in this browser could not be read by this version, so a new project was opened. The stored text was set aside and is not overwritten; it can be downloaded from File > Recovery copies.' : '';
+  return { project: s.newProjectSample ? createExampleProject(size) : createEmptyProject(size), recovered: false, message, held };
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -132,7 +132,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // closed. The saved pointer moves only after a write succeeded, so a failure is retried (every 15 s) rather than forgotten.
   // Every tab has a name and the copy carries the name of its last writer (recoveryStore.ts): a write over a copy that another
   // tab wrote is not done, and the conflict banner asks what to do. The rules are in recovery.ts.
-  const saved = useRef(project);
+  // What the recovery copy holds (null: nothing, e.g. after it was deleted).
+  const saved = useRef<Project | null>(project);
+  // Stored text that this build cannot read and that could not be set aside: nothing is written over it (see backupAutosave).
+  const heldRef = useRef(start.held);
   const [retry, setRetry] = useState(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (retryTimer.current !== null) clearTimeout(retryTimer.current); }, []);
@@ -151,6 +154,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (force = false): boolean => {
       const p = presentRef.current;
       if (!force && flushDecision({ autosave: settingsRef.current.autosave, pending: p !== saved.current, conflict: conflictRef.current }) !== 'write') return false;
+      if (heldRef.current) {
+        setAutosaveOk(false);
+        setRecovery((s) => ({ ...s, error: 'the project stored in this browser could not be set aside and is kept as it is' }));
+        return false;
+      }
       const r = writeRecovery(p, editorId, seenRef.current ?? '', force);
       if (r.kind === 'ok') {
         seenRef.current = r.seen;
@@ -173,6 +181,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [editorId, setConflict],
   );
+  // Autosave off deletes the browser copies (SettingsDialog): nothing holds this project any more, so switching it on again writes it.
+  useEffect(() => {
+    if (settings.autosave) return;
+    saved.current = null;
+    heldRef.current = false;
+    seenRef.current = currentSignature();
+    setRecovery({ savedAt: null, error: null });
+    setAutosaveOk(true);
+    setConflict(false);
+  }, [settings.autosave, setConflict]);
   useEffect(() => {
     if (!settings.autosave || project === saved.current || conflict) return;
     const t = setTimeout(() => writeNow(), 400);
@@ -198,7 +216,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     const onStorage = (e: StorageEvent) => {
       if ((e.storageArea && e.storageArea !== localStorage) || !affectsRecovery(e.key)) return;
-      if (isConflict(seenRef.current ?? '', currentSignature())) setConflict(true);
+      const now = currentSignature();
+      if (isGone(now)) {
+        // Deleted (in another tab, or by clearing the site data): the copy no longer holds this project, and writing again overwrites nothing.
+        saved.current = null;
+        seenRef.current = now;
+        setRecovery({ savedAt: null, error: null });
+        setConflict(false);
+        setRetry((n) => n + 1);
+      } else if (isConflict(seenRef.current ?? '', now)) setConflict(true);
     };
     window.addEventListener('pagehide', onHidden);
     document.addEventListener('visibilitychange', onHidden);

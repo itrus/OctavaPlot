@@ -60,5 +60,8 @@ export function writeRecovery(project: Project, editorId: string, seen: string, 
       /* the stamp stays old; the signature then shows an unstamped text */
     }
   }
+  // The check above and the writes are not one step across tabs: if another tab wrote in between, what is stored is not this text.
+  // That is reported as a conflict (the banner then asks), not as a protected project.
+  if (!force && read(AUTOSAVE_KEY) !== text) return { kind: 'conflict' };
   return { kind: 'ok', savedAt: now, seen: currentSignature() };
 }

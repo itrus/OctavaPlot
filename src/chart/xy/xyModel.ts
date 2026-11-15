@@ -303,8 +303,9 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   const counts = (kind: LayerKind, seriesId: Id): boolean => layerList.find((l) => l.id === `${seriesId}:${kind}`)?.rangeContribution ?? true;
   // Bars at numeric X: the slot of an X is the smallest distance between two X values of the chart (one X: a fifth of its size, or 1);
   // the bars of the series fill the slot less the gap, side by side, and the axis holds their edges.
-  const distinctX = [...new Set(raw.flatMap((r) => r.pts.map((p) => p.x)))].sort((a, b) => a - b);
-  const slot = distinctX.length > 1 ? distinctX.reduce((least, x, i) => (i === 0 ? least : Math.min(least, x - distinctX[i - 1])), Infinity) : Math.abs(distinctX[0] ?? 0) * 0.2 || 1;
+  // Only bars use it: the other types skip the sort of every X.
+  const distinctX = isBars ? [...new Set(raw.flatMap((r) => r.pts.map((p) => p.x)))].sort((a, b) => a - b) : [];
+  const slot = !isBars ? 1 : distinctX.length > 1 ? distinctX.reduce((least, x, i) => (i === 0 ? least : Math.min(least, x - distinctX[i - 1])), Infinity) : Math.abs(distinctX[0] ?? 0) * 0.2 || 1;
   // The space between bars is a percent of a bar's width, as for the columns: the bars fill the slot less that space.
   const barsWidth = slot / (1 + (chart.bars.gapPct ?? AUTO_BAR_GAP_PCT) / 100);
   const barWidth = barsWidth / Math.max(1, raw.length);

@@ -35,11 +35,33 @@ function maxDeviation(xs: ReadonlyArray<number>, m: number): number {
 
 /** Sample SD (n - 1), scaled by the largest deviation so squares neither overflow nor underflow. */
 export function sdOf(xs: ReadonlyArray<number>, m: number): number {
-  const scale = maxDeviation(xs, m);
+  const s = scaledDeviations(xs, m);
+  if (s === 0) return 0;
+  if (s === null) return Infinity;
+  const ss = neumaierSum(s.d.map((v) => v * v));
+  // The factor `half` goes last: the scale times it can pass the largest number although the SD does not.
+  return s.scale * Math.sqrt(ss / (xs.length - 1)) * s.half;
+}
+
+/**
+ * The deviations from `m` in units of the largest one (`scale`). When a deviation itself passes the largest number (values of
+ * opposite sign near it), the values are halved first and `half` is 2. 0: all values equal `m`. null: the spread cannot be shown.
+ */
+function scaledDeviations(xs: ReadonlyArray<number>, m: number): { d: number[]; scale: number; half: number } | 0 | null {
+  let a = xs;
+  let mm = m;
+  let half = 1;
+  let scale = maxDeviation(a, mm);
+  if (!Number.isFinite(scale)) {
+    a = xs.map((x) => x / 2);
+    mm = m / 2;
+    half = 2;
+    scale = maxDeviation(a, mm);
+  }
   if (scale === 0) return 0;
-  if (!Number.isFinite(scale)) return Infinity;
-  const ss = neumaierSum(xs.map((x) => ((x - m) / scale) ** 2));
-  return scale * Math.sqrt(ss / (xs.length - 1));
+  if (!Number.isFinite(scale)) return null;
+  const centre = mm;
+  return { d: a.map((x) => (x - centre) / scale), scale, half };
 }
 
 /**
@@ -47,9 +69,9 @@ export function sdOf(xs: ReadonlyArray<number>, m: number): number {
  * skewness m3 / m2^1.5 and kurtosis m4 / m2^2 are unchanged. Null when all values equal `m` or a deviation is not finite.
  */
 export function scaledMoments(xs: ReadonlyArray<number>, m: number): { m2: number; m3: number; m4: number } | null {
-  const scale = maxDeviation(xs, m);
-  if (scale === 0 || !Number.isFinite(scale)) return null;
-  const d = xs.map((x) => (x - m) / scale);
+  const s = scaledDeviations(xs, m);
+  if (s === 0 || s === null) return null;
+  const d = s.d;
   const n = xs.length;
   return {
     m2: neumaierSum(d.map((v) => v * v)) / n,

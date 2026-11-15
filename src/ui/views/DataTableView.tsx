@@ -8,7 +8,7 @@ import { addAnalysis, addGroup, changeTableKind, appendRows, composeCommands, de
 import { copyText, downloadBlob } from '../../util/download';
 import { exportFileName } from '../../util/fileName';
 import { AddColumnIcon, AddManyRowsIcon, CloseIcon, ExcludeIcon, FitCurveIcon, IncludeIcon, TableTypeIcon } from '../components/icons';
-import { isCsvFile, tableToCsv, type CsvExportMode } from '../data/csv';
+import { isCsvFile, MAX_CSV_BYTES, tableToCsv, type CsvExportMode } from '../data/csv';
 import { excludedCount } from '../../model/table/exclusion';
 import { ChangeTableTypeDialog } from '../dialogs/ChangeTableTypeDialog';
 import { ExportCsvDialog } from '../dialogs/ExportCsvDialog';
@@ -487,8 +487,16 @@ export function DataTableView({ table }: { table: DataTable }) {
       setMessage({ kind: 'error', text: `${file.name} is not a CSV file. Choose a .csv or .tsv file.` });
       return;
     }
+    if (file.size > MAX_CSV_BYTES) {
+      setMessage({ kind: 'error', text: `${file.name} is too large to import (${Math.round(file.size / 1048576)} MB; the limit is ${MAX_CSV_BYTES / 1048576} MB).` });
+      return;
+    }
     // The file is read and shown in a dialog; nothing changes until the user confirms there.
-    setPendingCsv({ name: file.name, text: await file.text() });
+    try {
+      setPendingCsv({ name: file.name, text: await file.text() });
+    } catch (err) {
+      setMessage({ kind: 'error', text: `${file.name} could not be read: ${err instanceof Error ? err.message : String(err)}` });
+    }
   };
   // A table of series blocks needs whole blocks: the leading column(s), then k series of the same width.
   const checkCsvShape = (data: CsvImportData): string | null =>

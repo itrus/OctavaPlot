@@ -12,6 +12,9 @@ import { ShortcutsDialog } from './ui/dialogs/ShortcutsDialog';
 import { setProjectName } from './state/commands';
 import { InfoDialog } from './ui/dialogs/InfoDialog';
 import { SettingsDialog } from './ui/dialogs/SettingsDialog';
+import { RecoveryDialog } from './ui/dialogs/RecoveryDialog';
+import { openDecision } from './state/openGuard';
+import type { Project } from './model/types';
 import { RepairNotesDialog } from './ui/dialogs/RepairNotesDialog';
 import { LOAD_OTHER_TAB_WARNING, RecoveryConflictBanner } from './ui/components/RecoveryConflictBanner';
 import { WheelRange } from './ui/components/WheelRange';
@@ -89,6 +92,7 @@ function Shell() {
   }, [view]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // What was reset when the last file was opened: all of it, with the paths, is behind the Details button.
   const [repairs, setRepairs] = useState<{ file: string; notes: string[] } | null>(null);
@@ -125,8 +129,14 @@ function Shell() {
   const saveProject = async () => {
     // What is written is this snapshot: edits made while the file is being written stay unsaved.
     const snapshot = project;
-    const json = projectToFileText(snapshot);
     const suggested = exportFileName(project.name, PROJECT_EXTENSION.slice(1), settings.timestampExports);
+    let json: string;
+    try {
+      json = projectToFileText(snapshot);
+    } catch (err) {
+      setStatus(`Could not save the project: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
     // Browsers with the File System Access API ask where to save and under what name; others download the suggested name.
     const picker = (window as unknown as { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
     if (picker) {
@@ -143,9 +153,15 @@ function Shell() {
       }
       return;
     }
-    downloadBlob(new Blob([json], { type: PROJECT_MIME }), suggested);
+    // No file handle: the browser takes the download and tells the page nothing more, so the project counts as saved once it is handed over.
+    try {
+      downloadBlob(new Blob([json], { type: PROJECT_MIME }), suggested);
+    } catch (err) {
+      setStatus(`Could not save the project: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
     markSaved(snapshot);
-    setStatus(`Project saved to ${suggested}.`);
+    setStatus(`Download of ${suggested} started: check your downloads folder. This browser cannot confirm that the file was written.`);
   };
 
   saveRef.current = saveProject;
@@ -159,9 +175,24 @@ function Shell() {
     setRepairs(null);
   };
 
+  // Open is asynchronous: the file is chosen, then read. What was confirmed is the project at the click, so an edit made after it
+  // asks again, and an Open that a later Open overtook is dropped (two reads can finish in either order).
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const openBase = useRef<Project | null>(null);
+  const openToken = useRef(0);
   const openProject = async (file: File) => {
+    const token = ++openToken.current;
+    const base = openBase.current ?? projectRef.current;
+    openBase.current = null;
     try {
       const { project: p, notes } = await readProjectFile(file);
+      const decision = openDecision({ token, latest: openToken.current, base, present: projectRef.current });
+      if (decision === 'drop') return;
+      if (decision === 'ask' && !confirmDiscard('Opening this file')) {
+        setStatus(`Opening ${file.name} was cancelled: the project was edited while the file was read.`);
+        return;
+      }
       replaceProject(p);
       setRepairs(notes.length > 0 ? { file: file.name, notes } : null);
       setStatus(openedStatus(file.name, notes));
@@ -202,7 +233,11 @@ function Shell() {
     setNavOpen,
     setInspectorOpen,
     startNewProject,
-    openProject: () => confirmDiscard('Opening another project') && fileRef.current?.click(),
+    openProject: () => {
+      if (!confirmDiscard('Opening another project')) return;
+      openBase.current = projectRef.current;
+      fileRef.current?.click();
+    },
     saveProject: () => void saveProject(),
     undo,
     redo,
@@ -210,6 +245,7 @@ function Shell() {
     setStatus,
     navigateInspector,
     openSettings: () => setSettingsOpen(true),
+    openRecovery: () => setRecoveryOpen(true),
     openShortcuts: () => setShortcutsOpen(true),
     openAbout: () => setInfoOpen(true),
   };
@@ -326,6 +362,7 @@ function Shell() {
       {repairsOpen && repairs && <RepairNotesDialog fileName={repairs.file} notes={repairs.notes} onClose={() => setRepairsOpen(false)} />}
       {recoveryConflict && <RecoveryConflictBanner onKeep={keepThisTab} onLoad={() => window.confirm(LOAD_OTHER_TAB_WARNING) && loadOtherTab()} onSave={() => void saveProject()} />}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {recoveryOpen && <RecoveryDialog onClose={() => setRecoveryOpen(false)} />}
     </div>
   );
 }

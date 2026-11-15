@@ -18,7 +18,7 @@ import { sanitizeOrder } from '../model/table/groupOrder';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
 import { RESULT_STATS } from '../model/graph/resultTokens';
 import { defaultLayout, sanitizeLayout } from '../model/project/layout';
-import { parseTable, writeProject } from './tableFile/tableCodec';
+import { checkProjectSize, parseTable, writeProject } from './tableFile/tableCodec';
 import { arr, fail, isObj, obj, str, type Obj } from './tableFile/fileChecks';
 import { FILE_FORMAT, FILE_VERSION, migrateRead, migrateShape, upgradeToCurrent } from './migrate';
 import type { Analysis, Chart, ChartLayer, Drawing, DrawingPoint, LineEnd, LineStyle, Layout, ChartType, SurvivalOptions, DataTable, Id, Project, ResultStat, SummarySpec } from '../model/types';
@@ -464,7 +464,9 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
   if (env.format !== FORMAT) fail('format', `must be "${FORMAT}"`);
   const p = upgradeToCurrent(env, notes);
   migrateShape(p, notes);
-  const dataTables = arr(p.dataTables, 'project.dataTables').map((t, i) => parseTable(t, `project.dataTables[${i}]`));
+  const rawTables = arr(p.dataTables, 'project.dataTables');
+  checkProjectSize(rawTables);
+  const dataTables = rawTables.map((t, i) => parseTable(t, `project.dataTables[${i}]`));
   const tableIds = new Set(dataTables.map((t) => t.id));
   if (tableIds.size !== dataTables.length) fail('project.dataTables', 'has two tables with the same ID');
   const charts = arr(p.charts, 'project.charts').map((c, i) => parseChart(c, `project.charts[${i}]`, dataTables, notes));
@@ -591,17 +593,40 @@ export function loadAutosave(): Project | null {
  * cannot read (a newer version, an earlier shape of the tables, a damaged copy) goes under a key of its own, which no later start replaces:
  * it may be the only copy of someone's work.
  */
-export function backupAutosave(): void {
+export function backupAutosave(): BackupOutcome {
+  let text: string | null;
   try {
-    const text = localStorage.getItem(AUTOSAVE_KEY);
-    if (!text) return;
-    try {
-      parseProject(text);
-      localStorage.setItem(AUTOSAVE_BACKUP_KEY, text);
-    } catch {
-      localStorage.setItem(AUTOSAVE_UNREADABLE_KEY, text);
-    }
+    text = localStorage.getItem(AUTOSAVE_KEY);
   } catch {
-    /* storage is unavailable: nothing to protect */
+    return 'none'; // storage is unavailable: nothing to protect
+  }
+  if (!text) return 'none';
+  let readable = true;
+  try {
+    parseProject(text);
+  } catch {
+    readable = false;
+  }
+  try {
+    if (readable) {
+      // The project is loaded from this text, so a backup that cannot be written loses nothing.
+      localStorage.setItem(AUTOSAVE_BACKUP_KEY, text);
+      return 'kept';
+    }
+    const earlier = localStorage.getItem(AUTOSAVE_UNREADABLE_KEY);
+    if (earlier === text) return 'kept';
+    // A different text already set aside may be other work: it is never replaced.
+    if (earlier) return 'held';
+    localStorage.setItem(AUTOSAVE_UNREADABLE_KEY, text);
+    return 'kept';
+  } catch {
+    // Unreadable text that could not be set aside: the next autosave would overwrite the only copy.
+    return readable ? 'kept' : 'held';
   }
 }
+
+/**
+ * What backupAutosave did. "held": text this build cannot read could not be set aside (storage refused it, or the place for it
+ * holds other work), so it must not be overwritten.
+ */
+export type BackupOutcome = 'none' | 'kept' | 'held';

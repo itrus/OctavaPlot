@@ -1,5 +1,5 @@
 import { leadingColumns } from '../../model/graph/chartTypes';
-import { MAX_TABLE_CELLS, MAX_TABLE_ROWS, canonicalObservationId, canonicalRowId, sanitizeRowTitle } from '../../model/table/rows';
+import { MAX_PROJECT_CELLS, MAX_TABLE_CELLS, MAX_TABLE_ROWS, canonicalObservationId, canonicalRowId, sanitizeRowTitle } from '../../model/table/rows';
 import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '../../model/table/tableLayout';
 import type { DataRow, DataTable, Group, Observation, Project, ReplicateLayout, SummaryFormat, TableKind } from '../../model/types';
 import { timeColumnOf, type TimeColumn } from '../../util/timeColumn';
@@ -216,6 +216,23 @@ function parseTime(raw: unknown, path: string): TimeColumn {
 
 const TABLE_KINDS: readonly TableKind[] = ['column', 'xy', 'grouped', 'contingency', 'survival'];
 
+/**
+ * Checks the cells that the tables of a file declare, all together, before any table is built: each cell becomes an object, so
+ * a small file of sparse tables can describe more than memory holds. A declaration that is not usable is left to parseTable to name.
+ */
+export function checkProjectSize(rawTables: readonly unknown[]): void {
+  let cells = 0;
+  for (const t of rawTables) {
+    if (typeof t !== 'object' || t === null) continue;
+    const { rowCount, groups } = t as { rowCount?: unknown; groups?: unknown };
+    if (typeof rowCount !== 'number' || !Number.isFinite(rowCount) || rowCount < 0 || !Array.isArray(groups)) continue;
+    // A table over its own limit is named by parseTable.
+    if (rowCount > MAX_TABLE_ROWS || rowCount * groups.length > MAX_TABLE_CELLS) continue;
+    cells += rowCount * groups.length;
+    if (cells > MAX_PROJECT_CELLS) fail('project.dataTables', `declare ${cells.toLocaleString('en-US')} cells together; a project holds at most ${MAX_PROJECT_CELLS.toLocaleString('en-US')}`);
+  }
+}
+
 export function parseTable(raw: unknown, path: string): DataTable {
   const t = obj(raw, path);
   const rowCount = num(t.rowCount, `${path}.rowCount`);
@@ -244,6 +261,8 @@ export function parseTable(raw: unknown, path: string): DataTable {
       observations,
     };
   });
+  // An absent kind is a column table (earlier files); an explicit value this build does not know is refused, not reread as another kind.
+  if (t.kind !== undefined && !TABLE_KINDS.some((k) => k === t.kind)) fail(`${path}.kind`, `is not a known table kind (${TABLE_KINDS.join(', ')})`);
   const kind: TableKind = TABLE_KINDS.find((k) => k === t.kind) ?? 'column';
   const lead = leadingColumns(kind);
   if (groups.length < lead) fail(`${path}.groups`, `a ${kind} table needs its first column (${kind === 'survival' ? 'time' : 'X'})`);

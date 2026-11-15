@@ -65,3 +65,9 @@ describe('PNG resolution', () => {
     expect(withPngDpi(junk, 300)).toBe(junk);
   });
 });
+
+describe('fitsCanvas sizes', () => {
+  it('refuses zero, negative and fractional sizes', () => {
+    for (const [w, h] of [[0, 10], [10, -1], [10.5, 10], [NaN, 10]]) expect(fitsCanvas(w, h)).toBe(false);
+  });
+});

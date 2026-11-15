@@ -60,3 +60,6 @@ export const MAX_TABLE_ROWS = 100000;
 
 /** Most cells (rows x columns) a table in a file may declare: past this the file is refused before anything is allocated. */
 export const MAX_TABLE_CELLS = 20_000_000;
+
+/** Most cells all the tables of a file may declare together: several tables that each pass the limit above still sum to a project too large to hold. */
+export const MAX_PROJECT_CELLS = 40_000_000;

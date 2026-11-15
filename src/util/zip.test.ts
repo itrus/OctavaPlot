@@ -72,3 +72,10 @@ describe('zipStore', () => {
     expect(readZip(zip)).toEqual([]);
   });
 });
+
+describe('zipStore name limit', () => {
+  it('refuses a name longer than 65535 bytes', () => {
+    expect(() => zipStore([{ name: 'a'.repeat(65536), data: new Uint8Array(0) }])).toThrow(/too long/);
+    expect(() => zipStore([{ name: 'é'.repeat(40000), data: new Uint8Array(0) }])).toThrow(/too long/);
+  });
+});

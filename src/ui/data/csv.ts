@@ -1,5 +1,5 @@
 import type { DataTable, ImportedTable } from '../../model/types';
-import { MAX_TABLE_ROWS, sanitizeRowTitle } from '../../model/table/rows';
+import { MAX_TABLE_CELLS, MAX_TABLE_ROWS, sanitizeRowTitle } from '../../model/table/rows';
 import { xySeries } from '../../model/table/tableLayout';
 import { usesSeriesBlocks } from '../../model/graph/chartTypes';
 import { formatCellFor, parseCellFor } from './cellText';
@@ -70,16 +70,24 @@ export function tableToCsv(table: DataTable, separator: DecimalSeparator = 'auto
   return lines.join('\r\n') + '\r\n';
 }
 
-/** Split CSV text into records of fields. Handles quoted fields, doubled quotes, embedded line breaks and a BOM. */
-export function parseCsv(text: string, delimiter: CsvDelimiter = ','): string[][] {
+/** Largest CSV file that is read; a larger one is refused before its contents are loaded. */
+export const MAX_CSV_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Split CSV text into records of fields. Handles quoted fields, doubled quotes, embedded line breaks and a BOM.
+ * `maxRecords`: the split stops with an error as soon as there are more records (blank lines not counted), not after the whole text.
+ */
+export function parseCsv(text: string, delimiter: CsvDelimiter = ',', maxRecords = Infinity): string[][] {
   const src = text.replace(/^\uFEFF/, '');
   const records: string[][] = [];
   let row: string[] = [];
   let field = '';
   let inQuotes = false;
   let i = 0;
+  let kept = 0;
   const endRecord = () => {
     row.push(field);
+    if (!(row.length === 1 && field.trim() === '') && ++kept > maxRecords) throw new Error(`A table holds at most ${(maxRecords - 2).toLocaleString("en-US")} rows; the file has more data lines than that.`);
     field = '';
     records.push(row);
     row = [];
@@ -208,7 +216,8 @@ export type FirstColumn = 'auto' | 'titles' | 'values';
 let lastSplit: { text: string; delimiter: CsvDelimiter; records: string[][] } | null = null;
 function splitRecords(text: string, delimiter: CsvDelimiter): string[][] {
   if (lastSplit && lastSplit.delimiter === delimiter && lastSplit.text === text) return lastSplit.records;
-  const records = parseCsv(text, delimiter);
+  // Two lines more than a table holds (the header, and one to name the excess in the message below): the split stops there instead of reading a file of any length.
+  const records = parseCsv(text, delimiter, MAX_TABLE_ROWS + 2);
   lastSplit = { text, delimiter, records };
   return records;
 }
@@ -236,6 +245,7 @@ function readCsv(text: string, separator: DecimalSeparator, delimiter: CsvDelimi
   const width = cols.length;
   const lineWidth = header.length - offset;
   if (width < 1) return { error: 'The file has no data columns.' };
+  if ((records.length - 1) * width > MAX_TABLE_CELLS) return { error: `A table holds at most ${MAX_TABLE_CELLS.toLocaleString('en-US')} cells; the file has ${((records.length - 1) * width).toLocaleString('en-US')}.` };
   const names = cols.map((c, i) => (header[c.at].trim() !== '' ? header[c.at].trim() : `Group ${i + 1}`));
   const marks = cols.some((c) => c.flag !== undefined);
   const hasSubjects = cols.some((c) => c.subject !== undefined);

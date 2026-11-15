@@ -122,3 +122,10 @@ describe('constant samples', () => {
     expect(densityProfile([4, 4, 4, 4], { smoothing: 'medium' as never, bandwidth: 1, trim: 'tails' })).toBeNull();
   });
 });
+
+describe('box mean', () => {
+  it('is the stable mean', () => {
+    expect(boxSummary([-1e16, 1, 1e16], 'tukey')?.mean).toBeCloseTo(1 / 3, 10);
+    expect(boxSummary([1e308, 1e308, 1e308, 1e308], 'tukey')?.mean).toBe(1e308);
+  });
+});

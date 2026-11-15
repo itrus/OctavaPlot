@@ -40,6 +40,9 @@ const LIMIT = 0xffffffff;
 export function zipStore(files: readonly ZipFile[], when: Date = new Date()): Uint8Array {
   if (files.length > 0xffff) throw new Error('A ZIP file holds at most 65535 files.');
   const names = files.map((f) => new TextEncoder().encode(f.name));
+  names.forEach((n, i) => {
+    if (n.length > 0xffff) throw new Error(`The name of "${files[i].name.slice(0, 40)}…" is too long for a ZIP file (65535 bytes).`);
+  });
   const { time, date } = dosDateTime(when);
   const total = files.reduce((n, f, i) => n + 30 + names[i].length + f.data.length + 46 + names[i].length, 22);
   // The total holds every file, so a file of 4 GB or more is caught here too.
