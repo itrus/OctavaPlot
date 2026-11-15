@@ -8,7 +8,7 @@ import { chartFamily, supportsHorizontal } from '../../model/graph/chartTypes';
 import { layoutOf, summaryFormatInfo, xySeries } from '../../model/table/tableLayout';
 import { hasFactors, seriesPaletteIndex, usesFactors } from '../../model/table/factors';
 import { resolveSummary } from '../../model/graph/summary';
-import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from '../../stats/describe';
+import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from './common/summaryUi';
 import { tooltipFmt } from '../../chart/tooltip';
 import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, OffsetSection } from './sections/LookControls';
 import { autoOffsetStep } from '../../model/table/offset';
@@ -18,7 +18,7 @@ import { bindingOf, bindingSelectState } from '../../chart/shared/axes/axes';
 import { IntervalFields, LineAtField } from './sections/SummaryControls';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { AxisBinding, AxisConfig, Chart, ChartStyle, DataTable, LineConnect, LineStyle, SummarySpec } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useProject, useSelection } from '../../state/AppContext';
 import { MAX_LEGEND_SIZES } from '../../chart/shared/scene/sizeLegend';
 import { NumberListField } from './common/NumberListField';
 import { patchAxis, patchChart, patchLook, patchStyle, patchSurvival } from '../../state/commands';
@@ -53,7 +53,7 @@ const stepOf = majorStepOf;
 
 /** Range, limits and ticks of one numeric axis: Auto fits the data, Manual uses the limits. */
 export function AxisLimits({ chart, which, scale, name, canScale = true, canReverse = true, time }: { chart: Chart; which: 'xAxis' | 'yAxis' | 'y2Axis'; scale: YAxisScale; name: string; canScale?: boolean; canReverse?: boolean; time?: TimeColumn }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const axis = chart[which];
   const ctx = axisCtx(axis, scale);
   const tag = which === 'xAxis' ? 'x' : 'y';
@@ -106,7 +106,9 @@ const SEVERAL = '__several__';
 
 
 export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { project, selection, setSelection, run } = useApp();
+  const { project } = useProject();
+  const { selection, setSelection } = useSelection();
+  const { run } = useCommands();
   const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages);
   const { shows } = nav;
 

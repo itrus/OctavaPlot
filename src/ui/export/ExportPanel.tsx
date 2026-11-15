@@ -4,7 +4,7 @@ import { buildExportReport } from '../../chart/export/exportReport';
 import { resolveFit } from '../../model/options/fitOptions';
 import { analysesOf } from '../../model/project/analysis';
 import type { Chart, DataTable } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { useCommands, usePreferences, useProject } from '../../state/AppContext';
 import { EXPORT_DPI_CHOICES, type ExportDpi, type ExportFormat } from '../../state/settings';
 import { Field, SelectInput } from '../inspector/common/controls';
 import { useFitsVersion } from '../components/useFitsVersion';
@@ -66,7 +66,9 @@ export function ExportButton({ fileName, disabled, onClick, title }: { fileName:
 
 /** The export of the graph, as a page of the inspector: the format, the Export button, and the report of what the file will hold. */
 export function ExportPanel({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { project, settings, updateSettings, setStatus } = useApp();
+  const { project } = useProject();
+  const { settings, updateSettings } = usePreferences();
+  const { setStatus } = useCommands();
   const job = useExportJob(setStatus);
   const curve = useMemo(() => resolveFit(chart.fit, analysesOf(project), table.id), [chart.fit, project.analyses, table.id]);
   const fitsVersion = useFitsVersion();

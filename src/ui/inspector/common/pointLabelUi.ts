@@ -5,16 +5,8 @@ import type {
   PointLabelPlacement,
   PointLabelSource,
 } from '../../../model/types';
-import {
-  LABEL_AUTO_COLOR,
-  LABEL_DECIMALS_LIMITS,
-  effectiveLabelSource,
-  labelAvailability,
-  labelWarnings,
-  sanitizeLabelStyle,
-  type PointLabelReport,
-  type SuppressedLabel,
-} from '../../../chart/shared/parts/labels';
+import { labelWarnings, type PointLabelReport, type SuppressedLabel } from '../../../chart/shared/parts/labels';
+import { LABEL_AUTO_COLOR, LABEL_DECIMALS_LIMITS, effectiveLabelSource, sanitizeLabelStyle } from '../../../model/options/pointLabelOptions';
 
 const PLACEMENT_OPTIONS: Array<{ value: PointLabelPlacement; label: string }> = [
   { value: 'above-right', label: 'Above right' },
@@ -153,4 +145,35 @@ export function suppressedRows(suppressed: readonly SuppressedLabel[]): { rows: 
     .slice(0, MAX_SUPPRESSED_ROWS)
     .map((s) => `${s.text === '' ? '(empty)' : s.text}: ${SUPPRESSED_REASON[s.reason] ?? 'hidden'}`);
   return { rows, more: Math.max(0, suppressed.length - rows.length) };
+}
+
+const LABEL_REASONS = {
+  needsSymbols: 'Point labels need Symbols to be shown.',
+  meanRowTitle: 'Mean markers have no single row; they are labelled with their value.',
+} as const;
+
+interface LabelSourceState {
+  value: PointLabelSource;
+  enabled: boolean;
+  reason: string | null;
+}
+
+interface LabelAvailability {
+  available: boolean;
+  reason: string | null;
+  sources: LabelSourceState[];
+}
+
+/** Which label controls apply; reasons are data so the Inspector can show them. */
+export function labelAvailability(type: ChartType, style: Pick<ChartStyle, 'showSymbols'>): LabelAvailability {
+  const available = style.showSymbols;
+  const rowTitleOk = type !== 'mean';
+  return {
+    available,
+    reason: available ? null : LABEL_REASONS.needsSymbols,
+    sources: [
+      { value: 'rowTitle', enabled: available && rowTitleOk, reason: rowTitleOk ? null : LABEL_REASONS.meanRowTitle },
+      { value: 'value', enabled: available, reason: null },
+    ],
+  };
 }

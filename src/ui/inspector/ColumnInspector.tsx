@@ -11,17 +11,8 @@ import { clippedEndpointCount, clippedEndpointMessage } from '../../chart/shared
 import { buildColumnModel } from '../../chart/column/columnModel';
 import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext } from '../../chart/shared/axes/scales';
 import { tooltipFmt } from '../../chart/tooltip';
-import {
-  DIRECTION_HINT,
-  centreChangeCompat,
-  centreTitles,
-  centreNoticeLines,
-  describeCounts,
-  describeSummaryControls,
-  datasetRowText,
-  intervalCaptionLines,
-} from '../../stats/describe';
-import { useApp } from '../../state/AppContext';
+import { DIRECTION_HINT, centreChangeCompat, centreTitles, centreNoticeLines, describeCounts, describeSummaryControls, datasetRowText, intervalCaptionLines } from './common/summaryUi';
+import { useCommands, useSelection } from '../../state/AppContext';
 import {
   composeCommands,
   patchAxis,
@@ -91,7 +82,8 @@ const SEVERAL = '__several__';
 /** The centre the bars and dots are drawn at, and its calculation options, are on the Plot page; Analysis stays for the charts that have a distribution to set. */
 
 export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { selection, setSelection, run, setStatus } = useApp();
+  const { selection, setSelection } = useSelection();
+  const { run, setStatus } = useCommands();
   const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages);
   const { shows } = nav;
   const layer = dataLayer(chart);

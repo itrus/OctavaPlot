@@ -5,8 +5,9 @@ import { fitsCanvas } from '../../chart/export/pngDpi';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
 import { newId } from '../../model/ids';
 import { FOLDER_NOUN, FOLDER_TITLE } from '../../model/project/folderItems';
-import type { Chart, DataTable, FitSettings, FolderKey, Id, ViewRef } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import type { Chart, DataTable, FitSettings, FolderKey, Id } from '../../model/types';
+import type { ViewRef } from '../../model/editor/types';
+import { useCommands, useNavigation, usePreferences, useProject } from '../../state/AppContext';
 import { duplicateItems, moveItems, nudgeItems, removeItems, renameItem, sortItemsByName } from '../../state/commands';
 import { Thumb, type ThumbItem } from './FolderThumbs';
 import { NOTHING_PICKED, pick, pickAll, pickedInOrder, prune, type PickState } from './folderSelection';
@@ -25,7 +26,10 @@ const KIND = { tables: 'table', results: 'analysis', graphs: 'chart', layouts: '
  * box, Ctrl+A), then open, rename, copy, reorder (drag them, or the arrows) or delete them. Everything can be undone.
  */
 export function FolderView({ folder }: { folder: FolderKey }) {
-  const { project, setView, run, setStatus, settings } = useApp();
+  const { project } = useProject();
+  const { setView } = useNavigation();
+  const { run, setStatus } = useCommands();
+  const { settings } = usePreferences();
   const [picks, setPicks] = useState<PickState>(NOTHING_PICKED);
   const [renaming, setRenaming] = useState<Id | null>(null);
   const [dragging, setDragging] = useState<Id[] | null>(null);

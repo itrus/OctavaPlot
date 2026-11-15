@@ -54,6 +54,19 @@ describe('drawing objects in the project', () => {
     expect(r.project.layouts?.[0].drawings).toEqual(p.layouts?.[0].drawings);
   });
 
+  it('keeps a figure drawn beyond page edges unchanged after saving and reopening', () => {
+    let p = withLayout();
+    const d = createDrawing(presetById('rect')!, { xFrac: -0.1, yFrac: 0.9 }, { xFrac: 1.2, yFrac: 1.3 }, look, 'edge');
+    expect(d.from).toEqual({ xFrac: 0, yFrac: 0.9 });
+    expect(d.to).toEqual({ xFrac: 1, yFrac: 1 });
+    p = addDrawing({ chartId: p.charts[0].id }, d)(p);
+    p = addDrawing({ layoutId: 'l1' }, { ...d, id: 'page-edge' })(p);
+    const r = parseProjectWithNotes(stringifyProject(p));
+    expect(r.notes).toEqual([]);
+    expect(r.project.charts[0].drawings).toEqual(p.charts[0].drawings);
+    expect(r.project.layouts![0].drawings).toEqual(p.layouts![0].drawings);
+  });
+
   it('are checked when a file is read: an entry that cannot be read is dropped with a note, wrong values take their defaults, a page never anchors to data', () => {
     let p = withLayout();
     const env = JSON.parse(stringifyProject(p));

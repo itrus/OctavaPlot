@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
-import type { Annotation, Chart, Drawing, Selection } from '../../../model/types';
+import type { Annotation, Chart, Drawing } from '../../../model/types';
+import type { Selection } from '../../../model/editor/types';
 import { selectedAnnotationIds, selectedPoints } from '../../../model/graph/selection/multi';
 import { n2 } from '../../../model/units';
 import { annotationElements } from './annotations';

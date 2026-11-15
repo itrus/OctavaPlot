@@ -2,7 +2,7 @@ import { EXTRA_TICK_LIMITS, MAX_EXTRA_TICKS } from '../../../model/graph/axis';
 import { LINE_STYLES } from '../../../model/graph/look';
 import type { YAxisScale } from '../../../chart/shared/axes/scales';
 import type { Chart, ExtraTick, ExtraTickDirection, LineStyle } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { patchAxis } from '../../../state/commands';
 import type { TimeColumn } from '../../../util/timeColumn';
 import { Check, ColorInput, Field, GroupBox, NumField, SelectInput, TextInput } from '../common/controls';
@@ -23,7 +23,7 @@ const DIRECTIONS: Array<{ value: ExtraTickDirection; label: string }> = [
  * front of the data).
  */
 export function ExtraTicksControls({ chart, which, scale, name, time }: { chart: Chart; which: 'xAxis' | 'yAxis'; scale: YAxisScale; name: string; time?: TimeColumn }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const ticks = chart[which].extraTicks ?? [];
   const tag = which === 'xAxis' ? 'x' : 'y';
   const grid = chart.grid;

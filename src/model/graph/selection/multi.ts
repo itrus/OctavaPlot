@@ -1,4 +1,5 @@
-import type { Annotation, Chart, ChartLayer, ChartStyle, Group, Id, Selection } from '../../types';
+import type { Annotation, Chart, ChartLayer, ChartStyle, Group, Id } from '../../types';
+import type { Selection } from '../../editor/types';
 import { resolveStyle } from '../style';
 
 /** A point of a chart: the data set it is in and the ID of its observation. */

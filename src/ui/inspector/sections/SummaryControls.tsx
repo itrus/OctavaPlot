@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CentreKind, InvalidPolicy, SmallSamplePolicy, SpreadKind } from '../../../model/types';
-import {
-  centreName,
-  confidencePercentText,
-  describeSummaryControls,
-  parseConfidencePercent,
-  spreadSelectModel,
-} from '../../../stats/describe';
+import { centreName } from '../../../model/presentation/summaryText';
+import { confidencePercentText, describeSummaryControls, parseConfidencePercent, spreadSelectModel } from '../common/summaryUi';
 import { Check, Field, FieldInput, type Overridden, SelectInput } from '../common/controls';
 
 const CENTRES: CentreKind[] = ['mean', 'geometricMean', 'median'];

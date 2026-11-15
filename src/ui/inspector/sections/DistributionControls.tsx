@@ -1,6 +1,6 @@
 import { DISTRIBUTION_LIMITS } from '../../../model/options/distributionOptions';
 import type { Chart, DistributionPoints, SmoothingLevel, ViolinNormalisationKind, WhiskerRuleKind } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { patchDistribution } from '../../../state/commands';
 import { WHISKER_RULES } from '../../../stats/distribution';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SelectInput } from '../common/controls';
@@ -20,7 +20,7 @@ const NORMALISATION: Array<{ value: ViolinNormalisationKind; label: string }> = 
 
 /** The settings of a box plot or a violin that are shared by all data sets (spec 10). */
 export function DistributionControls({ chart, lineColor, lineWidthPt, lineOpacity, onLine }: { chart: Chart; lineColor: string; lineWidthPt: number; lineOpacity: number; onLine: (patch: { lineColor?: string; lineWidthPt?: number; lineOpacity?: number }) => void }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const d = chart.distribution;
   const set = (label: string, patch: Partial<Chart['distribution']>, key?: string) => run(label, patchDistribution(chart.id, patch), key);
   const box = chart.type === 'box' || chart.type === 'groupedBox';

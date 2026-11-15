@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../model/defaults';
-import type { ChartType, Project, Selection, TableKind } from '../model/types';
+import type { ChartType, Project, TableKind } from '../model/types';
+import type { Selection } from '../model/editor/types';
 import { addChart, addDataTable } from '../state/commands';
 import { buildAnyModel } from './anyModel';
 import { describeSelection, nextSelection, selectableMarks, type StepGroup } from './selectionOrder';

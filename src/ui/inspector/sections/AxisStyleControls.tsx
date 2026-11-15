@@ -1,7 +1,7 @@
 import type { YAxisScale } from '../../../chart/shared/axes/scales';
 import { AXIS_LIMITS, AXIS_SCALES, BREAK_MARKS, MAX_BREAKS, NUMBER_FORMATS, TICK_DIRECTIONS } from '../../../model/graph/axis';
 import type { AxisBreak, AxisScaleKind, BreakMark, Chart, NumberFormatKind, TickDirection } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { patchAxis, type AxisKey } from '../../../state/commands';
 import { Check, Field, NumField, Section, SelectInput, TextInput } from '../common/controls';
 import { TimeField } from '../common/TimeField';
@@ -13,7 +13,7 @@ const DECIMALS = ['auto', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'
 
 /** A change to one axis of the chart, as one undo step named after the axis ("X axis tick length"). */
 function useAxisEdit(chart: Chart, which: AxisKey, name: string): (label: string, patch: Parameters<typeof patchAxis>[2], key?: string) => void {
-  const { run } = useApp();
+  const { run } = useCommands();
   return (label, patch, key) => run(`${name} ${label}`, patchAxis(chart.id, which, patch), key);
 }
 
@@ -147,7 +147,7 @@ export function TickFields({ chart, which, name }: { chart: Chart; which: AxisKe
  * below. A new break starts in the middle of the axis, a third of its range wide.
  */
 function BreakFields({ chart, which, name, scale, blocked, time }: { chart: Chart; which: AxisKey; name: string; scale: YAxisScale; blocked: string | null; time?: TimeColumn }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const axis = chart[which];
   const set = (breaks: AxisBreak[], label: string, key?: string) => run(`${name} ${label}`, patchAxis(chart.id, which, { breaks }), key);
   const [lo, hi] = [Math.min(...scale.domain), Math.max(...scale.domain)];

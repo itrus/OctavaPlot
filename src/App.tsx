@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { prepareChartInput } from './model/table/preparedChart';
-import { AppProvider, useApp } from './state/AppContext';
-import { openedStatus, PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile, refusedStatus } from './state/projectFile';
+import { AppProvider, useCommands, useGraphViewport, useHistory, useLayoutViewport, useNavigation, usePreferences, useProject, useRecovery, useResultsViewport, useStatus, useTableViewport } from './state/AppContext';
+import { openedStatus, refusedStatus, PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile } from './state/projectFile';
 import { Navigator } from './ui/navigator/Navigator';
 import { Splitter } from './ui/components/Splitter';
 import { NewProjectIcon, OpenProjectIcon, InfoIcon, SaveProjectIcon, SettingsIcon, FitWindowIcon, ImportIcon, ExportIcon, FitCurveIcon, DeleteIcon, GRAPH_PAGE_ICONS, LAYOUT_PAGE_ICONS, ResetIcon, TableTypeIcon, AddColumnIcon, ExcludeIcon, IncludeIcon } from './ui/components/icons';
@@ -31,12 +31,15 @@ type SaveFilePicker = (options: {
 }) => Promise<{ name: string; createWritable: () => Promise<{ write: (data: string) => Promise<void>; close: () => Promise<void> }> }>;
 
 // Each workspace view is its own chunk, loaded when first opened.
-const DataTableView = lazy(() => import('./ui/views/DataTableView').then((m) => ({ default: m.DataTableView })));
-const AnalysisView = lazy(() => import('./ui/views/AnalysisView').then((m) => ({ default: m.AnalysisView })));
-const LayoutView = lazy(() => import('./ui/views/LayoutView').then((m) => ({ default: m.LayoutView })));
-const FolderView = lazy(() => import('./ui/views/FolderView').then((m) => ({ default: m.FolderView })));
-const GraphView = lazy(() => import('./ui/views/GraphView').then((m) => ({ default: m.GraphView })));
-const Inspector = lazy(() => import('./ui/inspector/Inspector').then((m) => ({ default: m.Inspector })));
+const DataTableView = lazy(() => import('./ui/views/DataTableView').then((m) => ({ default: memo(m.DataTableView) })));
+const AnalysisView = lazy(() => import('./ui/views/AnalysisView').then((m) => ({ default: memo(m.AnalysisView) })));
+const LayoutView = lazy(() => import('./ui/views/LayoutView').then((m) => ({ default: memo(m.LayoutView) })));
+const FolderView = lazy(() => import('./ui/views/FolderView').then((m) => ({ default: memo(m.FolderView) })));
+const GraphView = lazy(() => import('./ui/views/GraphView').then((m) => ({ default: memo(m.GraphView) })));
+const Inspector = lazy(() => import('./ui/inspector/Inspector').then((m) => ({ default: memo(m.Inspector) })));
+
+// Keep shell-only changes (status and zoom controls) out of unrelated workspace trees.
+const MemoNavigator = memo(Navigator);
 
 /** A window outline with the left or right strip filled: the usual "side panel" glyph. */
 function PanelIcon({ side }: { side: 'left' | 'right' }) {
@@ -49,7 +52,17 @@ function PanelIcon({ side }: { side: 'left' | 'right' }) {
 }
 
 function Shell() {
-  const { project, view, run, undo, redo, replaceProject, newProject, hasUnsavedChanges, markSaved, status, setStatus, recoveryText, recoveryConflict, keepThisTab, loadOtherTab, zoom, setZoom, tableZoom, setTableZoom, resultsZoom, setResultsZoom, layoutZoom, setLayoutZoom, settings, requestFit, inspectorNav, navigateInspector, canUndo, canRedo } = useApp();
+  const { project, replaceProject, newProject, hasUnsavedChanges, markSaved } = useProject();
+  const { view, inspectorNav, navigateInspector } = useNavigation();
+  const { run, setStatus } = useCommands();
+  const { undo, redo, canUndo, canRedo } = useHistory();
+  const { status } = useStatus();
+  const { recoveryText, recoveryConflict, keepThisTab, loadOtherTab } = useRecovery();
+  const { zoom, setZoom, requestFit } = useGraphViewport();
+  const { tableZoom, setTableZoom } = useTableViewport();
+  const { resultsZoom, setResultsZoom } = useResultsViewport();
+  const { layoutZoom, setLayoutZoom } = useLayoutViewport();
+  const { settings } = usePreferences();
   const fileRef = useRef<HTMLInputElement>(null);
   // Panels are only hidden (never unmounted), so their selections and edits survive a collapse.
   const [navOpen, setNavOpen] = useState(true);
@@ -397,7 +410,7 @@ function Shell() {
         />
       </header>
       <MenuBar menus={menus} />
-      <Navigator />
+      <MemoNavigator />
       {navOpen && <Splitter side="nav" width={navW} min={180} max={480} onWidth={setNavW} label="Resize the navigation panel" />}
       {hasInspector && inspectorOpen && <Splitter side="insp" width={inspW} min={260} max={640} onWidth={setInspW} label="Resize the inspector" />}
       <main className="workspace">

@@ -1026,29 +1026,13 @@ export interface Project {
   layouts?: Layout[];
 }
 
-export type Selection =
-  | { kind: 'chart' }
-  | { kind: 'group'; groupId: Id }
-  /** Several data sets edited together (two or more; one is a 'group'). */
-  | { kind: 'groups'; groupIds: Id[] }
-  /** One raw observation's symbol (and its label); mean markers are not selectable. */
-  | { kind: 'point'; groupId: Id; pointId: Id }
-  /** Several points edited together (two or more; one is a 'point'), in the order they were picked; they may belong to different data sets. */
-  | { kind: 'points'; points: Array<{ groupId: Id; pointId: Id }> }
-  | { kind: 'annotation'; annotationId: Id }
-  /** Several annotations edited together (two or more; one is an 'annotation'). */
-  | { kind: 'annotations'; annotationIds: Id[] }
-  /** One drawing object or several, edited together. */
-  | { kind: 'drawings'; drawingIds: Id[] };
-
 /** How numbers are written: by the decimal point, by the decimal comma, or either (a comma is taken as a decimal comma). */
 export type DecimalSeparator = 'auto' | 'point' | 'comma';
 
 /** The folders of the navigator: Data Tables, Results, Graphs, Layouts. */
 export type FolderKey = 'tables' | 'results' | 'graphs' | 'layouts';
 
-/** A page of the project, or the overview of a folder (all its pages as thumbnails). */
-export type ViewRef = { kind: 'table'; id: Id } | { kind: 'chart'; id: Id } | { kind: 'analysis'; id: Id } | { kind: 'layout'; id: Id } | { kind: 'folder'; id: FolderKey };
+
 
 /** Volcano plots: X is a log2 fold change; Y is a p-value, or its -log10 when `yInput` says so. Up: X at or above the fold threshold and p below the threshold; down: the same on the negative side. */
 export interface VolcanoOptions {

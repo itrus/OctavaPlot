@@ -1,7 +1,7 @@
 import { applyOrder, moveGroup, type MoveOp } from '../../../model/table/groupOrder';
 import type { Chart, Group } from '../../../model/types';
 import { displayName } from '../../../chart/shared/parts/names';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { setLegendOrder } from '../../../state/commands';
 import { SubHeading } from '../common/controls';
 
@@ -10,7 +10,7 @@ import { SubHeading } from '../common/controls';
  * marks of the graph keep the order the data sets are drawn in.
  */
 export function LegendOrder({ chart, groups }: { chart: Chart; groups: Group[] }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const entries = applyOrder(groups, chart.legend.order ?? []);
   const ids = entries.map((g) => g.id);
   const off = !chart.legend.visible;

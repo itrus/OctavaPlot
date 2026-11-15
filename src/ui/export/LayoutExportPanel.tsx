@@ -3,8 +3,8 @@ import { layoutPngSize, layoutTextGroups, layoutToPdf, layoutToPngBlob, layoutTo
 import { buildExportReport } from '../../chart/export/exportReport';
 import { FONT_FAMILY } from '../../model/defaults';
 import type { Layout } from '../../model/types';
+import { useCommands, usePreferences, useProject } from '../../state/AppContext';
 import { ptToPx } from '../../model/units';
-import { useApp } from '../../state/AppContext';
 import { downloadBlob } from '../../util/download';
 import { browserFontAvailable, browserHasGlyph } from './browserFonts';
 import { ReportBody } from './ReportBody';
@@ -19,7 +19,9 @@ import { FileSizeLine } from './FileSizeLine';
  * resolution is chosen; both are remembered in Settings), the Export button, and the report of what the file will hold.
  */
 export function LayoutExportPanel({ layout, drawing }: { layout: Layout; drawing: LayoutDrawing }) {
-  const { project, settings, updateSettings, setStatus } = useApp();
+  const { project } = useProject();
+  const { settings, updateSettings } = usePreferences();
+  const { setStatus } = useCommands();
   // One export at a time: while one runs the Export button is disabled, and a second start is ignored.
   const job = useExportJob(setStatus);
   const format = settings.exportFormat;

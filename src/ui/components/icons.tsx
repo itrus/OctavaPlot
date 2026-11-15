@@ -127,7 +127,7 @@ export const AddManyRowsIcon = () => (
 );
 
 /** The pages of the inspector rail. */
-export const GraphPageIcon = () => (
+const GraphPageIcon = () => (
   <Icon>
     <rect x="2" y="2.5" width="12" height="11" rx="1.2" />
     <path d="M2 5.6h12M5.4 5.6v7.9" />
@@ -135,14 +135,14 @@ export const GraphPageIcon = () => (
 );
 
 /** The pages of a layout's inspector: the sheet, and the boxes on it. */
-export const SheetPageIcon = () => (
+const SheetPageIcon = () => (
   <Icon>
     <path d="M3.6 1.8h6.6l2.4 2.4v10H3.6z" />
     <path d="M10.2 1.8v2.4h2.4" />
   </Icon>
 );
 
-export const PanelsPageIcon = () => (
+const PanelsPageIcon = () => (
   <Icon>
     <rect x="2.2" y="2.2" width="5" height="5" rx=".8" />
     <rect x="8.8" y="2.2" width="5" height="5" rx=".8" />
@@ -150,21 +150,21 @@ export const PanelsPageIcon = () => (
   </Icon>
 );
 
-export const PlotPageIcon = () => (
+const PlotPageIcon = () => (
   <Icon>
     <path d="M2.2 2.4v11.2h11.6" />
     <path d="M5 11V8.4M8 11V5.2M11 11V7" />
   </Icon>
 );
 
-export const AxesPageIcon = () => (
+const AxesPageIcon = () => (
   <Icon>
     <path d="M3 2.4v10.6h10.6" />
     <path d="M3 5.2h1.6M3 8h1.6M6 13v-1.6M9 13v-1.6M12 13v-1.6" />
   </Icon>
 );
 
-export const LegendPageIcon = () => (
+const LegendPageIcon = () => (
   <Icon>
     <rect x="2.2" y="3" width="3" height="3" rx=".6" />
     <rect x="2.2" y="9.4" width="3" height="3" rx=".6" />
@@ -172,14 +172,14 @@ export const LegendPageIcon = () => (
   </Icon>
 );
 
-export const AnalysisPageIcon = () => (
+const AnalysisPageIcon = () => (
   <Icon>
     <rect x="2.6" y="1.8" width="10.8" height="12.4" rx="1.2" />
     <path d="M5 4.6h6M5.2 7.6h1M8 7.6h1M10.8 7.6h.2M5.2 10.4h1M8 10.4h1M10.8 10.4h.2" />
   </Icon>
 );
 
-export const NotesPageIcon = () => (
+const NotesPageIcon = () => (
   <Icon>
     <path d="M2.6 3h10.8v7.2H8.4L5.4 13v-2.8H2.6z" />
     <path d="M5 5.6h6M5 7.6h3.6" />

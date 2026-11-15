@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import { layerBaseStyle, layerEditLook, layerRows } from '../../../model/graph/layers';
 import { LINE_STYLES } from '../../../model/graph/look';
 import type { Chart, DataTable, LayerStyle, LineStyle } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { moveLayer, patchLayerStyle, resetLayerOrder, setLayerHidden, setLayerRange } from '../../../state/commands';
 import { Check, ColorInput, Field, NumField, Section, SelectInput } from '../common/controls';
 import { SymbolPicker } from '../common/SymbolPicker';
@@ -24,7 +24,7 @@ export function LayersSection({ chart, table }: { chart: Chart; table: DataTable
 }
 
 function LayersBody({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const rows = layerRows(chart, table, (id, fallback) => displayName(chart, id, fallback));
   return (
     <>

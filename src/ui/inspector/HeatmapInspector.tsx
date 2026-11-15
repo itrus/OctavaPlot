@@ -2,7 +2,7 @@ import { editScale, paletteColour, seedCustom } from '../../chart/heatmap/heatCo
 import { HEAT_LIMITS, HEAT_MARKS, HEAT_PALETTE_GROUPS, HEAT_STATISTICS, isDiverging } from '../../model/options/heatmapOptions';
 import { GroupedSelectField } from './GroupedSelect';
 import type { Chart, DataTable, HeatmapOptions } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { useCommands } from '../../state/AppContext';
 import { patchAxis, patchLook } from '../../state/commands';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SelectInput, TextInput } from './common/controls';
 import { InspectorShell } from './common/InspectorShell';
@@ -34,7 +34,7 @@ function MarkField({ label, value, onChange }: { label: string; value: HeatmapOp
 
 /** The formatting panel of heat maps of a grouped table. */
 export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages, inspectorShapeOf(chart.type).lacks);
   const { shows } = nav;
   const o = chart.heatmap;

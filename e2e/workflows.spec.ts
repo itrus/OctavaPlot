@@ -100,13 +100,14 @@ test.describe('files', () => {
     await expect(cell(page, 0, 0)).toHaveText('7.77');
   });
 
-  test('a PNG export has the size the panel states, and no resolution to choose', async ({ page }) => {
+  test('a PNG export matches the reported dimensions and chosen resolution', async ({ page }) => {
     await openApp(page);
     await openGraph(page);
     await expect(page.getByRole('navigation', { name: 'Graph settings pages' })).toBeVisible();
     await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' }).click();
     const panel = page.locator('.export-panel');
     await expect(panel).toBeVisible();
+    await panel.getByRole('button', { name: '150 dpi', exact: true }).click();
     // The size is a list of three lines (px, pt, mm); a graph's PNG has the pixels of the first, so there is no Picture line.
     const sizes = panel.locator('.report-sizes li');
     await expect(sizes).toHaveCount(3);
@@ -115,9 +116,8 @@ test.describe('files', () => {
     const [, w, h] = /^(\d+) × (\d+) px$/.exec((await sizes.first().textContent()) ?? '') ?? [];
     expect(Number(w)).toBeGreaterThan(0);
     await expect(panel.getByText(/^Picture: /)).toHaveCount(0);
-    // There is no filename to type and no resolution to choose: only a layout page has a resolution.
+    // The filename is generated automatically.
     await expect(panel.getByText('Filename')).toHaveCount(0);
-    await expect(panel.getByRole('combobox', { name: /Resolution/ })).toHaveCount(0);
 
     const download = page.waitForEvent('download');
     // The button names the file it writes: the name of the graph, the date and time of Settings, the extension.
@@ -134,9 +134,9 @@ test.describe('files', () => {
     expect([...bytes.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     expect(bytes.readUInt32BE(16)).toBe(Number(w));
     expect(bytes.readUInt32BE(20)).toBe(Number(h));
-    // The size on screen, 96 dpi, is written into the file (pHYs, pixels per metre).
+    // The chosen resolution is written into the file (pHYs, pixels per metre).
     const phys = bytes.indexOf(Buffer.from('pHYs'));
     expect(phys).toBeGreaterThan(0);
-    expect(Math.round(bytes.readUInt32BE(phys + 4) * 0.0254)).toBe(96);
+    expect(Math.round(bytes.readUInt32BE(phys + 4) * 0.0254)).toBe(150);
   });
 });

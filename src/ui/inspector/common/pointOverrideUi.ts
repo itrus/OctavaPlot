@@ -1,6 +1,8 @@
-import type { ChartStyle, ChartType, DataTable, Group, Id, PointLabelPlacement, Selection } from '../../../model/types';
+import type { ChartStyle, ChartType, DataTable, Group, Id, PointLabelPlacement } from '../../../model/types';
 import { DEFAULT_STYLE } from '../../../model/defaults';
-import { LABEL_OFFSET_LIMITS, type Box, type PlacementCode, type PointLabelModel } from '../../../chart/shared/parts/labels';
+import type { Selection } from '../../../model/editor/types';
+import { type Box, type PlacementCode, type PointLabelModel } from '../../../chart/shared/parts/labels';
+import { LABEL_OFFSET_LIMITS } from '../../../model/options/pointLabelOptions';
 import { LABEL_STYLE_KEYS } from '../../../model/graph/style';
 import { selectedGroupIds, selectionOfGroups } from '../../../model/graph/selection/scope';
 import { selectionOfPoints } from '../../../model/graph/selection/multi';

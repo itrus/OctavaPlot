@@ -1,7 +1,7 @@
 import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import { isCommitEnter } from '../components/shortcutGuard';
 import type { DataTable, DecimalSeparator, TableKind } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useNavigation, usePreferences, useProject, useTableViewport } from '../../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';
 import { newId } from '../../model/ids';
 import { addAnalysis, addGroup, changeTableKind, appendRows, composeCommands, deleteRows, duplicateRows, insertRows, MAX_TABLE_ROWS, rowRoom, setColumnTime, setExcluded, setFactor, pasteMatrix, removeGroup, renameGroup, removeSeries, renameSeries, replaceTableData, setCells, setRowTitles, type CellEdit } from '../../state/commands';
@@ -208,7 +208,11 @@ const KIND_TEXT: Record<TableKind, { label: string; noun: string; add: string; l
 };
 
 export function DataTableView({ table }: { table: DataTable }) {
-  const { project, run, tableZoom: z, settings, setView, setStatus } = useApp();
+  const { project } = useProject();
+  const { run, setStatus } = useCommands();
+  const { tableZoom: z } = useTableViewport();
+  const { settings } = usePreferences();
+  const { setView } = useNavigation();
   // Tables other than the column table group their columns into series; XY and survival tables lead with X / time.
   const isSeries = usesSeriesBlocks(table.kind);
   const lead = leadingColumns(table.kind);

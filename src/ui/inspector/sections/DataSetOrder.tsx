@@ -1,6 +1,6 @@
 import { moveGroup, type MoveOp } from '../../../model/table/groupOrder';
 import type { Chart, Id } from '../../../model/types';
-import { useApp } from '../../../state/AppContext';
+import { useCommands } from '../../../state/AppContext';
 import { setGroupOrder } from '../../../state/commands';
 import { SubHeading } from '../common/controls';
 
@@ -9,7 +9,7 @@ import { SubHeading } from '../common/controls';
  * the data set when it moves.
  */
 export function DataSetOrder({ chart, groups, heading = 'Order, left to right' }: { chart: Chart; groups: Array<{ id: Id; label: string }>; heading?: string }) {
-  const { run } = useApp();
+  const { run } = useCommands();
   const ids = groups.map((g) => g.id);
   const move = (id: Id, op: MoveOp) => run(op === 'reverse' ? 'Reverse data sets' : 'Move data set', setGroupOrder(chart.id, moveGroup(ids, id, op)));
   return (

@@ -4,7 +4,7 @@ import { analysesOf } from '../../../model/project/analysis';
 import { newId } from '../../../model/ids';
 import type { Chart, ChartFit, DataTable } from '../../../model/types';
 import { fitModelById } from '../../../stats/fitModels';
-import { useApp } from '../../../state/AppContext';
+import { useCommands, useNavigation, useProject, useSelection } from '../../../state/AppContext';
 import { addAnalysis, addAnnotation, composeCommands, patchLook } from '../../../state/commands';
 import { Check, Field, GroupBox, SelectInput } from '../common/controls';
 
@@ -13,7 +13,10 @@ import { Check, Field, GroupBox, SelectInput } from '../common/controls';
  * the chart picks one and chooses how the curve is drawn.
  */
 export function FitSection({ chart, table, model }: { chart: Chart; table: DataTable; model: XyModel }) {
-  const { project, run, setView, setSelection } = useApp();
+  const { project } = useProject();
+  const { run } = useCommands();
+  const { setView } = useNavigation();
+  const { setSelection } = useSelection();
   const f = chart.fit;
   const fits = analysesOf(project).filter((a) => a.kind === 'curvefit' && a.dataTableId === table.id);
   const chosen = fits.find((a) => a.id === f.analysisId);

@@ -83,11 +83,13 @@ The source is in `src/`, in layers. A layer imports from its own folder and from
 | `src/util/` | Download and file-name helpers; the date stamp of file names; rich text (`richText.ts`); date, time and duration columns (`timeColumn.ts`); a ZIP writer with CRC-32, no library (`zip.ts`) |
 | `src/stats/` | The calculations, with no knowledge of charts: summaries and intervals (`summary.ts`), box and density (`distribution.ts`), curve fits (`fit.ts`), histogram and cumulative bins, matrices, special functions, the calculation cache, and the off-main-thread fits: the engine interface and worker protocol (`fitEngine.ts`), the worker (`fitWorker.ts`) and the jobs and pending state behind the screen (`fitService.ts`) |
 | `src/model/` | The project as data. `types.ts`, `defaults.ts`, `ids.ts`, `units.ts` at the top, then the folders below |
+| `src/model/editor/` | Transient selection and navigation references, separate from the saved document |
+| `src/model/presentation/` | Shared descriptions of numerical results for charts and controls |
 | `src/model/table/` | Rows and columns of a data table, how its columns group into series, which data sets a graph draws, exclusions, the factors of a grouped table (`factors.ts`) and the offset of offset traces (`offset.ts`) |
 | `src/model/graph/` | What a graph is made of: chart types and their gallery, the style hierarchy, fills, looks, palettes, layers (`layers.ts`: the parts of a graph that can be hidden, reordered or given a look of their own), capabilities of each type, linking and formatting graphs, results written into texts (`resultTokens.ts`), selecting several points or annotations (`selection/multi.ts`) |
 | `src/model/options/` | The settings that belong to one family of charts (columns, distributions, fits, heat maps, histograms, pies) |
-| `src/model/project/` | What a project holds besides tables and graphs: results (`analysis.ts`, `curveFit.ts`), page layouts, folders and the order of the navigator |
-| `src/state/` | The project in memory: commands, undo and redo, the .oplot file and the steps that bring an older file up to date (`migrate.ts`), autosave, settings, what the inspector is asked to show |
+| `src/model/project/` | What a project holds besides tables and graphs: results (`analysis.ts`, `curveFit.ts`, and the shared `resultSheet.ts` contract), page layouts, folders and the order of the navigator |
+| `src/state/` | The project in memory: commands, undo and redo, the .oplot file and the steps that bring an older file up to date (`migrate.ts`), autosave, settings, what the inspector is asked to show. `app/contexts.ts` exposes separate subscriptions for the document, commands, history, selection, navigation, preferences, status, recovery and each viewport |
 | `src/chart/` | Everything that draws a graph from the model (below) |
 | `src/ui/` | The app: `views/` (data table, graph, results, layout and the folder overview), `dialogs/`, `navigator/`, `components/`, `data/` (reading cells and CSV, number format), `inspector/` |
 | `src/testing/` | Fixtures and checks used by tests only |

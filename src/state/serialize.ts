@@ -1,5 +1,7 @@
+import { checkSettings } from '../model/options/settingSchema';
+import { CHART_SCHEMA, STYLE_SCHEMA } from '../model/project/chartSchema';
 import { ANNOTATION_LINE_SPACING, CHART_PX_MAX, createChart, DEFAULT_STYLE, DEFAULT_SURVIVAL, TYPE_PRESETS } from '../model/defaults';
-import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../chart/shared/parts/labels';
+import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '../model/options/pointLabelOptions';
 import { CHART_TYPES, chartTypeInfo } from '../model/graph/chartTypes';
 import { defaultChartTypeFor } from '../model/graph/chartGallery';
 import { sanitizeFillKeys } from '../model/graph/fill';
@@ -10,6 +12,7 @@ import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
 import { sanitizeLayerStyles } from '../model/graph/layers';
 import { sanitizeLegendLayout, withoutLegendLayout } from '../model/graph/legendEntries';
 import { FONT_FAMILIES, sanitizeLook, SYMBOL_SHAPES } from '../model/graph/look';
+import { drawingFraction } from '../model/options/drawingOptions';
 import { clampDrawing, DRAWING_LIMITS } from '../model/graph/drawingPresets';
 import { sanitizeOrder } from '../model/table/groupOrder';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
@@ -91,43 +94,9 @@ function cleanLabelKeys(out: Obj, path: string, notes: string[]): void {
   }
 }
 
-/** Values that are text or a number by default but may also be null: "no colour" and "transparent". */
-const NULL_OK = new Set(['barPatternBackground', 'plotColor', 'pageColor']);
-const isHexColour = (v: unknown): boolean => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
-
-/**
- * Checks the keys of `raw` that `base` (the defaults) also has against the type of the default: a number must be
- * a finite number, text text, a flag true or false, a list a list, an object an object (checked in turn). A key whose
- * default is null holds a number or null; or, if its name ends in "colour" (or is "mid", the middle colour of a heat map scale), a #rrggbb colour or null; or, if it ends in "Id" or "Title", an ID or text, or null. A key that
- * fails is taken out, so the default applies, and noted. Keys `base` does not have, and the keys in `skip`, stay as they are.
- */
-function conform(raw: Obj, base: Obj, path: string, notes: string[], skip: ReadonlySet<string> = new Set()): Obj {
-  const out: Obj = {};
-  for (const key of Object.keys(raw)) if (key !== '__proto__') out[key] = raw[key];
-  for (const key of Object.keys(base)) {
-    if (skip.has(key) || !Object.prototype.hasOwnProperty.call(raw, key)) continue;
-    const want = base[key];
-    const got = raw[key];
-    let ok: boolean;
-    if (got === null) ok = want === null || NULL_OK.has(key);
-    else if (isObj(want)) {
-      ok = isObj(got);
-      if (ok) out[key] = conform(got as Obj, want, `${path}.${key}`, notes);
-    } else if (Array.isArray(want)) ok = Array.isArray(got);
-    else if (want === null) ok = /colou?r$|^mid$/i.test(key) ? isHexColour(got) : /Id$|Title$/.test(key) ? typeof got === 'string' : typeof got === 'number' && Number.isFinite(got);
-    else if (typeof want === 'number') ok = typeof got === 'number' && Number.isFinite(got);
-    else ok = typeof got === typeof want;
-    if (!ok) {
-      delete out[key];
-      notes.push(`${path}.${key} had an invalid value and was reset to the default.`);
-    }
-  }
-  return out;
-}
-
 /** The one pipeline every raw defaults/style/override object passes through. */
 function cleanStyle(raw: unknown, path: string, notes: string[]): Obj {
-  const out: Obj = isObj(raw) ? conform(raw, DEFAULT_STYLE as unknown as Obj, path, notes) : {};
+  const out: Obj = isObj(raw) ? checkSettings(raw, STYLE_SCHEMA, path, notes) : {};
   for (const [key, allowed] of Object.entries(STYLE_ENUMS)) {
     if (!Object.prototype.hasOwnProperty.call(out, key)) continue;
     const v = out[key];
@@ -269,7 +238,7 @@ function cleanDrawings(raw: unknown, path: string, notes: string[], page = false
   const out: Drawing[] = [];
   const seen = new Set<string>();
   const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-  const frac = (v: unknown) => Math.min(1, Math.max(0, v as number));
+  const frac = (v: unknown) => drawingFraction(v as number);
   raw.forEach((d, i) => {
     const point = (v: unknown): DrawingPoint | null => (isObj(v) && num(v.xFrac) && num(v.yFrac) ? { xFrac: frac(v.xFrac), yFrac: frac(v.yFrac), ...(!page && num(v.x) ? { x: v.x } : {}), ...(!page && num(v.y) ? { y: v.y } : {}) } : null);
     const from = isObj(d) ? point(d.from) : null;
@@ -423,7 +392,7 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
   if (typeof c0.type !== 'string' || !CHART_TYPES.some((t) => t.type === c0.type)) fail(`${path}.type`, `must be one of ${CHART_TYPES.map((t) => t.type).join(', ')}`);
   const base = createChart(dataTableId, undefined, c0.type as ChartType);
   // Styles and layers have their own checks below.
-  const c = conform(c0, base as unknown as Obj, path, notes, new Set(['defaults', 'layers']));
+  const c = checkSettings(c0, CHART_SCHEMA, path, notes);
   // The print width of earlier builds (docs/FILE_FORMAT.md): not read, and not written back.
   delete c.printWidthMm;
   // Comparison brackets joined to data sets were removed (14 November 2026): those of an older file are dropped, with a note. Brackets are now drawn with Graphics.

@@ -3,7 +3,7 @@ import { useRestyle } from './common/useScopedEdits';
 import { patchLook, patchStyle } from '../../state/commands';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { Chart, DataTable, PieLabelMode, PieOptions } from '../../model/types';
-import { useApp } from '../../state/AppContext';
+import { useCommands, useSelection } from '../../state/AppContext';
 import { inspectorShapeOf } from './common/nav';
 import { ColorInput, Field, GroupBox, NumField, SelectInput, TextInput, Check } from './common/controls';
 import { AnnotationsTab, DimensionsSection, LegendSection, PaletteField, TextSections } from './sections/SharedSections';
@@ -20,7 +20,8 @@ import { SLIDERS } from './common/sliderRanges';
 
 /** The formatting panel of pie and doughnut charts. */
 export function PieInspector({ chart, table }: { chart: Chart; table: DataTable }) {
-  const { run, selection } = useApp();
+  const { run } = useCommands();
+  const { selection } = useSelection();
   const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages, inspectorShapeOf(chart.type).lacks);
   const { shows } = nav;
   const layer = dataLayer(chart);

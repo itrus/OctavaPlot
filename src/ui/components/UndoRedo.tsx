@@ -1,4 +1,4 @@
-import { useApp } from '../../state/AppContext';
+import { useHistory } from '../../state/AppContext';
 
 const ICON = { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
 
@@ -20,7 +20,7 @@ const RedoIcon = () => (
 
 /** The one Undo/Redo pair of the project (one history for tables, graphs, results and layouts), in the top bar. */
 export function UndoRedo({ labeled = false }: { labeled?: boolean }) {
-  const { undo, redo, canUndo, canRedo } = useApp();
+  const { undo, redo, canUndo, canRedo } = useHistory();
   const cls = labeled ? 'icon-text' : 'icon-only';
   return (
     <span className="undo-redo">
