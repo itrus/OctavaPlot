@@ -6,7 +6,8 @@ import type { Chart, DataTable, PieLabelMode, PieOptions } from '../../model/typ
 import { useCommands, useSelection } from '../../state/AppContext';
 import { inspectorShapeOf } from './common/nav';
 import { ColorInput, Field, GroupBox, NumField, SelectInput, TextInput, Check } from './common/controls';
-import { AnnotationsTab, DimensionsSection, LegendSection, PaletteField, TextSections } from './sections/SharedSections';
+import { AnnotationsTab, DimensionsSection, LegendSection, TextSections } from './sections/SharedSections';
+import { PaletteField } from './sections/PalettePicker';
 import { LayersSection } from './sections/LayersSection';
 import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';

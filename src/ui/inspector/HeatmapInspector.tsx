@@ -1,6 +1,6 @@
 import { editScale, paletteColour, seedCustom } from '../../chart/heatmap/heatColours';
-import { HEAT_LIMITS, HEAT_MARKS, HEAT_PALETTE_GROUPS, HEAT_STATISTICS, isDiverging } from '../../model/options/heatmapOptions';
-import { GroupedSelectField } from './GroupedSelect';
+import { HEAT_LIMITS, HEAT_MARKS, HEAT_STATISTICS, isDiverging } from '../../model/options/heatmapOptions';
+import { GradientField } from './sections/GradientPicker';
 import type { Chart, DataTable, HeatmapOptions } from '../../model/types';
 import { useCommands } from '../../state/AppContext';
 import { patchAxis, patchLook } from '../../state/commands';
@@ -15,8 +15,9 @@ import { LayersSection } from './sections/LayersSection';
 import { AnnotationsTab, DimensionsSection, TextSections } from './sections/SharedSections';
 import { SLIDERS } from './common/sliderRanges';
 
-/** The colours of the scale at 16 even positions, as the stops of a CSS gradient (the scale as the cells show it, reversed or not). */
-const previewColours = (o: HeatmapOptions): string => Array.from({ length: 16 }, (_, i) => paletteColour(o.palette, i / 15, o.reverse, o.customColours)).join(', ');
+/** The colours of a scale at 16 even positions, as the stops of a gradient (the scale as the cells show it, reversed or not). */
+const scaleColours = (palette: HeatmapOptions['palette'], o: HeatmapOptions): string[] => Array.from({ length: 16 }, (_, i) => paletteColour(palette, i / 15, o.reverse, o.customColours));
+
 
 const wholeIn = (lim: { min: number; max: number }) => (v: number) => (Number.isInteger(v) && v >= lim.min && v <= lim.max ? null : `A whole number from ${lim.min} to ${lim.max}.`);
 const sizeIn = (v: number) => (v >= HEAT_LIMITS.cellPt.min && v <= HEAT_LIMITS.cellPt.max ? null : `From ${HEAT_LIMITS.cellPt.min} to ${HEAT_LIMITS.cellPt.max} pt.`);
@@ -57,13 +58,7 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
               <LayersSection chart={chart} table={table} />
 
               <GroupBox title="Colours">
-                <GroupedSelectField<HeatmapOptions['palette']>
-                  label="Scale"
-                  value={o.palette}
-                  groups={HEAT_PALETTE_GROUPS}
-                  onChange={choose}
-                  after={<span aria-hidden="true" style={{ flex: '0 0 56px', height: 14, border: '1px solid #9aa3ab', background: `linear-gradient(to right, ${previewColours(o)})` }} />}
-                />
+                <GradientField value={o.palette} colours={(p) => scaleColours(p, o)} onChoose={choose} />
                 <Field label="Low">
                   <ColorInput value={drawn(0)} ariaLabel="Low colour of the scale" onChange={(v) => edit('low', v)} />
                 </Field>

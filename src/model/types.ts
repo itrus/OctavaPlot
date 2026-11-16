@@ -376,6 +376,8 @@ export type HeatPalette =
   | 'gsea'
   | 'bs-blue' | 'bs-indigo' | 'bs-purple' | 'bs-pink' | 'bs-red' | 'bs-orange' | 'bs-yellow' | 'bs-green' | 'bs-teal' | 'bs-cyan' | 'bs-gray'
   | 'md-red' | 'md-pink' | 'md-purple' | 'md-deep-purple'
+  | 'pub-green' | 'pub-blue' | 'pub-purple-pink' | 'pub-blue-teal-yellow' | 'pub-purple-orange-yellow' | 'pub-magma'
+  | 'cm-viridis' | 'cm-cividis' | 'cm-inferno' | 'cb-rdbu' | 'cb-brbg'
   | 'custom';
 
 /** The user's own scale: low to high, or low, middle, high when `mid` is set (the middle is then at the centre value); all #rrggbb. */

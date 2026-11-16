@@ -1,11 +1,13 @@
 /**
- * The colour gradients of heat maps: 16 continuous scales from the ggsci R package (Xiao N.; https://github.com/nanxstats/ggsci),
- * each a list of colour stops from the low end to the high end of the scale. Only GSEA is diverging (its middle is the centre).
+ * The colour gradients of heat maps: 16 continuous scales from the ggsci R package (Xiao N.; https://github.com/nanxstats/ggsci) and 6 sampled from the
+ * default sequential gradients pictured in a Datawrapper article (Muth LC, 30 March 2022; approximate), each a list of colour stops from the low end to the
+ * high end of the scale. The published gradients run dark to light, the ggsci ones light to dark (Reverse the colours flips either). GSEA and the two
+ * ColorBrewer maps (RdBu, BrBG) are diverging. Added: three colour maps of the viridis family and the two ColorBrewer maps, 11 stops each, as supplied.
  */
 
 interface HeatGradient {
   value: string;
-  family: 'GSEA' | 'Bootstrap 5' | 'Material Design';
+  family: 'GSEA' | 'Bootstrap 5' | 'Material Design' | 'Published' | 'Viridis family' | 'ColorBrewer';
   name: string;
   diverging: boolean;
   colors: readonly string[];
@@ -30,6 +32,19 @@ export const HEAT_GRADIENTS: readonly HeatGradient[] = [
   g('md-pink', 'Material Design', 'Pink', ['#FCE4EC', '#F8BBD0', '#F48FB1', '#F06292', '#EC407A', '#E91E63', '#D81B60', '#C2185B', '#AD1457', '#880E4F']),
   g('md-purple', 'Material Design', 'Purple', ['#F3E5F5', '#E1BEE7', '#CE93D8', '#BA68C8', '#AB47BC', '#9C27B0', '#8E24AA', '#7B1FA2', '#6A1B9A', '#4A148C']),
   g('md-deep-purple', 'Material Design', 'Deep purple', ['#EDE7F6', '#D1C4E9', '#B39DDB', '#9575CD', '#7E57C2', '#673AB7', '#5E35B1', '#512DA8', '#4527A0', '#311B92']),
+
+  g('pub-green', 'Published', 'Green', ['#3D892C', '#4C933A', '#629F4A', '#77AB5A', '#8AB76A', '#9DC27A', '#B0CD8A', '#C4D89B', '#D6E4AC', '#E9EFBE', '#FCFACF']),
+  g('pub-blue', 'Published', 'Blue', ['#244C8B', '#2E5D9A', '#356FA9', '#4280B5', '#5393BE', '#65A6C4', '#7CB9C5', '#98CBC1', '#B4DDC1', '#D2EBD5', '#EFF8E6']),
+  g('pub-purple-pink', 'Published', 'Purple–pink', ['#701473', '#91217D', '#B23387', '#CD4E93', '#E06D9F', '#E98AAB', '#EDA2B5', '#F0B5BC', '#F4C6C3', '#F7D9D2', '#F9ECE3']),
+  g('pub-blue-teal-yellow', 'Published', 'Blue–teal–yellow', ['#28358E', '#3557A1', '#447BB0', '#5499BA', '#66B0BF', '#7BBFBF', '#93CBBD', '#AED9BA', '#CDE7B9', '#E5F4C5', '#FEFED1']),
+  g('pub-purple-orange-yellow', 'Published', 'Purple–orange–yellow', ['#0C0881', '#3A0E8D', '#681B93', '#8E2E8C', '#AD467D', '#C7606C', '#D97D60', '#E49955', '#EEB850', '#F0D754', '#F1F658']),
+  g('pub-magma', 'Published', 'Magma', ['#29125B', '#4C1D6A', '#6F2A73', '#923974', '#B44B6F', '#D16069', '#E27E6D', '#EA9F7C', '#F2BF8E', '#F8DDA9', '#FCFBC3']),
+
+  g('cm-viridis', 'Viridis family', 'Violet–green–yellow · Viridis', ['#440154', '#482475', '#414487', '#355F8D', '#2A788E', '#21918C', '#22A884', '#44BF70', '#7AD151', '#BDDF26', '#FDE725']),
+  g('cm-cividis', 'Viridis family', 'Blue–yellow · Cividis', ['#00224E', '#083370', '#35456C', '#4F576C', '#666970', '#7D7C78', '#948E77', '#AEA371', '#C8B866', '#E5CF52', '#FEE838']),
+  g('cm-inferno', 'Viridis family', 'Black–orange–yellow · Inferno', ['#000004', '#160B39', '#420A68', '#6A176E', '#932667', '#BC3754', '#DD513A', '#F37819', '#FCA50A', '#F6D746', '#FCFFA4']),
+  g('cb-rdbu', 'ColorBrewer', 'Red–blue · RdBu', ['#67001F', '#B2182B', '#D6604D', '#F4A582', '#FDDBC7', '#F7F7F7', '#D1E5F0', '#92C5DE', '#4393C3', '#2166AC', '#053061'], true),
+  g('cb-brbg', 'ColorBrewer', 'Brown–teal · BrBG', ['#543005', '#8C510A', '#BF812D', '#DFC27D', '#F6E8C3', '#F5F5F5', '#C7EAE5', '#80CDC1', '#35978F', '#01665E', '#003C30'], true),
 ];
 
 /** Names of the five earlier colour scales, so that files saved with them still open with the nearest of the new ones. */

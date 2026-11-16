@@ -15,7 +15,8 @@ import { ExportPanel } from '../export/ExportPanel';
 import { inspectorShapeOf } from './common/nav';
 import { useInspectorNav } from './common/useInspectorNav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
-import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, PaletteField, TextSections } from './sections/SharedSections';
+import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
+import { PaletteField } from './sections/PalettePicker';
 import { AxisLimits } from './XyInspector';
 import { SLIDERS } from './common/sliderRanges';
 

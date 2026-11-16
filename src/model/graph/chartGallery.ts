@@ -120,7 +120,7 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'heat',
       label: 'Heat map',
       items: [
-        item('heat.blue', 'Blue heat map', 'A single-hue scale, pale to dark blue, for values that are all positive. Fifteen more gradients are in the Inspector.', 'heatmap', 'matrix.heatmap', { heatPalette: 'bs-blue' }),
+        item('heat.blue', 'Blue heat map', 'A single-hue scale, pale to dark blue, for values that are all positive. Twenty-six more gradients are in the Inspector.', 'heatmap', 'matrix.heatmap', { heatPalette: 'bs-blue' }),
         item('heat.purple', 'Purple heat map', 'A single-hue scale, pale to dark purple.', 'heatmap', 'matrix.heatmap', { heatPalette: 'bs-purple' }),
         item('heat.red', 'Red heat map', 'A single-hue scale, pale to dark red.', 'heatmap', 'matrix.heatmap', { heatPalette: 'md-red' }),
         item('heat.gsea', 'GSEA heat map', 'A diverging scale, blue through pale to red, around a middle value.', 'heatmap', 'matrix.heatmap', { heatPalette: 'gsea' }),

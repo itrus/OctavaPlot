@@ -6,7 +6,7 @@ import { HEAT_GRADIENTS, LEGACY_HEAT_PALETTES } from './heatGradients';
 
 /** The palette list as the inspector shows it: one group per origin (in the order of HEAT_GRADIENTS), then the user's own colours. */
 export const HEAT_PALETTE_GROUPS: ReadonlyArray<{ label: string; options: ReadonlyArray<{ value: HeatPalette; label: string }> }> = [
-  ...(['GSEA', 'Bootstrap 5', 'Material Design'] as const).map((family) => ({
+  ...(['GSEA', 'Bootstrap 5', 'Material Design', 'Published', 'Viridis family', 'ColorBrewer'] as const).map((family) => ({
     label: family,
     options: HEAT_GRADIENTS.filter((p) => p.family === family).map((p) => ({ value: p.value as HeatPalette, label: p.diverging ? `${p.name} (diverging)` : p.name })),
   })),

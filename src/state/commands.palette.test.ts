@@ -17,7 +17,7 @@ describe('palettes', () => {
   it('lists the ggsci palettes first with Science first, then the app own ones', () => {
     const names = PALETTES.map((x) => x.name);
     expect(names[0]).toBe('Science (AAAS)');
-    expect(names.slice(-5)).toEqual(['Vibrant', 'Pastel', 'Colorblind-friendly', 'Monochrome', 'Black and White']);
+    expect(names.slice(-7)).toEqual(['Vibrant', 'Pastel', 'Colorblind-friendly', 'Monochrome', 'Black and White', 'Retro', 'Warm and cool']);
     expect(PALETTES.filter((x) => x.source === 'ggsci')).toHaveLength(15);
     expect(PALETTES.every((x) => x.colors.every((c) => /^#[0-9a-f]{6}$/i.test(c)))).toBe(true);
   });

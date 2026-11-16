@@ -130,14 +130,14 @@ describe('heat colours', () => {
     expect(paletteColour('bs-blue', -5, false)).toBe(paletteColour('bs-blue', 0, false));
     expect(paletteColour('bs-blue', 5, false)).toBe(paletteColour('bs-blue', 1, false));
   });
-  it('has the 16 ggsci gradients, 151 stops, and passes through every stop', () => {
-    expect(HEAT_GRADIENTS).toHaveLength(16);
-    expect(HEAT_GRADIENTS.reduce((n, p) => n + p.colors.length, 0)).toBe(151);
+  it('has the 16 ggsci, 6 published and 5 named colour-map gradients, 272 stops, and passes through every stop', () => {
+    expect(HEAT_GRADIENTS).toHaveLength(27);
+    expect(HEAT_GRADIENTS.reduce((n, p) => n + p.colors.length, 0)).toBe(272);
     for (const p of HEAT_GRADIENTS) {
       expect(paletteColour(p.value as HeatPalette, 0, false)).toBe(p.colors[0].toLowerCase());
       expect(paletteColour(p.value as HeatPalette, 1, false)).toBe(p.colors.at(-1)!.toLowerCase());
     }
-    expect(HEAT_GRADIENTS.filter((p) => p.diverging).map((p) => p.value)).toEqual(['gsea']);
+    expect(HEAT_GRADIENTS.filter((p) => p.diverging).map((p) => p.value)).toEqual(['gsea', 'cb-rdbu', 'cb-brbg']);
   });
   it('places values in two halves on the diverging scale', () => {
     const s = { palette: 'gsea' as const, reverse: false, lo: -2, hi: 6, centre: 0 };

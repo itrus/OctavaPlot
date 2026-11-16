@@ -58,9 +58,9 @@ describe('the custom scale', () => {
     expect([0, 0.5, 1].map((t) => paletteColour('custom', t, true, c))).toEqual(['#b2182b', '#ffffff', '#2166ac']);
     expect(isDiverging({ palette: 'custom', customColours: c })).toBe(true);
   });
-  it('without a middle colour is not diverging; of the gradients only GSEA is', () => {
+  it('without a middle colour is not diverging; of the gradients only GSEA, RdBu and BrBG are', () => {
     expect(isDiverging({ palette: 'custom', customColours: custom })).toBe(false);
-    for (const p of HEAT_GRADIENTS) expect(isDiverging({ palette: p.value as HeatmapOptions['palette'], customColours: custom })).toBe(p.value === 'gsea');
+    for (const p of HEAT_GRADIENTS) expect(isDiverging({ palette: p.value as HeatmapOptions['palette'], customColours: custom })).toBe(p.diverging);
   });
   it('puts the centre value at the middle colour', () => {
     const c = { low: '#2166ac', mid: '#ffffff', high: '#b2182b' };

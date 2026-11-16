@@ -78,7 +78,8 @@ function frozenExample(type: ChartType) {
       heightPx: legacyPx(120),
       showTitle: false,
       legend: { ...c.legend, visible: false },
-      paletteId: 'classic',
+      // No palette: the bars take the grey sequence the goldens were made with (BAR_PALETTE), which is not the order of Black and White.
+      paletteId: null,
       // The sizes of the numbers and ticks the goldens were made with, before the defaults were rounded (27 pt numbers, 11 pt ticks).
       xAxis: { ...c.xAxis, lineWidthPt: 2.1 * LEGACY_SCALE, tickFontSizePt: 26.6, tickLengthPt: 11.2 },
       yAxis: { ...c.yAxis, lineWidthPt: 2.1 * LEGACY_SCALE, tickFontSizePt: 26.6, tickLengthPt: 11.2 },

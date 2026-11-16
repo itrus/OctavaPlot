@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { CloseIcon } from '../../components/icons';
+import { useMemo } from 'react';
 import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../../model/graph/aspect';
 import { graphSources, type GraphSource } from '../../../model/table/chartTable';
 import { AXIS_LIMITS } from '../../../model/graph/axis';
@@ -13,15 +12,12 @@ import { type AnnotationPlacer, nudgePatches } from '../../../chart/shared/scene
 import { RESULT_STATS, resultValue } from '../../../model/graph/resultTokens';
 import { mixedAnnotationKeys, selectedAnnotationIds, toggleAnnotationSelection } from '../../../model/graph/selection/multi';
 import { capabilitiesOf } from '../../../model/graph/capabilities';
-import { COMPARED_COLOURS, safeColours } from '../../../model/graph/colour/colorVision';
-import { GGSCI_CITATION, PALETTE_GROUPS, PALETTE_GROUP_INFO, paletteById, palettesInGroup } from '../../../model/graph/palettes';
 import type { Annotation, Chart, Group, Id, ResultStat } from '../../../model/types';
 import { useCommands, useProject, useSelection } from '../../../state/AppContext';
 import {
   addAnnotation,
   addReferenceLine,
   addRegion,
-  applyPalette,
   composeCommands,
   patchAnnotation,
   patchAnnotations,
@@ -45,7 +41,6 @@ import {
 } from '../../../state/commands';
 import { LINE_STYLES } from '../../../model/graph/look';
 import type { LineStyle } from '../../../model/types';
-import { DialogShell, trapTab } from '../../dialogs/DialogShell';
 import { Check, ColorInput, Field, GroupBox, NumField, Section, SelectInput, SubHeading, TextInput } from '../common/controls';
 import { BarLabelSection, hasBarLabels } from './LookControls';
 import { LegendOrder } from './LegendOrder';
@@ -537,117 +532,3 @@ export function OnThisGraph({ chart }: { chart: Chart }) {
     </>
   );
 }
-
-/** The palette menu entries, in subcategories. */
-function PaletteOptions() {
-  return (
-    <>
-      {PALETTE_GROUPS.map((g) => (
-        <optgroup key={g} label={g}>
-          {palettesInGroup(g).map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </optgroup>
-      ))}
-    </>
-  );
-}
-
-/** How many of the first colours of a palette stay clearly apart for colour-blind viewers (measured, see colorVision.ts). */
-function SafeLine({ colors }: { colors: readonly string[] }) {
-  const n = useMemo(() => safeColours(colors), [colors]);
-  if (n >= COMPARED_COLOURS) return <div className="small vision vision-ok">Colorblind friendly for the first {COMPARED_COLOURS} colours</div>;
-  if (n < 2) return <div className="small muted vision">First two colours clash</div>;
-  return <div className="small muted vision">Colorblind friendly for the first {n} colours</div>;
-}
-
-/** An info button beside the palette menu; it opens a window with the colours, what the palette is and its source. */
-function PaletteInfo({ paletteId }: { paletteId: string | null }) {
-  const [open, setOpen] = useState(false);
-  const palette = paletteById(paletteId);
-  if (!palette) return null;
-  return (
-    <>
-      <button className="icon-btn palette-info" aria-label="About this palette" title="About this palette" onClick={() => setOpen(true)}>i</button>
-      {open && (
-        <DialogShell>
-        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)} onKeyDown={(e) => (e.key === 'Escape' ? setOpen(false) : trapTab(e))}>
-          <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Colour palettes" tabIndex={-1} ref={(el) => el?.focus()}>
-            <div className="modal-head">
-              <strong>Colour palettes</strong>
-              <button className="modal-close" onClick={() => setOpen(false)} aria-label="Close"><CloseIcon /></button>
-            </div>
-            <div className="modal-body modal-pad palette-about">
-              <p className="muted small">In use: <strong>{palette.name}</strong>, {palette.colors.length} colours, applied to the data sets in order and repeated when there are more data sets than colours.</p>
-              {PALETTE_GROUPS.map((g) => (
-                <section key={g} className="palette-group">
-                  <h4>{g}</h4>
-                  <p className="muted small">{PALETTE_GROUP_INFO[g]}</p>
-                  {palettesInGroup(g).map((p) => (
-                    <div key={p.id} className={`palette-entry${p.id === palette.id ? ' current' : ''}`}>
-                      <div className="palette-entry-head">
-                        <strong>{p.name}</strong>
-                        <span className="palette-swatches" aria-hidden="true">
-                          {p.colors.slice(0, 12).map((c, i) => (
-                            <i key={i} style={{ background: c }} title={c} />
-                          ))}
-                        </span>
-                      </div>
-                      {p.description && <div className="small">{p.description}</div>}
-                      <SafeLine colors={p.colors} />
-                    </div>
-                  ))}
-                </section>
-              ))}
-              <p className="muted small">
-                Source of the colours (all but the last group): {GGSCI_CITATION.text} <a href={GGSCI_CITATION.url} target="_blank" rel="noreferrer">{GGSCI_CITATION.url}</a>. Descriptions after <a href={GGSCI_CITATION.vignette} target="_blank" rel="noreferrer">the ggsci introduction</a>.
-              </p>
-            </div>
-            <div className="modal-foot">
-              <button className="primary" onClick={() => setOpen(false)}>Close</button>
-            </div>
-          </div>
-        </div>
-        </DialogShell>
-      )}
-    </>
-  );
-}
-
-/** The colour palette of the data sets: choosing one gives them coordinated colours in order. */
-export function PaletteField({ chart, hint }: { chart: Chart; hint: string }) {
-  const { run } = useCommands();
-  const palette = paletteById(chart.paletteId);
-  return (
-    <div className="palette-field">
-      <Field label="Color palette" hint={hint}>
-        <select
-          value={chart.paletteId ?? 'custom'}
-          aria-label="Color palette"
-          onChange={(e) => {
-            const chosen = paletteById(e.target.value);
-            if (chosen) run(`Apply ${chosen.name} palette`, applyPalette(chart.id, chosen));
-          }}
-        >
-          {chart.paletteId === null && (
-            <option value="custom" disabled>
-              Custom colours
-            </option>
-          )}
-          <PaletteOptions />
-        </select>
-        <PaletteInfo paletteId={chart.paletteId} />
-      </Field>
-      {palette && (
-        <div className="palette-strip">
-          <span className="palette-swatches" aria-hidden="true">
-            {palette.colors.slice(0, 12).map((c, i) => (
-              <i key={i} style={{ background: c }} title={c} />
-            ))}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
