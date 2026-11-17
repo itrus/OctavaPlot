@@ -2,7 +2,7 @@
 
 OctavaPlot is a scientific figure editor: composable graphical layers, trustworthy calculations, and exact output. It is not a statistics suite. Calculations exist only to draw or annotate a chart.
 
-The calculation rules, presets and acceptance fixtures are in [docs/calculation-contracts.md](calculation-contracts.md). Where each part of the code is, is in the [README](../README.md#structure-of-the-source).
+The calculation rules, presets and acceptance fixtures are in [docs/calculation-contracts.md](calculation-contracts.md). Where each part of the code is, is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Decisions
 
@@ -47,7 +47,7 @@ Version 0.1 was built in 63 commits over about three weeks, from an empty reposi
 | 8 Nov | Layout inspector, thumbnails on the Type tab, a round of fixes; the graph's print width removed. |
 | 14 Nov | Shapes and lines (33 presets, on graphs and layout pages, drawn the same in SVG, PNG and PDF); comparison brackets and subjects removed. |
 
-In numbers (14 November 2026 count, see "Size"): about 38.3 kLoC of source, 28.7 kLoC of tests, 57 graphs in the gallery, 63 browser tests. Phases P0 to P5 were built as far as BACKLOG.md records; items dropped by decision are listed under "Decisions".
+In numbers (14 November 2026 count): about 38.3 kLoC of source, 28.7 kLoC of tests, 57 graphs in the gallery, 63 browser tests. Phases P0 to P5 were built as far as BACKLOG.md records; items dropped by decision are listed under "Decisions".
 
 ## To do
 
@@ -72,7 +72,7 @@ Measured on 27 October 2026 with `npm run perf` (`e2e/performance.spec.ts`, in t
 
 | Workload | Target | Measured |
 |---|---|---|
-| Edit title, color or stroke | Visible within 50 ms | 27 October: a normal graph: title 19 to 20 ms (met). 10 000 observations: 107 to 164 ms. 100 000 observations: title 2.3 to 2.5 s, stroke width 1.1 to 1.3 s (not met). **29 October** (column family only; XY, grouped, survival and histogram got no change): normal graph 18 ms (met). 10 000 observations 170 to 195 ms (not met; the 27 October figure was 107 to 164 ms, the perf run called this unchanged). **31 October, three runs on a quiet machine: 119 to 172 ms**, which overlaps both earlier ranges, so no regression is shown; the target is still not met). 100 000 observations: title until the drawing changes 0.14 to 0.19 s; the next frame after the first edit after opening 1.6 s (it waits for the browser's first raster); once settled 0.12 s; stroke width 0.10 s (before, on the same day: title 2.45 s, stroke 1.04 s). Not met at 50 ms |
+| Edit title, color or stroke | Visible within 50 ms | Normal graph: title 18 to 20 ms (met; 27 and 29 October, 29 October for the column family only). 10 000 observations: 119 to 172 ms (31 October, three runs; not met). 100 000 observations: title 0.12 s once the first paint has settled, 1.6 s for the next frame after the first edit after opening (it waits for the browser's first raster); stroke width 0.10 to 0.11 s (not met at 50 ms). The 27 October figures for 100 000 observations were 2.3 to 2.5 s (title) and 1.1 to 1.3 s (stroke), before the column-family change |
 | Select one point in 10k | Within 100 ms | 27 October: 25 to 32 ms until the drawing changes, but 246 to 297 ms until the next frame (not met). **29 October:** 27 to 45 ms to the next frame (before, on the same day: 182 ms) (met) |
 | Pan and zoom 100k points | 30+ fps | Not measured, also on 29 October (there is no clipping of the preview to the viewport) |
 | Open a project with 100k observations | Under 3 s | 27 October: the table shows after 1.4 s (met); the graph is drawn after 5.7 to 7.8 s (not met). **29 October:** the graph is drawn after 2.0 to 2.7 s (met; before, on the same day: 5.6 to 5.8 s). The measure is the presence of the drawing in the page, not painted pixels, so the time to the first painted frame is longer. The table time was not re-measured |
@@ -109,23 +109,4 @@ Done 28 October 2026. The design, so the next change does not undo it:
 - Export inspection panel: output size, fonts and fallbacks, raster resolution, clipped objects, known limits. Built as a dialog behind the Export button (size in px, pt and mm, fonts requested, used and missing, raster size and the canvas limit, the warnings of the chart model, known limits, a copyable JSON report). Clipped objects appear only as the models word them. Glyph checks are in the dialog (see "Done so far"); page layouts are checked too since 29 October 2026 (one check for each font on the page, unit-tested, not tried in a browser).
 - Rich text with Greek letters, sub- and superscripts, written as plain text with braces (`H_{2}O`, `m^{-2}`, `\mu`); missing glyphs are reported. Built 28 October 2026 for the text of a graph, and 29 October 2026 for the title and panel labels of a layout page.
 
-## Done so far
-
-The entries are dated and are history: a thing they describe may have been removed since (subjects and comparison brackets, 14 November 2026; see "Version 0.1" and BACKLOG).
-
-- Annotations, the bar labels of column and grouped charts (a layer for each data set), the point labels of column charts, the editor's selection marks, the pie legend and the heat map labels as scene elements with stable ids, drawn by one renderer for every family (steps 1a to 1e).
-- The export dialog, font diagnostics and the P0 defect fixes listed in [docs/BACKLOG.md](BACKLOG.md).
-- Glyph checks in the export dialog; a numeric legend offset; fill down and right in the data grid; a row limit and tests for CSV import (27 October 2026).
-- First-class layers and bindings: hide, order, range, own looks (XY, survival, column, grouped and histogram), one data layer.
-- A shared calculation cache keyed by calculation identity.
-- A scene shared by preview, export and hit testing for the marks of every family; stable ids on them.
-- PNG at a chosen resolution.
-- A capability registry (`src/model/graph/capabilities.ts`) that the inspector and the README table read.
-- A folder overview of the pages, and the layout of the source with its architecture test.
-- Roles on the data (28 October 2026): a subject on each observation and a factor on each series of a grouped table, set in the data table (Subject…, Factor…), kept in the file and in CSV; and every graph of the gallery can be made (nested dots, repeated measures, grouped before and after, three-way bars and dots, bars at numeric X, bubbles, vectors, offset traces, separated scatter; see BACKLOG, "Status by area").
-- Nonlinear fits in a Web Worker, with a pending state and results keyed by their inputs (see "Fits in a worker").
-- 29 October 2026 (unit-tested; what was tried in a browser is said in BACKLOG, "Status by area"): a look at every item of the BACKLOG list in Chrome, with two defects fixed (a bracket label with a subscript touched its bar; a large bubble made a huge legend key); keyboard reach and multi-selection of annotations and points, results in texts, label drag; a master legend, rich text and glyph checks on layout pages, batch export to a ZIP; brackets on grouped and XY charts, X error bars, oblique lines, equal units, extra ticks, regions, a right Y axis on XY, dates on the XY X column, heat map ranges; the legend lists a series once when it has the same name and place in two factor clusters, and a dots-only grouped chart gets dot keys (capped at 20 pt); migrations; part of the accessibility sweep; faster large column graphs.
-
-## Size
-
-The code base is about 38.3 kLoC in `src` (272 `.ts` and `.tsx` source files with 38 317 lines, tests left out; the 6 helpers of `src/testing` count as source) and about 28.7 kLoC of tests (220 test files: 206 `*.test.ts(x)` files in `src` with 27 194 lines, and the 14 `.ts` files of `e2e/` with 1 555 lines: twelve specs, the helpers and the Playwright configuration), counted on 14 November 2026 on the working tree, which holds changes that are not committed yet. `src/styles.css` (700 lines) is not in these counts; `scripts/loc-history.mjs`, which counts `.ts`, `.tsx`, `.css`, `.html` and `.rs` over the whole repository (the e2e files count as source there), gives its own figures per commit (`docs/loc-history.csv`). The planning assumption is 65-85 kLoC with tests, up to 100 kLoC for advanced plotting. It is a budget, not a goal. Consolidating duplicated chart-specific models should lower net growth.
+The dated list of what was done is in [CHANGELOG.md](CHANGELOG.md).

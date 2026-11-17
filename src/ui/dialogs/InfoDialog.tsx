@@ -1,4 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { benchSteps, runBenchmark, type BenchResult, type BenchStep } from '../diagnostics/benchmark';
+import { MIN_BROWSERS, readSystemInfo, storagePersisted } from '../../state/diagnostics/systemInfo';
+import { ASSUMED_LIMIT_BYTES, formatBytes, heapUsage, keyName, measureLocalStorage, type StorageUsage } from '../../state/diagnostics/storageUsage';
+import { AUTOSAVE_META_KEY, clockTime, parseMeta } from '../../state/recovery/recovery';
+import { usePreferences, useRecovery } from '../../state/AppContext';
 import { ModalBackdrop } from './DialogShell';
 import { CloseIcon } from '../components/icons';
 import { useRoving } from '../inspector/common/roving';
@@ -11,8 +16,10 @@ const link = (href: string) => (
 
 const TABS = [
   { id: 'about', label: 'About' },
-  { id: 'palettes', label: 'Colour palettes' },
-  { id: 'gradients', label: 'Heat-map gradients' },
+  { id: 'colours', label: 'Colours' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'system', label: 'System' },
+  { id: 'benchmark', label: 'Benchmark' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -106,6 +113,141 @@ function GradientsTab() {
   );
 }
 
+function MemoryTab() {
+  const [usage] = useState(readUsage);
+  const { settings } = usePreferences();
+  const { autosaveOk } = useRecovery();
+  const [savedAt] = useState(readSavedAt);
+  const [heap] = useState(heapUsage);
+  const pct = usage ? Math.min(100, (usage.appBytes / ASSUMED_LIMIT_BYTES) * 100) : 0;
+  return (
+    <>
+      <p>
+        <strong>Autosave</strong>{' '}
+        {!settings.autosave ? 'is off.' : !autosaveOk ? 'is failing: the browser refused to store the project.' : savedAt !== null ? `is on; last saved at ${clockTime(savedAt)}.` : 'is on; nothing saved yet.'}
+      </p>
+      {!usage ? (
+        <p>Browser storage cannot be read.</p>
+      ) : (
+        <>
+          <p>
+            <strong>{formatBytes(usage.appBytes)}</strong> of about {formatBytes(ASSUMED_LIMIT_BYTES)} localStorage used (limit approximate).
+          </p>
+          <div className="storage-bar" role="img" aria-label={`${pct.toFixed(1)} percent of the assumed limit used`}><div style={{ width: `${pct}%` }} /></div>
+          <table className="storage-table">
+            <thead><tr><th>Item</th><th>Size</th></tr></thead>
+            <tbody>
+              {usage.rows.map((r) => <tr key={r.key}><td title={r.key}>{keyName(r.key)}</td><td>{formatBytes(r.bytes)}</td></tr>)}
+              {usage.rows.length === 0 && <tr><td colSpan={2} className="muted">Nothing stored.</td></tr>}
+            </tbody>
+          </table>
+        </>
+      )}
+      {heap && <p><strong>Page memory:</strong> {formatBytes(heap.used)} of {formatBytes(heap.limit)} (JavaScript heap).</p>}
+    </>
+  );
+}
+
+/** The colour palettes of the graphs and the gradients of the heat maps, with their sources, one after the other. */
+function ColoursTab() {
+  return (
+    <>
+      <h2>Colour palettes</h2>
+      <PalettesTab />
+      <h2 style={{ marginTop: 28 }}>Heat-map gradients</h2>
+      <GradientsTab />
+    </>
+  );
+}
+
+/** Starts when the tab opens (the tab is mounted only while shown), and stops if it closes first. */
+function BenchmarkTab() {
+  const [results, setResults] = useState<Partial<Record<BenchStep['id'], BenchResult>>>({});
+  const [failed, setFailed] = useState(false);
+  const steps = benchSteps();
+  useEffect(() => {
+    let cancelled = false;
+    runBenchmark((r) => { if (!cancelled) setResults((t) => ({ ...t, [r.id]: r })); }, () => cancelled).catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, []);
+  const done = steps.every((s) => results[s.id] !== undefined);
+  const runs = new Set(steps.map((s) => s.n));
+  // The steps are independent, so the totals add and the standard errors add in quadrature.
+  const total = steps.reduce((sum, s) => sum + (results[s.id]?.mean ?? 0), 0);
+  const totalSe = Math.sqrt(steps.reduce((sum, s) => sum + (results[s.id]?.se ?? 0) ** 2, 0));
+  const slowest = Math.max(1, ...steps.map((s) => results[s.id]?.mean ?? 0));
+  const ms = (v: number) => (v < 10 ? v.toFixed(1) : Math.round(v).toString());
+  const timeText = (mean: number, se: number) => `${ms(mean)} ± ${ms(se)} ms`;
+  return (
+    <>
+      {failed && <p>The benchmark could not run in this browser.</p>}
+      <table className="storage-table bench-table">
+        <thead><tr><th /><th /><th className="muted small">M ± SE{runs.size === 1 ? `, n = ${[...runs][0]}` : ''}</th></tr></thead>
+        <tbody>
+          {steps.map((s) => {
+            const r = results[s.id];
+            return (
+              <tr key={s.id}>
+                <td>{s.label}</td>
+                <td className="bench-bar" aria-hidden="true">{r && <div style={{ width: `${(100 * r.mean) / slowest}%` }} />}</td>
+                <td title={r ? `mean ± standard error of ${r.n} runs` : undefined}>{r ? timeText(r.mean, r.se) : failed ? '' : 'running…'}</td>
+              </tr>
+            );
+          })}
+          <tr className="muted"><td>Curve fit (with R)</td><td /><td>later</td></tr>
+          {done && <tr className="bench-total"><td>Total</td><td /><td>{timeText(total, totalSe)}</td></tr>}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+function SystemTab() {
+  const [system] = useState(readSystemInfo);
+  const [persisted, setPersisted] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void storagePersisted().then((p) => { if (alive) setPersisted(p); });
+    return () => { alive = false; };
+  }, []);
+  const { browser } = system;
+  return (
+    <>
+      <p className={`browser-badge ${browser.supported === true ? 'ok' : browser.supported === false ? 'bad' : 'unknown'}`} title={browser.supported === null ? 'Not recognised: cannot be checked against the minimum' : browser.supported ? 'Meets the minimum' : 'Older than the minimum: parts of the app may not work'}>
+        <span className="browser-badge-mark" aria-hidden="true">{browser.supported === true ? '✓' : browser.supported === false ? '✗' : '?'}</span>
+        <strong>{browser.text}</strong>
+        <span>{browser.supported === true ? 'meets the minimum' : browser.supported === false ? 'too old' : 'not recognised'}</span>
+      </p>
+      <h3>Minimum browser</h3>
+      <p>
+        {MIN_BROWSERS.flatMap((r) => [{ label: r.label, min: r.min }, ...(r.also ? [{ label: r.also.label, min: r.min }] : [])])
+          .map((r) => `${r.label} ${r.min[0]}${r.min[1] ? `.${r.min[1]}` : ''}`)
+          .join(', ')}{' '}
+        or newer.
+      </p>
+      <h3>This computer</h3>
+      <table className="storage-table">
+        <tbody>
+          <tr><td>Required features</td><td>{system.missing.length === 0 ? 'all present' : `missing: ${system.missing.join(', ')}`}</td></tr>
+          {system.limited.length > 0 && <tr><td>Optional features</td><td>{system.limited.join('; ')}</td></tr>}
+          {system.threads !== null && <tr><td>CPU threads</td><td>{system.threads}</td></tr>}
+          {system.deviceMemoryGb !== null && <tr><td>Device memory</td><td>{system.deviceMemoryGb >= 8 ? '8 GB or more' : `about ${system.deviceMemoryGb} GB`}</td></tr>}
+          <tr><td>Screen</td><td>{system.screen}</td></tr>
+          {persisted !== null && <tr><td>Storage kept</td><td>{persisted ? 'protected from clean-up' : 'may be cleared by the browser when space is low'}</td></tr>}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+function readUsage(): StorageUsage | null {
+  try { return measureLocalStorage(); } catch { return null; }
+}
+
+function readSavedAt(): number | null {
+  try { return parseMeta(localStorage.getItem(AUTOSAVE_META_KEY))?.savedAt ?? null; } catch { return null; }
+}
+
 /** A window with the program's version and credits, in tabs; the sources of the colour palettes and gradients are cited here. */
 export function InfoDialog({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<TabId>('about');
@@ -126,8 +268,10 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
         </div>
         <div className="modal-body modal-pad info-view" id="info-panel" role="tabpanel" aria-labelledby={`info-tab-${tab}`}>
           {tab === 'about' && <AboutTab />}
-          {tab === 'palettes' && <PalettesTab />}
-          {tab === 'gradients' && <GradientsTab />}
+          {tab === 'colours' && <ColoursTab />}
+          {tab === 'memory' && <MemoryTab />}
+          {tab === 'system' && <SystemTab />}
+          {tab === 'benchmark' && <BenchmarkTab />}
         </div>
         <div className="modal-foot">
           <button className="primary" onClick={onClose}>Close</button>

@@ -4,7 +4,7 @@ import type { ChartType, TableKind } from '../types';
 
 /**
  * What each chart type can do, in one place. The controls of the inspector, the validation of a project and the capability
- * table of the README all read this, so a setting that a drawing does not honour is not offered (and a test says which are
+ * table of the user guide all read this, so a setting that a drawing does not honour is not offered (and a test says which are
  * offered and which are absent for every type). Where a capability was already a predicate (supportsHorizontal,
  * chartFamily) the registry is built from it, so the two cannot disagree.
  */
@@ -67,11 +67,11 @@ export function capabilitiesOf(type: ChartType): Capabilities {
 export const CAPABILITIES: readonly Capabilities[] = CHART_TYPES.map((c) => capabilitiesOf(c.type));
 
 const yes = (v: boolean) => (v ? 'yes' : '–');
-/** The table type a chart type is drawn from, as the table of the README names it (two chart types of different tables can share a name). */
+/** The table type a chart type is drawn from, as the table of the user guide names it (two chart types of different tables can share a name). */
 const TABLE_NAME: Record<TableKind, string> = { column: 'Column', xy: 'XY', grouped: 'Grouped', contingency: 'Contingency', survival: 'Survival' };
 
 /**
- * The capability table of the README, as Markdown. The README holds it between two marker comments and a test compares the two,
+ * The capability table of the user guide, as Markdown. The guide (docs/GUIDE.md) holds it between two marker comments and a test compares the two,
  * so the document cannot say something the code does not.
  */
 export function capabilityTable(): string {

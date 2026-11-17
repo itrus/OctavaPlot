@@ -60,8 +60,8 @@ describe('capability registry', () => {
     expect(capabilitiesOf('violin').curveFit).toBe(false);
   });
 
-  it('is the source of the table in the README (UPDATE_README=1 rewrites it)', () => {
-    const file = resolve(__dirname, '../../../README.md');
+  it('is the source of the table in the user guide (docs/GUIDE.md) (UPDATE_README=1 rewrites it)', () => {
+    const file = resolve(__dirname, '../../../docs/GUIDE.md');
     const readme = readFileSync(file, 'utf8');
     const start = '<!-- capabilities:start -->';
     const end = '<!-- capabilities:end -->';

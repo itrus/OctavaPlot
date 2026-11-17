@@ -108,7 +108,7 @@ Not planned (dropped by decision, 1 November 2026); the section number stays so 
 
 ## 13. Comparisons (removed)
 
-Comparison brackets joined to data sets were removed on 14 November 2026; the section number stays so that the others do not move. A comparison is marked with a bracket of the Graphics menu whose text is the user's (it may hold a result token, section 18): no test is calculated and no p-value is supplied or adjusted, and these are out of scope. The text tool offers ns, `*` to `****` and `#` to `####` as quick texts; applying a cut-off to a p-value is the user's.
+Comparison brackets joined to data sets were removed on 14 November 2026; the number stays so that the others do not move. A bracket of the Graphics menu carries the user's own text (it may hold a result token, section 18): no test is calculated and no p-value is supplied or adjusted.
 
 ## 14. Theme (P unless noted)
 
@@ -129,7 +129,7 @@ The sizes are the defaults of `src/model/defaults.ts`, in pt of the drawing (1 p
 | Band fill opacity | 0.20 |
 | Background, text | white, black; grid and full frame off |
 
-Default palette: Science (AAAS) of the ggsci set (README, "Palettes"); the Okabe-Ito colours that this section once called the seed palette are "Colorblind-friendly", one of the earlier palettes kept so that saved graphs open. Choosing a palette takes the colours set by hand away, so that the palette governs. Palette overflow repeats with distinct shapes and a warning (not checked on 14 November 2026). One pinned sans-serif font list is used and fallbacks are disclosed in the export dialog.
+Default palette: Science (AAAS) of the ggsci set (user guide, "Colour palettes"); the Okabe-Ito colours that this section once called the seed palette are "Colorblind-friendly", one of the earlier palettes kept so that saved graphs open. Choosing a palette takes the colours set by hand away, so that the palette governs. Palette overflow repeats with distinct shapes and a warning (not checked on 14 November 2026). One pinned sans-serif font list is used and fallbacks are disclosed in the export dialog.
 
 ## 15. Acceptance fixtures
 
