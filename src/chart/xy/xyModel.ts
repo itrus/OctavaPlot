@@ -377,6 +377,7 @@ export function buildXyModel(chart: Chart, tableIn: DataTable, fitSettings: FitS
   const layoutFor = (ya: YAxisScale) => chartLayout(chart, W, H, {
     legendLabels: legendSeries.map((i) => raw[i].label + AXIS_TAG[raw[i].binding]),
     categoryLabels: [],
+    xTickTexts: xAxis.ticks.map(xAxis.tickLabel),
     // Offset traces: a row of its own under the X axis title for the sentence that tells the offset (inside the plot it could lie on a trace).
     extraBottomPt: isOffset ? chart.yAxis.tickFontSizePt * 1.8 : sizeKey ? sizeKey.heightPt : 0,
     yTickLabels: ya.ticks.map(ya.tickLabel),

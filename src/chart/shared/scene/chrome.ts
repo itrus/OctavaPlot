@@ -170,7 +170,9 @@ export function referenceLineElements(lines: readonly PlacedReferenceLine[], fon
     el('g', [['data-reference-lines', '']], {
       children: [
         el('g', [['clip-path', 'url(#plot-clip)'], ['fill', 'none']], {
-          children: lines.map((l) => el('path', [['d', l.d], ['stroke', l.line.color], ['stroke-width', l.line.widthPt], ['stroke-opacity', l.line.opacity < 1 ? l.line.opacity : undefined], ['stroke-dasharray', dashOf(l.line.style, l.line.widthPt)]], { id: svgId('reference-line', l.id) })),
+          children: lines.flatMap((l) => [el('path', [['d', l.d], ['stroke', l.line.color], ['stroke-width', l.line.widthPt], ['stroke-opacity', l.line.opacity < 1 ? l.line.opacity : undefined], ['stroke-dasharray', dashOf(l.line.style, l.line.widthPt)]], { id: svgId('reference-line', l.id) }),
+            // A wider invisible path, so that a thin line is easy to click (in the editor only): it opens the settings of the line.
+            el('path', [['d', l.d], ['stroke', 'transparent'], ['stroke-width', Math.max(l.line.widthPt, 12)]], { editorOnly: true, hit: { kind: 'referenceLine', objectId: l.id } })]),
         }),
         ...lines.flatMap((l) =>
           l.label
@@ -245,14 +247,18 @@ export function numericAxisElements({ name: given, chart, cfg, scale, along, cro
     if (x?.showText === false) return [];
     // An added tick can have its text moved away from the axis and turned.
     const away = x?.textOffsetPt ?? 0;
-    const angle = x?.textAngle ?? 0;
+    // An added tick's own angle wins over the axis' angle.
+    const angle = x?.textAngle ?? cfg.tickAngle ?? 0;
     const hit = { hit: { kind: 'axis', objectId: name } as const, text: scale.tickLabel(t) };
     const common = [['font-size', cfg.tickFontSizePt], ['font-weight', cfg.tickBold ? 'bold' : undefined], ['fill', chart.textColor]] as const;
     if (along === 'y') {
-      const [px, py] = [plot.x - labelOffset(cfg) - Y_TICK_LABEL_GAP - away, map(t)];
-      return [el('text', [['x', n2(px)], ['y', n2(py)], ['dy', '0.35em'], ['text-anchor', 'end'], ['transform', angle !== 0 ? `rotate(${angle} ${n2(px)} ${n2(py)})` : undefined], ...common], hit)];
+      const [px0, py] = [plot.x - labelOffset(cfg) - Y_TICK_LABEL_GAP - away, map(t)];
+      // Upright text is centred on its tick, in the column left of the axis; other angles hang from the tick.
+      const upright = Math.abs(angle) >= 85;
+      const px = upright ? px0 - cfg.tickFontSizePt * (angle < 0 ? 0.2 : 0.8) : px0;
+      return [el('text', [['x', n2(px)], ['y', n2(py)], ['dy', upright ? undefined : '0.35em'], ['text-anchor', upright ? 'middle' : 'end'], ['transform', angle !== 0 ? `rotate(${angle} ${n2(px)} ${n2(py)})` : undefined], ...common], hit)];
     }
-    const [px, py] = [map(t), bottom + labelOffset(cfg) + X_TICK_LABEL_GAP + cfg.tickFontSizePt * 0.8 + away];
+    const [px, py] = [map(t) - Math.sin((angle * Math.PI) / 180) * cfg.tickFontSizePt * 0.35, bottom + labelOffset(cfg) + X_TICK_LABEL_GAP + cfg.tickFontSizePt * 0.8 + away];
     // Turned text hangs from the tick: it starts at the tick when it is turned clockwise, ends there when it is turned the other way.
     const anchor = angle === 0 ? 'middle' : angle > 0 ? 'start' : 'end';
     return [el('text', [['x', n2(px)], ['y', n2(py)], ['text-anchor', anchor], ['transform', angle !== 0 ? `rotate(${angle} ${n2(px)} ${n2(py)})` : undefined], ...common], hit)];
@@ -290,7 +296,14 @@ export function categoryAxisElements({ chart, cfg, plot, items, horizontal, cros
     }
     const ty = bottom + labelOffset(cfg) + X_TICK_LABEL_GAP + cfg.tickFontSizePt * 0.8;
     const common = [['font-size', cfg.tickFontSizePt], ['font-weight', cfg.tickBold ? 'bold' : undefined], ['fill', chart.textColor]] as const;
-    return rotated
+    // Turned by hand: the angle is the axis' own; the text hangs from its tick.
+    if (cfg.tickAngle !== undefined && cfg.tickAngle !== 0) {
+      const a = cfg.tickAngle;
+      const x0 = c.centerX - Math.sin((a * Math.PI) / 180) * cfg.tickFontSizePt * 0.35;
+      const y0 = ty - cfg.tickFontSizePt * 0.4;
+      return el('text', [['x', n2(x0)], ['y', n2(y0)], ['text-anchor', a < 0 ? 'end' : 'start'], ['transform', `rotate(${a} ${n2(x0)} ${n2(y0)})`], ...common], { hit: { kind: 'axis', objectId: 'x' }, text: c.label });
+    }
+    return rotated && cfg.tickAngle === undefined
       ? el('text', [['x', n2(c.centerX)], ['y', n2(ty - cfg.tickFontSizePt * 0.4)], ['text-anchor', 'end'], ['transform', `rotate(-45 ${n2(c.centerX)} ${n2(ty - cfg.tickFontSizePt * 0.4)})`], ...common], { hit: { kind: 'axis', objectId: 'x' }, text: c.label })
       : el('text', [['x', n2(c.centerX)], ['y', n2(ty)], ['text-anchor', 'middle'], ...common], { hit: { kind: 'axis', objectId: 'x' }, text: c.label });
   });

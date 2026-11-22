@@ -33,8 +33,10 @@ function choicesFor(chart: Chart, table: DataTable): Choice[] {
   for (const t of chartTypesFor(table.kind)) {
     const same = t.type === chart.type;
     if (t.type === 'groupedBar' && scatter) {
-      out.push({ id: t.type, type: t.type, label: t.label, description: t.description, sketch: <TypeSketch type={t.type} />, on: same && !dotsOnly, change: same ? BARS(chart.id) : [setChartType(chart.id, t.type)] });
+      // The dots come first (they are what a grouped graph starts as), then the bars. Each sets its whole look, so a switch from another type
+      // never brings back what that type left (the error bars of a box, the bars of a line).
       out.push({ id: scatter.id, type: t.type, label: scatter.label, description: scatter.description, sketch: <GallerySketch item={scatter} />, on: same && dotsOnly, change: [...(same ? [] : [setChartType(chart.id, t.type)]), ...DOTS_ONLY(chart.id)] });
+      out.push({ id: t.type, type: t.type, label: t.label, description: t.description, sketch: <TypeSketch type={t.type} />, on: same && !dotsOnly, change: [...(same ? [] : [setChartType(chart.id, t.type)]), ...BARS(chart.id)] });
     } else {
       out.push({ id: t.type, type: t.type, label: t.label, description: t.description, sketch: <TypeSketch type={t.type} />, on: same, change: same ? [] : [setChartType(chart.id, t.type)] });
     }

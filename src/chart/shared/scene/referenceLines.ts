@@ -12,7 +12,7 @@ export interface PlacedReferenceLine {
   label: string;
   labelX: number;
   labelY: number;
-  anchor: 'start' | 'end';
+  anchor: 'start' | 'middle' | 'end';
   line: ReferenceLine;
 }
 
@@ -27,6 +27,9 @@ interface Place {
   plot: { x: number; y: number; width: number; height: number };
   /** The value axis is the horizontal one (a horizontal column chart): its lines are vertical. */
   valueAxisHorizontal?: boolean;
+  /** Where the labels stand outside the plotting box (the layout's refLabel), and the size of their text. */
+  labelAt?: { left: number; right: number; top: number; bottom: number };
+  fontPt?: number;
 }
 
 export const insideAxis = (axis: AxisFacts, v: number): boolean => {
@@ -113,13 +116,17 @@ function placeReferenceLines(lines: readonly ReferenceLine[], place: Place): { p
     // The line is vertical when it is at an X value, or at a value of a horizontal value axis.
     const vertical = onX || !!place.valueAxisHorizontal;
     const d = vertical ? `M${n2(at)},${n2(plot.y)}V${n2(plot.y + plot.height)}` : `M${n2(plot.x)},${n2(at)}H${n2(plot.x + plot.width)}`;
+    // The label stands outside the plotting box: right of a horizontal line (or left of it), above a vertical one (or below it).
+    const out = place.labelAt;
+    const start = line.labelAt === 'start';
+    const fs = place.fontPt ?? 12;
     placed.push({
       id: line.id,
       d,
       label: line.showLabel ? line.label : '',
-      labelX: vertical ? at + 6 : plot.x + plot.width - 6,
-      labelY: vertical ? plot.y + 20 : at - 6,
-      anchor: vertical ? 'start' : 'end',
+      labelX: vertical ? at : out ? (start ? out.left : out.right) : plot.x + plot.width - 6,
+      labelY: vertical ? (out ? (start ? out.bottom : out.top) : plot.y + 20) : at + fs * 0.35,
+      anchor: vertical ? 'middle' : start ? 'end' : 'start',
       line,
     });
   }
@@ -204,7 +211,7 @@ interface XyShaped {
   yScale: (v: number) => number;
   x: AxisFacts;
   y: AxisFacts;
-  layout: { plot: { x: number; y: number; width: number; height: number } };
+  layout: { plot: { x: number; y: number; width: number; height: number }; refLabel: { left: number; right: number; top: number; bottom: number } };
 }
 
 /** ... and of a model over categories (columns, grouped bars): a value axis that may run across. */
@@ -212,7 +219,7 @@ interface CategoryShaped {
   orient: { horizontal: boolean; toScreen: (x: number, y: number) => { x: number; y: number } };
   yScale: (v: number) => number;
   y: AxisFacts;
-  layout: { plot: { x: number; y: number; width: number; height: number } };
+  layout: { plot: { x: number; y: number; width: number; height: number }; refLabel: { left: number; right: number; top: number; bottom: number } };
 }
 
 /** The model of a chart of a family that can have reference lines (the others carry no axes to put them on). */
@@ -230,12 +237,12 @@ export function referenceLinesOf(chart: Chart, any: ModelOfFamily) {
     case 'xy':
     case 'survival':
     case 'histogram':
-      return placeReferenceLines(lines, { xMap: any.model.xScale, yMap: any.model.yScale, xAxis: any.model.x, yAxis: any.model.y, plot: any.model.layout.plot });
+      return placeReferenceLines(lines, { xMap: any.model.xScale, yMap: any.model.yScale, xAxis: any.model.x, yAxis: any.model.y, plot: any.model.layout.plot, labelAt: any.model.layout.refLabel, fontPt: chart.yAxis.tickFontSizePt });
     case 'column':
     case 'grouped': {
       const m = any.model;
       const horizontal = m.orient.horizontal;
-      return placeReferenceLines(lines, { yMap: horizontal ? (v) => m.orient.toScreen(0, m.yScale(v)).x : m.yScale, yAxis: m.y, plot: m.layout.plot, valueAxisHorizontal: horizontal });
+      return placeReferenceLines(lines, { yMap: horizontal ? (v) => m.orient.toScreen(0, m.yScale(v)).x : m.yScale, yAxis: m.y, plot: m.layout.plot, valueAxisHorizontal: horizontal, labelAt: m.layout.refLabel, fontPt: chart.yAxis.tickFontSizePt });
     }
     default:
       return placeReferenceLines(lines, { plot: { x: 0, y: 0, width: 0, height: 0 } });

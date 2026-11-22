@@ -110,11 +110,11 @@ test.describe('the chart', () => {
 test.describe('the navigator', () => {
   test('arrow keys move between the folders and pages, Left and Right fold a folder', async ({ page }) => {
     await openApp(page);
-    await navItem(page, 'Graph 1', 'BAR').click();
+    await navItem(page, 'Data 1', 'BAR').click();
     await page.keyboard.press('ArrowDown');
     await expect(page.locator(':focus')).toContainText('New Graph');
     await page.keyboard.press('ArrowUp');
-    await expect(page.locator(':focus')).toContainText('Graph 1');
+    await expect(page.locator(':focus')).toContainText('Data 1');
     await page.keyboard.press('Home');
     await expect(page.locator(':focus')).toHaveText('Data Tables');
     await page.keyboard.press('ArrowLeft');

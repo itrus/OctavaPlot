@@ -16,11 +16,11 @@ export async function openApp(page: Page, viewport?: { width: number; height: nu
   await expect(page.getByRole('grid', { name: 'Data table' })).toBeVisible();
 }
 
-/** An item of the navigator by its name and badge (the badge is part of its text: "Graph 1BAR"). */
+/** An item of the navigator by its name and badge (the badge is part of its text: "Data 1BAR"). */
 export const navItem = (page: Page, name: string, badge: 'BAR' | 'COL' | 'XY' | 'GRP' | string): Locator => page.locator('.nav-item').filter({ hasText: new RegExp(`${name.replace(/[()]/g, '\\$&')}${badge}$`) });
 
-/** Opens the example graph (Graph 1) and waits for its drawing. */
-export async function openGraph(page: Page, name = 'Graph 1'): Promise<void> {
+/** Opens the example graph (named after its table, Data 1) and waits for its drawing. */
+export async function openGraph(page: Page, name = 'Data 1'): Promise<void> {
   await navItem(page, name, 'BAR').click();
   await expect(page.locator('.chart-surface svg')).toBeVisible();
 }

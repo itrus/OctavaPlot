@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../../model/graph/aspect';
 import { graphSources, type GraphSource } from '../../../model/table/chartTable';
 import { AXIS_LIMITS } from '../../../model/graph/axis';
@@ -60,7 +60,7 @@ function useChartSetter(chart: Chart) {
   return (label: string, patch: Partial<Chart>, key?: string) => run(label, patchChart(chart.id, patch), key);
 }
 
-export function TextSections({ chart, groups, yName, dual, axes = true }: { chart: Chart; groups: Group[]; yName: string; dual: boolean; axes?: boolean }) {
+export function TextSections({ chart, groups, yName, dual, axes = true }: { chart: Chart; groups: ReadonlyArray<Pick<Group, 'id' | 'name'>>; yName: string; dual: boolean; axes?: boolean }) {
   const { run } = useCommands();
   const setChart = useChartSetter(chart);
   return (
@@ -189,7 +189,7 @@ export function DimensionsSection({ chart }: { chart: Chart }) {
   );
 }
 
-export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[] }) {
+export function LegendSection({ chart, groups }: { chart: Chart; groups: ReadonlyArray<Pick<Group, 'id' | 'name'>> }) {
   const { run } = useCommands();
   return (
     <div>
@@ -244,7 +244,8 @@ export function LegendSection({ chart, groups }: { chart: Chart; groups: Group[]
 /** What the text fields that can hold a result say about it. */
 const RESULT_HINT = 'A result of a data set can be written in the text, as {{n Control}}, {{mean Control}} or {{sd Control|2}} (n, sum, mean, sd, sem, median, min, max; a number of decimals after a bar). It is filled when the graph is drawn, so it follows the data.';
 
-function ReferenceLinesSection({ chart }: { chart: Chart }) {
+/** Lines at values of the axes (a threshold, a target, a control level); they are set with the axes. */
+export function ReferenceLinesSection({ chart }: { chart: Chart }) {
   const { run } = useCommands();
   const { project } = useProject();
   const lines = capabilitiesOf(chart.type).referenceLines;
@@ -252,10 +253,16 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
   const table = prepareChartInput(project, chart)?.table;
   const groups = table?.groups ?? [];
   const hasX = lines === 'xy';
+  // A line clicked on the graph is the one picked here, and is brought into view.
+  const { selection } = useSelection();
+  const picked = selection.kind === 'referenceLine' ? selection.lineId : null;
+  useEffect(() => {
+    if (picked) document.getElementById(`ref-card-${picked}`)?.scrollIntoView({ block: 'nearest' });
+  }, [picked]);
   const oblique = capabilitiesOf(chart.type).guides;
-  const add = (axis: 'x' | 'y') => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis, value: 0, color: '#cc0000', widthPt: 2, style: 'dashed', opacity: 1, label: '', showLabel: false }));
+  const add = (axis: 'x' | 'y') => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis, value: 0, color: '#000000', widthPt: 4, style: 'dotted', opacity: 1, label: '', showLabel: true, labelAt: 'end', onTop: true }));
   // An oblique line: y = intercept + slope * x; the identity line is the one with slope 1 and intercept 0.
-  const addOblique = (slope: number, intercept: number) => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis: 'y', value: 0, slope, intercept, color: '#cc0000', widthPt: 2, style: 'dashed', opacity: 1, label: '', showLabel: false }));
+  const addOblique = (slope: number, intercept: number) => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis: 'y', value: 0, slope, intercept, color: '#000000', widthPt: 4, style: 'dotted', opacity: 1, label: '', showLabel: false }));
   return (
     <Section title="Reference lines">
       <div className="button-row">
@@ -272,7 +279,7 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
       {chart.referenceLines.map((l, i) => {
         const set = (label: string, patch: Parameters<typeof patchReferenceLine>[2], key?: string) => run(label, patchReferenceLine(chart.id, l.id, patch), key === undefined ? undefined : `ref:${l.id}:${key}`);
         return (
-          <div key={l.id} className="annotation-card selected">
+          <div key={l.id} id={`ref-card-${l.id}`} className={`annotation-card${picked === l.id ? ' selected' : ''}`}>
             {l.slope !== undefined ? (
               <>
                 <NumField label={`Intercept a (line ${i + 1})`} value={l.intercept ?? 0} onCommit={(v) => set('Reference line intercept', { intercept: v }, 'intercept')} hint="The line is Y = a + bX" />
@@ -312,8 +319,15 @@ function ReferenceLinesSection({ chart }: { chart: Chart }) {
             <Field label="Label" hint={RESULT_HINT}>
               <TextInput value={l.label} onChange={(v) => set('Reference line label', { label: v }, 'label')} />
             </Field>
-            <Field label="Show label">
-              <Check checked={l.showLabel} onChange={(v) => set('Show reference line label', { showLabel: v })} />
+            <Field label="Label" hint="Outside the plotting box: the end of the line is right of a horizontal line and above a vertical one; the beginning is left of it and below it. An oblique line has its label at its end, inside the plot.">
+              <SelectInput<'none' | 'end' | 'start'>
+                value={!l.showLabel ? 'none' : l.slope === undefined && l.labelAt === 'start' ? 'start' : 'end'}
+                options={[{ value: 'none', label: 'No label' }, { value: 'end', label: 'End of the line' }, ...(l.slope === undefined ? [{ value: 'start' as const, label: 'Beginning of the line' }] : [])]}
+                onChange={(v) => set('Reference line label', v === 'none' ? { showLabel: false } : { showLabel: true, labelAt: v })}
+              />
+            </Field>
+            <Field label="In front of the data" hint="Draw the line over the bars, points and curves instead of behind them">
+              <Check checked={l.onTop === true} onChange={(v) => set('Reference line in front', { onTop: v })} />
             </Field>
             <Field label="Colour">
               <ColorInput value={l.color} onChange={(v) => set('Reference line colour', { color: v }, 'color')} />
@@ -387,7 +401,6 @@ export function AnnotationsTab({ chart, placer }: { chart: Chart; placer?: Annot
   return (
     <div className="tab-body">
       {hasBarLabels(chart.type) && <BarLabelSection chart={chart} />}
-      <ReferenceLinesSection chart={chart} />
       <RegionsSection chart={chart} />
       <Section title="Shapes and lines">
         <DrawingList

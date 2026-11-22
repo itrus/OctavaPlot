@@ -11,6 +11,8 @@ export type Selection =
   /** Several points edited together (two or more; one is a 'point'), in the order they were picked; they may belong to different data sets. */
   | { kind: 'points'; points: Array<{ groupId: Id; pointId: Id }> }
   | { kind: 'annotation'; annotationId: Id }
+  /** One reference line (its settings are on the Axes page). */
+  | { kind: 'referenceLine'; lineId: Id }
   /** Several annotations edited together (two or more; one is an 'annotation'). */
   | { kind: 'annotations'; annotationIds: Id[] }
   /** One drawing object or several, edited together. */

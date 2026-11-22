@@ -5,10 +5,15 @@ import { fitsCanvas } from '../../chart/export/pngDpi';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
 import { newId } from '../../model/ids';
 import { FOLDER_NOUN, FOLDER_TITLE } from '../../model/project/folderItems';
-import type { Chart, DataTable, FitSettings, FolderKey, Id } from '../../model/types';
+import type { Chart, DataTable, FitSettings, FolderKey, HighlightColor, Id } from '../../model/types';
 import type { ViewRef } from '../../model/editor/types';
 import { useCommands, useNavigation, usePreferences, useProject } from '../../state/AppContext';
-import { duplicateItems, moveItems, nudgeItems, removeItems, renameItem, sortItemsByName } from '../../state/commands';
+import { composeCommands, duplicateItems, moveItems, nudgeItems, removeItems, renameItem, setHighlight, sortItemsByName } from '../../state/commands';
+import { HIGHLIGHTS, highlightBackground, highlightOf } from '../../model/project/highlight';
+import { useDismiss } from '../components/useDismiss';
+import { useCommand } from '../components/appCommands';
+import { ConfirmDeleteDialog } from '../dialogs/ConfirmDeleteDialog';
+import { deletionEffects, noEffects, type DeletionEffects } from '../../state/deletionEffects';
 import { Thumb, type ThumbItem } from './FolderThumbs';
 import { NOTHING_PICKED, pick, pickAll, pickedInOrder, prune, type PickState } from './folderSelection';
 import { DeleteIcon, ExportIcon } from '../components/icons';
@@ -38,17 +43,20 @@ export function FolderView({ folder }: { folder: FolderKey }) {
   // Batch export of the picked graphs: one export at a time, like the export of a single graph.
   const exportJob = useExportJob(setStatus);
   const [exportOpen, setExportOpen] = useState(false);
+  const [hlOpen, setHlOpen] = useState(false);
+  const hlRef = useRef<HTMLSpanElement>(null);
+  useDismiss(hlOpen, [hlRef], () => setHlOpen(false));
 
-  const entries = useMemo((): Array<{ id: Id; name: string; entry: ThumbItem; badges: Badge[] }> => {
+  const entries = useMemo((): Array<{ id: Id; name: string; entry: ThumbItem; badges: Badge[]; highlight?: HighlightColor }> => {
     switch (folder) {
       case 'tables':
-        return project.dataTables.map((item) => ({ id: item.id, name: item.name, entry: { kind: 'table', item }, badges: [TABLE_BADGE[item.kind]] }));
+        return project.dataTables.map((item) => ({ id: item.id, name: item.name, highlight: item.highlight, entry: { kind: 'table', item }, badges: [TABLE_BADGE[item.kind]] }));
       case 'results':
-        return (project.analyses ?? []).map((item) => ({ id: item.id, name: item.name, entry: { kind: 'analysis', item }, badges: [] }));
+        return (project.analyses ?? []).map((item) => ({ id: item.id, name: item.name, highlight: item.highlight, entry: { kind: 'analysis', item }, badges: [] }));
       case 'graphs':
-        return project.charts.map((item) => ({ id: item.id, name: item.name, entry: { kind: 'chart', item }, badges: [chartBadge(item.type), ...(item.linkedTo ? [{ text: '🔗', title: `Linked to ${project.charts.find((x) => x.id === item.linkedTo)?.name ?? 'another graph'}: it follows that graph's format` }] : [])] }));
+        return project.charts.map((item) => ({ id: item.id, name: item.name, highlight: item.highlight, entry: { kind: 'chart', item }, badges: [chartBadge(item.type), ...(item.linkedTo ? [{ text: '🔗', title: `Linked to ${project.charts.find((x) => x.id === item.linkedTo)?.name ?? 'another graph'}: it follows that graph's format` }] : [])] }));
       case 'layouts':
-        return (project.layouts ?? []).map((item) => ({ id: item.id, name: item.name, entry: { kind: 'layout', item }, badges: [] }));
+        return (project.layouts ?? []).map((item) => ({ id: item.id, name: item.name, highlight: item.highlight, entry: { kind: 'layout', item }, badges: [] }));
     }
   }, [project, folder]);
   const order = useMemo(() => entries.map((e) => e.id), [entries]);
@@ -97,7 +105,15 @@ export function FolderView({ folder }: { folder: FolderKey }) {
       },
     });
   };
+  // A deletion that takes more than was picked (the graphs and results of a table, a layout left empty) is confirmed first.
+  const [pendingDelete, setPendingDelete] = useState<{ effects: DeletionEffects; go: () => void } | null>(null);
   const remove = () => {
+    if (count === 0 || everyTable) return;
+    const effects = deletionEffects(project, folder, chosen);
+    if (noEffects(effects)) performRemove();
+    else setPendingDelete({ effects, go: performRemove });
+  };
+  const performRemove = () => {
     if (count === 0 || everyTable) return;
     const ids = chosen;
     const tables = folder === 'tables' ? ids : [];
@@ -111,6 +127,16 @@ export function FolderView({ folder }: { folder: FolderKey }) {
     run(count === 1 ? `Duplicate ${noun.one}` : `Duplicate ${count} ${noun.many}`, duplicateItems(folder, chosen.map((id) => [id, newId(KIND[folder])] as const)));
     setStatus(`Duplicated ${count === 1 ? nameOf(chosen[0]) : `${count} ${noun.many}`}.`);
   };
+  /** Colour the names of all the selected ones (null clears): one step to undo. */
+  const highlight = (color: HighlightColor | null) => {
+    if (count === 0) return;
+    setHlOpen(false);
+    run(color ? `Highlight ${count === 1 ? noun.one : `${count} ${noun.many}`}` : 'Remove highlight', composeCommands(...chosen.map((id) => setHighlight(KIND[folder], id, color))));
+  };
+  useCommand('highlight-item', (detail) => {
+    if (count === 0) setStatus(`Select ${noun.many} on this page first.`);
+    else highlight(highlightOf(detail) ?? null);
+  });
   const nudge = (step: 1 | -1) => {
     if (count > 0) run(step === -1 ? 'Move earlier' : 'Move later', nudgeItems(folder, chosen, step));
   };
@@ -179,6 +205,21 @@ export function FolderView({ folder }: { folder: FolderKey }) {
             <ExportIcon /> Export{count > 1 ? ` ${count}` : ''}…
           </button>
         )}
+        <span className="folder-hl" ref={hlRef}>
+          <button onClick={() => setHlOpen(!hlOpen)} disabled={count === 0} aria-haspopup="menu" aria-expanded={hlOpen} title="Colour the names of the selected, to find them again">Highlight ▾</button>
+          {hlOpen && (
+            <div className="folder-hl-pop" role="menu" aria-label="Highlight">
+              <button role="menuitem" className="menu-item" onClick={() => highlight(null)}><span className="menu-swatch menu-swatch-none" aria-hidden="true" /><span className="menu-label">No color</span></button>
+              <div className="menu-sep" role="separator" />
+              {HIGHLIGHTS.map((h) => (
+                <button key={h.id} role="menuitem" className="menu-item" onClick={() => highlight(h.id)}>
+                  <span className="menu-swatch" style={{ background: h.color }} aria-hidden="true" />
+                  <span className="menu-label">{h.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </span>
         <span className="topbar-sep" />
         <button onClick={() => nudge(-1)} disabled={count === 0} title="Move the selected earlier in the list" aria-label="Move earlier">◀ Earlier</button>
         <button onClick={() => nudge(1)} disabled={count === 0} title="Move the selected later in the list" aria-label="Move later">Later ▶</button>
@@ -188,6 +229,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
           <DeleteIcon /> Delete{count > 1 ? ` ${count}` : ''}
         </button>
       </div>
+      {pendingDelete && <ConfirmDeleteDialog project={project} what={count === 1 ? `${noun.one} “${nameOf(chosen[0])}”` : `${count} ${noun.many}`} effects={pendingDelete.effects} onConfirm={() => { const go = pendingDelete.go; setPendingDelete(null); go(); }} onClose={() => setPendingDelete(null)} />}
       {exportOpen && <BatchExportDialog project={project} ids={chosen} state={exportJob.state} onExport={exportPicked} onClose={() => setExportOpen(false)} />}
       {entries.length === 0 ? (
         <div className="empty">No {noun.many} yet. Use the New … line under {FOLDER_TITLE[folder]} in the navigator.</div>
@@ -226,7 +268,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
                       }}
                     />
                   ) : (
-                    <span className="folder-name" title={`${e.name} (double-click to rename)`} onDoubleClick={() => setRenaming(e.id)}>
+                    <span className={`folder-name${e.highlight ? ' hl' : ''}`} style={e.highlight ? { background: highlightBackground(e.highlight) } : undefined} title={`${e.name} (double-click to rename)`} onDoubleClick={() => setRenaming(e.id)}>
                       {e.badges.map((badge) => (
                         <span key={badge.text} className="nav-badge" title={badge.title}>{badge.text}</span>
                       ))}

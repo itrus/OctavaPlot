@@ -23,7 +23,7 @@ const FORMATS: readonly Format[] = [
   { id: 'column', label: 'Column', kind: 'column', blurb: 'One column per group, with its replicate values in the rows: comparing groups.' },
   { id: 'grouped', label: 'Grouped', kind: 'grouped', blurb: 'Two category levels with replicates in subcolumns, for example Male / Female by Control / Treated.' },
   { id: 'xy', label: 'XY', kind: 'xy', blurb: 'A numeric X column and one or more Y series: how Y changes with X.' },
-  { id: 'contingency', label: 'Contingency', kind: 'contingency', blurb: 'Counts of subjects in each outcome: groups of subjects in the rows, outcomes in the columns.' },
+  { id: 'contingency', label: 'Contingency', kind: 'contingency', blurb: 'Counts in categories: the categories (row titles) in the rows, a column of counts for each whole; one column is one pie.' },
   { id: 'survival', label: 'Survival', kind: 'survival', blurb: 'Time to an event, with censoring, for each group: one row per subject.' },
 ];
 
@@ -125,12 +125,12 @@ function ContingencySketch() {
   // The outcomes only: a Total column would count every subject twice if it were plotted with the others.
   const cw = (W - label) / 2;
   const cells: Cell[] = [{ x: 0, y: 0, w: label, h: ROW, head: true }];
-  ['Cured', 'Not cured'].forEach((t, i) => cells.push({ x: label + i * cw, y: 0, w: cw, h: ROW, text: t, head: true }));
-  ['Treated', 'Control'].forEach((t, r) => {
+  cells.push({ x: label, y: 0, w: cw, h: ROW, text: 'Cases', head: true });
+  ['Cured', 'Improved', 'No change'].forEach((t, r) => {
     cells.push({ x: 0, y: (1 + r) * ROW, w: label, h: ROW, text: t });
-    (r === 0 ? ['38', '12'] : ['21', '29']).forEach((v, c) => cells.push({ x: label + c * cw, y: (1 + r) * ROW, w: cw, h: ROW, text: v, muted: true }));
+    cells.push({ x: label, y: (1 + r) * ROW, w: cw, h: ROW, text: ['38', '21', '12'][r], muted: true });
   });
-  return <Sketch cells={cells} rows={3} />;
+  return <Sketch cells={cells} rows={4} />;
 }
 
 function SurvivalSketch() {
@@ -224,7 +224,7 @@ export function NewTableDialog({ defaultSample, onCreate, onClose }: { defaultSa
         ) : (
           <div className="muted">
             {formatId === 'column' && 'Enter the replicate values of each group down its column.'}
-            {formatId === 'contingency' && 'Enter the number of subjects in each outcome, one row per group of subjects.'}
+            {formatId === 'contingency' && 'Enter the count of each category, one row per category; each column is one whole (one pie).'}
             {formatId === 'survival' && 'Enter one subject per row: the time, then 1 (event) or 0 (censored) in the column of the subject\'s group.'}
             {' '}This table type needs no further options.
           </div>

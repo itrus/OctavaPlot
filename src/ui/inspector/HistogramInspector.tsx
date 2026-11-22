@@ -9,13 +9,13 @@ import { useCommands } from '../../state/AppContext';
 import { composeCommands, patchAxis, patchLook, patchStyle } from '../../state/commands';
 import { LayersSection } from './sections/LayersSection';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput } from './common/controls';
-import { FrameSection } from './sections/LookControls';
+import { FrameSection, GridStyleSection } from './sections/LookControls';
 import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';
 import { inspectorShapeOf } from './common/nav';
 import { useInspectorNav } from './common/useInspectorNav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
-import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
+import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections, ReferenceLinesSection } from './sections/SharedSections';
 import { PaletteField } from './sections/PalettePicker';
 import { AxisLimits } from './XyInspector';
 import { SLIDERS } from './common/sliderRanges';
@@ -163,6 +163,8 @@ export function HistogramInspector({ chart, table }: { chart: Chart; table: Data
                 </Field>
                 <AxisLimits chart={chart} which="yAxis" scale={model.y} name="Y" canScale={false} canReverse={false} />
               </Section>
+              <GridStyleSection chart={chart} />
+              <ReferenceLinesSection chart={chart} />
             </div>
           )}
           {shows('type') && <ChartTypePicker chart={chart} table={table} />}

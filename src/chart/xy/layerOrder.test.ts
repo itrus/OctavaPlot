@@ -9,7 +9,7 @@ import { buildXyModel } from './xyModel';
 
 const table = createXyTable('XY', true, { kind: 'replicates', n: 3 });
 const make = (patch: Partial<Chart> = {}): Chart => {
-  const c = createChart(table.id, undefined, 'xyLineSymbols');
+  const c = createChart(table.id, undefined, 'xyLine');
   return { ...c, ...patch, layers: c.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showErrorBars: true } } : l)) };
 };
 const project = (chart: Chart): Project => ({ id: 'p', name: 'p', dataTables: [table], charts: [chart] });

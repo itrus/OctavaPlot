@@ -205,6 +205,19 @@ describe('renaming from the navigator', () => {
     expect(renameItem('chart', p.charts[0].id, 'Figure 1')(p).charts[0].name).toBe('Figure 1');
     expect(renameItem('table', p.dataTables[0].id, '   ')(p)).toBe(p);
   });
+
+  it('gives the graphs of a renamed table its name, unless their name or title was changed', async () => {
+    const { renameItem } = await import('./commands');
+    const p = createExampleProject();
+    const t = p.dataTables[0];
+    const c = p.charts.find((x) => x.dataTableId === t.id)!;
+    const follow = { ...p, charts: p.charts.map((x) => (x === c ? { ...x, name: t.name, title: t.name } : x)) };
+    const a = renameItem('table', t.id, 'Dose response')(follow).charts.find((x) => x.id === c.id)!;
+    expect([a.name, a.title]).toEqual(['Dose response', 'Dose response']);
+    const own = { ...p, charts: p.charts.map((x) => (x === c ? { ...x, name: 'Fig', title: 'My title' } : x)) };
+    const b = renameItem('table', t.id, 'Dose response')(own).charts.find((x) => x.id === c.id)!;
+    expect([b.name, b.title]).toEqual(['Fig', 'My title']);
+  });
 });
 
 describe('duplicating and deleting items', () => {

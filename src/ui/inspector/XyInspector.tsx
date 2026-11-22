@@ -10,7 +10,7 @@ import { hasFactors, seriesPaletteIndex, usesFactors } from '../../model/table/f
 import { resolveSummary } from '../../model/graph/summary';
 import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from './common/summaryUi';
 import { tooltipFmt } from '../../chart/tooltip';
-import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, OffsetSection } from './sections/LookControls';
+import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, OffsetSection, GridStyleSection } from './sections/LookControls';
 import { autoOffsetStep } from '../../model/table/offset';
 import { DataSetOrder } from './sections/DataSetOrder';
 import { AxisStyleControls } from './sections/AxisStyleControls';
@@ -43,7 +43,7 @@ import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';
 import { useInspectorNav } from './common/useInspectorNav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
-import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
+import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections, ReferenceLinesSection } from './sections/SharedSections';
 import { PaletteField } from './sections/PalettePicker';
 import { displayName } from '../../chart/shared/parts/names';
 import { inspectorShapeOf } from './common/nav';
@@ -231,7 +231,6 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
               {shows('analysis') && distChart && <DistributionControls chart={chart} lineColor={st.lineColor} lineWidthPt={st.lineWidthPt} lineOpacity={st.lineOpacity} onLine={(patch) => setStyle(patch)} />}
               {shows('style') && (
               <>
-              {(barChart || chart.type === 'groupedLine') && supportsHorizontal(chart.type) && <DirectionSection chart={chart} />}
               {(barChart || chart.type === 'xyBars') && (
                 <GroupBox title={distChart ? (chart.type === 'groupedBox' ? 'Box' : 'Violin') : 'Bars'} {...(chart.type === 'groupedBar' || chart.type === 'xyBars' ? { checked: st.showBars, onCheckedChange: (v: boolean) => setStyle({ showBars: v }), overridden: ov('showBars') } : {})}>
                   <Field label="Fill" overridden={ov('barFill')}>
@@ -454,6 +453,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                   <div className="muted small">Reference lines, shaded regions, extra ticks and annotations placed at values are on the left Y axis.</div>
                 </Section>
               )}
+              <GridStyleSection chart={chart} />
+              <ReferenceLinesSection chart={chart} />
             </div>
           )}
 
@@ -463,6 +464,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
           {shows('layout') && (
             <div>
               <DimensionsSection chart={chart} />
+              {supportsHorizontal(chart.type) && <DirectionSection chart={chart} />}
               {(chart.type === 'groupedBar' || chart.type === 'groupedFloating' || chart.type === 'contingencyBars') && <ColumnLayoutSection chart={chart} spacing={false} baseline />}
               {chart.type === 'xyBars' && <ColumnLayoutSection chart={chart} spacing baseline numericX />}
               {chart.type === 'xyOffset' && <OffsetSection chart={chart} autoStep={autoOffsetStep(table)} />}

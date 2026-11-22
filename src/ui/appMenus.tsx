@@ -7,7 +7,8 @@ import { ADD_COLUMN_LABEL, type TableAction } from './views/tableMenu';
 import { inspectorShapeOf, PAGES as INSPECTOR_PAGES } from './inspector/common/nav';
 import type { InspectorTarget } from '../state/inspectorNav';
 import { resetAllDataSets, type Command } from '../state/commands';
-import type { Analysis, Chart, DataTable } from '../model/types';
+import { HIGHLIGHTS } from '../model/project/highlight';
+import type { Analysis, Chart, DataTable, HighlightColor } from '../model/types';
 
 /**
  * What the menu bar and the shortcuts need to know and to do: what is on screen (a table, a graph, a layout, results, or a folder) and how the
@@ -18,8 +19,12 @@ export interface MenuContext {
   chart: Chart | undefined;
   analysis: Analysis | undefined;
   onLayout: boolean;
+  /** True on the page of a folder (Data Tables, Graphs, Results, Layouts), where items are picked. */
+  onFolder: boolean;
   /** What the item on screen is called in Duplicate, Rename and Delete; null on a folder. */
   itemNoun: string | null;
+  /** The highlight of the item on screen; undefined for none. */
+  highlight: HighlightColor | undefined;
   tableCount: number;
   hasInspector: boolean;
   canUndo: boolean;
@@ -182,6 +187,18 @@ export function buildMenus(c: MenuContext): MenuSpec[] {
         item('New data table…', () => { c.setNavOpen(true); fireCommand('new-table'); }),
         item(`Duplicate ${itemNoun ?? 'item'}`, () => fireCommand('duplicate-item'), { shortcut: 'Ctrl+Shift+D', hidden: !itemNoun, title: 'Make a copy of the item on screen' }),
         item(`Rename ${itemNoun ?? 'item'}`, () => { c.setNavOpen(true); fireCommand('rename-item'); }, { shortcut: 'F2', hidden: !itemNoun, title: 'Rename the item on screen' }),
+        {
+          kind: 'submenu',
+          label: itemNoun ? `Highlight ${itemNoun}` : 'Highlight selected',
+          hidden: !itemNoun && !c.onFolder,
+          title: itemNoun ? 'Colour the name of the item in the navigator, so that it is easy to come back to' : 'Colour the names of the items selected on this page',
+          entries: [
+            // The tick stands at the right, so the colour of the row stays visible.
+            item('No color', () => fireCommand('highlight-item', ''), { checked: itemNoun ? c.highlight === undefined : undefined, icon: <span className="menu-swatch menu-swatch-none" /> }),
+            sep,
+            ...HIGHLIGHTS.map((h) => item(h.label, () => fireCommand('highlight-item', h.id), { checked: itemNoun ? c.highlight === h.id : undefined, icon: <span className="menu-swatch" style={{ background: h.color }} /> })),
+          ],
+        },
         item(`Delete ${itemNoun ?? 'item'}`, () => fireCommand('delete-item'), { icon: <DeleteIcon />, hidden: !itemNoun, disabled: lastTable, title: table ? (lastTable ? 'The last table cannot be deleted' : 'Delete this table and the graphs and results that use it (can be undone)') : 'Delete this item (can be undone)' }),
         sep,
         item('Import CSV…', () => fireCommand('import-csv'), { icon: <ImportIcon />, hidden: !table }),

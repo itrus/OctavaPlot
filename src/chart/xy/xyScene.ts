@@ -135,6 +135,7 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
   const xCross = crossingPosition(chart.origin.y, y, yScale, bottom);
   const axis = { chart, plot };
 
+  const shownLines = referenceLinesOf(chart, { family: 'xy', model }).placed.filter((l) => !hidden.has(`${l.line.id}:referenceLine`));
   const back = [
     ...backgroundElements(chart, W, H, plot),
     ...(ya.visible ? gridElements({ dir: 'h', grid: chart.grid, major: y.ticks, minor: y.minorTicks ?? [], showMajor: ya.showGrid, showMinor: ya.showMinorGrid, at: yScale, from: plot.x, to: right, extras: y.extraTicks }) : []),
@@ -143,9 +144,11 @@ function compileXyChrome(chart: Chart, model: XyModel): Pick<Scene, 'defs' | 'ba
     ...(xa.visible ? gridElements({ dir: 'v', grid: chart.grid, major: x.ticks, minor: x.minorTicks ?? [], showMajor: xa.showGrid, showMinor: xa.showMinorGrid, at: xScale, from: plot.y, to: bottom, extras: x.extraTicks }) : []),
     // The shaded regions are behind everything else that is drawn in the plot.
     ...regionElements(regionsOf(chart, { family: 'xy', model }).placed.filter((r) => !hidden.has(`${r.region.id}:region`)), ya.tickFontSizePt),
-    ...referenceLineElements(referenceLinesOf(chart, { family: 'xy', model }).placed.filter((l) => !hidden.has(`${l.line.id}:referenceLine`)), ya.tickFontSizePt),
+    ...referenceLineElements(shownLines.filter((l) => !l.line.onTop), ya.tickFontSizePt),
   ];
   const front = [
+    // The reference lines that are set in front of the data.
+    ...referenceLineElements(shownLines.filter((l) => l.line.onTop), ya.tickFontSizePt),
     // The gridlines that added ticks want in front of the data.
     ...(ya.visible ? extraGridElements({ dir: 'h', grid: chart.grid, extras: y.extraTicks, at: yScale, from: plot.x, to: right }, true) : []),
     ...(xa.visible ? extraGridElements({ dir: 'v', grid: chart.grid, extras: x.extraTicks, at: xScale, from: plot.y, to: bottom }, true) : []),

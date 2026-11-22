@@ -69,6 +69,9 @@ test('the Direction control turns a forest plot and turns it back, with its diam
   const svg = await openForest(page, 'difference');
   await page.getByLabel('Summary row: Pooled').check();
   const horizontal = await geometry(svg);
+  // The Direction control is with the size of the graph: Graph, Layout.
+  await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Graph' }).click();
+  await page.getByRole('tab', { name: 'Layout' }).click();
   await page.getByLabel('Columns run').getByRole('button', { name: 'Vertical' }).click();
   expect(await geometry(svg)).not.toEqual(horizontal);
   expect(await diamonds(svg)).toBe(1);

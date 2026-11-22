@@ -4,13 +4,17 @@ import { createPortal } from 'react-dom';
 import { newId } from '../../model/ids';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
 import { FOLDER_TITLE } from '../../model/project/folderItems';
-import type { AnalysisKind, ChartType, FolderKey, Id, TableKind } from '../../model/types';
+import type { AnalysisKind, ChartType, FolderKey, HighlightColor, Id, TableKind } from '../../model/types';
 import type { ViewRef } from '../../model/editor/types';
 import type { ChartVariant } from '../../model/graph/chartVariant';
 import { useCommands, useNavigation, usePreferences, useProject } from '../../state/AppContext';
 import { newChartStart } from '../../state/settings';
-import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, unlinkChart, removeAnalysis, type NewTableOptions } from '../../state/commands';
+import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, setHighlight, unlinkChart, removeAnalysis, type NewTableOptions } from '../../state/commands';
 import { useCommand } from '../components/appCommands';
+import { ConfirmDeleteDialog } from '../dialogs/ConfirmDeleteDialog';
+import { deletionEffects, noEffects, type DeletionEffects } from '../../state/deletionEffects';
+import { GraphNavIcon, LayoutNavIcon, TableNavIcon } from './navIcons';
+import { highlightBackground, highlightOf } from '../../model/project/highlight';
 import { navFold, navStep } from './navKeys';
 import { NewAnalysisDialog } from '../dialogs/NewAnalysisDialog';
 import { NewLayoutDialog, type NewLayoutOptions } from '../dialogs/NewLayoutDialog';
@@ -120,7 +124,17 @@ export function Navigator() {
     }
     setStatus(`Duplicated ${current.name}.`);
   };
+  // A deletion that takes more than was asked for (the graphs and results of a table, a layout left empty) is confirmed first.
+  const [pendingDelete, setPendingDelete] = useState<{ what: string; effects: DeletionEffects; go: () => void } | null>(null);
   const deleteCurrent = () => {
+    if (!current || view.kind === 'folder') return;
+    if (view.kind === 'table' && project.dataTables.length <= 1) return;
+    const folderOf = { table: 'tables', analysis: 'results', chart: 'graphs', layout: 'layouts' } as const;
+    const effects = deletionEffects(project, folderOf[view.kind], [view.id]);
+    if (noEffects(effects)) performDelete();
+    else setPendingDelete({ what: `${view.kind === 'chart' ? 'graph' : view.kind === 'analysis' ? 'result' : view.kind} “${current.name}”`, effects, go: performDelete });
+  };
+  const performDelete = () => {
     if (!current) return;
     if (view.kind === 'table') {
       if (project.dataTables.length <= 1) return;
@@ -156,7 +170,7 @@ export function Navigator() {
     setRenaming(null);
     run('Rename', renameItem(ref.kind, ref.id, name));
   };
-  const item = (ref: Exclude<ViewRef, { kind: 'folder' }>, icon: string, name: string, badges: Badge[] = [], after?: ReactNode) => {
+  const item = (ref: Exclude<ViewRef, { kind: 'folder' }>, icon: ReactNode, name: string, badges: Badge[] = [], after?: ReactNode, highlight?: HighlightColor) => {
     const row =
     renaming === ref.id ? (
       <div key={ref.id} className="nav-item active">
@@ -175,7 +189,7 @@ export function Navigator() {
         />
       </div>
     ) : (
-      <button key={ref.id} className={`nav-item${sameView(view, ref) ? ' active' : related.has(ref.id) ? ' related' : ''}`} onClick={() => setView(ref)} onDoubleClick={() => setRenaming(ref.id)} onKeyDown={(e) => e.key === 'F2' && setRenaming(ref.id)} title="Double-click or press F2 to rename">
+      <button key={ref.id} className={`nav-item${sameView(view, ref) ? ' active' : related.has(ref.id) ? ' related' : ''}${highlight ? ' hl' : ''}`} style={highlight ? { background: highlightBackground(highlight) } : undefined} onClick={() => setView(ref)} onDoubleClick={() => setRenaming(ref.id)} onKeyDown={(e) => e.key === 'F2' && setRenaming(ref.id)} title="Double-click or press F2 to rename">
         <span className="nav-icon">{icon}</span> {name}
         {badges.map((badge) => (
           <span key={badge.text} className="nav-badge" title={badge.title}>{badge.text}</span>
@@ -221,6 +235,11 @@ export function Navigator() {
   useCommand('duplicate-item', duplicateCurrent);
   useCommand('rename-item', renameCurrent);
   useCommand('delete-item', deleteCurrent);
+  useCommand('highlight-item', (detail) => {
+    if (view.kind === 'folder') return;
+    const color = highlightOf(detail) ?? null;
+    run(color ? 'Highlight' : 'Remove highlight', setHighlight(view.kind, view.id, color));
+  });
   useCommand('new-table', () => setDialog('table'));
   useCommand('new-analysis', () => setDialog('analysis'));
   const newItem = (label: string, onClick: () => void) => (
@@ -236,14 +255,14 @@ export function Navigator() {
           {folder('tables')}
           {open.tables && (
             <>
-              {project.dataTables.map((t) => item({ kind: 'table', id: t.id }, '▦', t.name, [TABLE_BADGE[t.kind]]))}
+              {project.dataTables.map((t) => item({ kind: 'table', id: t.id }, <TableNavIcon />, t.name, [TABLE_BADGE[t.kind]], undefined, t.highlight))}
               {newItem('New Data Table…', () => setDialog('table'))}
             </>
           )}
           {folder('results')}
           {open.results && (
             <>
-              {analysesOf(project).map((a) => item({ kind: 'analysis', id: a.id }, 'Σ', a.name))}
+              {analysesOf(project).map((a) => item({ kind: 'analysis', id: a.id }, 'Σ', a.name, [], undefined, a.highlight))}
               {newItem('New Analysis…', () => setDialog('analysis'))}
             </>
           )}
@@ -253,7 +272,7 @@ export function Navigator() {
               {project.charts.map((c) =>
                 item(
                   { kind: 'chart', id: c.id },
-                  '▥',
+                  <GraphNavIcon type={c.type} />,
                   c.name,
                   [chartBadge(c.type), ...(c.linkedTo ? [{ text: '🔗', title: `Linked to ${project.charts.find((x) => x.id === c.linkedTo)?.name ?? 'another graph'}: it follows that graph's format` }] : [])],
                   c.linkedTo ? (
@@ -268,6 +287,7 @@ export function Navigator() {
                       Unlink
                     </button>
                   ) : undefined,
+                  c.highlight,
                 ),
               )}
               {newItem('New Graph…', () => setDialog('graph'))}
@@ -276,7 +296,7 @@ export function Navigator() {
           {folder('layouts')}
           {open.layouts && (
             <>
-              {(project.layouts ?? []).map((l) => item({ kind: 'layout', id: l.id }, '▤', l.name))}
+              {(project.layouts ?? []).map((l) => item({ kind: 'layout', id: l.id }, <LayoutNavIcon />, l.name, [], undefined, l.highlight))}
               {newItem('New Layout…', () => setDialog('layout'))}
             </>
           )}
@@ -288,6 +308,7 @@ export function Navigator() {
         </div>
       </div>
       {/* In the page body, not in the (sliding) panel, so the dialog is positioned against the window. */}
+      {pendingDelete && createPortal(<ConfirmDeleteDialog what={pendingDelete.what} effects={pendingDelete.effects} project={project} onConfirm={() => { const go = pendingDelete.go; setPendingDelete(null); go(); }} onClose={() => setPendingDelete(null)} />, document.body)}
       {dialog === 'table' && createPortal(<NewTableDialog defaultSample={settings.newProjectSample} onCreate={createTable} onClose={() => setDialog(null)} />, document.body)}
       {dialog === 'layout' && createPortal(<NewLayoutDialog charts={project.charts} initialChartId={view.kind === 'chart' ? view.id : undefined} onCreate={createLayout} onClose={() => setDialog(null)} />, document.body)}
       {dialog === 'analysis' && createPortal(<NewAnalysisDialog tables={project.dataTables} initialTableId={currentTableId ?? project.dataTables[0].id} onCreate={createAnalysis} onClose={() => setDialog(null)} />, document.body)}

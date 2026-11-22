@@ -81,9 +81,14 @@ export type ReplicateLayout =
   /** XY tables: a Y, a +/- error of Y and a +/- error of X for each point, in three columns: error bars along both axes, each of its own. */
   | { kind: 'xerror' };
 
+/** The colours an item of the navigator can be marked with (model/project/highlight.ts). */
+export type HighlightColor = 'yellow' | 'red' | 'blue' | 'green' | 'purple' | 'orange' | 'gray';
+
 export interface DataTable {
   id: Id;
   name: string;
+  /** A colour the item's row has in the navigator, to find it again; absent = none. */
+  highlight?: HighlightColor;
   kind: TableKind;
   /** XY tables: how each Y series is entered. Absent = a single Y value. */
   layout?: ReplicateLayout;
@@ -584,6 +589,8 @@ export interface AxisConfig {
   /** Length of a major tick, pt; minor ticks are half of it. */
   tickLengthPt: number;
   numberFormat: NumberFormatKind;
+  /** Angle of the tick labels in degrees, -90 to 90: negative turns the text up to the right, positive down to the right (the labels of a bottom axis hang from their tick); absent = automatic (horizontal, and for category names 45 degrees up when they would overlap). */
+  tickAngle?: number;
   /** Digits after the decimal point; null = automatic. */
   decimals: number | null;
   /** Group the digits of large numbers by thousands. */
@@ -687,9 +694,13 @@ export interface ReferenceLine {
   style: LineStyle;
   /** How opaque the line and its label are, 0 (invisible) to 1. */
   opacity: number;
-  /** Text written at the end of the line. */
+  /** Text written beside the line, outside the plotting box. */
   label: string;
   showLabel: boolean;
+  /** Where the label stands: at the end of the line (right of a horizontal line, above a vertical one; the default) or at its beginning (left, below). */
+  labelAt?: 'end' | 'start';
+  /** Drawn in front of the data instead of behind it. Absent = behind. */
+  onTop?: boolean;
 }
 
 /** A band across the plotting region between two values of an axis (a normal range, a window): X gives a vertical band, Y a horizontal one. */
@@ -818,6 +829,8 @@ export interface SurvivalOptions {
 export interface Chart {
   id: Id;
   name: string;
+  /** A colour the item's row has in the navigator, to find it again; absent = none. */
+  highlight?: HighlightColor;
   dataTableId: Id;
   /** The graph this one was made like and still follows: its format settings that this graph has not changed itself (see model/graph/chartLink.ts). */
   linkedTo?: Id;
@@ -943,6 +956,8 @@ export type AnalysisKind = 'descriptive' | 'curvefit' | 'survival';
 export interface Analysis {
   id: Id;
   name: string;
+  /** A colour the item's row has in the navigator, to find it again; absent = none. */
+  highlight?: HighlightColor;
   kind: AnalysisKind;
   dataTableId: Id;
   /** Confidence level of the intervals, 0 < level < 1. */
@@ -996,6 +1011,8 @@ export interface LayoutLegend {
 export interface Layout {
   id: Id;
   name: string;
+  /** A colour the item's row has in the navigator, to find it again; absent = none. */
+  highlight?: HighlightColor;
   orientation: PageOrientation;
   /** Page colour; null = transparent. */
   background: string | null;

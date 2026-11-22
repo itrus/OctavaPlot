@@ -1,28 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { createChart, createContingencyTable } from '../../model/defaults';
 import type { DataTable, Project } from '../../model/types';
-import { patchLook, setCells, setChartType } from '../../state/commands';
+import { addGroup, patchLook, setCells, setChartType } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { chartToSvgString } from '../export/export';
 import { buildPieModel, pieGrid, percentText, sliceLabelText, slicePath } from './pieModel';
 import { pieTooltipLines } from '../tooltip';
 
 const setup = (type: 'pie' | 'doughnut' = 'pie') => {
-  const table: DataTable = createContingencyTable('Outcomes', true); // Treated 38/12, Control 21/29
+  const table: DataTable = createContingencyTable('Outcomes', true); // one column, Cases: Cured 38, Improved 21, No change 12
   const chart = createChart(table.id, undefined, type);
   const p: Project = { id: 'p', name: 'p', dataTables: [table], charts: [chart] };
   return { p, table, chart };
 };
 
 describe('pie model', () => {
-  it('makes one pie for each row, with the parts in the table order', () => {
+  it('makes one pie, of the column, with the parts the rows in the table order', () => {
     const { table, chart } = setup();
     const m = buildPieModel(chart, table);
-    expect(m.pies.map((p) => p.title)).toEqual(['Treated', 'Control']);
-    expect(m.pies[0].slices.map((s) => s.label)).toEqual(['Cured', 'Not cured']);
-    expect(m.pies[0].total).toBe(50);
-    expect(m.pies[0].slices.map((s) => s.fraction)).toEqual([0.76, 0.24]);
-    expect(m.parts.map((p) => p.label)).toEqual(['Cured', 'Not cured']);
+    expect(m.pies).toHaveLength(1);
+    expect(m.pies[0].title).toBe('Cases');
+    expect(m.pies[0].slices.map((s) => s.label)).toEqual(['Cured', 'Improved', 'No change']);
+    expect(m.pies[0].total).toBe(71);
+    expect(m.pies[0].slices.map((s) => s.fraction)).toEqual([38 / 71, 21 / 71, 12 / 71]);
+    expect(m.parts.map((p) => p.label)).toEqual(['Cured', 'Improved', 'No change']);
+  });
+  it('draws one column at a time: the first that is on the graph', () => {
+    const { p, table, chart } = setup();
+    const two = setCells(table.id, [{ col: 1, row: 0, value: 5 }, { col: 1, row: 1, value: 5 }])(addGroup(table.id)(p)).dataTables[0];
+    expect(buildPieModel(chart, two).pies).toHaveLength(1);
+    expect(buildPieModel(chart, two).pies[0].title).toBe('Cases');
+    const m = buildPieModel({ ...chart, hiddenGroupIds: [two.groups[0].id] }, two);
+    expect(m.pies).toHaveLength(1);
+    expect(m.pies[0].title).toBe('Outcome 2');
+    expect(m.pies[0].total).toBe(10);
   });
   it('gives each part the angle of its share, and the shares add up to 1', () => {
     const { table, chart } = setup();
@@ -37,7 +48,7 @@ describe('pie model', () => {
   });
   it('draws a whole circle when one part has everything, and nothing for a part without a count', () => {
     const { p, table } = setup();
-    const edited = setCells(table.id, [{ col: 1, row: 0, value: 0 }])(p);
+    const edited = setCells(table.id, [{ col: 0, row: 1, value: 0 }, { col: 0, row: 2, value: 0 }])(p);
     const t = edited.dataTables[0];
     const m = buildPieModel(p.charts[0], t);
     expect(m.pies[0].slices[1].path).toBe('');
@@ -46,17 +57,16 @@ describe('pie model', () => {
     expect(m.pies[0].slices[0].path).toContain('A');
     expect(chartToSvgString(p.charts[0], t)).not.toContain('NaN');
   });
-  it('does not draw a row whose counts are negative or add up to zero, and says why', () => {
+  it('does not draw a column with a negative count or counts that add up to zero, and says why', () => {
     const { p, table } = setup();
-    const edited = setCells(table.id, [
-      { col: 0, row: 0, value: -3 },
-      { col: 0, row: 1, value: 0 },
-      { col: 1, row: 1, value: 0 },
-    ])(p).dataTables[0];
-    const m = buildPieModel(p.charts[0], edited);
+    const negative = setCells(table.id, [{ col: 0, row: 0, value: -3 }])(p).dataTables[0];
+    const m = buildPieModel(p.charts[0], negative);
     expect(m.pies).toHaveLength(0);
-    expect(m.warnings.join(' ')).toMatch(/Treated: a count is negative/);
-    expect(m.warnings.join(' ')).toMatch(/Control: the counts add up to zero/);
+    expect(m.warnings.join(' ')).toMatch(/Cases: a count is negative/);
+    const zero = setCells(table.id, [{ col: 0, row: 0, value: 0 }, { col: 0, row: 1, value: 0 }, { col: 0, row: 2, value: 0 }])(p).dataTables[0];
+    const z = buildPieModel(p.charts[0], zero);
+    expect(z.pies).toHaveLength(0);
+    expect(z.warnings.join(' ')).toMatch(/Cases: the counts add up to zero/);
   });
   it('can run the other way and start elsewhere', () => {
     const { p, table } = setup();
@@ -71,9 +81,9 @@ describe('pie model', () => {
     const shown = patchLook(p.charts[0].id, { pie: { ...p.charts[0].pie, hole: 0.4, showTotal: true } })(p).charts[0];
     const m = buildPieModel(shown, table);
     expect(m.pies[0].rInner).toBeCloseTo(m.pies[0].r * 0.4, 9);
-    expect(m.pies[0].totalText).toBe('Total = 50');
+    expect(m.pies[0].totalText).toBe('Total = 71');
     const svg = chartToSvgString(shown, table);
-    expect(svg).toContain('>Total = 50</text>');
+    expect(svg).toContain('>Total = 71</text>');
     // A hole too small for the text leaves it under the pie.
     const tiny = patchLook(p.charts[0].id, { pie: { ...shown.pie, hole: 0.05 } })(p).charts[0];
     expect(buildPieModel(tiny, table).pies[0].totalInHole).toBe(false);
@@ -106,9 +116,9 @@ describe('pie model', () => {
   it('shows the part, the row and the share in the tooltip', () => {
     const { table, chart } = setup();
     const m = buildPieModel(chart, table);
-    const s = m.pies[1].slices[0];
+    const s = m.pies[0].slices[1];
     const lines = pieTooltipLines(m, { kind: 'bar', groupId: s.groupId, objectId: s.id })!;
-    expect(lines).toEqual(['Cured', 'Control', 'Count: 21', 'Share: 42.0% of 50']);
+    expect(lines).toEqual(['Improved', 'Cases', 'Count: 21', 'Share: 29.6% of 71']);
   });
 });
 
@@ -117,7 +127,7 @@ describe('pie chart', () => {
     const { table, chart } = setup();
     const svg = chartToSvgString(chart, table);
     expect(svg).toContain('>Cured</text>');
-    expect(svg).toContain('>Control</text>');
+    expect(svg).not.toContain('>Cases</text>'); // the chart's title is the only one
     expect(svg).not.toContain('NaN');
     expect(buildPieModel(chart, table).layout.legend).not.toBeNull();
   });
@@ -137,21 +147,12 @@ describe('pie chart', () => {
   });
 });
 
-describe('the pies under the chart title', () => {
-  it('stand close under it when there are several, however tall the chart is', () => {
+describe('the pie in the plot area', () => {
+  it('is one, in the middle, however tall the chart is', () => {
     const { table, chart } = setup();
     const tall = { ...chart, heightPx: chart.widthPx * 2 };
     const m = buildPieModel(tall, table);
-    expect(m.pies).toHaveLength(2);
-    // The title of the first pie is within a few lines of text from the top of the plot area, not in the middle of the chart's height.
-    const top = Math.min(...m.pies.map((p) => p.titleAt.y));
-    expect(top).toBeLessThan(m.heightPt * 0.25);
-  });
-  it('keep the centre when there is one pie', () => {
-    const { table, chart } = setup();
-    const one = buildPieModel(chart, { ...table, rowCount: 1 });
-    const two = buildPieModel(chart, table);
-    expect(one.pies).toHaveLength(1);
-    expect(one.pies[0].cy).toBeGreaterThan(two.pies[0].cy);
+    expect(m.pies).toHaveLength(1);
+    expect(m.pies[0].cy).toBeGreaterThan(m.heightPt * 0.25);
   });
 });

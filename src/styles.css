@@ -135,6 +135,14 @@ button.icon-only { display: inline-flex; align-items: center; justify-content: c
 .nav-item { margin-left: 18px; }
 .nav-item.active { background: var(--accent-soft); }
 .nav-item.active, .nav-item.related { font-weight: 700; }
+/* A highlighted item of the navigator (Edit > Highlight): the colour is the row's background; the open item keeps a frame. */
+.nav-item.hl.active { box-shadow: inset 0 0 0 1px var(--accent); }
+.folder-name.hl { border-radius: 3px; padding: 0 4px; }
+.menu-sub { z-index: 61; min-width: 150px; }
+.menu-item.open { background: var(--accent-soft); }
+.menu-tick { margin-left: 16px; }
+.menu-swatch-none { background: #fff; background-image: linear-gradient(135deg, transparent 45%, #c0392b 45%, #c0392b 55%, transparent 55%); }
+.menu-swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.25); display: inline-block; }
 .chev { display: inline-block; width: 12px; color: var(--muted); }
 
 .workspace { grid-area: main; min-width: 0; min-height: 0; display: flex; background: #fff; }
@@ -424,7 +432,7 @@ input[type='color'].mixed { opacity: 0.45; }
 .nav-item { display: flex; align-items: center; gap: 6px; }
 .nav-item.nav-new { font-style: italic; }
 .nav-item:disabled { color: #9aa1a8; }
-.nav-icon { width: 16px; text-align: center; color: var(--muted); flex: none; }
+.nav-icon { width: 16px; text-align: center; color: var(--muted); flex: none; display: inline-flex; align-items: center; justify-content: center; }
 .nav-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .nav-locked { display: flex; align-items: center; gap: 6px; }
 .nav-locked:disabled { color: #8d949b; cursor: not-allowed; }
@@ -482,6 +490,9 @@ input[type='color'].mixed { opacity: 0.45; }
 .info-head { display: flex; align-items: center; gap: 20px; margin-bottom: 8px; }
 .info-head h2 { font-size: 26px; margin: 0; }
 .info-logo { flex: none; display: block; }
+.info-rows { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; align-items: baseline; margin: 12px 0 0; }
+.info-rows dt { font-weight: 600; }
+.info-rows dd { margin: 0; overflow-wrap: anywhere; }
 .coffee-btn { display: inline-block; padding: 4px 12px; border: 1px solid #000; border-radius: 6px; background: #FFDD00; color: #000; font-weight: 600; text-decoration: none; }
 .coffee-btn:hover { filter: brightness(0.95); }
 .inline-controls { display: inline-flex; align-items: center; gap: 8px; }
@@ -787,3 +798,12 @@ input[type='color'].mixed { opacity: 0.45; }
 .palette-all { display: flex; flex-wrap: wrap; gap: 2px; }
 .palette-all i { width: 14px; height: 14px; border: 1px solid rgba(0, 0, 0, 0.35); border-radius: 2px; display: inline-block; }
 .palette-source { overflow-wrap: anywhere; }
+
+.folder-hl { position: relative; display: inline-flex; }
+.folder-hl-pop { position: absolute; top: 100%; left: 0; z-index: 60; min-width: 150px; background: #fff; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); padding: 4px; display: flex; flex-direction: column; }
+/* The delete confirmation: small pictures of what goes with the item, as in the folder overview. */
+.delete-heading { font-weight: 600; margin: 8px 0 4px; }
+.delete-cards { display: flex; flex-wrap: wrap; gap: 10px; max-height: 38vh; overflow-y: auto; padding: 2px; }
+.delete-card { margin: 0; width: 150px; }
+.delete-card figcaption { margin-top: 3px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.delete-thumb { height: 100px; }

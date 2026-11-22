@@ -9,7 +9,7 @@ import { SubHeading } from '../common/controls';
  * The order of the entries of the legend, top to bottom (or left to right in a row). It is the legend's own: the
  * marks of the graph keep the order the data sets are drawn in.
  */
-export function LegendOrder({ chart, groups }: { chart: Chart; groups: Group[] }) {
+export function LegendOrder({ chart, groups }: { chart: Chart; groups: ReadonlyArray<Pick<Group, 'id' | 'name'>> }) {
   const { run } = useCommands();
   const entries = applyOrder(groups, chart.legend.order ?? []);
   const ids = entries.map((g) => g.id);

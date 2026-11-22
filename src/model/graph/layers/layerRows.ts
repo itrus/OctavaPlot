@@ -3,6 +3,7 @@ import { centreLower } from '../../../stats/summary';
 import { dataLayer } from '../style';
 import { resolveSummary } from '../summary';
 import { xySeries } from '../../table/tableLayout';
+import { pieColumn, pieParts } from '../../table/pieParts';
 import type { Chart, ChartType, DataTable, Id, LayerStyle } from '../../types';
 import { layerStylesAvailable, LAYER_NAMES, layersOf, ORDERABLE_LAYER_KINDS, type LayerKind, type LayerSpec } from './layerList';
 import { lookKeysOf } from './layerLooks';
@@ -89,7 +90,7 @@ const SURVIVAL_NAMES: Partial<Record<LayerKind, string>> = { line: 'Curve', poin
 
 /** What the parts of a pie or doughnut chart are called. */
 function pieName(kind: LayerKind): string {
-  return kind === 'bars' ? 'Slices' : kind === 'labels' ? 'Slice labels' : kind === 'titles' ? 'Pie titles and totals' : LAYER_NAMES[kind];
+  return kind === 'bars' ? 'Slices' : kind === 'labels' ? 'Slice labels' : kind === 'titles' ? 'Pie total' : LAYER_NAMES[kind];
 }
 
 /** What the parts of a heat map are called. */
@@ -151,6 +152,8 @@ function obliqueName(slope: number, intercept: number): string {
 /** The layers of an XY or survival chart as the inspector lists them, topmost first. */
 export function layerRows(chart: Chart, table: DataTable, seriesName: (id: Id, fallback: string) => string = (_, f) => f): LayerRow[] {
   const names = new Map(xySeries(table).map((s) => [s.id, s.name]));
+  // The parts of a pie are the rows of the drawn column.
+  if (chartFamily(chart.type) === 'pie') for (const p of pieParts(table, pieColumn(chart, table))) names.set(p.id, p.label);
   // The visibility the style gives, before anything is hidden by ID, tells a layer that is off by its style from one that is hidden.
   const byStyle = new Map(layersOf({ ...chart, hiddenLayerIds: [] }, table).map((l) => [l.id, l.visible]));
   const byRange = new Map(layersOf({ ...chart, rangeExcludedLayerIds: [] }, table).map((l) => [l.id, l.rangeContribution]));

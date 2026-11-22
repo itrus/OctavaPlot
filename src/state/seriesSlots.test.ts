@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { buildGroupedModel } from '../chart/grouped/groupedModel';
-import { buildPieModel } from '../chart/pie/pieModel';
 import { buildXyModel } from '../chart/xy/xyModel';
 import { createEmptyProject } from '../model/defaults';
 import { xySeries } from '../model/table/tableLayout';
@@ -15,7 +14,6 @@ const chart = (p: Project, id = 'c') => p.charts.find((c) => c.id === id)!;
 const colours = {
   xy: (p: Project) => buildXyModel(chart(p), table(p)).series.map((s) => s.style.barFill),
   grouped: (p: Project) => buildGroupedModel(chart(p), table(p)).series.map((s) => s.style.barFill),
-  pie: (p: Project) => buildPieModel(chart(p, 'pie'), table(p)).parts.map((x) => x.style.barFill),
 };
 const firstSeries = (p: Project) => xySeries(table(p))[0].id;
 
@@ -39,13 +37,11 @@ describe('the colour of a series stays with it when another series is removed', 
     expect(colours.grouped(removeSeries('t', firstSeries(p))(p))).toEqual(before.slice(1));
   });
 
-  it('in a contingency table the pie and the bars colour an outcome alike, before and after the first outcome is removed', () => {
-    let bars = make('contingency', 'contingencyBars');
-    bars = addChart('pie', 't', undefined, 'pie')(bars);
-    expect(colours.grouped(bars)).toEqual(colours.pie(bars));
-    const after = removeGroup('t', table(bars).groups[0].id)(bars);
-    expect(colours.pie(after)).toEqual(colours.pie(bars).slice(1));
-    expect(colours.grouped(after)).toEqual(colours.pie(after));
+  it('in a contingency table the bars keep the colour of an outcome after the first outcome is removed', () => {
+    const bars = addGroup('t')(make('contingency', 'contingencyBars'));
+    const before = colours.grouped(bars);
+    expect(before.length).toBe(2);
+    expect(colours.grouped(removeGroup('t', table(bars).groups[0].id)(bars))).toEqual(before.slice(1));
   });
 
   it('survives a change of the way the series are entered, a copy and a file', () => {

@@ -4,6 +4,7 @@ import { MAX_REPLICATES, MIN_REPLICATES, seriesWidth, SUMMARY_FORMATS } from '..
 import type { DataRow, DataTable, Group, Observation, Project, ReplicateLayout, SummaryFormat, TableKind } from '../../model/types';
 import { timeColumnOf, type TimeColumn } from '../../util/timeColumn';
 import { arr, fail, isObj, num, obj, str } from './fileChecks';
+import { highlightOf } from '../../model/project/highlight';
 /**
  * How a data table is written in a project file (docs/FILE_FORMAT.md, "Data tables"; reading is in serialize.ts). Only what
  * is there is stored: an empty cell is left out, and so is every ID that is the canonical one of its place (see
@@ -272,5 +273,6 @@ export function parseTable(raw: unknown, path: string): DataTable {
   });
   const layout = kind === 'xy' || kind === 'grouped' ? parseLayout(t.layout, `${path}.layout`) : undefined;
   if (layout && (groups.length - lead) % seriesWidth(layout) !== 0) fail(`${path}.groups`, `do not fit the table layout: the columns must come in blocks of ${seriesWidth(layout)}`);
-  return { id: str(t.id, `${path}.id`), name: str(t.name, `${path}.name`), kind, ...(layout ? { layout } : {}), rowCount, rows: parseRows(t.rows, `${path}.rows`, rowCount), groups };
+  const highlight = highlightOf(t.highlight);
+  return { id: str(t.id, `${path}.id`), name: str(t.name, `${path}.name`), ...(highlight ? { highlight } : {}), kind, ...(layout ? { layout } : {}), rowCount, rows: parseRows(t.rows, `${path}.rows`, rowCount), groups };
 }

@@ -187,7 +187,8 @@ export const DEFAULT_SUMMARY: SummarySpec = {
 /** Visibility flags that a chart-type preset owns. */
 export const PRESET_KEYS = ['showBars', 'showSymbols', 'showLines', 'showMeanLine'] as const;
 
-export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEYS)[number]>> = {
+/** What a chart type switches on; the one setting beyond the four keys is the individual values of replicates (Points and connecting line shows them). */
+export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEYS)[number]> & { showRawPoints?: boolean }> = {
   bar: { showBars: true, showSymbols: true, showLines: false, showMeanLine: false },
   scatter: { showBars: false, showSymbols: true, showLines: false, showMeanLine: true },
   mean: { showBars: false, showSymbols: true, showLines: false, showMeanLine: false },
@@ -200,8 +201,9 @@ export const TYPE_PRESETS: Record<ChartType, Pick<ChartStyle, (typeof PRESET_KEY
   histogram: { showBars: true, showSymbols: false, showLines: false, showMeanLine: false },
   ecdf: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   xyScatter: { showBars: false, showSymbols: true, showLines: false, showMeanLine: false },
-  xyLine: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
-  xyLineSymbols: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
+  // The line with a dot at each average (the individual values stay hidden); "Points and connecting line" shows every value.
+  xyLine: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false },
+  xyLineSymbols: { showBars: false, showSymbols: true, showLines: true, showMeanLine: false, showRawPoints: true },
   // Spikes: the line layer draws the stems; an area has its fill under the line, which is its outline.
   xySpikes: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
   xyArea: { showBars: false, showSymbols: false, showLines: true, showMeanLine: false },
@@ -480,11 +482,14 @@ export function createGroupedTable(name: string, sample: boolean, layout: Replic
   return layout.kind === 'single' ? table : { ...table, layout };
 }
 
-/** A contingency table: rows are groups of subjects, columns are outcomes, cells are counts. */
+/**
+ * A contingency table (1000 rows, like the others): the rows are the categories (their row titles), a column holds the counts, so a column is one whole. It
+ * starts with one column, which is one pie; a pie chart draws one column at a time.
+ */
 export function createContingencyTable(name: string, sample: boolean): DataTable {
-  const groups = [createGroup('Cured', 0, CATEGORY_ROWS, sample ? [38, 21] : []), createGroup('Not cured', 1, CATEGORY_ROWS, sample ? [12, 29] : [])];
-  const rows = createRows(CATEGORY_ROWS).map((r, i) => ({ ...r, title: sample ? ['Treated', 'Control'][i] ?? '' : '' }));
-  return { id: newId('table'), name, kind: 'contingency', rowCount: CATEGORY_ROWS, rows, groups };
+  const groups = [createGroup('Cases', 0, INITIAL_ROWS, sample ? [38, 21, 12] : [])];
+  const rows = createRows(INITIAL_ROWS).map((r, i) => ({ ...r, title: sample ? ['Cured', 'Improved', 'No change'][i] ?? '' : '' }));
+  return { id: newId('table'), name, kind: 'contingency', rowCount: INITIAL_ROWS, rows, groups };
 }
 
 const SURVIVAL_SAMPLE: Array<[number, 0 | 1, 0 | 1]> = [
@@ -512,7 +517,7 @@ export function createEmptyProject(size?: ChartStart): Project {
   const groups: Group[] = [];
   for (let i = 0; i < 4; i++) groups.push(createGroup(nextGroupName(groups.map((g) => g.name)), i, INITIAL_ROWS));
   const table: DataTable = { id: newId('table'), name: 'Data 1', kind: 'column', rowCount: INITIAL_ROWS, rows: createRows(INITIAL_ROWS), groups };
-  return { id: newId('project'), name: untitledProjectName(), dataTables: [table], charts: [createChart(table.id, size)] };
+  return { id: newId('project'), name: untitledProjectName(), dataTables: [table], charts: [{ ...createChart(table.id, size), name: table.name, title: table.name }] };
 }
 
 export function createExampleProject(size?: ChartStart): Project {
@@ -521,7 +526,7 @@ export function createExampleProject(size?: ChartStart): Project {
     id: newId('project'),
     name: untitledProjectName(),
     dataTables: [table],
-    charts: [createChart(table.id, size)],
+    charts: [{ ...createChart(table.id, size), name: table.name, title: table.name }],
   };
 }
 

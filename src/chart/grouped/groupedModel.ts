@@ -293,6 +293,7 @@ export function buildGroupedModel(chart: Chart, table: DataTable): GroupedModel 
     legendLabels: legendSeries.map((i) => raw[i].label),
     categoryLabels: horizontal ? [] : axisLabels,
     yTickLabels: horizontal ? labels : yAxis.ticks.map(yAxis.tickLabel),
+    ...(horizontal ? { xNumberLabels: yAxis.ticks.map(yAxis.tickLabel) } : {}),
     categoryRowPt: (clusters || separated) && !horizontal ? chart.xAxis.tickFontSizePt * 1.6 : 0,
   });
   warnings.push(...lay.warnings);

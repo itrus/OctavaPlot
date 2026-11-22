@@ -1,6 +1,5 @@
-import { leadingColumns } from '../../model/graph/chartTypes';
 import { layersOf, type LayerSpec } from '../../model/graph/layers';
-import { rowTitleAt } from '../../model/table/rows';
+import { pieColumn, pieParts } from '../../model/table/pieParts';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { legendEntries } from '../../model/graph/legendEntries';
 import type { Chart, ChartStyle, DataTable, Id, PieLabelMode } from '../../model/types';
@@ -53,7 +52,7 @@ interface PieSlice {
 
 interface PieGeom {
   row: number;
-  /** The ID of the row of the table the pie is of. */
+  /** The ID of the column of the table the pie is of. */
   rowId?: Id;
   title: string;
   cx: number;
@@ -63,8 +62,6 @@ interface PieGeom {
   rInner: number;
   total: number;
   slices: PieSlice[];
-  /** Where the title of the pie goes, above it (the baseline of its text). */
-  titleAt: { x: number; y: number };
   /** Where the total goes when it does not fit in the hole (or the pie has none): under the pie. */
   totalAt: { x: number; y: number };
   totalText: string | null;
@@ -139,25 +136,20 @@ export function pieGrid(count: number, width: number, height: number, roomX = 0,
 }
 
 /**
- * Model of pie and doughnut charts: one pie for each row of a contingency table, the parts being its columns. A row
- * with a negative count, or with no counts at all, is not drawn and is reported; nothing is drawn for a zero total.
+ * Model of pie and doughnut charts: one pie, of one column of a contingency table (the first not taken off the graph), the parts
+ * being its rows, named by their row titles; a part's ID is made from the ID of its row. A column with a negative count is not drawn and is
+ * reported; nothing is drawn for a zero total.
  */
 export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   const [W, H] = [chartPx2Pt(chart.widthPx), chartPx2Pt(chart.heightPx)];
   const layer = dataLayer(chart);
   const opts = chart.pie;
   const warnings: string[] = [];
-  const first = leadingColumns(table.kind);
-  const parts = table.groups.slice(first).map((g, i) => ({ g, style: resolveStyle(chart, layer, { id: g.id, paletteIndex: g.paletteIndex ?? i }), label: displayName(chart, g.id, g.name) }));
-  const hidden = new Set(chart.hiddenGroupIds);
-  const shown = parts.filter((p) => !hidden.has(p.g.id));
-
-  // Rows that hold something: a title or a count.
-  const rows: number[] = [];
-  for (let r = 0; r < table.rowCount; r++) {
-    const hasValue = shown.some((p) => p.g.observations[r]?.value !== null && p.g.observations[r]?.value !== undefined);
-    if (rowTitleAt(table, r).trim() !== '' || hasValue) rows.push(r);
-  }
+  // One column is drawn, as one pie; its rows are the parts, named by their row titles.
+  const column = pieColumn(chart, table);
+  const parts = pieParts(table, column).map((p, i) => ({ g: { id: p.id, row: p.row }, style: resolveStyle(chart, layer, { id: p.id, paletteIndex: i }), label: displayName(chart, p.id, p.label) }));
+  const shown = parts;
+  const drawn = column && parts.length > 0 ? [column] : [];
 
   const hiddenAxis = { ...chart.xAxis, visible: false };
   const legendKeyParts = legendEntries(chart.legend, parts.map((p) => p.g.id));
@@ -174,10 +166,11 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   const fontPt = chart.xAxis.tickFontSizePt;
   const labelPt = chart.legend.fontSizePt;
   // The title stands above the pie, the total (when it is not in the hole) under it.
-  const titleH = fontPt * 1.8;
+  // The chart's own title is the only one: the pie has none above it, only its total when asked for.
+  const titleH = 0;
   const titleBand = titleH + (opts.showTotal ? fontPt * 1.4 : 0);
   // Room for the labels round the pie when they are written outside it: the widest one that can occur, and one line.
-  const biggest = shown.reduce((m, p) => p.g.observations.reduce((mm, o) => (o.value !== null && Number.isFinite(o.value) ? Math.max(mm, o.value) : mm), m), 1);
+  const biggest = (column?.observations ?? []).reduce((mm, o) => (o.value !== null && Number.isFinite(o.value) ? Math.max(mm, o.value) : mm), 1);
   const widest = Math.max(0, ...shown.map((p) => measureText(sliceLabelText(opts.labels, p.label, biggest, 1, opts.percentDigits) ?? '', labelPt, false, false, chart.fontFamily)));
   const bars = chart.type === 'slices';
   const dots = chart.type === 'dotGrid';
@@ -187,29 +180,28 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
   // A bar of slices runs across the chart, one under the other; the others are placed in a grid of as many as fit.
   const barLine = bars ? labelPt * 1.4 : 0;
   const { cols, rows: rowsDown, diameter } = bars
-    ? { cols: 1, rows: Math.max(1, rows.length), diameter: Math.min(plot.width * 0.92, Math.max(0, plot.height / Math.max(1, rows.length) - titleBand - barLine) * 5) }
-    : pieGrid(Math.max(1, rows.length), plot.width, plot.height, roomX, roomY, titleBand);
+    ? { cols: 1, rows: 1, diameter: Math.min(plot.width * 0.92, Math.max(0, plot.height - titleBand - barLine) * 5) }
+    : pieGrid(1, plot.width, plot.height, roomX, roomY, titleBand);
   const cellW = plot.width / cols;
-  // With several pies the block stands at the top, under the chart title, instead of being centred in the whole plot area (the title would be far from the pies).
-  // One pie keeps the centre. A pie's cell is as tall as its title, labels and diameter need.
-  const cellH = !bars && rows.length > 1 ? Math.min(plot.height / rowsDown, titleBand + 2 * roomY + diameter) : plot.height / rowsDown;
+  // The one pie is centred in the plot area.
+  const cellH = plot.height / rowsDown;
   const r = diameter / 2;
-  // The height of a bar: a fifth of its length, as long as the row has room for it, its title and its labels.
+  // The height of a bar: a fifth of its length, as long as there is room for it, its title and its labels.
   const barH = bars ? Math.min(diameter / 5, Math.max(0, cellH - titleBand - barLine)) : 0;
-  if (rows.length > 0 && (bars ? barH < 8 : r < 12)) warnings.push(bars ? 'The chart is too small for its bars; enlarge the chart or use fewer rows.' : 'The chart is too small for its pies; enlarge the chart, use fewer rows, or switch the labels off.');
+  if (drawn.length > 0 && (bars ? barH < 8 : r < 12)) warnings.push(bars ? 'The chart is too small for its bar; enlarge the chart.' : 'The chart is too small for its pie; enlarge the chart, or switch the labels off.');
   const rInner = chart.type === 'doughnut' ? r * opts.hole : 0;
   const dir = opts.direction === 'clockwise' ? 1 : -1;
   const start = (opts.startAngle * Math.PI) / 180;
   const bad: string[] = [];
 
   const pies: PieGeom[] = [];
-  rows.forEach((row, k) => {
+  drawn.forEach((source, k) => {
     const col = k % cols;
     const line = Math.floor(k / cols);
     const cx = plot.x + cellW * (col + 0.5);
     const cy = plot.y + cellH * line + titleH + (cellH - titleBand) / 2;
-    const title = rowTitleAt(table, row).trim() || `Row ${row + 1}`;
-    const raw = shown.map((p) => p.g.observations[row]?.value ?? null);
+    const title = displayName(chart, source.id, source.name).trim() || 'Counts';
+    const raw = shown.map((p) => source.observations[p.g.row]?.value ?? null);
     if (raw.some((v) => v !== null && (!Number.isFinite(v) || v < 0))) {
       bad.push(`${title}: a count is negative`);
       return;
@@ -229,8 +221,8 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
       const a0 = angle;
       const a1 = angle + dir * fraction * TWO_PI;
       angle = a1;
-      const id = `${p.g.id}:slice:${row}`;
-      const obsId = p.g.observations[row]?.id;
+      const id = `${p.g.id}:slice:${source.id}`;
+      const obsId = source.observations[p.g.row]?.id;
       if (!(w > 0)) return { id, obsId, groupId: p.g.id, label: p.label, value: w, fraction, path: '', style: p.style, text: null };
       if (bars) {
         // A bar of slices: the segment of the whole bar that is its share, with its text under it (left out where it would not fit).
@@ -257,8 +249,8 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
     });
     const totalText = opts.showTotal ? `${opts.totalPrefix}${formatLabelValue(total, null)}` : null;
     pies.push({
-      row,
-      rowId: table.rows[row]?.id,
+      row: k,
+      rowId: source.id,
       title,
       cx,
       cy,
@@ -266,14 +258,13 @@ export function buildPieModel(chart: Chart, table: DataTable): PieModel {
       rInner,
       total,
       slices,
-      titleAt: bars ? { x: cx, y: cy - barH / 2 - fontPt * 0.6 } : { x: cx, y: cy - r - roomY - fontPt * 0.4 },
       totalAt: bars ? { x: cx, y: cy + barH / 2 + barLine + fontPt * 1.6 } : { x: cx, y: cy + r + roomY + fontPt * 0.8 },
       totalText,
       totalInHole: totalText !== null && rInner > 0 && measureText(totalText, fontPt, false, false, chart.fontFamily) <= rInner * 1.7,
     });
   });
   if (bad.length > 0) warnings.push(`Not drawn: ${bad.join('; ')}. A pie needs counts of 0 or more that add up to more than 0.`);
-  if (rows.length === 0) warnings.push('Enter counts in the table to see the chart.');
+  if (drawn.length === 0) warnings.push('Enter counts in the table to see the chart.');
 
   const model: PieModel = {
     widthPt: W,

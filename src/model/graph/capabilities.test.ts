@@ -56,7 +56,7 @@ describe('capability registry', () => {
     // X lines need a numeric X axis; a column chart has categories there.
     for (const c of CAPABILITIES) if (c.referenceLines === 'xy') expect(['xy', 'survival', 'histogram']).toContain(chartFamily(c.type));
     // The three Cartesian column charts and the XY charts of points, lines, bars, spikes and areas can be bound to the right axis (offset traces and vectors share one scale).
-    expect(CAPABILITIES.filter((c) => c.secondaryAxis).map((c) => c.type)).toEqual(['bar', 'scatter', 'mean', 'xyScatter', 'xyLine', 'xyLineSymbols', 'xyBubble', 'xyBars', 'xySpikes', 'xyArea']);
+    expect(CAPABILITIES.filter((c) => c.secondaryAxis).map((c) => c.type)).toEqual(['bar', 'scatter', 'mean', 'xyLineSymbols', 'xyScatter', 'xyLine', 'xyBubble', 'xyBars', 'xySpikes', 'xyArea']);
     expect(capabilitiesOf('violin').curveFit).toBe(false);
   });
 

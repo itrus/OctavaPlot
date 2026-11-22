@@ -120,12 +120,31 @@ export function AxisStyleControls({
   );
 }
 
+/** The angles the labels of an axis can be turned to by hand (degrees; negative turns the text up to the right). */
+const ANGLES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'auto', label: 'Automatic' },
+  { value: '0', label: 'Horizontal' },
+  { value: '-30', label: 'Up 30°' },
+  { value: '-45', label: 'Up 45°' },
+  { value: '-60', label: 'Up 60°' },
+  { value: '-90', label: 'Vertical, read upward' },
+  { value: '30', label: 'Down 30°' },
+  { value: '45', label: 'Down 45°' },
+  { value: '60', label: 'Down 60°' },
+  { value: '90', label: 'Vertical, read downward' },
+];
+
 /** Direction and length of the tick marks: the part of the axis style every axis has, the category axis too. */
 export function TickFields({ chart, which, name }: { chart: Chart; which: AxisKey; name: string }) {
   const axis = chart[which];
   const set = useAxisEdit(chart, which, name);
+  const current = axis.tickAngle === undefined ? 'auto' : String(axis.tickAngle);
+  const options = ANGLES.some((a) => a.value === current) ? ANGLES : [...ANGLES, { value: current, label: `${current}°` }];
   return (
     <>
+      <Field label="Label angle" hint="Turn the names or numbers of this axis yourself. Automatic keeps them horizontal, and turns names 45 degrees up when they would overlap.">
+        <SelectInput<string> value={current} options={options.map((a) => ({ value: a.value, label: a.label }))} onChange={(v) => set('label angle', { tickAngle: v === 'auto' ? undefined : Number(v) })} />
+      </Field>
       <Field label="Tick direction">
         <SelectInput<TickDirection> value={axis.tickDirection} options={TICK_DIRECTIONS.map((d) => ({ value: d.value, label: d.label }))} onChange={(v) => set('tick direction', { tickDirection: v })} />
       </Field>

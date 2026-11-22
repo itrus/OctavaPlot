@@ -11,6 +11,8 @@ export type AppCommandName =
   /** detail: a TableAction (views/tableMenu.ts) */
   | 'table-action'
   | 'delete-item'
+  /** detail: a HighlightColor, or '' to clear it */
+  | 'highlight-item'
   | 'new-table'
   | 'new-analysis'
   | 'import-csv'

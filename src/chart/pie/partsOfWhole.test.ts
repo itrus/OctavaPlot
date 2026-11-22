@@ -6,7 +6,7 @@ import { chartToSvgString } from '../export/export';
 import { buildPieModel, cutForArea, dotsPath } from './pieModel';
 
 const setup = (type: 'slices' | 'dotGrid') => {
-  const table: DataTable = createContingencyTable('Outcomes', true); // Treated 38/12, Control 21/29
+  const table: DataTable = createContingencyTable('Outcomes', true); // one column, Cases: Cured 38, Improved 21, No change 12
   const chart = createChart(table.id, undefined, type);
   const p: Project = { id: 'p', name: 'p', dataTables: [table], charts: [chart] };
   return { p, table, chart };
@@ -50,32 +50,26 @@ describe('dot shape and size', () => {
   });
 });
 
-describe('slices (one bar of parts for each row)', () => {
-  it('makes a bar for each row with a segment as wide as each share, side by side', () => {
+describe('slices (one bar of parts: the rows of the column)', () => {
+  it('makes one bar with a segment as wide as each share, side by side', () => {
     const { table, chart } = setup('slices');
     const m = buildPieModel(chart, table);
-    expect(m.pies.map((p) => p.title)).toEqual(['Treated', 'Control']);
-    const widths = (i: number) => m.pies[i].slices.map((s) => {
-      const [, x0, , y0] = /M([\d.-]+),([\d.-]+)H([\d.-]+)V/.exec(s.path)!.map(Number);
-      return { x0, x1: Number(/H([\d.-]+)V/.exec(s.path)![1]), y0 };
-    });
-    const w = widths(0);
+    expect(m.pies.map((p) => p.title)).toEqual(['Cases']);
+    const w = m.pies[0].slices.map((s) => ({ x0: Number(/M([\d.-]+),/.exec(s.path)![1]), x1: Number(/H([\d.-]+)V/.exec(s.path)![1]) }));
     expect(w[1].x0).toBeCloseTo(w[0].x1, 1);
-    expect((w[0].x1 - w[0].x0) / (w[1].x1 - w[0].x0)).toBeCloseTo(0.76, 2);
-    // The second row is under the first, in the same columns.
-    expect(m.pies[1].cy).toBeGreaterThan(m.pies[0].cy);
-    expect(widths(1)[0].x0).toBeCloseTo(w[0].x0, 1);
+    expect(w[2].x0).toBeCloseTo(w[1].x1, 1);
+    expect((w[0].x1 - w[0].x0) / (w[1].x1 - w[1].x0)).toBeCloseTo(38 / 21, 2);
   });
 
   it('writes the shares under the segments, and leaves out a text wider than its segment', () => {
     const { table, chart } = setup('slices');
     const withText = buildPieModel({ ...chart, pie: { ...chart.pie, labels: 'percent' } }, table);
-    expect(withText.pies[0].slices.map((s) => s.text?.content)).toEqual(['76.0%', '24.0%']);
+    expect(withText.pies[0].slices.map((s) => s.text?.content)).toEqual(['53.5%', '29.6%', '16.9%']);
     expect(withText.pies[0].slices[0].text!.y).toBeGreaterThan(withText.pies[0].cy);
-    const squeezed = setCells(table.id, [{ row: 0, col: 1, value: 1 }])(setup('slices').p);
+    const squeezed = setCells(table.id, [{ row: 2, col: 0, value: 1 }])(setup('slices').p);
     const t2 = squeezed.dataTables[0];
     const m = buildPieModel({ ...chart, pie: { ...chart.pie, labels: 'name-percent' } }, t2);
-    expect(m.pies[0].slices[1].text).toBeNull();
+    expect(m.pies[0].slices[2].text).toBeNull();
   });
 
   it('draws and exports, with the colours of the parts', () => {
@@ -88,28 +82,29 @@ describe('slices (one bar of parts for each row)', () => {
 });
 
 describe('10 × 10 dot plot', () => {
-  it('has 100 dots for each row, shared by the parts as their shares are', () => {
-    const { table, chart } = setup('dotGrid');
-    const m = buildPieModel(chart, table);
-    expect(m.pies[0].slices.map((s) => circles(s.path))).toEqual([76, 24]);
-    expect(m.pies[1].slices.map((s) => circles(s.path))).toEqual([42, 58]);
-    expect(m.pies.every((p) => p.slices.reduce((n, s) => n + circles(s.path), 0) === 100)).toBe(true);
+  it('has 100 dots, shared by the parts as their shares are', () => {
+    const { p, table, chart } = setup('dotGrid');
+    const t = setCells(table.id, [{ row: 0, col: 0, value: 76 }, { row: 1, col: 0, value: 24 }, { row: 2, col: 0, value: 0 }])(p).dataTables[0];
+    const m = buildPieModel(chart, t);
+    expect(m.pies).toHaveLength(1);
+    expect(m.pies[0].slices.map((s) => circles(s.path))).toEqual([76, 24, 0]);
+    expect(m.pies[0].slices.reduce((n, s) => n + circles(s.path), 0)).toBe(100);
     expect(m.pies[0].slices.every((s) => s.text === null)).toBe(true);
+    void table;
   });
 
   it('splits a dot that two parts share, so that a share that is not a whole number of dots is kept', () => {
     const { p, table, chart } = setup('dotGrid');
-    const t = setCells(table.id, [{ row: 0, col: 0, value: 1 }, { row: 0, col: 1, value: 2 }])(p).dataTables[0];
+    const t = setCells(table.id, [{ row: 0, col: 0, value: 1 }, { row: 1, col: 0, value: 2 }, { row: 2, col: 0, value: 0 }])(p).dataTables[0];
     const m = buildPieModel(chart, t);
     // 33.33 and 66.67 dots: dot 33 is shared.
-    expect(m.pies[0].slices.map((s) => circles(s.path))).toEqual([34, 67]);
+    expect(m.pies[0].slices.map((s) => circles(s.path))).toEqual([34, 67, 0]);
   });
 
-  it('has the same grid in every row, and the exact share stays on the part', () => {
+  it('keeps the exact share on the part', () => {
     const { table, chart } = setup('dotGrid');
     const m = buildPieModel(chart, table);
-    expect(m.pies[0].slices[0].fraction).toBe(0.76);
-    expect(m.pies[0].r).toBeCloseTo(m.pies[1].r, 9);
+    expect(m.pies[0].slices[0].fraction).toBe(38 / 71);
   });
 
   it('survives labels and totals being asked for, draws and exports', () => {

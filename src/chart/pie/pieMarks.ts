@@ -9,7 +9,7 @@ import { svgId } from '../shared/scene/svgIds';
 
 /**
  * The marks of a pie or doughnut chart as scene elements, in the order of the chart's layers (model.layers): the slices of each
- * part (outcome) across all the pies, the text beside the slices, and the title and total of each pie. A layer hidden by its ID
+ * part (outcome) across all the pies, the text beside the slices, and the total of the pie (it has no title of its own: the chart's title names it). A layer hidden by its ID
  * draws nothing. Every mark has an id made from its layer and the cell or row it draws, the same whatever the style. What shows
  * only while a data set is selected (the dashed outline of its slices) carries its ID (`whenSelected`).
  */
@@ -39,7 +39,6 @@ export function compilePieMarks(chart: Chart, model: PieModel): SceneElement[] {
         return model.pies.flatMap((pie) => {
           const name = pie.rowId ?? String(pie.row);
           return [
-            el('text', [['x', n2(pie.titleAt.x)], ['y', n2(pie.titleAt.y)], ['text-anchor', 'middle'], ['font-size', fontPt], ['font-weight', chart.xAxis.tickBold ? 'bold' : undefined], ['fill', chart.textColor]], { text: pie.title, id: svgId(layer.id, name, 'title') }),
             ...(pie.totalText
               ? [
                   pie.totalInHole

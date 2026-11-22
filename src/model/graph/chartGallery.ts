@@ -40,8 +40,8 @@ export const GALLERY: Record<TableKind, GalleryTab[]> = {
       id: 'xy',
       label: 'XY',
       items: [
-        typed('xyScatter', 'xyScatter'),
         typed('xyLineSymbols', 'xyLineSymbols'),
+        typed('xyScatter', 'xyScatter'),
         typed('xyLine', 'xyLine'),
         typed('xy.bars', 'xyBars', 'xy.bars'),
         typed('xy.area', 'xyArea', 'xy.area'),

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useDismiss } from './useDismiss';
 
-/** One row of a menu: an action, a switch (`checked` given), or a line between groups. */
+/** One row of a menu: an action, a switch (`checked` given), a row that opens a list of actions at its side (a submenu), or a line between groups. */
 export type MenuEntry =
   | { kind?: 'item'; hidden?: boolean; label: string; shortcut?: string; title?: string; disabled?: boolean; checked?: boolean; icon?: ReactNode; onSelect: () => void }
+  | { kind: 'submenu'; hidden?: boolean; label: string; title?: string; disabled?: boolean; icon?: ReactNode; entries: MenuEntry[] }
   | { kind: 'separator' };
 
 export interface MenuSpec {
@@ -30,6 +31,9 @@ export function MenuBar({ menus, children }: { menus: MenuSpec[]; children?: Rea
   const [at, setAt] = useState({ left: 0, top: 0 });
   const root = useRef<HTMLDivElement>(null);
   const pop = useRef<HTMLDivElement>(null);
+  const subPop = useRef<HTMLDivElement>(null);
+  /** The submenu that is open: which entry of the menu it belongs to and where it stands (at the side of that row). */
+  const [sub, setSub] = useState<{ index: number; left: number; top: number } | null>(null);
   const titles = useRef<Array<HTMLButtonElement | null>>([]);
 
   const enabled = () => [...(pop.current?.querySelectorAll<HTMLButtonElement>('button[role^="menuitem"]:not([disabled])') ?? [])];
@@ -41,9 +45,45 @@ export function MenuBar({ menus, children }: { menus: MenuSpec[]; children?: Rea
   const close = (refocus: boolean) => {
     const was = open;
     setOpen(null);
+    setSub(null);
     if (refocus && was !== null) titles.current[was]?.focus();
   };
-  useDismiss(open !== null, [root, pop], () => setOpen(null));
+  useDismiss(open !== null, [root, pop, subPop], () => {
+    setOpen(null);
+    setSub(null);
+  });
+  const subItems = () => [...(subPop.current?.querySelectorAll<HTMLButtonElement>('button[role^="menuitem"]:not([disabled])') ?? [])];
+  const openSub = (index: number, row: HTMLElement, byKeyboard: boolean) => {
+    const r = row.getBoundingClientRect();
+    setSub({ index, left: r.right - 2, top: r.top - 4 });
+    if (byKeyboard) requestAnimationFrame(() => subItems()[0]?.focus());
+  };
+  const onSubKey = (e: KeyboardEvent) => {
+    const list = subItems();
+    const i = list.indexOf(document.activeElement as HTMLButtonElement);
+    const go = (k: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      list[(k + list.length) % list.length]?.focus();
+    };
+    const back = () => {
+      e.preventDefault();
+      e.stopPropagation();
+      const parent = sub && enabled().find((b) => b.dataset.sub === String(sub.index));
+      setSub(null);
+      parent?.focus();
+    };
+    if (e.key === 'ArrowDown') go(i + 1);
+    else if (e.key === 'ArrowUp') go(i < 0 ? list.length - 1 : i - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(list.length - 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'Escape') back();
+    else if (e.key === 'Tab') {
+      e.preventDefault();
+      e.stopPropagation();
+      close(true);
+    }
+  };
 
   // The first item takes the focus when a menu opens by keyboard (a pointer opens it without moving the focus).
   const byKey = useRef(false);
@@ -75,11 +115,15 @@ export function MenuBar({ menus, children }: { menus: MenuSpec[]; children?: Rea
       show(next);
       titles.current[next]?.focus();
     };
+    const here = document.activeElement as HTMLElement | null;
     if (e.key === 'ArrowDown') go(i + 1);
     else if (e.key === 'ArrowUp') go(i < 0 ? list.length - 1 : i - 1);
     else if (e.key === 'Home') go(0);
     else if (e.key === 'End') go(list.length - 1);
-    else if (e.key === 'ArrowRight') sideways(1);
+    else if (e.key === 'ArrowRight' && here?.dataset.sub !== undefined) {
+      e.preventDefault();
+      openSub(Number(here.dataset.sub), here, true);
+    } else if (e.key === 'ArrowRight') sideways(1);
     else if (e.key === 'ArrowLeft') sideways(-1);
     else if (e.key === 'Escape' || e.key === 'Tab') {
       e.preventDefault();
@@ -125,7 +169,53 @@ export function MenuBar({ menus, children }: { menus: MenuSpec[]; children?: Rea
           {spec.entries.map((e, k) =>
             e.kind === 'separator' ? (
               <div key={k} className="menu-sep" role="separator" />
+            ) : e.kind === 'submenu' ? (
+              <button
+                key={k}
+                role="menuitem"
+                aria-haspopup="menu"
+                aria-expanded={sub?.index === k}
+                data-sub={k}
+                tabIndex={-1}
+                disabled={e.disabled}
+                title={e.title}
+                className={`menu-item${sub?.index === k ? ' open' : ''}`}
+                onClick={(ev) => openSub(k, ev.currentTarget, false)}
+                onMouseEnter={(ev) => openSub(k, ev.currentTarget, false)}
+              >
+                <span className="menu-mark" aria-hidden="true">{e.icon ?? ''}</span>
+                <span className="menu-label">{e.label}</span>
+                <span className="menu-shortcut" aria-hidden="true">▸</span>
+              </button>
             ) : (
+              <button
+                key={k}
+                role={e.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'}
+                aria-checked={e.checked}
+                tabIndex={-1}
+                disabled={e.disabled}
+                title={e.title}
+                className="menu-item"
+                onMouseEnter={() => setSub(null)}
+                onClick={() => {
+                  close(false);
+                  e.onSelect();
+                }}
+              >
+                <span className="menu-mark" aria-hidden="true">{e.checked ? '✓' : (e.icon ?? '')}</span>
+                <span className="menu-label">{e.label}</span>
+                {e.shortcut && <span className="menu-shortcut">{e.shortcut}</span>}
+              </button>
+            ),
+          )}
+        </div>
+      )}
+      {spec && sub && spec.entries[sub.index]?.kind === 'submenu' && (
+        <div ref={subPop} className="menu-pop menu-sub" role="menu" aria-label={spec.entries[sub.index].kind === 'submenu' ? (spec.entries[sub.index] as { label: string }).label : ''} onKeyDown={onSubKey} style={{ left: sub.left - shift, top: sub.top }}>
+          {(spec.entries[sub.index] as Extract<MenuEntry, { kind: 'submenu' }>).entries.map((e, k) =>
+            e.kind === 'separator' ? (
+              <div key={k} className="menu-sep" role="separator" />
+            ) : e.kind === 'submenu' ? null : (
               <button
                 key={k}
                 role={e.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'}
@@ -139,9 +229,9 @@ export function MenuBar({ menus, children }: { menus: MenuSpec[]; children?: Rea
                   e.onSelect();
                 }}
               >
-                <span className="menu-mark" aria-hidden="true">{e.checked ? '✓' : (e.icon ?? '')}</span>
+                <span className="menu-mark" aria-hidden="true">{e.icon ?? (e.checked ? '✓' : '')}</span>
                 <span className="menu-label">{e.label}</span>
-                {e.shortcut && <span className="menu-shortcut">{e.shortcut}</span>}
+                {e.icon && e.checked && <span className="menu-tick" aria-hidden="true">✓</span>}
               </button>
             ),
           )}

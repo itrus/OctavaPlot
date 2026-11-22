@@ -29,7 +29,9 @@ import type { StyleScope } from '../model/graph/selection/scope';
 import type { TimeColumn } from '../util/timeColumn';
 import { followThresholds, sanitizeVolcano, withVolcanoLines } from '../model/options/volcanoOptions';
 import { LABEL_STYLE_KEYS, clearGroupKeys, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
+import { highlightOf } from '../model/project/highlight';
 import type {
+  HighlightColor,
   ImportedTable,
   Drawing,
   LayerStyle,
@@ -540,7 +542,8 @@ export const setChartType = (chartId: Id, type: ChartType): Command => (p) =>
       distribution: c.distribution.points === dotsOf(c.type) && dotsOf(type) !== dotsOf(c.type) ? { ...c.distribution, points: dotsOf(type) } : c.distribution,
       layers: c.layers.map((l) => ({
         ...l,
-        style: { ...l.style, ...TYPE_PRESETS[type] },
+        // The three point-and-line types differ in the individual values of replicates too: each sets it, so a switch between them is complete.
+        style: { ...l.style, ...TYPE_PRESETS[type], ...(type === 'xyScatter' || type === 'xyLine' || type === 'xyLineSymbols' ? { showRawPoints: TYPE_PRESETS[type].showRawPoints ?? false } : {}) },
         summary: l.summary.spread === oldSpread && startSpread !== oldSpread ? { ...l.summary, spread: startSpread } : l.summary,
         groupOverrides: strip(l.groupOverrides),
         objectOverrides: strip(l.objectOverrides),
@@ -923,10 +926,37 @@ export const duplicateItems = (folder: FolderKey, copies: ReadonlyArray<readonly
 export const renameItem = (kind: 'table' | 'chart' | 'analysis' | 'layout', id: Id, name: string): Command => (p) => {
   const next = name.trim();
   if (next === '') return p;
-  if (kind === 'table') return mapTable(p, id, (t) => (t.name === next ? t : { ...t, name: next }));
+  if (kind === 'table') {
+    const old = p.dataTables.find((t) => t.id === id)?.name;
+    if (old === undefined || old === next) return p;
+    const renamed = mapTable(p, id, (t) => ({ ...t, name: next }));
+    // The graphs of the table follow it: a graph name or title that still equals the old table name takes the new one.
+    // One the user has changed to something else is left alone.
+    return {
+      ...renamed,
+      charts: renamed.charts.map((c) => (c.dataTableId === id && (c.name === old || c.title === old)
+        ? { ...c, name: c.name === old ? next : c.name, title: c.title === old ? next : c.title }
+        : c)),
+    };
+  }
   if (kind === 'chart') return mapChart(p, id, (c) => (c.name === next ? c : { ...c, name: next }));
   if (kind === 'layout') return { ...p, layouts: (p.layouts ?? []).map((l) => (l.id === id && l.name !== next ? { ...l, name: next } : l)) };
   return { ...p, analyses: (p.analyses ?? []).map((a) => (a.id === id && a.name !== next ? { ...a, name: next } : a)) };
+};
+
+/** Mark a table, graph, result or layout with a colour in the navigator, or clear the mark (null). Unknown colours are ignored. */
+export const setHighlight = (kind: 'table' | 'chart' | 'analysis' | 'layout', id: Id, color: HighlightColor | null): Command => (p) => {
+  const next = color === null ? undefined : highlightOf(color);
+  if (color !== null && next === undefined) return p;
+  const apply = <T extends { highlight?: HighlightColor }>(x: T): T => {
+    if (x.highlight === next) return x;
+    const { highlight: _old, ...rest } = x;
+    return (next ? { ...rest, highlight: next } : rest) as T;
+  };
+  if (kind === 'table') return mapTable(p, id, apply);
+  if (kind === 'chart') return mapChart(p, id, apply);
+  if (kind === 'layout') return { ...p, layouts: (p.layouts ?? []).map((l) => (l.id === id ? apply(l) : l)) };
+  return { ...p, analyses: (p.analyses ?? []).map((a) => (a.id === id ? apply(a) : a)) };
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -983,11 +1013,16 @@ export const removeTable = (tableId: Id): Command => (p) => {
   );
 };
 
-/** Empties the layout panels that held a graph that is gone (they stay as placeholders). */
-const clearPanels = (p: Project, gone: ReadonlySet<Id>): Project =>
-  gone.size === 0 || !(p.layouts ?? []).some((l) => l.panels.some((id) => id !== null && gone.has(id)))
-    ? p
-    : { ...p, layouts: (p.layouts ?? []).map((l) => ({ ...l, panels: l.panels.map((id) => (id !== null && gone.has(id) ? null : id)) })) };
+/**
+ * Empties the layout panels that held a graph that is gone (they stay as placeholders). A layout that held a graph and is left with none
+ * is deleted with it (the page would be blank); one that was already empty is not touched.
+ */
+const clearPanels = (p: Project, gone: ReadonlySet<Id>): Project => {
+  if (gone.size === 0 || !(p.layouts ?? []).some((l) => l.panels.some((id) => id !== null && gone.has(id)))) return p;
+  const cleared = (p.layouts ?? []).map((l) => ({ held: l.panels.some((id) => id !== null && gone.has(id)), layout: { ...l, panels: l.panels.map((id) => (id !== null && gone.has(id) ? null : id)) } }));
+  const layouts = cleared.filter(({ held, layout }) => !(held && layout.panels.every((id) => id === null))).map(({ layout }) => layout);
+  return { ...p, layouts: layouts.length > 0 ? layouts : undefined };
+};
 
 /**
  * The layers of a graph that belong to the graph as a whole (the at-risk table, the titles, the pair lines, the cells of a heat map)

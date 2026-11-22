@@ -285,6 +285,7 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
     legendLabels: legendRows.map((r) => r.name + AXIS_TAG[r.binding]),
     categoryLabels: horizontal ? [] : rows.map((r) => r.name),
     yTickLabels: horizontal ? rows.map((r) => r.name) : y.ticks.map(y.tickLabel),
+    ...(horizontal ? { xNumberLabels: y.ticks.map(y.tickLabel) } : {}),
     y2Axis: y2 ? chart.y2Axis : undefined,
     y2TickLabels: y2 ? y2.ticks.map(y2.tickLabel) : undefined,
   });

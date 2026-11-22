@@ -20,6 +20,7 @@ import { RESULT_STATS } from '../model/graph/resultTokens';
 import { defaultLayout, sanitizeLayout } from '../model/project/layout';
 import { checkProjectSize, parseTable, writeProject } from './tableFile/tableCodec';
 import { arr, fail, isObj, obj, str, type Obj } from './tableFile/fileChecks';
+import { highlightOf } from '../model/project/highlight';
 import { FILE_FORMAT, FILE_VERSION, migrateRead, migrateShape, upgradeToCurrent } from './migrate';
 import type { Analysis, Chart, ChartLayer, Drawing, DrawingPoint, LineEnd, LineStyle, Layout, ChartType, SurvivalOptions, DataTable, Id, Project, ResultStat, SummarySpec } from '../model/types';
 
@@ -323,6 +324,8 @@ function cleanReferenceLines(raw: unknown, path: string, notes: string[]): Chart
       opacity: typeof l.opacity === 'number' && Number.isFinite(l.opacity) ? Math.min(1, Math.max(0, l.opacity)) : 1,
       label: typeof l.label === 'string' ? l.label : '',
       showLabel: l.showLabel === true,
+      ...(l.labelAt === 'start' ? { labelAt: 'start' as const } : {}),
+      ...(l.onTop === true ? { onTop: true } : {}),
     });
   });
   return out;
@@ -447,6 +450,10 @@ function parseChart(raw: unknown, path: string, tables: DataTable[], notes: stri
     layerOrder: Array.isArray(c.layerOrder) ? [...new Set(c.layerOrder.filter((id): id is string => typeof id === 'string'))] : [],
     layers,
   };
+  // A highlight this version does not know is dropped.
+  const highlight = highlightOf(c.highlight);
+  if (highlight) chart.highlight = highlight;
+  else delete chart.highlight;
   if (!(chart.widthPx > 0) || !(chart.heightPx > 0)) fail(`${path}`, 'must have positive widthPx and heightPx');
   return chart;
 }
@@ -497,15 +504,16 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
       else notes.push(`${ap}.level had an invalid value and was reset to 0.95.`);
     }
     const name = typeof o.name === 'string' && o.name !== '' ? o.name : analysisTypeInfo(kind).label;
+    const highlight = highlightOf(o.highlight);
     if (kind === 'descriptive' || kind === 'survival') {
-      analyses.push({ id, name, kind, dataTableId, level });
+      analyses.push({ id, name, ...(highlight ? { highlight } : {}), kind, dataTableId, level });
       return;
     }
     // A curve fit applies to an XY table and names one of the models.
     const model = FIT_MODEL_IDS.find((m) => m === o.model);
     if (!model) fail(`${ap}.model`, `must be one of ${FIT_MODEL_IDS.join(', ')}`);
     if (table.kind !== 'xy') fail(`${ap}.dataTableId`, 'must be an XY table for a curve fit');
-    analyses.push({ id, name, kind, dataTableId, level, model, degree: sanitizeDegree(o.degree, 2) });
+    analyses.push({ id, name, ...(highlight ? { highlight } : {}), kind, dataTableId, level, model, degree: sanitizeDegree(o.degree, 2) });
   });
   migrateRead({ dataTables, charts }, notes);
   // A link refers to another graph: one to a graph that is missing, to itself, or round in a circle is dropped.

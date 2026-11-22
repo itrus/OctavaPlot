@@ -10,7 +10,7 @@ import { buildXyModel } from './xyModel';
 
 const table = createXyTable('XY', true, { kind: 'replicates', n: 3 });
 const styled0: Chart = (() => {
-  const c = createChart(table.id, undefined, 'xyLineSymbols');
+  const c = createChart(table.id, undefined, 'xyLine');
   return { ...c, layers: c.layers.map((l, i) => (i === 0 ? { ...l, style: { ...l.style, showErrorBars: true } } : l)) };
 })();
 /** The centres with their symbols; the same chart showing the individual values instead. */

@@ -5,7 +5,7 @@ import { DialogShell, trapTab } from './DialogShell';
 import { SKETCH_AXIS, sketchColour as col } from './sketchColours';
 
 /** A small modal with a title, a body and Cancel / confirm buttons. Focus is taken once, when it opens. */
-export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled, wide, children }: { title: string; confirmLabel: string; onConfirm: () => void; onClose: () => void; confirmDisabled?: boolean; wide?: boolean; children: ReactNode }) {
+export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled, wide, cancelLabel = 'Cancel', enterConfirms = true, children }: { title: string; confirmLabel: string; onConfirm: () => void; onClose: () => void; confirmDisabled?: boolean; wide?: boolean; cancelLabel?: string; /** False: Enter does not confirm (a deletion is confirmed by a click). */ enterConfirms?: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => ref.current?.focus(), []);
   const latest = useRef({ onConfirm, onClose, confirmDisabled });
@@ -14,7 +14,7 @@ export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') latest.current.onClose();
       // Enter that ends the composition of a character (an input method for Japanese, Chinese, ...) is not a confirmation.
-      else if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLButtonElement && e.target.getAttribute('role') !== 'radio')) {
+      else if (enterConfirms && e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLButtonElement && e.target.getAttribute('role') !== 'radio')) {
         // A card is a radio button: Enter on it confirms the choice instead of selecting it again.
         e.preventDefault();
         // Enter does what the confirm button does: nothing while that is disabled.
@@ -34,7 +34,7 @@ export function Modal({ title, confirmLabel, onConfirm, onClose, confirmDisabled
         </div>
         <div className="modal-body modal-pad">{children}</div>
         <div className="modal-foot">
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>{cancelLabel}</button>
           <button className="primary" onClick={onConfirm} disabled={confirmDisabled}>{confirmLabel}</button>
         </div>
       </div>
@@ -231,7 +231,8 @@ export function ChartSketch({ type }: { type: ChartType }) {
         <svg {...SKETCH}>
           {axes}
           {type !== 'xyScatter' && <path d={pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x} ${y}`).join('')} strokeWidth={2} />}
-          {type !== 'xyLine' && pts.map(([x, y]) => <circle key={x} cx={x} cy={y} r="2.4" fill="currentColor" stroke="none" />)}
+          {type === 'xyLine' && pts.map(([x, y]) => <circle key={x} cx={x} cy={y} r="3.2" fill="currentColor" stroke="none" />)}
+          {type !== 'xyLine' && pts.flatMap(([x, y], i) => (type === 'xyLineSymbols' ? [y - 3, y + 3] : [y]).map((yy) => <circle key={`${x}-${i}-${yy}`} cx={x} cy={yy} r="2" fill="currentColor" stroke="none" />))}
         </svg>
       );
     }

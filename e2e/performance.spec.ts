@@ -106,7 +106,7 @@ test('selecting one point among 10 000', async ({ page }) => {
   await openApp(page);
   await openProject(page, bigProject(10_000, 1, 'scatter'));
   await expect(page.getByLabel('Project name')).toHaveValue('perf');
-  await page.locator('.nav-item').filter({ hasText: /▥/ }).first().click();
+  await page.locator('.nav-item').filter({ has: page.locator('.nav-badge', { hasText: /^(SCAT|BAR|LINE|L\+S)$/ }) }).first().click();
   await expect(page.locator('.chart-surface svg')).toBeVisible({ timeout: 240_000 });
   const point = page.locator('.chart-surface [data-hit="point"]').nth(5000);
   await expect(point).toHaveCount(1);
@@ -149,7 +149,7 @@ for (const [label, json] of [
     await openApp(page);
     await openProject(page, json());
     await expect(page.getByLabel('Project name')).toHaveValue('perf');
-    await page.locator('.nav-item').filter({ hasText: '▥' }).first().click();
+    await page.locator('.nav-item').filter({ has: page.locator('.nav-badge', { hasText: /^(SCAT|BAR|LINE|L\+S)$/ }) }).first().click();
     await expect(page.locator('.chart-surface svg')).toBeVisible({ timeout: 240_000 });
     await page.getByRole('tab', { name: 'Graph' }).click();
   await page.getByRole('tab', { name: 'Titles' }).click();

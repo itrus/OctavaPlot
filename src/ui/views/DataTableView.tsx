@@ -203,7 +203,7 @@ const KIND_TEXT: Record<TableKind, { label: string; noun: string; leadName: stri
   column: { label: 'Column table', noun: 'groups', leadName: 'Group name', columnName: 'Group name', hint: '', tags: null },
   xy: { label: 'XY table', noun: 'Y series', leadName: 'X column name', columnName: 'Series name', hint: 'First column = X (numbers), every other column is a Y series. ', tags: { lead: ['X', 'The X values'], rest: ['Y', 'A Y series'] } },
   grouped: { label: 'Grouped table', noun: 'groups', leadName: 'Group name', columnName: 'Group name', hint: 'Each row is a category: type its name in the Row title column. Each group of columns is a series. ', tags: null },
-  contingency: { label: 'Contingency table', noun: 'outcomes', leadName: 'Outcome name', columnName: 'Outcome name', hint: 'Each row is a group of subjects (its name in the Row title column); each column is an outcome; the cells are counts. ', tags: null },
+  contingency: { label: 'Contingency table', noun: 'outcomes', leadName: 'Outcome name', columnName: 'Outcome name', hint: 'Each row is a category (its name in the Row title column); each column is a whole, such as one pie; the cells are counts. ', tags: null },
   survival: { label: 'Survival table', noun: 'groups', leadName: 'Time column name', columnName: 'Group name', hint: 'One row per subject: the time in the first column, then 1 (event) or 0 (censored) in the column of the subject\'s group. ', tags: { lead: ['T', 'The time of each subject'], rest: ['G', 'A group: 1 = event, 0 = censored'] } },
 };
 

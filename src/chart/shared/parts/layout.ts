@@ -4,6 +4,7 @@ import { FONT_FAMILY } from '../../../model/defaults';
 import type { AxisConfig, Chart, LegendConfig } from '../../../model/types';
 import { legendColumns, legendOffset } from '../../../model/graph/legendEntries';
 import { measureText } from './text';
+import { chartFamily, supportsHorizontal } from '../../../model/graph/chartTypes';
 
 /** Layout constants in pt (spec section 20 starting tokens). */
 const OUTER_MARGIN = 14;
@@ -49,6 +50,8 @@ export interface Layout {
   extraBottom: { y: number; height: number } | null;
   /** Band reserved under the category labels (the names of the factors of grouped bars): top y and height, pt; null when none was asked for. */
   categoryRow: { y: number; height: number } | null;
+  /** Where the labels of reference lines stand outside the plotting box: the x of the left and right ones (their text ends / starts there) and the baseline y of the top and bottom ones. */
+  refLabel: { left: number; right: number; top: number; bottom: number };
   warnings: string[];
 }
 
@@ -72,7 +75,16 @@ export interface LayoutInput {
   /** Font of the chart's text (for measuring) and the extra distance of the chart title from the top edge. */
   fontFamily?: string;
   titleOffsetPt?: number;
+  /** The numbers of a value axis that runs along the bottom (a horizontal bar chart), first to last: the first and the last stand at the ends of the axis, and half of each hangs out over the plot, so room is kept for it. */
+  xNumberLabels?: string[];
+  /** The numbers along a numeric bottom axis (their widths matter when the labels are turned by hand). */
+  xTickTexts?: string[];
+  /** Room outside the plot for the labels of reference lines, pt (see referenceLabelRoom). */
+  refLabelRoom?: { left: number; right: number; top: number; bottom: number };
 }
+
+/** The space kept between the end of a number on the axis and the edge of the image, pt. */
+const END_LABEL_GAP = 4;
 
 const hasText = (s: string): boolean => s.trim().length > 0;
 
@@ -115,6 +127,33 @@ function layoutLegendGrid(widths: number[], columns: number, rowHeight: number):
   return { rows, rowHeight, widths, colX, width: colX[count - 1] + colWidths[count - 1] };
 }
 
+/**
+ * The room the labels of the chart's reference lines need outside the plotting box: a horizontal line's label stands to its right (or
+ * left), a vertical line's above (or below) the plot. A line without a visible label, an oblique line (its label stays at its end, inside)
+ * and a line of an axis the chart does not have ask for none.
+ */
+function referenceLabelRoom(chart: Chart): { left: number; right: number; top: number; bottom: number } {
+  const room = { left: 0, right: 0, top: 0, bottom: 0 };
+  const family = chartFamily(chart.type);
+  if (chart.referenceLines.length === 0 || family === 'pie' || family === 'heatmap') return room;
+  const fs = chart.yAxis.tickFontSizePt;
+  const turned = (family === 'column' || family === 'grouped') && chart.orientation === 'horizontal' && supportsHorizontal(chart.type);
+  for (const l of chart.referenceLines) {
+    if (!l.showLabel || l.slope !== undefined || l.label.trim() === '') continue;
+    if ((family === 'column' || family === 'grouped') && l.axis === 'x') continue;
+    const vertical = l.axis === 'x' || turned;
+    const start = l.labelAt === 'start';
+    if (vertical) {
+      const side = start ? 'bottom' : 'top';
+      room[side] = Math.max(room[side], fs * 1.25 + 6);
+    } else {
+      const side = start ? 'left' : 'right';
+      room[side] = Math.max(room[side], measureText(l.label, fs, false, false, chart.fontFamily) + 12);
+    }
+  }
+  return room;
+}
+
 /** The layout of a chart: its font, title, axes and legend are taken from it; `rest` adds what the chart type knows and may override any of them. */
 export function chartLayout(chart: Chart, widthPt: number, heightPt: number, rest: Omit<LayoutInput, 'widthPt' | 'heightPt' | 'title' | 'xAxis' | 'yAxis' | 'legend' | 'fontFamily' | 'titleOffsetPt'> & Partial<LayoutInput>): Layout {
   return computeLayout({
@@ -126,6 +165,7 @@ export function chartLayout(chart: Chart, widthPt: number, heightPt: number, res
     xAxis: chart.xAxis,
     yAxis: chart.yAxis,
     legend: chart.legend,
+    refLabelRoom: referenceLabelRoom(chart),
     ...rest,
   });
 }
@@ -185,6 +225,10 @@ export function computeLayout(input: LayoutInput): Layout {
     legendTop = top;
     top += legendHeight + 12;
   }
+  const room = input.refLabelRoom ?? { left: 0, right: 0, top: 0, bottom: 0 };
+  // Labels of reference lines above the plot stand between the title (and a top legend) and the plot.
+  const refTop = top + room.top - 4;
+  top += room.top;
   let bottom = M;
   let legendBottomY = 0;
   if (showLegend && legend.position === 'bottom') {
@@ -204,36 +248,58 @@ export function computeLayout(input: LayoutInput): Layout {
     y2Block = numberStartPt(y2) + Y_TICK_LABEL_GAP + widest;
     if (y2TitleVisible) y2Block += AXIS_TITLE_GAP + y2.titleOffsetPt + y2.titleFontSizePt * 1.2;
   }
-  right += y2Block;
+  right += y2Block + room.right;
 
   // ---- Left: Y axis title, tick labels, ticks.
   let left = M;
   const yTitleVisible = yAxis.visible && yAxis.titleVisible && hasText(yAxis.title);
   if (yTitleVisible) left += yAxis.titleFontSizePt * 1.2 + AXIS_TITLE_GAP + yAxis.titleOffsetPt;
+  // Labels of reference lines to the left of the plot stand between the Y title and the numbers.
+  const refLeft = left + room.left - 6;
+  left += room.left;
   if (yAxis.visible) {
     const widest = Math.max(0, ...input.yTickLabels.map((l) => measureText(l, yAxis.tickFontSizePt, yAxis.tickBold, false, ff)));
-    left += widest + Y_TICK_LABEL_GAP + numberStartPt(yAxis);
+    // Numbers turned by hand take the width of the turned text.
+    const turn = ((yAxis.tickAngle ?? 0) * Math.PI) / 180;
+    const across = yAxis.tickAngle !== undefined ? Math.abs(Math.cos(turn)) * widest + Math.abs(Math.sin(turn)) * yAxis.tickFontSizePt * 1.1 : widest;
+    left += across + Y_TICK_LABEL_GAP + numberStartPt(yAxis);
   }
+
+  // ---- The numbers along the bottom end at the edges of the plot: the last (100 on a scale to 100) needs half its width beyond the plot, and the first half before it.
+  if (xAxis.visible && input.xNumberLabels && input.xNumberLabels.length > 0) {
+    const half = (l: string) => measureText(l, xAxis.tickFontSizePt, xAxis.tickBold, false, ff) / 2;
+    const ends = input.xNumberLabels;
+    right = Math.max(right, half(ends[ends.length - 1]) + END_LABEL_GAP);
+    left = Math.max(left, half(ends[0]) + END_LABEL_GAP);
+  }
+  // Where the labels of reference lines to the right of the plot start: past the right axis, whatever else made the margin larger.
+  const refRight = W - right + y2Block + 6;
 
   // ---- Bottom: X tick labels, ticks, X title. Rotation decided after plot width is known.
   const xTitleVisible = xAxis.visible && xAxis.titleVisible && hasText(xAxis.title);
   const xTitleBlock = xTitleVisible ? xAxis.titleFontSizePt * 1.2 + AXIS_TITLE_GAP + xAxis.titleOffsetPt : 0;
-  const labelWidths = input.categoryLabels.map((l) => measureText(l, xAxis.tickFontSizePt, xAxis.tickBold, false, ff));
+  // Labels turned by hand: the height they take depends on the angle and on the longest text (the names, or the numbers of a numeric axis).
+  const manualX = xAxis.tickAngle;
+  const bottomTexts = manualX !== undefined && input.categoryLabels.length === 0 ? input.xTickTexts ?? input.xNumberLabels ?? [] : input.categoryLabels;
+  const labelWidths = bottomTexts.map((l) => measureText(l, xAxis.tickFontSizePt, xAxis.tickBold, false, ff));
   const maxLabelWidth = Math.max(0, ...labelWidths);
+  const manualRad = ((manualX ?? 0) * Math.PI) / 180;
   const tickLabelBlock = (rotated: boolean): number =>
     xAxis.visible
       ? numberStartPt(xAxis) +
         X_TICK_LABEL_GAP +
-        (rotated ? maxLabelWidth * Math.SQRT1_2 + xAxis.tickFontSizePt * Math.SQRT1_2 : xAxis.tickFontSizePt * 1.1)
+        (manualX !== undefined
+          ? Math.abs(Math.sin(manualRad)) * maxLabelWidth + (0.1 + Math.abs(Math.cos(manualRad))) * xAxis.tickFontSizePt
+          : rotated ? maxLabelWidth * Math.SQRT1_2 + xAxis.tickFontSizePt * Math.SQRT1_2 : xAxis.tickFontSizePt * 1.1)
       : 0;
 
   const plotWidthFor = () => W - left - right;
   const slot = plotWidthFor() / Math.max(1, input.categoryLabels.length);
-  const xTickRotated = xAxis.visible && maxLabelWidth > slot * 0.92;
+  const xTickRotated = xAxis.visible && (manualX !== undefined ? manualX !== 0 : maxLabelWidth > slot * 0.92);
 
   const extra = input.extraBottomPt && input.extraBottomPt > 0 ? input.extraBottomPt : 0;
   const categoryRow = input.categoryRowPt && input.categoryRowPt > 0 && xAxis.visible ? input.categoryRowPt : 0;
-  bottom += tickLabelBlock(xTickRotated) + xTitleBlock + extra + categoryRow;
+  bottom += tickLabelBlock(xTickRotated) + xTitleBlock + extra + categoryRow + room.bottom;
 
   let plot: Rect = { x: left, y: top, width: W - left - right, height: H - top - bottom };
   if (plot.width < MIN_PLOT || plot.height < MIN_PLOT) {
@@ -298,7 +364,8 @@ export function computeLayout(input: LayoutInput): Layout {
   }
 
   const extraBottom = extra > 0 ? { y: H - M - (showLegend && legend.position === 'bottom' ? legendHeight + 12 : 0) - extra, height: extra } : null;
-  return { plot, title: titleLayout, legend: legendLayout, xTickRotated, xTitle, yTitle, y2Title, extraBottom, categoryRow: categoryRow > 0 ? { y: plot.y + plot.height + tickLabelBlock(xTickRotated), height: categoryRow } : null, warnings };
+  const refBottom = plot.y + plot.height + tickLabelBlock(xTickRotated) + categoryRow + room.bottom - 4;
+  return { refLabel: { left: refLeft, right: refRight, top: refTop, bottom: refBottom }, plot, title: titleLayout, legend: legendLayout, xTickRotated, xTitle, yTitle, y2Title, extraBottom, categoryRow: categoryRow > 0 ? { y: plot.y + plot.height + tickLabelBlock(xTickRotated), height: categoryRow } : null, warnings };
 }
 
 /** The size of a legend key: its width, the gap to the name, and its height (the largest a symbol is drawn in a key, so that a large dot or bubble does not cover the name beside it). */

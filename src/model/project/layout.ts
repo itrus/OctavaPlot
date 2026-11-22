@@ -1,4 +1,5 @@
 import { mmToPt, ptToMm } from '../units';
+import { highlightOf } from './highlight';
 import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, PageOrientation, PanelLabelStyle } from '../types';
 
 /** A4 in mm; the renderer's unit is the point (1 in = 72 pt). */
@@ -267,10 +268,12 @@ export function sanitizeLayout(raw: Partial<Record<keyof Layout, unknown>>, base
   const arrangement = 'arrangement' in raw ? sanitizeArrangement(raw.arrangement, base.arrangement, orientation) : base.arrangement;
   const legend = 'legend' in raw ? sanitizeLegend(raw.legend, base.legend) : base.legend;
   const annotations = 'annotations' in raw ? (Array.isArray(raw.annotations) ? (raw.annotations as Layout['annotations']) : undefined) : base.annotations;
+  const highlight = 'highlight' in raw ? highlightOf(raw.highlight) : base.highlight;
   const drawings = 'drawings' in raw ? (Array.isArray(raw.drawings) ? (raw.drawings as Layout['drawings']) : undefined) : base.drawings;
   return {
     id: base.id,
     name: typeof raw.name === 'string' && raw.name.trim() !== '' ? raw.name.trim() : base.name,
+    ...(highlight ? { highlight } : {}),
     orientation,
     background: raw.background === null ? null : typeof raw.background === 'string' && HEX.test(raw.background) ? raw.background : base.background,
     arrangement,

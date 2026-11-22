@@ -67,12 +67,14 @@ export function compileCategoryChrome(chart: Chart, c: CategoryChromeInput): Chr
       : []),
     // Right gridlines: dashed when the left grid is also drawn, so the two sets stay distinguishable.
     ...(y2 ? gridElements({ dir: 'h', grid: chart.grid, major: y2.scale.ticks, minor: y2.scale.minorTicks ?? [], showMajor: y2a.showGrid, showMinor: y2a.showMinorGrid, at: y2.map, from: plot.x, to: right, fallbackDash: ya.visible && ya.showGrid ? '3 3' : undefined }) : []),
-    ...referenceLineElements(c.references, ya.tickFontSizePt),
+    ...referenceLineElements(c.references.filter((l) => !l.line.onTop), ya.tickFontSizePt),
   ];
   const valueAxis = horizontal
     ? numericAxisElements({ ...axis, name: 'y', cfg: ya, scale: y, along: 'x', crossing: bottom, pieces: clipX, gaps: onPage(valueGaps), map: valueX })
     : numericAxisElements({ ...axis, name: 'y', cfg: ya, scale: y, along: 'y', crossing: plot.x, pieces: valuePieces, gaps: valueGaps, map: yScale });
   const front = [
+    // The reference lines that are set in front of the data.
+    ...referenceLineElements(c.references.filter((l) => l.line.onTop), ya.tickFontSizePt),
     // The gridlines that added ticks want in front of the data.
     ...(ya.visible ? (horizontal ? extraGridElements({ dir: 'v', grid: chart.grid, extras: y.extraTicks, at: valueX, from: plot.y, to: bottom }, true) : extraGridElements({ dir: 'h', grid: chart.grid, extras: y.extraTicks, at: yScale, from: plot.x, to: right }, true)) : []),
     ...valueAxis,

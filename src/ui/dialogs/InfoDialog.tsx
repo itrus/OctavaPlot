@@ -27,24 +27,22 @@ function AboutTab() {
   return (
     <>
       <div className="info-head">
-        <img className="info-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="OctavaPlot logo" width={128} height={128} />
+        <img className="info-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="OctavaPlot logo" width={96} height={96} />
         <h2>OctavaPlot <span className="muted small">v{__APP_VERSION__}{__APP_COMMIT__ ? ` (build ${__APP_COMMIT__})` : ''}</span></h2>
       </div>
       <p>Scientific data tables and the charts drawn from them, in the browser. Everything stays in your browser; nothing is sent anywhere.</p>
 
-      <h3>Source code</h3>
-      <p>
-        The code, the issue tracker and the releases are on GitHub: {link('https://github.com/itrus/OctavaPlot')}
-      </p>
-
-      <h3>Support</h3>
-      <p>
-        OctavaPlot is free software (GNU GPL v3). If it is useful to you,{' '}
-        <a className="coffee-btn" href="https://www.buymeacoffee.com/itrus" target="_blank" rel="noreferrer">🎓 Buy me a coffee</a>
-      </p>
-
-      <h3>Built with</h3>
-      <p>React, D3 (scales), TypeScript and Vite.</p>
+      <dl className="info-rows">
+        <dt>Source code</dt>
+        <dd>Code, issue tracker and releases: {link('https://github.com/itrus/OctavaPlot')}</dd>
+        <dt>Support</dt>
+        <dd>
+          Free software (GNU GPL v3). If it is useful to you,{' '}
+          <a className="coffee-btn" href="https://www.buymeacoffee.com/itrus" target="_blank" rel="noreferrer">🎓 Buy me a coffee</a>
+        </dd>
+        <dt>Built with</dt>
+        <dd>React, D3 (scales), TypeScript and Vite.</dd>
+      </dl>
     </>
   );
 }

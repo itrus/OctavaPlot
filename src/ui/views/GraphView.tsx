@@ -186,6 +186,9 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
           setTip(null);
         }
       }
+    } else if (hit.kind === 'referenceLine' && hit.objectId) {
+      // The settings of the line open on the Axes page (navigateInspector above), with the line picked there.
+      setSelection({ kind: 'referenceLine', lineId: hit.objectId });
     } else if (hit.groupId && hit.kind !== 'background') {
       setSelection({ kind: 'group', groupId: hit.groupId });
     } else {

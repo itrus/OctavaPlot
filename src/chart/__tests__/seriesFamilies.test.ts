@@ -16,6 +16,16 @@ function projectWith(kind: TableKind, type: ChartType, layout?: Parameters<typeo
   const p = addDataTable('t', kind, { sample: true, ...layout })(createExampleProject());
   return addChart('c', 't', undefined, type)(p);
 }
+/** The sample contingency table has one column (one pie); the bars are tested on groups of subjects (rows) by outcomes (columns). */
+const withOutcomes = (p: Project): Project => ({
+  ...p,
+  dataTables: p.dataTables.map((t) => {
+    if (t.id !== 't' || t.kind !== 'contingency') return t;
+    const cured = { ...t.groups[0], name: 'Cured', observations: t.groups[0].observations.map((o, i) => ({ ...o, value: [38, 21][i] ?? null })) };
+    const not = { ...cured, id: 'g_not', name: 'Not cured', paletteIndex: 1, observations: cured.observations.map((o, i) => ({ ...o, id: `o_not${i}`, value: [12, 29][i] ?? null })) };
+    return { ...t, groups: [cured, not], rows: t.rows.map((r, i) => ({ ...r, title: ['Treated', 'Control'][i] ?? '' })) };
+  }),
+});
 const tableOf = (p: Project) => p.dataTables.find((t) => t.id === 't')!;
 const chartOf = (p: Project) => p.charts.find((c) => c.id === 'c')!;
 
@@ -179,7 +189,7 @@ describe('grouped chart', () => {
 
 describe('contingency chart', () => {
   it('groups of subjects are the categories and outcomes the series', () => {
-    const p = projectWith('contingency', 'contingencyBars');
+    const p = withOutcomes(projectWith('contingency', 'contingencyBars'));
     const m = buildGroupedModel(chartOf(p), tableOf(p));
     expect(m.categories.map((c) => c.label)).toEqual(['Treated', 'Control']);
     expect(m.series.map((s) => s.label)).toEqual(['Cured', 'Not cured']);
@@ -188,7 +198,7 @@ describe('contingency chart', () => {
   });
 
   it('stacked bars stack the counts, and the axis fits the totals', () => {
-    const p = projectWith('contingency', 'contingencyStacked');
+    const p = withOutcomes(projectWith('contingency', 'contingencyStacked'));
     const m = buildGroupedModel(chartOf(p), tableOf(p));
     const [cured, not] = m.series;
     // The second outcome starts where the first ends.
@@ -197,7 +207,7 @@ describe('contingency chart', () => {
   });
 
   it('percent bars show each row as a share of its own total, 0 to 100', () => {
-    const p = projectWith('contingency', 'contingencyPercent');
+    const p = withOutcomes(projectWith('contingency', 'contingencyPercent'));
     const m = buildGroupedModel(chartOf(p), tableOf(p));
     expect(m.y.domain).toEqual([0, 100]);
     expect(m.series[0].bars[0].value).toBeCloseTo(76, 9); // 38 of 50
@@ -206,7 +216,7 @@ describe('contingency chart', () => {
   });
 
   it('a negative count is not drawn and is reported', () => {
-    const p = projectWith('contingency', 'contingencyBars');
+    const p = withOutcomes(projectWith('contingency', 'contingencyBars'));
     const edited = setCells('t', [{ row: 0, col: 0, value: -3 }])(p).dataTables.find((x) => x.id === 't')!;
     const m = buildGroupedModel(chartOf(p), edited);
     expect(m.series[0].bars.map((b) => b.row)).toEqual([1]);
@@ -245,7 +255,7 @@ describe('creating and saving the new tables', () => {
     p = addGroup('s')(p);
     p = addGroup('k')(p);
     expect(p.dataTables.find((t) => t.id === 's')!.groups.map((g) => g.name)).toEqual(['Time', 'Group A', 'Group B', 'Group C']);
-    expect(p.dataTables.find((t) => t.id === 'k')!.groups.map((g) => g.name)).toEqual(['Cured', 'Not cured', 'Outcome 3']);
+    expect(p.dataTables.find((t) => t.id === 'k')!.groups.map((g) => g.name)).toEqual(['Cases', 'Outcome 2']);
   });
 
   it('a graph made from a table takes that table\'s first graph of the New Graph gallery', () => {

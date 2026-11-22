@@ -16,6 +16,7 @@ export function inspectorTargetFor(hit: HitTarget): InspectorTarget | null {
     case 'legend':
       return { page: 'legend' };
     case 'axis':
+    case 'referenceLine':
       return { page: 'axes' };
     case 'title':
       return { page: 'graph', part: 'text' };

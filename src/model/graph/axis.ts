@@ -8,6 +8,7 @@ export const AXIS_LIMITS = {
   decimals: { min: 0, max: 10 },
   affixLength: 24,
   offsetPt: { min: 0, max: 120 },
+  tickAngle: { min: -90, max: 90 },
 } as const;
 
 export const BREAK_MARKS: ReadonlyArray<{ value: BreakMark; label: string }> = [
@@ -138,6 +139,9 @@ export function sanitizeAxis(axis: AxisConfig, base: AxisConfig): AxisConfig {
   };
   // No extra ticks is the absence of the setting, so a file without any is as it was.
   if (extraTicks.length === 0) delete out.extraTicks;
+  // An angle that is not a number is the absence of the setting (automatic).
+  if (typeof a.tickAngle === 'number' && Number.isFinite(a.tickAngle)) out.tickAngle = clamp(a.tickAngle, AXIS_LIMITS.tickAngle.min, AXIS_LIMITS.tickAngle.max, 0);
+  else delete out.tickAngle;
   return out;
 }
 

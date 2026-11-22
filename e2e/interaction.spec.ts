@@ -137,7 +137,7 @@ test.describe('a narrow window', () => {
     await expect(app).toHaveAttribute('data-nav', 'open');
     await navItem(page, 'Data 1', 'COL').click();
     await expect(app).toHaveAttribute('data-nav', 'open');
-    await navItem(page, 'Graph 1', 'BAR').click();
+    await navItem(page, 'Data 1', 'BAR').click();
     await expect(app).toHaveAttribute('data-nav', 'closed');
     await expect(status(page)).toHaveText('');
     // The page does not scroll sideways.

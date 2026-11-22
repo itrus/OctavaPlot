@@ -41,14 +41,14 @@ function FrameAndColours({ chart }: { chart: Chart }) {
   );
 }
 
-/** Colour, thickness and pattern of the major and the minor gridlines; each axis switches its own on in its section. */
-function GridStyleSection({ chart }: { chart: Chart }) {
+/** Colour, thickness and pattern of the major and the minor gridlines, for both axes at once; each axis switches its own on in its section, so this stands with them (Axes). */
+export function GridStyleSection({ chart }: { chart: Chart }) {
   const { run } = useCommands();
   const g = chart.grid;
   const set = (label: string, grid: Partial<Chart['grid']>, key?: string) => run(label, patchLook(chart.id, { grid }), key);
   const styles = LINE_STYLES.map((s) => ({ value: s.value, label: s.label }));
   return (
-    <Section title="Gridline style" defaultOpen={false}>
+    <Section title="Gridline style (both axes)" defaultOpen={false}>
       <Field label="Major colour">
         <ColorInput value={g.color} ariaLabel="Major gridline colour" onChange={(v) => set('Major gridline colour', { color: v })} />
       </Field>
@@ -88,7 +88,6 @@ export function FrameSection({ chart, dual, origin = 'y' }: { chart: Chart; dual
         {dual && <div className="muted small">Line thickness applies to both Y axes.</div>}
       </Section>
       <FrameAndColours chart={chart} />
-      <GridStyleSection chart={chart} />
     </div>
   );
 }

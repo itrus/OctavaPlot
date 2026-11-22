@@ -196,6 +196,7 @@ export function buildSurvivalModel(chart: Chart, table: DataTable): XyModel {
   const layout = chartLayout(chart, W, H, {
     legendLabels: legendSeries.map((i) => raw[i].label),
     categoryLabels: [],
+    xTickTexts: xAxis.ticks.map(xAxis.tickLabel),
     yTickLabels: yAxis.ticks.map(yAxis.tickLabel),
     extraBottomPt: showAtRisk ? (raw.length + 1) * rowHeight + 4 : 0,
   });

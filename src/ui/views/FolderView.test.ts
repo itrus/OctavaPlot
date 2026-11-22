@@ -62,7 +62,7 @@ describe('the overview of a folder', () => {
     expect(html('tables')).toContain('<span class="nav-badge" title="Column table">COL</span>');
     expect(html('tables')).toContain('<span class="nav-badge" title="XY table">XY</span>');
     expect(html('graphs')).toContain('<span class="nav-badge" title="Bar chart">BAR</span>');
-    expect(html('graphs')).toContain('<span class="nav-badge" title="Points only">SCAT</span>');
+    expect(html('graphs')).toContain('<span class="nav-badge" title="Points and connecting line">L+S</span>');
     expect(html('results')).not.toContain('nav-badge');
   });
 
@@ -95,6 +95,6 @@ describe('the navigator folders', () => {
     const out = nav();
     expect(out).toContain('title="Column table">COL</span>');
     expect(out).toContain('title="Bar chart">BAR</span>');
-    expect(out).toContain('title="Points only">SCAT</span>');
+    expect(out).toContain('title="Points and connecting line">L+S</span>');
   });
 });

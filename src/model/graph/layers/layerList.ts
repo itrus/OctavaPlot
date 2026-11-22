@@ -1,4 +1,5 @@
-import { chartFamily, leadingColumns } from '../chartTypes';
+import { chartFamily } from '../chartTypes';
+import { pieColumn, pieParts } from '../../table/pieParts';
 import { resolveStyle, dataLayer } from '../style';
 import { layoutOf, xySeries } from '../../table/tableLayout';
 import { seriesPaletteIndex } from '../../table/factors';
@@ -122,16 +123,14 @@ function finishLayers(chart: Chart, out: LayerSpec[]): LayerSpec[] {
 }
 
 /**
- * The layers of a pie or doughnut chart, lowest first: for each part (outcome) its slices in all the pies, then for each part the
- * text beside its slices, then the titles and totals of the pies, then annotations. The parts that are hidden from the chart have
- * none. There are no reference lines: a pie has no axes to put them on.
+ * The layers of a pie or doughnut chart, lowest first: for each part (a row of the drawn column) its slice, then for each part the
+ * text beside its slice, then the title and total of the pie, then annotations. There are no reference lines: a pie has no axes to
+ * put them on.
  */
 function pieLayers(chart: Chart, table: DataTable): LayerSpec[] {
-  const hiddenParts = new Set(chart.hiddenGroupIds);
-  const layer = dataLayer(chart);
-  const parts = table.groups.slice(leadingColumns(table.kind)).filter((g) => !hiddenParts.has(g.id));
-  void layer;
-  const perPart = (kind: LayerKind, visible: boolean) => parts.map((g) => bound(g.id, kind, visible, false));
+  // The parts are the rows of the one column that is drawn.
+  const parts = pieParts(table, pieColumn(chart, table));
+  const perPart = (kind: LayerKind, visible: boolean) => parts.map((p) => bound(p.id, kind, visible, false));
   return [
     ...perPart('bars', true),
     ...perPart('labels', chart.pie.labels !== 'none'),

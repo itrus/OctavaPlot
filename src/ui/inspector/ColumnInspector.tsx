@@ -25,10 +25,10 @@ import {
 } from '../../state/commands';
 import { DistributionControls } from './sections/DistributionControls';
 import { LayersSection } from './sections/LayersSection';
-import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection } from './sections/LookControls';
+import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, GridStyleSection } from './sections/LookControls';
 import { AxisStyleControls, TickFields } from './sections/AxisStyleControls';
 import { DataSetOrder } from './sections/DataSetOrder';
-import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections } from './sections/SharedSections';
+import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections, ReferenceLinesSection } from './sections/SharedSections';
 import { PaletteField } from './sections/PalettePicker';
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
 import { DataSetPicker } from './sections/DataSetPicker';
@@ -626,7 +626,8 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               <AxisStyleControls chart={chart} which="y2Axis" scale={model.y2} name="Right Y" canScale canReverse />
             </Section>
           )}
-
+          <GridStyleSection chart={chart} />
+              <ReferenceLinesSection chart={chart} />
             </div>
           )}
 

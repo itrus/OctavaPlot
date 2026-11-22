@@ -18,7 +18,7 @@ const chartOf = (p: Project): Chart => p.charts.find((c) => c.id === 'c')!;
 const tableOf = (p: Project): DataTable => p.dataTables.find((t) => t.id === 't')!;
 const svg = (p: Project, editor = false): string =>
   editor
-    ? renderToStaticMarkup(createElement(ChartCanvas, { chart: chartOf(p), any: buildAnyModel(chartOf(p), tableOf(p)), cssWidth: '600px', cssHeight: '400px', editor: { selection: { kind: 'group' as const, groupId: tableOf(p).groups[0].id } } }))
+    ? renderToStaticMarkup(createElement(ChartCanvas, { chart: chartOf(p), any: buildAnyModel(chartOf(p), tableOf(p)), cssWidth: '600px', cssHeight: '400px', editor: { selection: { kind: 'group' as const, groupId: `part:${tableOf(p).rows[0].id}` } } }))
     : chartToSvgString(chartOf(p), tableOf(p));
 const count = (markup: string, text: string) => markup.split(text).length - 1;
 const idsOf = (markup: string): string[] => [...markup.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
@@ -26,14 +26,14 @@ const hitKinds = (nodes: ReadonlyArray<SceneElement>): string[] => nodes.flatMap
 
 describe('the layers of a pie chart', () => {
   const p = project('pie', 'contingency');
-  const parts = tableOf(p).groups.length;
+  const parts = 3; // the rows of the one column that is drawn: Cured, Improved, No change
 
   it('are the slices and the labels of each part, and the titles of the pies', () => {
     const ls = layersOf(chartOf(p), tableOf(p));
     expect(ls.filter((l) => l.kind === 'bars')).toHaveLength(parts);
     expect(ls.filter((l) => l.kind === 'labels')).toHaveLength(parts);
     expect(ls.filter((l) => l.kind === 'titles')).toHaveLength(1);
-    expect(ls.filter((l) => l.kind === 'bars').map((l) => l.binding?.seriesId)).toEqual(tableOf(p).groups.map((g) => g.id));
+    expect(ls.filter((l) => l.kind === 'bars').map((l) => l.binding?.seriesId)).toEqual(tableOf(p).rows.slice(0, 3).map((r) => `part:${r.id}`));
   });
 
   it('have no reference lines, since a pie has no axes, but have annotations', () => {
@@ -53,7 +53,7 @@ describe('the layers of a pie chart', () => {
   it('are named for what they draw, take no look of their own and no say in the axis range', () => {
     const rows = layerRows(chartOf(p), tableOf(p));
     const names = rows.map((r) => r.label.split(':')[0]);
-    expect(names).toEqual(expect.arrayContaining(['Slices', 'Slice labels', 'Pie titles and totals']));
+    expect(names).toEqual(expect.arrayContaining(['Slices', 'Slice labels', 'Pie total']));
     expect(rows.every((r) => r.takes === null && r.inRange === null)).toBe(true);
     expect(patchLayerStyle('c', rows[0].layer.id, { color: '#ff0000' })(p).charts[0].layerStyles).toEqual({});
   });

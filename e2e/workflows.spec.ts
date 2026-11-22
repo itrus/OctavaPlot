@@ -49,7 +49,7 @@ test.describe('graphs', () => {
 
     await menuItem(page, 'Edit', 'Duplicate graph');
     await expect(graphs).toHaveCount(count + 1);
-    await expect(status(page)).toContainText('Duplicated Graph 1.');
+    await expect(status(page)).toContainText('Duplicated Data 1.');
 
     // The message belongs to the action: the next one clears it.
     await navItem(page, 'Data 1', 'COL').click();
@@ -122,13 +122,13 @@ test.describe('files', () => {
     const download = page.waitForEvent('download');
     // The button names the file it writes: the name of the graph, the date and time of Settings, the extension.
     const button = panel.getByRole('button', { name: /^Export .+\.png$/ });
-    await expect(button).toHaveText(/^Export Graph_1_\d{6}_\d{4}\.png$/);
+    await expect(button).toHaveText(/^Export Data_1_\d{6}_\d{4}\.png$/);
     const label = ((await button.textContent()) ?? '').replace(/^Export /, '');
     await button.click();
     const file = await download;
     expect(file.suggestedFilename()).toBe(label);
-    // The file is named after the graph (Graph 1), then the date and time of Settings.
-    expect(file.suggestedFilename()).toMatch(/^Graph_1.*\.png$/);
+    // The file is named after the graph (Data 1), then the date and time of Settings.
+    expect(file.suggestedFilename()).toMatch(/^Data_1.*\.png$/);
     const bytes = await (await import('node:fs/promises')).readFile(await file.path());
     // The PNG signature, then the IHDR chunk with the width and the height.
     expect([...bytes.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);

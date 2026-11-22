@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createChart, createXyTable } from '../../model/defaults';
 import { CHART_TYPES, chartTypesFor } from '../../model/graph/chartTypes';
+import { layersOf } from '../../model/graph/layers';
 import { effectiveTable, graphSources } from '../../model/table/chartTable';
 import type { Chart, ChartType, DataTable, Project } from '../../model/types';
 import { addChart, addDataTable, addGroup, applyPalette, setCells, setChartType, setGroupOnGraph } from '../../state/commands';
@@ -19,13 +20,23 @@ const project = (type: ChartType): { p: Project; table: DataTable; chart: Chart 
 describe('chart types and table types', () => {
   it('offers the chart types of each table type', () => {
     expect(chartTypesFor('column').map((c) => c.type)).toEqual(['bar', 'scatter', 'mean', 'box', 'floating', 'paired', 'histogram', 'ecdf', 'violin']);
-    expect(chartTypesFor('xy').map((c) => c.type)).toEqual(['xyScatter', 'xyLine', 'xyLineSymbols', 'xyOffset', 'xyBubble', 'xyVolcano', 'xyBars', 'xySpikes', 'xyArea']);
+    expect(chartTypesFor('xy').map((c) => c.type)).toEqual(['xyLineSymbols', 'xyScatter', 'xyLine', 'xyOffset', 'xyBubble', 'xyVolcano', 'xyBars', 'xySpikes', 'xyArea']);
     expect(CHART_TYPES).toHaveLength(34);
   });
+  it('shows every value with the connecting line, or only the averages (with replicates)', () => {
+    const t = createXyTable('R', true, { kind: 'replicates', n: 3 });
+    const kinds = (type: ChartType) => layersOf(createChart(t.id, undefined, type), t).filter((l) => l.visible).map((l) => l.kind);
+    expect(kinds('xyLineSymbols')).toContain('rawPoints');
+    expect(kinds('xyLineSymbols')).not.toContain('points');
+    expect(kinds('xyLine')).toContain('points');
+    expect(kinds('xyLine')).not.toContain('rawPoints');
+    expect(kinds('xyLine')).toContain('line');
+  });
+
   it('the presets decide symbols and lines', () => {
     const s = (t: ChartType) => createChart('t', undefined, t).layers[0].style;
     expect([s('xyScatter').showSymbols, s('xyScatter').showLines]).toEqual([true, false]);
-    expect([s('xyLine').showSymbols, s('xyLine').showLines]).toEqual([false, true]);
+    expect([s('xyLine').showSymbols, s('xyLine').showLines]).toEqual([true, true]);
     expect([s('xyLineSymbols').showSymbols, s('xyLineSymbols').showLines]).toEqual([true, true]);
   });
 });
@@ -123,10 +134,10 @@ describe('creating XY tables and graphs', () => {
     expect(addDataTable('t3')(p).dataTables.find((x) => x.id === 't3')!.kind).toBe('column');
   });
 
-  it('a graph of an XY table starts as an XY scatter and takes the chosen chart type', () => {
+  it('a graph of an XY table starts as points with a connecting line and takes the chosen chart type', () => {
     let p = addDataTable('t2', 'xy')(createExampleProject());
     p = addChart('c2', 't2')(p);
-    expect(p.charts.find((c) => c.id === 'c2')!.type).toBe('xyScatter');
+    expect(p.charts.find((c) => c.id === 'c2')!.type).toBe('xyLineSymbols');
     p = addChart('c3', 't2', undefined, 'xyLineSymbols')(p);
     const c3 = p.charts.find((c) => c.id === 'c3')!;
     expect([c3.type, c3.layers[0].style.showLines, c3.layers[0].style.showSymbols]).toEqual(['xyLineSymbols', true, true]);
@@ -156,7 +167,7 @@ describe('chart type and table type must agree', () => {
   it('addChart and setChartType ignore a chart type that does not suit the table', () => {
     const { p, table } = project('xyLine');
     const q = addChart('c9', table.id, undefined, 'bar')(p);
-    expect(q.charts.find((c) => c.id === 'c9')!.type).toBe('xyScatter');
+    expect(q.charts.find((c) => c.id === 'c9')!.type).toBe('xyLineSymbols');
     const r = setChartType(p.charts[0].id, 'mean')(p);
     expect(r.charts[0].type).toBe('xyLine');
     expect(setChartType(p.charts[0].id, 'xyScatter')(p).charts[0].type).toBe('xyScatter');
@@ -167,9 +178,9 @@ describe('chart type and table type must agree', () => {
     const file = JSON.parse(stringifyProject(p));
     file.project.charts[0].type = 'bar';
     const { project: back, notes } = parseProjectWithNotes(JSON.stringify(file));
-    expect(back.charts[0].type).toBe('xyScatter');
+    expect(back.charts[0].type).toBe('xyLineSymbols');
     expect(back.charts[0].layers[0].style.showSymbols).toBe(true);
-    expect(notes.join(' ')).toMatch(/changed to xyScatter/);
+    expect(notes.join(' ')).toMatch(/changed to xyLineSymbols/);
     // and the reverse: an XY chart type on a column table
     const q = createExampleProject();
     const f2 = JSON.parse(stringifyProject(q));

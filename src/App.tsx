@@ -247,6 +247,8 @@ function Shell() {
     chart,
     analysis,
     onLayout,
+    onFolder: view.kind === 'folder',
+    highlight: (table ?? chart ?? analysis ?? (onLayout ? project.layouts?.find((l) => l.id === view.id) : undefined))?.highlight,
     itemNoun: table ? 'table' : chart ? 'graph' : onLayout ? 'layout' : analysis ? 'result' : null,
     tableCount: project.dataTables.length,
     hasInspector,
