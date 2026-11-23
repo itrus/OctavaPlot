@@ -203,7 +203,7 @@ describe('colour range limits', () => {
 
 describe('cell labels', () => {
   it('fit the cell in width and height, shrink when needed, and are left out when they cannot be read', async () => {
-    const { fitCellLabel } = await import('./heatMarks');
+    const { fitCellLabel } = await import('./heatDrawing');
     expect(fitCellLabel('4.2', 120, 80, 20)).toBe(20);
     const narrow = fitCellLabel('123456.789', 60, 80, 20)!;
     expect(narrow).toBeLessThan(20);

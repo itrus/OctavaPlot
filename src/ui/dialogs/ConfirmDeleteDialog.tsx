@@ -1,7 +1,7 @@
 import type { Project } from '../../model/types';
-import type { DeletionEffects } from '../../state/deletionEffects';
+import type { DeletionEffects } from '../../state/commands';
 import { Thumb, type ThumbItem } from '../views/FolderThumbs';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 /** One picture of what would be deleted, with its name under it. */
 function Card({ entry, name, project }: { entry: ThumbItem; name: string; project: Project }) {

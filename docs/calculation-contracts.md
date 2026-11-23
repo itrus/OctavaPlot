@@ -129,7 +129,7 @@ The sizes are the defaults of `src/model/defaults.ts`, in pt of the drawing (1 p
 | Band fill opacity | 0.20 |
 | Background, text | white, black; grid and full frame off |
 
-Default palette: Science (AAAS) of the ggsci set (user guide, "Colour palettes"); the Okabe-Ito colours that this section once called the seed palette are "Colorblind-friendly", one of the earlier palettes kept so that saved graphs open. Choosing a palette takes the colours set by hand away, so that the palette governs. Palette overflow repeats with distinct shapes and a warning (not checked on 14 November 2026). One pinned sans-serif font list is used and fallbacks are disclosed in the export dialog.
+Default palette: Science (AAAS) of the ggsci set (user guide, "Colour palettes"); the Okabe-Ito colours that this section once called the seed palette are "Colourblind-friendly", one of the earlier palettes kept so that saved graphs open. Choosing a palette takes the colours set by hand away, so that the palette governs. Palette overflow repeats with distinct shapes and a warning (not checked on 14 November 2026). One pinned sans-serif font list is used and fallbacks are disclosed in the export dialog.
 
 ## 15. Acceptance fixtures
 

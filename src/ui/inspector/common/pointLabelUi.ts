@@ -7,6 +7,7 @@ import type {
 } from '../../../model/types';
 import { labelWarnings, type PointLabelReport, type SuppressedLabel } from '../../../chart/shared/parts/labels';
 import { LABEL_AUTO_COLOR, LABEL_DECIMALS_LIMITS, effectiveLabelSource, sanitizeLabelStyle } from '../../../model/options/pointLabelOptions';
+import { isHex } from '../../../model/sanitize';
 
 const PLACEMENT_OPTIONS: Array<{ value: PointLabelPlacement; label: string }> = [
   { value: 'above-right', label: 'Above right' },
@@ -116,7 +117,7 @@ export function placementPatch(value: string): Partial<ChartStyle> | null {
 
 /** Auto stores null; switching Auto off keeps the colour shown, so nothing jumps. */
 export function colourPatch(auto: boolean, shown: string = LABEL_AUTO_COLOR): Partial<ChartStyle> {
-  return { pointLabelColor: auto ? null : /^#[0-9a-fA-F]{6}$/.test(shown) ? shown : LABEL_AUTO_COLOR };
+  return { pointLabelColor: auto ? null : isHex(shown) ? shown : LABEL_AUTO_COLOR };
 }
 
 /** Auto stores null (6 significant digits); otherwise a whole number within the limits. */

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../../model/defaults';
 import { patchStyle } from '../../state/commands';
 import { buildColumnModel } from './columnModel';
-import { compileColumnPointLabels, compileColumnSelection } from './columnMarks';
+import { compileColumnPointLabels, compileColumnSelection } from './columnDrawing';
 import type { SceneElement } from '../shared/scene/sceneElement';
 
 const ex = createExampleProject();

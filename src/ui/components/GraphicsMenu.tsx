@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { useDismiss } from './useDismiss';
+import { useDismiss } from './hooks';
 import { createPortal } from 'react-dom';
 import { drawingGeometry } from '../../chart/shared/scene/drawings';
 import { createDrawing, DRAWING_GROUPS, DRAWING_PRESETS, pointsOfDrag, type DrawingPreset } from '../../model/graph/drawingPresets';

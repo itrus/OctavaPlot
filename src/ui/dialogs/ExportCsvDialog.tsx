@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CsvExportMode } from '../data/csv';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 const CHOICES: Array<{ mode: CsvExportMode; label: string; about: string }> = [
   { mode: 'entered', label: 'All rows as entered', about: 'Every value as stored, excluded values included.' },

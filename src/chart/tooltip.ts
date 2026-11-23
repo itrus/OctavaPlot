@@ -1,7 +1,7 @@
 import { format } from 'd3';
 import { rowTitleAt } from '../model/table/rows';
 import type { DataTable } from '../model/types';
-import { summaryTooltipLines } from '../model/presentation/summaryText';
+import { summaryTooltipLines } from '../model/graph/summary';
 import { formatTimeCell } from '../util/timeColumn';
 import { AXIS_NAME } from './shared/axes/axes';
 import type { HitTarget } from './shared/scene/hitTest';

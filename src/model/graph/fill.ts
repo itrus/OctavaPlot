@@ -2,13 +2,14 @@
  * Bar fill model (spec 5.2 L288-295): mode, pattern, spacing, line width and
  * colours resolved from a style, plus the file sanitiser and the Inspector
  * state. Nothing here draws. Defaults and limits are P (spec 1.2 L57).
- * Imports only types, so defaults.ts can import this module.
+ * Imports only types and sanitize.ts (which imports nothing), so any model file can import this one.
  *
  * In pattern mode the solid fill colour (barFill) is ignored and
  * barPatternBackground is used instead (P).
  */
 
 import type { ChartStyle, FillMode, FillPattern } from '../types';
+import { isHex } from '../sanitize';
 
 export const FILL_PATTERNS: readonly FillPattern[] = [
   'horizontal',
@@ -62,8 +63,6 @@ export interface FillSpec {
   opacity: number;
 }
 
-const HEX = /^#[0-9a-fA-F]{6}$/;
-const isHex = (v: unknown): v is string => typeof v === 'string' && HEX.test(v);
 const isPositive = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
@@ -125,7 +124,7 @@ export function isPatternInvisible(fill: FillSpec): boolean {
 const FILL_KEY_CHECKS: Record<string, (v: unknown) => boolean> = {
   barFillMode: (v) => typeof v === 'string' && (FILL_MODES as readonly string[]).includes(v),
   barPattern: (v) => typeof v === 'string' && (FILL_PATTERNS as readonly string[]).includes(v),
-  // Only non-positive or non-finite values are invalid; values beyond the P limits are kept and clamped by the resolver.
+  // Only non-positive or non-finite values are invalid; values beyond the limits are kept and clamped by the resolver.
   barPatternSpacingPt: isPositive,
   barPatternWidthPt: isPositive,
   barPatternColor: (v) => v === null || isHex(v),
@@ -164,7 +163,7 @@ const limitError = (label: string, v: number, lim: { min: number; max: number })
   !isPositive(v)
     ? `${label} must be a positive number.`
     : v < lim.min || v > lim.max
-      ? `${label} is outside the P limit ${lim.min} to ${lim.max} pt and is clamped.`
+      ? `${label} is outside ${lim.min} to ${lim.max} pt and is clamped.`
       : null;
 
 export function describeBarFillUi(style: FillStyleInput & Pick<ChartStyle, 'showBars'>): BarFillUi {

@@ -1,6 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
-import { CloseIcon } from '../../components/icons';
-import { ModalBackdrop } from '../../dialogs/DialogShell';
+import { DialogWindow } from '../../dialogs/DialogShell';
 import { Field } from './controls';
 
 /** A row of small squares, one for each of the first `max` colours. */
@@ -102,12 +101,7 @@ export function PickerField<Id extends string>({
         </button>
       </Field>
       {open && (
-        <ModalBackdrop onClose={close}>
-          <div className="modal palette-modal" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={(el) => el?.focus()}>
-            <div className="modal-head">
-              <strong>{title}</strong>
-              <button className="modal-close" onClick={close} aria-label="Close"><CloseIcon /></button>
-            </div>
+        <DialogWindow title={title} onClose={close} className="palette-modal">
             {windowHint && <div className="muted small palette-hint">{windowHint}</div>}
             <div className="palette-groups">
               {groups.map((g) => (
@@ -141,8 +135,7 @@ export function PickerField<Id extends string>({
               <div id={INFO_ID} className="palette-info-text" aria-live="polite">{info(hover ?? current)}</div>
               <button className="primary" onClick={close}>Close</button>
             </div>
-          </div>
-        </ModalBackdrop>
+        </DialogWindow>
       )}
     </div>
   );

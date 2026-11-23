@@ -3,7 +3,7 @@ import { useRoving } from '../inspector/common/roving';
 import { GRID_MAX, standardArrangements } from '../../model/project/layout';
 import type { Chart, Id, LayoutArrangement, PageOrientation } from '../../model/types';
 import { ArrangementSketch } from '../components/ArrangementSketch';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 export interface NewLayoutOptions {
   orientation: PageOrientation;

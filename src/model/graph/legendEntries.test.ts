@@ -6,8 +6,7 @@ import { duplicateChart, setLegendColumns, setLegendItemVisible, setLegendOrder 
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { buildXyModel } from '../../chart/xy/xyModel';
 import { chartToSvgString } from '../../chart/export/export';
-import { inheritChart } from './link/chartFormat';
-import { syncLinks } from './link/chartLink';
+import { inheritChart, syncLinks } from './chartLink';
 import { legendColumns, legendEntries, sanitizeLegendLayout, withoutRepeats } from './legendEntries';
 
 const base = { hiddenGroupIds: [] as string[] };

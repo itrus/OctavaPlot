@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react';
 import { insertSymbol, SYMBOL_GROUPS, symbolOf } from '../../util/richText';
-import { ModalBackdrop } from '../dialogs/DialogShell';
+import { DialogWindow } from '../dialogs/DialogShell';
 
 /** What the button says on hover: how the text of a graph is written. */
 const SYMBOL_HINT =
@@ -22,11 +22,7 @@ function writeInto(el: Box, text: string): void {
 function SymbolDialog({ onPick, onClose }: { onPick: (name: string) => void; onClose: () => void }) {
   const [hover, setHover] = useState<string | null>(null);
   return (
-    <ModalBackdrop onClose={onClose}>
-      <div className="modal char-modal" role="dialog" aria-modal="true" aria-label="Insert symbol" tabIndex={-1} ref={(el) => el?.focus()}>
-        <div className="modal-head">
-          <strong>Insert symbol</strong>
-        </div>
+    <DialogWindow title="Insert symbol" onClose={onClose} className="char-modal" closeButton={false}>
         <div className="modal-body modal-pad">
           <div className="char-groups">
             {SYMBOL_GROUPS.map((g) => (
@@ -50,8 +46,7 @@ function SymbolDialog({ onPick, onClose }: { onPick: (name: string) => void; onC
         <div className="modal-foot">
           <button onClick={onClose}>Close</button>
         </div>
-      </div>
-    </ModalBackdrop>
+    </DialogWindow>
   );
 }
 

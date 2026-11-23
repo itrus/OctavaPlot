@@ -1,10 +1,10 @@
 import type { Command } from './commands';
-import { ProjectContext, CommandsContext, HistoryContext, SelectionContext, NavigationContext, StatusContext, RecoveryContext, PreferencesContext, GraphViewportContext, TableViewportContext, LayoutViewportContext, ResultsViewportContext } from './app/contexts';
+import { ProjectContext, CommandsContext, HistoryContext, SelectionContext, NavigationContext, StatusContext, RecoveryContext, PreferencesContext, GraphViewportContext, TableViewportContext, LayoutViewportContext, ResultsViewportContext } from './contexts';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { createEmptyProject, createExampleProject } from '../model/defaults';
 import { viewAfterRemoval } from '../model/project/viewOrder';
 import type { Project } from '../model/types';
-import type { Selection, ViewRef } from '../model/editor/types';
+import type { Selection, ViewRef } from '../model/selection';
 import { historyReducer, initialHistory, scopeCoalesceKey } from './history';
 import { affectsRecovery, flushDecision, isConflict, isGone, protectionOf, recoveryStatusText, shouldWarnOnUnload, bannerVisible } from './recovery/recovery';
 import { currentSignature, newEditorId, writeRecovery } from './recovery/recoveryStore';
@@ -13,7 +13,7 @@ import { statusAfter, type StatusMemo } from './statusLine';
 import { loadSettings, newChartStart, saveSettings, sanitizeSettings, type Settings } from './settings';
 import { forgetPlaces, type InspectorTarget } from './inspectorNav';
 
-export { useProject, useCommands, useHistory, useSelection, useNavigation, useStatus, useRecovery, usePreferences, useGraphViewport, useTableViewport, useResultsViewport, useLayoutViewport } from './app/contexts';
+export { useProject, useCommands, useHistory, useSelection, useNavigation, useStatus, useRecovery, usePreferences, useGraphViewport, useTableViewport, useResultsViewport, useLayoutViewport } from './contexts';
 
 /**
  * The project to start with: the autosave (kept as a backup first, so a bad edit cannot replace the only copy), else a new one by

@@ -3,7 +3,7 @@ import { useRoving } from '../inspector/common/roving';
 import { MAX_REPLICATES, MIN_REPLICATES, subLabels } from '../../model/table/tableLayout';
 import type { ReplicateLayout, SummaryFormat, TableKind } from '../../model/types';
 import type { NewTableOptions } from '../../state/commands';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 import { TableLayoutOptions } from './TableLayoutOptions';
 
 type FormatId = 'xy' | 'column' | 'grouped' | 'contingency' | 'survival';

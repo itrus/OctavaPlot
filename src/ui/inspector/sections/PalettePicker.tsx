@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { COMPARED_COLOURS, safeColours } from '../../../model/graph/colour/colorVision';
-import { DATAWRAPPER_CITATION, GGSCI_CITATION, PALETTE_GROUPS, paletteById, palettesInGroup } from '../../../model/graph/palettes';
+import { COMPARED_COLOURS, safeColours, DATAWRAPPER_CITATION, GGSCI_CITATION, PALETTE_GROUPS, paletteById, palettesInGroup } from '../../../model/graph/palettes';
 import type { Chart } from '../../../model/types';
 import { useCommands } from '../../../state/AppContext';
 import { applyPalette } from '../../../state/commands';
@@ -11,9 +10,9 @@ const GROUPS = PALETTE_GROUPS.map((g) => ({ label: g, items: palettesInGroup(g).
 /** How many of the first colours of a palette stay clearly apart for colour-blind viewers (measured, see colorVision.ts). */
 function SafeLine({ colors }: { colors: readonly string[] }) {
   const n = useMemo(() => safeColours(colors), [colors]);
-  if (n >= COMPARED_COLOURS) return <span className="vision vision-ok">Colorblind friendly for the first {COMPARED_COLOURS} colours</span>;
+  if (n >= COMPARED_COLOURS) return <span className="vision vision-ok">Colourblind friendly for the first {COMPARED_COLOURS} colours</span>;
   if (n < 2) return <span className="muted vision">First two colours clash</span>;
-  return <span className="muted vision">Colorblind friendly for the first {n} colours</span>;
+  return <span className="muted vision">Colourblind friendly for the first {n} colours</span>;
 }
 
 /** The lines at the bottom of the window about a palette: its name, all its colours, what it is, and where it comes from. */
@@ -36,7 +35,7 @@ export function PaletteField({ chart, hint }: { chart: Chart; hint: string }) {
   const { run } = useCommands();
   return (
     <PickerField
-      fieldLabel="Color palette"
+      fieldLabel="Colour palette"
       hint={hint}
       title="Colour palettes"
       groups={GROUPS}

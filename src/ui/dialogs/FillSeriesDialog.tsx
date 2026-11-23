@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DecimalSeparator } from '../../model/types';
 import { formatCell, parseCell } from '../data/cellText';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 export type SeriesDirection = 'down' | 'across';
 

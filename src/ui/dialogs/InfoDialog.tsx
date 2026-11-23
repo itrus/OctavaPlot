@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { benchSteps, runBenchmark, type BenchResult, type BenchStep } from '../diagnostics/benchmark';
-import { MIN_BROWSERS, readSystemInfo, storagePersisted } from '../../state/diagnostics/systemInfo';
-import { ASSUMED_LIMIT_BYTES, formatBytes, heapUsage, keyName, measureLocalStorage, type StorageUsage } from '../../state/diagnostics/storageUsage';
+import { MIN_BROWSERS, readSystemInfo, storagePersisted } from '../diagnostics/systemInfo';
+import { ASSUMED_LIMIT_BYTES, formatBytes, heapUsage, keyName, measureLocalStorage, type StorageUsage } from '../diagnostics/storageUsage';
 import { AUTOSAVE_META_KEY, clockTime, parseMeta } from '../../state/recovery/recovery';
 import { usePreferences, useRecovery } from '../../state/AppContext';
-import { ModalBackdrop } from './DialogShell';
-import { CloseIcon } from '../components/icons';
+import { DialogWindow } from './DialogShell';
 import { useRoving } from '../inspector/common/roving';
 import { PALETTE_GROUPS, PALETTE_GROUP_INFO, DATAWRAPPER_CITATION, GGSCI_CITATION, palettesInGroup } from '../../model/graph/palettes';
 import { HEAT_PALETTE_GROUPS } from '../../model/options/heatmapOptions';
@@ -51,7 +50,7 @@ function PalettesTab() {
   return (
     <>
       <p>
-        The <strong>Color palette</strong> button of a graph opens a window with every palette as a button. Point at one to see all its colours,
+        The <strong>Colour palette</strong> button of a graph opens a window with every palette as a button. Point at one to see all its colours,
         what it is and where it comes from; click it to give the data sets its colours, in order.
       </p>
       <h3>Sources</h3>
@@ -74,7 +73,7 @@ function PalettesTab() {
       ))}
       <p className="muted small">
         Gephi&rsquo;s palette engine is generative, so it is a seeded port of the one in ggsci giving ten fixed colours; iTerm is the Rose Pine
-        scheme only (ggsci has more than 400). The palettes in &ldquo;Other&rdquo; are the app&rsquo;s own, except Colorblind-friendly, which is the
+        scheme only (ggsci has more than 400). The palettes in &ldquo;Other&rdquo; are the app&rsquo;s own, except Colourblind-friendly, which is the
         palette of Okabe &amp; Ito (2008). Black and White and Monochrome run from the darkest colour to the lightest. Colour-vision notes use the
         simulation of Machado, Oliveira &amp; Fernandes (2009).
       </p>
@@ -251,12 +250,7 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<TabId>('about');
   const roving = useRoving(TABS.map(() => true), TABS.findIndex((t) => t.id === tab), (i) => setTab(TABS[i].id));
   return (
-    <ModalBackdrop onClose={onClose}>
-      <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Info" tabIndex={-1} ref={(el) => el?.focus()}>
-        <div className="modal-head">
-          <strong>Info</strong>
-          <button className="modal-close" onClick={onClose} aria-label="Close"><CloseIcon /></button>
-        </div>
+    <DialogWindow title="Info" onClose={onClose}>
         <div className="format-tabs info-tabs" role="tablist" aria-label="Info" {...roving.groupProps}>
           {TABS.map((t, i) => (
             <button key={t.id} id={`info-tab-${t.id}`} role="tab" aria-selected={tab === t.id} aria-controls="info-panel" {...roving.itemProps(i)} className={`format-tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
@@ -274,7 +268,6 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
         <div className="modal-foot">
           <button className="primary" onClick={onClose}>Close</button>
         </div>
-      </div>
-    </ModalBackdrop>
+    </DialogWindow>
   );
 }

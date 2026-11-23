@@ -9,9 +9,8 @@ import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SummarySpec } from 
 import { AXIS_SHORT, AXIS_TAG, bindingOf, bindingSelectState } from '../../chart/shared/axes/axes';
 import { clippedEndpointCount, clippedEndpointMessage } from '../../chart/shared/parts/errorGeometry';
 import { buildColumnModel } from '../../chart/column/columnModel';
-import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext } from '../../chart/shared/axes/scales';
 import { tooltipFmt } from '../../chart/tooltip';
-import { DIRECTION_HINT, centreChangeCompat, centreTitles, centreNoticeLines, describeCounts, describeSummaryControls, datasetRowText, intervalCaptionLines } from './common/summaryUi';
+import { centreChangeCompat, centreTitles, centreNoticeLines, describeCounts, describeSummaryControls, datasetRowText, intervalCaptionLines } from './common/summaryUi';
 import { useCommands, useSelection } from '../../state/AppContext';
 import {
   composeCommands,
@@ -25,17 +24,14 @@ import {
 } from '../../state/commands';
 import { DistributionControls } from './sections/DistributionControls';
 import { LayersSection } from './sections/LayersSection';
-import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, GridStyleSection } from './sections/LookControls';
-import { AxisStyleControls, TickFields } from './sections/AxisStyleControls';
-import { DataSetOrder } from './sections/DataSetOrder';
+import { ColumnLayoutSection, DirectionSection, ErrorBarLookFields, FrameSection, LineLookFields, LineOrderSection, GridStyleSection, SymbolLookFields } from './sections/LookControls';
+import { AxisLimits, TickFields } from './sections/AxisStyleControls';
+import { DataSetOrder, DataSetPicker, DataSetReset } from './sections/DataSets';
 import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections, ReferenceLinesSection } from './sections/SharedSections';
 import { PaletteField } from './sections/PalettePicker';
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
-import { DataSetPicker } from './sections/DataSetPicker';
-import { DataSetReset } from './sections/DataSetReset';
-import { scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput, SubHeading, TextInput } from './common/controls';
-import { SymbolPicker } from './common/SymbolPicker';
+import { scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope, mixedPointStyleKeys } from '../../model/selection';
+import { Check, ColorInput, Field, GroupBox, NumField, Section, SelectInput, SubHeading, TextInput } from './common/controls';
 import {
   backgroundDisplay,
   backgroundNonePatch,
@@ -52,15 +48,12 @@ import {
 } from './common/fillRules';
 import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';
-import { useInspectorNav } from './common/useInspectorNav';
+import { useInspectorNav, inspectorShapeOf } from './common/nav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
-import { ExtraTicksControls } from './sections/ExtraTicksControls';
 import { PointLabelControls, SelectedPointBox, SelectedPointsBox, type PointEdit } from './sections/PointLabelControls';
 import { multiPointState, POINT_LABEL_KEYS, pointSelectionState } from './common/pointOverrideUi';
-import { mixedPointStyleKeys } from '../../model/graph/selection/multi';
 import { CalculationOptions,IntervalFields, LineAtField } from './sections/SummaryControls';
 import { displayName } from '../../chart/shared/parts/names';
-import { inspectorShapeOf } from './common/nav';
 import { SLIDERS } from './common/sliderRanges';
 import { DotPlacementControls } from './sections/DotPlacementControls';
 
@@ -174,15 +167,6 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
   const mixedBinding = inScopeBindings.some((b) => b !== inScopeBindings[0]);
   const setBinding = (axisBinding: AxisBinding) =>
     run(axisBinding === 'secondary' ? 'Plot data on right Y axis' : 'Plot data on left Y axis', patchStyle(chart.id, scope, { axisBinding }));
-  const axisCtx = (axis: Chart['yAxis'], scale: { domain: [number, number]; log?: number | null }): AxisEditContext => ({
-    min: axis.min,
-    max: axis.max,
-    majorInterval: axis.majorInterval,
-    domain: scale.domain,
-    log: scale.log,
-  });
-  const yCtx = axisCtx(chart.yAxis, model.y);
-  const yAuto = majorStepOf;
   const leftName = dual ? 'Left Y' : 'Y';
   const errorOff = describeSummaryControls({ showErrorBars: st.showErrorBars, centre: spec.centre, spread: spec.spread }).errorOff;
   const titles = centreTitles(spec.centre, chart.type);
@@ -258,7 +242,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
                 <ColorInput
                   value={backgroundDisplay(st)}
                   disabled={!fillUi.patternControlsEnabled || st.barPatternBackground === null}
-                  ariaLabel="Pattern background color"
+                  ariaLabel="Pattern background colour"
                   onChange={(v) => setStyle({ barPatternBackground: v })}
                 />
                 <label className="auto-check">
@@ -273,7 +257,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               </Field>
             ) : (
               <Field label="Fill" overridden={ov('barFill')} note={fillRowNote(st)}>
-                <ColorInput value={st.barFill} disabled={!fillUi.solidColorEnabled} ariaLabel="Bar fill color" onChange={(v) => setStyle({ barFill: v })} />
+                <ColorInput value={st.barFill} disabled={!fillUi.solidColorEnabled} ariaLabel="Bar fill colour" onChange={(v) => setStyle({ barFill: v })} />
               </Field>
             )}
             <Field label="Fill pattern" overridden={ov('barFillMode')}>
@@ -290,18 +274,18 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
                 onChange={(v) => setStyle({ barPattern: v })}
               />
             </Field>
-            <Field label="Pattern color" overridden={ov('barPatternColor')}>
+            <Field label="Pattern colour" overridden={ov('barPatternColor')}>
               <ColorInput
                 value={patternColorDisplay(st)}
                 disabled={!fillUi.patternControlsEnabled || followsBorder(st)}
-                ariaLabel="Pattern color"
+                ariaLabel="Pattern colour"
                 onChange={(v) => setStyle({ barPatternColor: v })}
               />
               <label className="auto-check">
                 <Check
                   checked={followsBorder(st)}
                   disabled={!fillUi.patternControlsEnabled}
-                  ariaLabel="Pattern color follows the border color"
+                  ariaLabel="Pattern colour follows the border colour"
                   onChange={(v) => setStyle(followBorderPatch(v, st.barBorderColor))}
                 />
                 = border
@@ -313,7 +297,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               value={st.barPatternSpacingPt}
               disabled={!fillUi.patternControlsEnabled}
               overridden={ov('barPatternSpacingPt')}
-              hint="Distance between marks (P limit 2 to 100 pt)"
+              hint="Distance between marks (2 to 100 pt)"
               note={fillUi.spacingError}
               validate={(v) => spacingError(v, st.barPatternWidthPt)}
               onCommit={(v) => setStyle({ barPatternSpacingPt: v })}
@@ -324,7 +308,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               value={st.barPatternWidthPt}
               disabled={!fillUi.patternControlsEnabled}
               overridden={ov('barPatternWidthPt')}
-              hint={`${widthName} (P limit 0.2 to 10 pt)`}
+              hint={`${widthName} (0.2 to 10 pt)`}
               note={fillUi.widthError}
               validate={(v) => widthError(v, st.barPatternSpacingPt, st.barPattern)}
               onCommit={(v) => setStyle({ barPatternWidthPt: v })}
@@ -332,7 +316,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             <NumField {...SLIDERS.fraction} label="Opacity" value={st.barOpacity} min={0} max={1} disabled={!st.showBars} overridden={ov('barOpacity')} onCommit={(v) => setStyle({ barOpacity: v })} hint="0 = transparent, 1 = opaque" note={opacityNote(st)} />
             <NumField {...SLIDERS.line} label="Border" unit="pt" value={st.barBorderWidthPt} min={0} max={20} disabled={!st.showBars} overridden={ov('barBorderWidthPt')} onCommit={(v) => setStyle({ barBorderWidthPt: v })} />
             <NumField {...SLIDERS.fraction} label="Border opacity" value={st.barBorderOpacity} min={0} max={1} disabled={!st.showBars} overridden={ov('barBorderOpacity')} onCommit={(v) => setStyle({ barBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
-            <Field label="Border color" overridden={ov('barBorderColor')}>
+            <Field label="Border colour" overridden={ov('barBorderColor')}>
               <ColorInput value={st.barBorderColor} disabled={!st.showBars} onChange={(v) => setStyle({ barBorderColor: v })} />
             </Field>
           </GroupBox>
@@ -347,24 +331,8 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
             }}
             overridden={ov('showSymbols')}
           >
-            <Field label="Color" overridden={ov('symbolColor')}>
-              <ColorInput value={st.symbolColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolColor: v })} />
-            </Field>
-            <Field label="Shape" overridden={ov('symbolShape')}>
-              <SymbolPicker shape={st.symbolShape} fillOpacity={st.symbolFillOpacity} disabled={!st.showSymbols} onChange={setStyle} />
-            </Field>
-            <NumField {...SLIDERS.symbol} label="Size" unit="pt" value={st.symbolSizePt} min={2} max={60} disabled={!st.showSymbols} overridden={ov('symbolSizePt')} onCommit={(v) => setStyle({ symbolSizePt: v })} />
-            <NumField {...SLIDERS.fraction} label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
-            <Field label="Border color" overridden={ov('symbolBorderColor')}>
-              <ColorInput value={st.symbolBorderColor} disabled={!st.showSymbols} onChange={(v) => setStyle({ symbolBorderColor: v })} />
-            </Field>
-            <NumField {...SLIDERS.line} label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={20} disabled={!st.showSymbols} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
-            <NumField {...SLIDERS.fraction} label="Border opacity" value={st.symbolBorderOpacity} min={0} max={1} disabled={!st.showSymbols} overridden={ov('symbolBorderOpacity')} onCommit={(v) => setStyle({ symbolBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
-            {chart.type !== 'mean' && (
-              <>
-                <DotPlacementControls chart={chart} disabled={!st.showSymbols} />
-              </>
-            )}
+            <SymbolLookFields st={st} ov={ov} setStyle={setStyle} disabled={!st.showSymbols} />
+            {chart.type !== 'mean' && <DotPlacementControls chart={chart} disabled={!st.showSymbols} />}
           </GroupBox>
 
           {!isDist && (
@@ -387,35 +355,7 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
               onSpread={(spread) => setSummary({ spread }, 'Change error bar shows')}
               onLevel={(confidenceLevel) => setSummary({ confidenceLevel }, 'Change confidence level')}
             />
-            <Field label="Color" overridden={ov('errorColor')}>
-              <ColorInput value={st.errorColor} disabled={errorOff} onChange={(v) => setStyle({ errorColor: v })} />
-            </Field>
-            <Field label="Cap style" overridden={ov('errorCap')}>
-              <SelectInput
-                value={st.errorCap}
-                disabled={errorOff}
-                options={[
-                  { value: 'bar', label: 'Bar' },
-                  { value: 'none', label: 'None' },
-                ]}
-                onChange={(v) => setStyle({ errorCap: v })}
-              />
-            </Field>
-            <NumField {...SLIDERS.cap} label="Cap width" unit="pt" value={st.errorCapWidthPt} min={0} max={40} disabled={errorOff || st.errorCap === 'none'} overridden={ov('errorCapWidthPt')} onCommit={(v) => setStyle({ errorCapWidthPt: v })} />
-            <Field label="Direction" overridden={ov('errorDirection')} hint={DIRECTION_HINT}>
-              <SelectInput
-                value={st.errorDirection}
-                disabled={errorOff}
-                options={[
-                  { value: 'both', label: 'Both' },
-                  { value: 'positive', label: 'Above' },
-                  { value: 'negative', label: 'Below' },
-                ]}
-                onChange={(v) => setStyle({ errorDirection: v })}
-              />
-            </Field>
-            <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={20} disabled={errorOff} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
-            <NumField {...SLIDERS.fraction} label="Opacity" value={st.errorOpacity} min={0} max={1} disabled={errorOff} overridden={ov('errorOpacity')} onCommit={(v) => setStyle({ errorOpacity: v })} hint="0 = transparent, 1 = opaque" />
+            <ErrorBarLookFields st={st} ov={ov} setStyle={setStyle} disabled={errorOff} />
           </GroupBox>
 
           </>
@@ -429,23 +369,19 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
           {(chart.type === 'mean' || chart.type === 'paired') && (
             <GroupBox title={chart.type === 'paired' ? 'Lines joining the rows' : 'Lines'} checked={st.showLines} onCheckedChange={(v) => setStyle({ showLines: v })} overridden={ov('showLines')}>
               {chart.type === 'paired' && (
-                <Field label="Color by" hint="Row: each row's line has a color of the palette, after the colors of the data sets. One color: every line has the color below. Row needs a palette (not colors set by hand).">
+                <Field label="Colour by" hint="Row: each row's line has a colour of the palette, after the colours of the data sets. One colour: every line has the colour below. Row needs a palette (not colours set by hand).">
                   <SelectInput<Chart['pairs']['lineColour']>
                     value={chart.pairs.lineColour}
                     disabled={!st.showLines}
                     options={[
                       { value: 'subject', label: 'Row' },
-                      { value: 'one', label: 'One color' },
+                      { value: 'one', label: 'One colour' },
                     ]}
-                    onChange={(v) => run('Line colors', patchLook(chart.id, { pairs: { lineColour: v } }))}
+                    onChange={(v) => run('Line colours', patchLook(chart.id, { pairs: { lineColour: v } }))}
                   />
                 </Field>
               )}
-              <Field label="Color" overridden={ov('lineColor')}>
-                <ColorInput value={st.lineColor} disabled={!st.showLines || (chart.type === 'paired' && pairLinesBySubject(chart))} onChange={(v) => setStyle({ lineColor: v })} />
-              </Field>
-              <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={20} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
-              <NumField {...SLIDERS.fraction} label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showLines} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
+              <LineLookFields st={st} ov={ov} setStyle={setStyle} disabled={!st.showLines} colourLocked={chart.type === 'paired' && pairLinesBySubject(chart)} />
               {chart.type === 'paired' && (
                 <Field label="Join across a missing value" hint="A row with a missing value: join the values either side of it. Nothing is made up for the missing one.">
                   <Check checked={chart.pairs.bridge} disabled={!st.showLines} onChange={(v) => run('Join across missing values', patchLook(chart.id, { pairs: { bridge: v } }))} />
@@ -455,11 +391,12 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
           )}
           {(chart.type === 'scatter' || chart.type === 'paired') && (
             <GroupBox title={titles.lines} checked={st.showMeanLine} onCheckedChange={(v) => setStyle({ showMeanLine: v })} overridden={ov('showMeanLine')}>
-              <Field label="Color" overridden={ov('lineColor')}>
-                <ColorInput value={st.lineColor} disabled={!st.showMeanLine} onChange={(v) => setStyle({ lineColor: v })} />
-              </Field>
-              <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={20} disabled={!st.showMeanLine} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
-              <NumField {...SLIDERS.fraction} label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showMeanLine} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
+              {chart.type === 'paired' ? (
+                // The colour, thickness and opacity are the ones of the lines joining the rows (one setting); Layers gives this line a look of its own.
+                <div className="field-note">Drawn with the colour, thickness and opacity of the lines joining the rows. Give it a look of its own under Layers.</div>
+              ) : (
+                <LineLookFields st={st} ov={ov} setStyle={setStyle} disabled={!st.showMeanLine} />
+              )}
             </GroupBox>
           )}
 
@@ -534,96 +471,21 @@ export function ColumnInspector({ chart, table }: { chart: Chart; table: DataTab
                 <div className="muted small">The X axis lists the data sets, so it has no numeric limits to set.</div>
               </Section>
               <Section title={dual ? 'Left Y axis' : 'Y axis'}>
-                <Field label={`Show ${leftName} axis`}>
+                <Field label={dual ? 'Show left Y axis' : 'Show Y axis'}>
                   <Check checked={chart.yAxis.visible} onChange={(v) => run('Show Y axis', patchAxis(chart.id, 'yAxis', { visible: v }))} />
                 </Field>
-              <Field label="Range" hint="Auto fits the axis to the data; Manual uses the limits below">
-                <SelectInput<'auto' | 'manual'>
-                  value={chart.yAxis.min === null && chart.yAxis.max === null ? 'auto' : 'manual'}
-                  options={[
-                    { value: 'auto', label: 'Auto' },
-                    { value: 'manual', label: 'Manual' },
-                  ]}
-                  onChange={(v) =>
-                    run('Y range', patchAxis(chart.id, 'yAxis', v === 'auto' ? { min: null, max: null } : { min: chart.yAxis.min ?? model.y.domain[0], max: chart.yAxis.max ?? model.y.domain[1] }))
-                  }
-                />
-              </Field>
-                <OptionalNumField
-                  label={`${leftName} minimum`}
-                  value={chart.yAxis.min}
-                  autoValue={model.y.domain[0]}
-                  validate={(v) => validateAxisMin(v, yCtx)}
-                  onCommit={(v) => run('Y minimum', patchAxis(chart.id, 'yAxis', { min: v }), 'axis:ymin')}
-                />
-                <OptionalNumField
-                  label={`${leftName} maximum`}
-                  value={chart.yAxis.max}
-                  autoValue={model.y.domain[1]}
-                  validate={(v) => validateAxisMax(v, yCtx)}
-                  onCommit={(v) => run('Y maximum', patchAxis(chart.id, 'yAxis', { max: v }), 'axis:ymax')}
-                />
-                <OptionalNumField
-                  label={dual ? 'Left major tick interval' : 'Major tick interval'}
-                  value={chart.yAxis.majorInterval}
-                  autoValue={yAuto(model.y)}
-                  validate={(v) => validateAxisInterval(v, yCtx)}
-                  onCommit={(v) => run('Major tick interval', patchAxis(chart.id, 'yAxis', { majorInterval: v }), 'axis:yint')}
-                />
-                <Field label={dual ? 'Left major gridlines' : 'Major gridlines'}>
-                  <Check checked={chart.yAxis.showGrid} onChange={(v) => run('Gridlines', patchAxis(chart.id, 'yAxis', { showGrid: v }))} />
-                </Field>
-                <ExtraTicksControls chart={chart} which="yAxis" scale={model.y} name={leftName} />
-                <AxisStyleControls chart={chart} which="yAxis" scale={model.y} name={leftName} canScale canReverse />
+                <AxisLimits chart={chart} which="yAxis" scale={model.y} name={leftName} />
               </Section>
           {dual && model.y2 && (
             <Section title="Right Y axis">
-              <Field label="Range" hint="Auto fits the axis to the data; Manual uses the limits below">
-                <SelectInput<'auto' | 'manual'>
-                  value={chart.y2Axis.min === null && chart.y2Axis.max === null ? 'auto' : 'manual'}
-                  options={[
-                    { value: 'auto', label: 'Auto' },
-                    { value: 'manual', label: 'Manual' },
-                  ]}
-                  onChange={(v) =>
-                    run('Right Y range', patchAxis(chart.id, 'y2Axis', v === 'auto' ? { min: null, max: null } : { min: chart.y2Axis.min ?? model.y2!.domain[0], max: chart.y2Axis.max ?? model.y2!.domain[1] }))
-                  }
-                />
-              </Field>
               <Field label="Right Y axis title">
                 <TextInput value={chart.y2Axis.title} onChange={(v) => run('Right Y axis title', patchAxis(chart.id, 'y2Axis', { title: v }), 'axis:y2t')} />
               </Field>
-              <OptionalNumField
-                label="Right Y minimum"
-                value={chart.y2Axis.min}
-                autoValue={model.y2.domain[0]}
-                validate={(v) => validateAxisMin(v, axisCtx(chart.y2Axis, model.y2!))}
-                onCommit={(v) => run('Right Y minimum', patchAxis(chart.id, 'y2Axis', { min: v }), 'axis:y2min')}
-              />
-              <OptionalNumField
-                label="Right Y maximum"
-                value={chart.y2Axis.max}
-                autoValue={model.y2.domain[1]}
-                validate={(v) => validateAxisMax(v, axisCtx(chart.y2Axis, model.y2!))}
-                onCommit={(v) => run('Right Y maximum', patchAxis(chart.id, 'y2Axis', { max: v }), 'axis:y2max')}
-              />
-              <OptionalNumField
-                label="Right major tick interval"
-                value={chart.y2Axis.majorInterval}
-                autoValue={yAuto(model.y2)}
-                validate={(v) => validateAxisInterval(v, axisCtx(chart.y2Axis, model.y2!))}
-                onCommit={(v) => run('Right major tick interval', patchAxis(chart.id, 'y2Axis', { majorInterval: v }), 'axis:y2int')}
-              />
-              <Field label="Show Right Y axis">
+              <Field label="Show right Y axis">
                 <Check checked={chart.y2Axis.visible} onChange={(v) => run('Show right Y axis', patchAxis(chart.id, 'y2Axis', { visible: v }))} />
               </Field>
-              <Field
-                label="Right major gridlines"
-                note={chart.yAxis.showGrid ? 'Drawn dashed to tell them apart from the left gridlines.' : null}
-              >
-                <Check checked={chart.y2Axis.showGrid} onChange={(v) => run('Right gridlines', patchAxis(chart.id, 'y2Axis', { showGrid: v }))} />
-              </Field>
-              <AxisStyleControls chart={chart} which="y2Axis" scale={model.y2} name="Right Y" canScale canReverse />
+              <AxisLimits chart={chart} which="y2Axis" scale={model.y2} name="Right Y" />
+              <div className="muted small">Reference lines, extra ticks and annotations placed at values are on the left Y axis.</div>
             </Section>
           )}
           <GridStyleSection chart={chart} />

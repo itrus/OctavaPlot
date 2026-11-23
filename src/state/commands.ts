@@ -1,7 +1,7 @@
 import { MAX_EXTRA_TICKS, sanitizeAxis } from '../model/graph/axis';
 import { sanitizeBarLabels, sanitizeBars } from '../model/options/columnOptions';
 import { sanitizeDistribution } from '../model/options/distributionOptions';
-import { sanitizeLayerStyles } from '../model/graph/layers';
+import { sanitizeLayerStyles, clearPartStyles, layerKindOf, layersOf, layerStylesAvailable, lookKeysOf, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
 import { sanitizeLook } from '../model/graph/look';
 import { sanitizeLegendLayout, withoutLegendColumns, withoutLegendOffset, withoutLegendOrder } from '../model/graph/legendEntries';
 import { sanitizeOrder } from '../model/table/groupOrder';
@@ -9,7 +9,7 @@ import { type ChartStart, createChart, createColumnTable, createContingencyTable
 import { kindChangeEffects } from '../model/table/tableKind';
 import { analysisKindApplies, analysisTypeInfo } from '../model/project/analysis';
 import { sanitizeDegree } from '../model/options/fitOptions';
-import { inheritChart } from '../model/graph/link/chartFormat';
+import { inheritChart } from '../model/graph/chartLink';
 import { clampFrame, defaultLayout, FREE_MAX, framesOf, newFrame, resizePanels, sanitizeLayout, turnFrames } from '../model/project/layout';
 import type { FitModelId } from '../stats/fitModels';
 import { effectiveTable } from '../model/table/chartTable';
@@ -24,47 +24,12 @@ import { type Palette } from '../model/graph/palettes';
 import { canonicalObservationId, canonicalRowId, createRows, freshId, MAX_TABLE_ROWS, sanitizeRowTitle } from '../model/table/rows';
 import { clearGroupSummary, clearGroupSummaryKeys, patchAllSummary, patchGroupSummary, validateSummaryPatch } from '../model/graph/summary';
 import { folderItems, nudge, reorder, sortedByName } from '../model/project/folderItems';
-import { clearPartStyles, layerKindOf, layersOf, layerStylesAvailable, lookKeysOf, ORDERABLE_LAYER_KINDS } from '../model/graph/layers';
-import type { StyleScope } from '../model/graph/selection/scope';
+import type { StyleScope } from '../model/selection';
 import type { TimeColumn } from '../util/timeColumn';
 import { followThresholds, sanitizeVolcano, withVolcanoLines } from '../model/options/volcanoOptions';
 import { LABEL_STYLE_KEYS, clearGroupKeys, clearObjectKeys, groupObjectIds, patchAllGroups, patchGroup, patchObject, resetGroupStyle, dataLayer } from '../model/graph/style';
 import { highlightOf } from '../model/project/highlight';
-import type {
-  HighlightColor,
-  ImportedTable,
-  Drawing,
-  LayerStyle,
-  Analysis,
-  AnalysisKind,
-  Annotation,
-  AxisConfig,
-  BarLabels,
-  BarLayout,
-  DistributionOptions,
-  GridStyle,
-  Chart,
-  ChartLayer,
-  ChartStyle,
-  ChartType,
-  DataRow,
-  DataTable,
-  Group,
-  Id,
-  Observation,
-  JitterConfig,
-  VolcanoOptions,
-  Layout,
-  LegendConfig,
-  FolderKey,
-  Project,
-  ReferenceLine,
-  ShadedRegion,
-  ReplicateLayout,
-  SummarySpec,
-  SurvivalOptions,
-  TableKind,
-} from '../model/types';
+import type { HighlightColor, ImportedTable, Drawing, LayerStyle, Analysis, AnalysisKind, Annotation, AxisConfig, BarLabels, BarLayout, DistributionOptions, GridStyle, Chart, ChartLayer, ChartStyle, ChartType, DataRow, DataTable, Group, Id, Observation, JitterConfig, VolcanoOptions, Layout, LegendConfig, FolderKey, Project, ReferenceLine, ShadedRegion, ReplicateLayout, SummarySpec, SurvivalOptions, TableKind } from '../model/types';
 
 /** A command is a pure project -> project function; the history reducer applies it. */
 export type Command = (p: Project) => Project;
@@ -657,18 +622,11 @@ export const clearSummaryOverrides = (chartId: Id, scope: StyleScope): Command =
 export const addAnnotation = (chartId: Id, annotation: Annotation): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, annotations: [...c.annotations, annotation] }));
 
-export const patchAnnotation = (chartId: Id, annotationId: Id, patch: Partial<Annotation>): Command => (p) =>
-  mapChart(p, chartId, (c) => ({
-    ...c,
-    annotations: c.annotations.map((a) => (a.id === annotationId ? { ...a, ...patch } : a)),
-  }));
-
 /** The same change to several annotations at once (one history step). */
 export const patchAnnotations = (chartId: Id, annotationIds: readonly Id[], patch: Partial<Annotation>): Command => (p) =>
-  mapChart(p, chartId, (c) => ({
-    ...c,
-    annotations: c.annotations.map((a) => (annotationIds.includes(a.id) ? { ...a, ...patch } : a)),
-  }));
+  mapChart(p, chartId, (c) => ({ ...c, annotations: c.annotations.map((a) => (annotationIds.includes(a.id) ? { ...a, ...patch } : a)) }));
+
+export const patchAnnotation = (chartId: Id, annotationId: Id, patch: Partial<Annotation>): Command => patchAnnotations(chartId, [annotationId], patch);
 
 export const removeAnnotation = (chartId: Id, annotationId: Id): Command => (p) =>
   mapChart(p, chartId, (c) => ({ ...c, annotations: c.annotations.filter((a) => a.id !== annotationId) }));
@@ -726,8 +684,6 @@ export const patchRegion = (chartId: Id, regionId: Id, patch: Partial<Omit<Shade
   mapChart(p, chartId, (c) => ({ ...c, regions: c.regions.map((r) => (r.id === regionId ? { ...r, ...patch } : r)) }));
 
 export const removeRegion = (chartId: Id, regionId: Id): Command => (p) => mapChart(p, chartId, (c) => ({ ...c, regions: c.regions.filter((r) => r.id !== regionId), hiddenLayerIds: c.hiddenLayerIds.filter((id) => id !== `${regionId}:region`) }));
-
-
 
 // ---------------------------------------------------------------- project items
 
@@ -811,17 +767,30 @@ export const addAnalysis = (id: Id, tableId: Id, kind: AnalysisKind = 'descripti
   return { ...p, analyses: [...existing, { id, name, kind, dataTableId: tableId, level: 0.95, ...(kind === 'curvefit' ? { model: fit?.model ?? 'linear', degree: sanitizeDegree(fit?.degree, 2) } : {}) }] };
 };
 
-export const patchAnalysis = (id: Id, patch: Partial<Pick<Analysis, 'name' | 'level' | 'model' | 'degree'>>): Command => (p) => ({
-  ...p,
-  analyses: (p.analyses ?? []).map((a) => (a.id === id ? { ...a, ...patch, ...(patch.degree !== undefined ? { degree: sanitizeDegree(patch.degree, a.degree ?? 2) } : {}) } : a)),
-});
+/** The project with one analysis changed by `fn`; the same project when there is no such analysis or nothing changed (no undo step). */
+const mapAnalysis = (p: Project, id: Id, fn: (a: Analysis) => Analysis): Project => {
+  const analysis = p.analyses?.find((a) => a.id === id);
+  if (!analysis) return p;
+  const next = fn(analysis);
+  return next === analysis ? p : { ...p, analyses: p.analyses!.map((a) => (a === analysis ? next : a)) };
+};
 
-export const removeAnalysis = (id: Id): Command => (p) => ({
-  ...p,
-  analyses: (p.analyses ?? []).filter((a) => a.id !== id),
-  // A graph that drew this curve fit draws none now.
-  charts: p.charts.map((c) => (c.fit.analysisId === id ? { ...c, fit: { ...c.fit, analysisId: null } } : c)),
-});
+export const patchAnalysis = (id: Id, patch: Partial<Pick<Analysis, 'name' | 'level' | 'model' | 'degree'>>): Command => (p) =>
+  mapAnalysis(p, id, (a) => {
+    const next: Record<string, unknown> = { ...a, ...patch, ...(patch.degree !== undefined ? { degree: sanitizeDegree(patch.degree, a.degree ?? 2) } : {}) };
+    return Object.keys(next).every((k) => next[k] === (a as unknown as Record<string, unknown>)[k]) ? a : (next as unknown as Analysis);
+  });
+
+export const removeAnalysis = (id: Id): Command => (p) => {
+  if (!p.analyses?.some((a) => a.id === id)) return p;
+  const analyses = p.analyses.filter((a) => a.id !== id);
+  return {
+    ...p,
+    analyses: analyses.length > 0 ? analyses : undefined,
+    // A graph that drew this curve fit draws none now.
+    charts: p.charts.map((c) => (c.fit.analysisId === id ? { ...c, fit: { ...c.fit, analysisId: null } } : c)),
+  };
+};
 
 export const setProjectName = (name: string): Command => (p) => (p.name === name ? p : { ...p, name });
 
@@ -940,8 +909,8 @@ export const renameItem = (kind: 'table' | 'chart' | 'analysis' | 'layout', id: 
     };
   }
   if (kind === 'chart') return mapChart(p, id, (c) => (c.name === next ? c : { ...c, name: next }));
-  if (kind === 'layout') return { ...p, layouts: (p.layouts ?? []).map((l) => (l.id === id && l.name !== next ? { ...l, name: next } : l)) };
-  return { ...p, analyses: (p.analyses ?? []).map((a) => (a.id === id && a.name !== next ? { ...a, name: next } : a)) };
+  if (kind === 'layout') return mapLayout(p, id, (l) => (l.name === next ? l : { ...l, name: next }));
+  return mapAnalysis(p, id, (a) => (a.name === next ? a : { ...a, name: next }));
 };
 
 /** Mark a table, graph, result or layout with a colour in the navigator, or clear the mark (null). Unknown colours are ignored. */
@@ -955,8 +924,8 @@ export const setHighlight = (kind: 'table' | 'chart' | 'analysis' | 'layout', id
   };
   if (kind === 'table') return mapTable(p, id, apply);
   if (kind === 'chart') return mapChart(p, id, apply);
-  if (kind === 'layout') return { ...p, layouts: (p.layouts ?? []).map((l) => (l.id === id ? apply(l) : l)) };
-  return { ...p, analyses: (p.analyses ?? []).map((a) => (a.id === id ? apply(a) : a)) };
+  if (kind === 'layout') return mapLayout(p, id, apply);
+  return mapAnalysis(p, id, apply);
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1040,11 +1009,11 @@ const withChartIdOf = (c: Chart, copyId: Id): Pick<Chart, 'hiddenLayerIds' | 'ra
   };
 };
 
-/** A copy of a graph (same data table, same settings) with new IDs for it and its layers. */
+/** A copy of a graph (same data table, same settings) with a new ID. */
 export const duplicateChart = (chartId: Id, copyId: Id): Command => (p) => {
   const c = p.charts.find((x) => x.id === chartId);
   if (!c) return p;
-  const copy: Chart = { ...c, ...withChartIdOf(c, copyId), id: copyId, name: copyName(c.name, p.charts.map((x) => x.name)), layers: c.layers.map((l) => ({ ...l, id: newId('layer') })) };
+  const copy: Chart = { ...c, ...withChartIdOf(c, copyId), id: copyId, name: copyName(c.name, p.charts.map((x) => x.name)) };
   return { ...p, charts: [...p.charts, copy] };
 };
 
@@ -1126,7 +1095,8 @@ export const setLayoutPanel = (id: Id, slot: number, chartId: Id | null): Comman
   });
 
 export const removeLayout = (id: Id): Command => (p) => {
-  const layouts = (p.layouts ?? []).filter((l) => l.id !== id);
+  if (!p.layouts?.some((l) => l.id === id)) return p;
+  const layouts = p.layouts.filter((l) => l.id !== id);
   return { ...p, layouts: layouts.length > 0 ? layouts : undefined };
 };
 
@@ -1342,3 +1312,31 @@ export const changeTableKind = (tableId: Id, kind: TableKind, layout: ReplicateL
   const fallback = defaultChartTypeFor(kind);
   return composeCommands(...charts.map((c) => setChartType(c.id, fallback)), ...analyses.map((a) => removeAnalysis(a.id)))(changed);
 };
+
+/** What a deletion takes with the items asked for: the graphs and results that used a deleted table, and the layouts left with no graph. */
+export interface DeletionEffects {
+  charts: Array<{ id: Id; name: string }>;
+  analyses: Array<{ id: Id; name: string }>;
+  layouts: Array<{ id: Id; name: string }>;
+}
+
+/** Whether the deletion takes nothing but what was asked for. */
+export const noEffects = (e: DeletionEffects): boolean => e.charts.length === 0 && e.analyses.length === 0 && e.layouts.length === 0;
+
+/**
+ * What deleting these items of a folder would also delete, found by making the deletion on a copy: the very command that is run afterwards,
+ * so the notice says exactly what happens. A layout is also deleted when it is left with no graph at all (it had one before).
+ */
+export function deletionEffects(p: Project, folder: FolderKey, ids: ReadonlyArray<Id>): DeletionEffects {
+  const after = removeItems(folder, ids)(p);
+  const asked = new Set(ids);
+  const gone = <T extends { id: Id; name: string }>(before: readonly T[], now: readonly T[], own: boolean): Array<{ id: Id; name: string }> => {
+    const kept = new Set(now.map((x) => x.id));
+    return before.filter((x) => !kept.has(x.id) && !(own && asked.has(x.id))).map((x) => ({ id: x.id, name: x.name }));
+  };
+  return {
+    charts: gone(p.charts, after.charts, folder === 'graphs'),
+    analyses: gone(p.analyses ?? [], after.analyses ?? [], folder === 'results'),
+    layouts: gone(p.layouts ?? [], after.layouts ?? [], folder === 'layouts'),
+  };
+}

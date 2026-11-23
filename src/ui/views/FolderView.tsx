@@ -1,26 +1,25 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
-import { isCommitEnter } from '../components/shortcutGuard';
+import { isCommitEnter } from '../components/appShortcuts';
 import { runBatch, type BatchFormat, type BatchPlan } from '../../chart/export/batchExport';
 import { fitsCanvas } from '../../chart/export/pngDpi';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
 import { newId } from '../../model/ids';
 import { FOLDER_NOUN, FOLDER_TITLE } from '../../model/project/folderItems';
 import type { Chart, DataTable, FitSettings, FolderKey, HighlightColor, Id } from '../../model/types';
-import type { ViewRef } from '../../model/editor/types';
+import type { ViewRef } from '../../model/selection';
 import { useCommands, useNavigation, usePreferences, useProject } from '../../state/AppContext';
-import { composeCommands, duplicateItems, moveItems, nudgeItems, removeItems, renameItem, setHighlight, sortItemsByName } from '../../state/commands';
+import { composeCommands, duplicateItems, moveItems, nudgeItems, removeItems, renameItem, setHighlight, sortItemsByName, deletionEffects, noEffects, type DeletionEffects } from '../../state/commands';
 import { HIGHLIGHTS, highlightBackground, highlightOf } from '../../model/project/highlight';
-import { useDismiss } from '../components/useDismiss';
+import { useDismiss } from '../components/hooks';
 import { useCommand } from '../components/appCommands';
 import { ConfirmDeleteDialog } from '../dialogs/ConfirmDeleteDialog';
-import { deletionEffects, noEffects, type DeletionEffects } from '../../state/deletionEffects';
 import { Thumb, type ThumbItem } from './FolderThumbs';
 import { NOTHING_PICKED, pick, pickAll, pickedInOrder, prune, type PickState } from './folderSelection';
 import { DeleteIcon, ExportIcon } from '../components/icons';
 import { downloadBlob } from '../../util/download';
 import { exportFileName } from '../../util/fileName';
 import { BatchExportDialog } from '../export/BatchExportDialog';
-import { useExportJob } from '../export/useExportJob';
+import { useExportJob } from '../export/exportJob';
 import { UndoRedo } from '../components/UndoRedo';
 
 /** The kind of page each folder holds. */
@@ -209,7 +208,7 @@ export function FolderView({ folder }: { folder: FolderKey }) {
           <button onClick={() => setHlOpen(!hlOpen)} disabled={count === 0} aria-haspopup="menu" aria-expanded={hlOpen} title="Colour the names of the selected, to find them again">Highlight ▾</button>
           {hlOpen && (
             <div className="folder-hl-pop" role="menu" aria-label="Highlight">
-              <button role="menuitem" className="menu-item" onClick={() => highlight(null)}><span className="menu-swatch menu-swatch-none" aria-hidden="true" /><span className="menu-label">No color</span></button>
+              <button role="menuitem" className="menu-item" onClick={() => highlight(null)}><span className="menu-swatch menu-swatch-none" aria-hidden="true" /><span className="menu-label">No colour</span></button>
               <div className="menu-sep" role="separator" />
               {HIGHLIGHTS.map((h) => (
                 <button key={h.id} role="menuitem" className="menu-item" onClick={() => highlight(h.id)}>

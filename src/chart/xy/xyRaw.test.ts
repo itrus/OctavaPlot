@@ -8,7 +8,7 @@ import { addChart, addDataTable, patchSummary } from '../../state/commands';
 import { calcStats } from '../../stats/calcCache';
 import { buildAnyModel, ChartCanvas } from '../anyModel';
 import { buildXyModel } from './xyModel';
-import { RAW_POINT_SCALE } from './xyScene';
+import { RAW_POINT_SCALE } from './xyDrawing';
 
 const project = (kind: 'replicates' | 'single', patch: (c: Chart) => Chart = (c) => c): Project => {
   const layout = kind === 'replicates' ? ({ kind: 'replicates', n: 3 } as const) : undefined;

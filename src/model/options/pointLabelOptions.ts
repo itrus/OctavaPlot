@@ -1,11 +1,11 @@
 import type { ChartStyle, ChartType, PointLabelSource } from '../types';
+import { isHex } from '../sanitize';
 
 export const LABEL_FONT_LIMITS = { min: 8, max: 40 } as const;
 export const LABEL_OFFSET_LIMITS = { min: -400, max: 400 } as const;
 export const LABEL_DECIMALS_LIMITS = { min: 0, max: 10 } as const;
 export const LABEL_AUTO_COLOR = '#000000';
 
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /** Mean markers summarise a data set, so only the value source applies. */
@@ -27,7 +27,7 @@ export function sanitizeLabelStyle<T extends ChartStyle>(style: T): T {
   out.pointLabelOffsetXPt = num(style.pointLabelOffsetXPt, 0, LABEL_OFFSET_LIMITS.min, LABEL_OFFSET_LIMITS.max);
   out.pointLabelOffsetYPt = num(style.pointLabelOffsetYPt, 0, LABEL_OFFSET_LIMITS.min, LABEL_OFFSET_LIMITS.max);
   const c = style.pointLabelColor;
-  if (c !== null && !(typeof c === 'string' && HEX_COLOR.test(c))) out.pointLabelColor = null;
+  if (c !== null && !isHex(c)) out.pointLabelColor = null;
   const d = style.pointLabelDecimals;
   if (d !== null) {
     out.pointLabelDecimals =

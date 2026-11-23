@@ -10,7 +10,7 @@ import { cellStatistic, matrixRange, normaliseMatrix, type CellResult, type Matr
 import { computeGroupStats } from '../../stats/summary';
 import { colourEdges, contrastColour, intervalColour, intervalIndex, scaleColour, type HeatScale } from './heatColours';
 import { chartLayout, type Layout, type Rect } from '../shared/parts/layout';
-import { compileHeatMarks } from './heatMarks';
+import { compileHeatMarks } from './heatDrawing';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { displayName } from '../shared/parts/names';
 import { suppliedStats, suppliedStatistic } from '../../model/table/suppliedStats';
@@ -77,6 +77,8 @@ export interface HeatModel {
   colLabelAt: HeatLabel[];
   gridWidth: number;
   gridHeight: number;
+  /** The colour range as drawn (the limits set by hand, or the automatic ones), lowest first. */
+  range: [number, number];
   /** The edges of the colour intervals, or null for a continuous scale. */
   edges: number[] | null;
   /** What the cells show, as the colour bar and the tooltip name it: "SD", or "Row z-score of mean" when normalised. */
@@ -292,6 +294,7 @@ export function buildHeatModel(chart: Chart, table: DataTable): HeatModel {
     colLabelAt: shownCols.map((l) => ({ ...l, at: plot.x + across.start(l.index) + cw / 2 })),
     gridWidth: across.length,
     gridHeight: down.length,
+    range: [lo, hi],
     edges,
     valueName,
     warnings: [...new Set(warnings)],

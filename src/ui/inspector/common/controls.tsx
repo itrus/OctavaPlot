@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { recallSection, rememberSection } from '../../../state/inspectorNav';
-import { isCommitEnter } from '../../components/shortcutGuard';
+import { isCommitEnter } from '../../components/appShortcuts';
 import { formatNum, sliderStep, snapToStep } from './numberFormat';
 import { WheelRange } from '../../components/WheelRange';
 import { SymbolButton } from '../../components/SymbolButton';

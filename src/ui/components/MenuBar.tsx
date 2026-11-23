@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { useDismiss } from './useDismiss';
+import { useDismiss } from './hooks';
 
 /** One row of a menu: an action, a switch (`checked` given), a row that opens a list of actions at its side (a submenu), or a line between groups. */
 export type MenuEntry =

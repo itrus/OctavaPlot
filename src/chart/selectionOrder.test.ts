@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createExampleProject } from '../model/defaults';
 import type { ChartType, Project, TableKind } from '../model/types';
-import type { Selection } from '../model/editor/types';
+import type { Selection } from '../model/selection';
 import { addChart, addDataTable } from '../state/commands';
 import { buildAnyModel } from './anyModel';
-import { describeSelection, nextSelection, selectableMarks, type StepGroup } from './selectionOrder';
+import { describeSelection, nextSelection, selectableMarks, type StepGroup, describeFocus, nextFocus, type ChromeStop, type Focus, extendGroups, extendAnnotations, extendPoints } from './selectionOrder';
 
 const marksOf = (kind: TableKind, type: ChartType): StepGroup[] => {
   const p: Project = addChart('c', 't', undefined, type)(addDataTable('t', kind, { sample: true })(createExampleProject()));
@@ -98,7 +98,6 @@ describe('what is read out', () => {
   });
 });
 
-import { describeFocus, nextFocus, type ChromeStop, type Focus } from './selectionOrder';
 
 describe('the title, legend and axes as stops of the keyboard', () => {
   const stops: ChromeStop[] = ['chart-title', 'legend', 'x-axis', 'y-axis'];
@@ -140,7 +139,6 @@ describe('the title, legend and axes as stops of the keyboard', () => {
   });
 });
 
-import { extendGroups } from './selectionOrder';
 
 describe('several data sets selected with the keyboard', () => {
   const groups = (...groupIds: string[]): Selection => ({ kind: 'groups', groupIds });
@@ -167,7 +165,6 @@ describe('several data sets selected with the keyboard', () => {
   });
 });
 
-import { extendAnnotations, extendPoints } from './selectionOrder';
 
 describe('annotations on the keyboard', () => {
   const stops: ChromeStop[] = ['chart-title', 'legend'];

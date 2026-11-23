@@ -1,5 +1,7 @@
 /** Structural types of settings. Bounds and enum membership belong to the option sanitizers. */
 type SettingKind = 'number' | 'string' | 'boolean' | 'array' | 'nullableNumber' | 'nullableString' | 'nullableColor';
+import { isHex } from '../sanitize';
+
 export interface SettingSchema { readonly [key: string]: SettingKind | SettingSchema }
 
 /** Check schema keys against model keys and their value types at compile time. */
@@ -21,7 +23,7 @@ function accepts(kind: SettingKind, value: unknown): boolean {
     case 'array': return Array.isArray(value);
     case 'nullableNumber': return value === null || finite(value);
     case 'nullableString': return value === null || typeof value === 'string';
-    case 'nullableColor': return value === null || (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value));
+    case 'nullableColor': return value === null || isHex(value);
   }
 }
 

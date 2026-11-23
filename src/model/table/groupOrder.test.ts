@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildColumnModel } from '../../chart/column/columnModel';
-import { columnLayout } from '../../chart/column/columnLayout';
+import { buildColumnModel, columnLayout } from '../../chart/column/columnModel';
 import { createChart, createColumnTable } from '../defaults';
 import { effectiveTable } from './chartTable';
 import { applyOrder, moveGroup, sanitizeOrder } from './groupOrder';

@@ -5,10 +5,9 @@ import { chartToSvgString } from '../chart/export/export';
 import { GALLERY } from '../model/graph/chartGallery';
 import { createEmptyProject, createExampleProject } from '../model/defaults';
 import { canonicalObservationId, canonicalRowId } from '../model/table/rows';
-import type { TableKind } from '../model/types';
-import type { Project } from '../model/types';
+import type { TableKind, Project } from '../model/types';
 import { addAnnotation, addChart, addDataTable, addReferenceLine, patchStyle, setProjectName, setRowTitles } from './commands';
-import { MAX_PROJECT_BYTES, openedStatus, PROJECT_EXTENSION, projectToFileText, readProjectFile, refusedStatus, type ProjectSource } from './projectFile';
+import { MAX_PROJECT_BYTES, openedStatus, PROJECT_EXTENSION, projectToFileText, readProjectFile, refusedStatus, type ProjectSource, openDecision } from './projectFile';
 import { parseProjectWithNotes } from './serialize';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -206,4 +205,12 @@ describe('status after opening', () => {
     expect(s).toMatch(/^b\.oplot was not opened\. Invalid project file: project\.dataTables/);
     expect(s).toMatch(/open project was not changed\.$/);
   });
+});
+
+describe('Open after the file is read', () => {
+  const a = {};
+  it('replaces when nothing came between', () => expect(openDecision({ token: 2, latest: 2, base: a, present: a })).toBe('replace'));
+  it('asks again after an edit', () => expect(openDecision({ token: 2, latest: 2, base: a, present: {} })).toBe('ask'));
+  it('drops an Open that a later one overtook', () => expect(openDecision({ token: 1, latest: 2, base: a, present: a })).toBe('drop'));
+  it('drops it even when the project changed too', () => expect(openDecision({ token: 1, latest: 2, base: a, present: {} })).toBe('drop'));
 });

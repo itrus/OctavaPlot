@@ -4,7 +4,7 @@ import { analysesOf, analysisApplies, analysisColumns } from './analysis';
 import type { Project } from '../types';
 import { addAnalysis, addDataTable, patchAnalysis, removeAnalysis } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
-import { describeValues } from '../../stats/descriptive';
+import { describeValues } from '../../stats/summary';
 
 const withTable = (kind: Parameters<typeof addDataTable>[1], options?: Parameters<typeof addDataTable>[2]): Project =>
   addDataTable('t', kind, { sample: true, ...options })(createExampleProject());

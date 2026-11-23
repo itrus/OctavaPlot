@@ -5,14 +5,13 @@ import { pieColumn, pieParts } from '../../model/table/pieParts';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
 import type { Chart, DataTable, PieLabelMode, PieOptions } from '../../model/types';
 import { useCommands, useSelection } from '../../state/AppContext';
-import { inspectorShapeOf } from './common/nav';
+import { inspectorShapeOf, useInspectorNav } from './common/nav';
 import { ColorInput, Field, GroupBox, NumField, SelectInput, TextInput, Check } from './common/controls';
 import { AnnotationsTab, DimensionsSection, LegendSection, TextSections } from './sections/SharedSections';
 import { PaletteField } from './sections/PalettePicker';
 import { LayersSection } from './sections/LayersSection';
 import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';
-import { useInspectorNav } from './common/useInspectorNav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
 import { displayName } from '../../chart/shared/parts/names';
 import { SLIDERS } from './common/sliderRanges';
@@ -101,7 +100,7 @@ export function PieInspector({ chart, table }: { chart: Chart; table: DataTable 
                   </Field>
                 )}
                 {parts.map(({ g, style, label }) => (
-                  <Field key={g.id} label={label} overridden={selectedGroup === g.id}>
+                  <Field key={g.id} label={selectedGroup === g.id ? `${label} (selected)` : label}>
                     <ColorInput value={style.barFill} ariaLabel={`Colour of ${label}`} onChange={(v) => recolour(g.id, { barFill: v })} />
                   </Field>
                 ))}
@@ -113,7 +112,7 @@ export function PieInspector({ chart, table }: { chart: Chart; table: DataTable 
                   max={20}
                   onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderWidthPt: v }), 'style:all:border')}
                 />
-                <Field label="Border color">
+                <Field label="Border colour">
                   <ColorInput value={parts[0]?.style.barBorderColor ?? '#ffffff'} ariaLabel="Border colour" onChange={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderColor: v }), 'style:all:bordercolor')} />
                 </Field>
               </GroupBox>

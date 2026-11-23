@@ -141,7 +141,7 @@ export function scaleBarElement(chart: Chart, axis: AxisConfig, along: 'x' | 'y'
   const lo = Math.min(scale.domain[0], scale.domain[1]);
   const length = Math.abs(map(lo + step) - map(lo));
   if (!(length > 0) || !Number.isFinite(length)) return null;
-  const label = scale.tickLabel(step);
+  const label = scale.stepLabel ?? scale.tickLabel(step);
   const x0 = plot.x + BAR_INSET;
   const yBottom = plot.y + plot.height - BAR_INSET;
   const font = axis.tickFontSizePt;

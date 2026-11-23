@@ -5,13 +5,12 @@ import { legendEntries } from '../../model/graph/legendEntries';
 import { NO_FIT_SETTINGS } from '../../model/options/fitOptions';
 import type { Chart, DataTable } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
-import { autoBinWidth, binEdges, binHeights, countBins, ecdfSteps } from '../../stats/histogram';
-import { sortedFinite } from '../../stats/distribution';
+import { autoBinWidth, binEdges, binHeights, countBins, ecdfSteps, sortedFinite } from '../../stats/distribution';
 import { axisMapper, resolveAxis, stepPathThroughBreaks } from '../shared/axes/axisScale';
 import { chartLayout } from '../shared/parts/layout';
 import type { XyModel, XyPoint, XySeries } from '../xy/xyModel';
 import { displayName } from '../shared/parts/names';
-import { attachLazyScene } from '../xy/xyScene';
+import { attachLazyScene } from '../xy/xyDrawing';
 
 /**
  * Model of histograms and cumulative distributions of a column table: one series for each data set, the values on a

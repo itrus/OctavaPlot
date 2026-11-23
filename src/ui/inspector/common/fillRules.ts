@@ -1,7 +1,7 @@
 /**
  * Pure helpers for the Bars box fill controls (spec 5.2 L288-295): validation,
  * style patches and display text. No React here, so they are unit-tested.
- * Limits are P (spec 1.2 L57) and are labelled "P limit" in messages.
+ * The limits are those of FILL_LIMITS; a message names them.
  */
 
 import { FILL_LIMITS, FILL_PATTERN_OPTIONS, describeBarFillUi, resolveBarFill } from '../../../model/graph/fill';
@@ -21,11 +21,11 @@ const fmt = (v: number): string => String(Number(v.toPrecision(6)));
 
 function limitMessage(label: string, v: number, lim: { min: number; max: number }): string | null {
   if (!Number.isFinite(v) || v <= 0) return `${label} must be a positive number.`;
-  if (v < lim.min || v > lim.max) return `${label} must be between ${lim.min} and ${lim.max} pt (P limit).`;
+  if (v < lim.min || v > lim.max) return `${label} must be between ${lim.min} and ${lim.max} pt.`;
   return null;
 }
 
-/** Spacing error: the P limit, then the cross rule (spacing is never below the mark width). */
+/** Spacing error: the limits, then the cross rule (spacing is never below the mark width). */
 export function spacingError(spacingPt: number, widthPt: number): string | null {
   const limit = limitMessage('Spacing', spacingPt, FILL_LIMITS.spacingPt);
   if (limit) return limit;
@@ -33,7 +33,7 @@ export function spacingError(spacingPt: number, widthPt: number): string | null 
   return null;
 }
 
-/** Width error: the P limit, then the cross rule (the mark width never exceeds the spacing). */
+/** Width error: the limits, then the cross rule (the mark width never exceeds the spacing). */
 export function widthError(widthPt: number, spacingPt: number, pattern: FillPattern): string | null {
   const label = widthLabel(pattern);
   const limit = limitMessage(label, widthPt, FILL_LIMITS.widthPt);

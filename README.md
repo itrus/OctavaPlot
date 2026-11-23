@@ -84,6 +84,7 @@ npm test          # unit tests (vitest)
 npm run perf      # timings of the performance table, taken in the browser on the production build (node_modules/.cache/perf.json)
 npm run e2e       # browser tests (Playwright, in the installed Google Chrome; starts its own dev server on port 5199)
 npm run typecheck # type-check only (no unused locals or parameters allowed)
+npm run knip      # unused files, exports and dependencies
 ```
 
 ## Project file (.oplot)
@@ -107,8 +108,6 @@ The full description (contents, units, what is checked, what is not stored, priv
 - [Project file](docs/FILE_FORMAT.md): the `.oplot` format, what is checked on opening, privacy.
 - [Source structure](docs/ARCHITECTURE.md), [calculation contracts](docs/calculation-contracts.md), [roadmap](docs/ROADMAP.md), [backlog](docs/BACKLOG.md) and [change log](docs/CHANGELOG.md).
 
-OctavaPlot edits five kinds of data table (column, XY, grouped, contingency and survival) and draws 34 chart types from them.
-
 ## Compliance note
 
 Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. Autosave can be switched off in Settings; switching it off deletes the copy kept in the browser (after asking). A project saved as a file stays wherever the file is kept.
@@ -124,7 +123,7 @@ Row titles, data-set names and values are stored unencrypted in the browser (`lo
 | Version | Dates | Commits | Code | What it is |
 |---|---|---|---|---|
 | v0.1 | 22 Oct – 14 Nov 2026 (to f978e1b) | 63 | 66.8 kLoC (40.0 source + 26.8 tests) | From an empty repository to the full editor: 5 table types, 57 gallery graphs (34 chart types), curve fits in a Web Worker, `.oplot` files, layouts, SVG/PNG/PDF export, forest plots, heat maps, shapes and rich text. 63 browser tests |
-| v0.2 | from 14 Nov 2026 (in progress) | 20 so far (f978e1b to 17 Nov 2026) | 68.3 kLoC on 14 Nov (40.9 source + 27.4 tests); not counted since | Audit fixes with regression tests, symbol picker, palette and gradient pickers, export panels, new-graph and layout dialogs, axis and chart defaults, a shorter README with the details in `docs/` |
+| v0.2 | from 14 Nov 2026 (in progress) | 22 so far (f978e1b to 22 Nov 2026) | 68.3 kLoC on 14 Nov (40.9 source + 27.4 tests); not counted since | Audit fixes with regression tests, symbol picker, palette and gradient pickers, export panels, new-graph and layout dialogs, axis and chart defaults, a shorter README with the details in `docs/` |
 
 What changed and when: [docs/CHANGELOG.md](docs/CHANGELOG.md). Day-by-day history of v0.1: [docs/ROADMAP.md](docs/ROADMAP.md#version-01-22-october-to-14-november-2026).
 
@@ -132,7 +131,7 @@ What changed and when: [docs/CHANGELOG.md](docs/CHANGELOG.md). Day-by-day histor
 
 1. **Beta-testing.** Release the app to a small group and collect defects and requests.
 2. **Statistics with R.** Statistical tests will be run with R. How R is brought in is not decided yet: **webR** (R running inside the browser) or a **standalone R** installed next to the app. Each choice has its own consequences for where the data goes and for what has to be installed; this needs to be settled before the work starts.
-3. **Tooling.** Add `knip` as a dev dependency, choose a few lint rules and try the stricter compiler flags.
+3. **Tooling.** Choose a few lint rules and try the stricter compiler flags (`knip` is in place since 23 Nov 2026).
 
 The full list, with what has not yet been tried in a browser and the known issues, is in [docs/BACKLOG.md](docs/BACKLOG.md).
 

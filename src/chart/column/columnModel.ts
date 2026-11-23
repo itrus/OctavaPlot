@@ -1,5 +1,5 @@
-import { scaleLinear, scaleLog } from 'd3';
-import { omittedRangeWarnings } from '../shared/axes/axisScale';
+import { scaleLinear, scaleLog, scaleBand } from 'd3';
+import { omittedRangeWarnings, axisMapper, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { BAR_PALETTE } from '../../model/defaults';
 import { paletteById, paletteColor } from '../../model/graph/palettes';
@@ -8,7 +8,7 @@ import { isPatternInvisible, resolveBarFill } from '../../model/graph/fill';
 import { groupRowTitle } from '../../model/table/rows';
 import { resolveSummary } from '../../model/graph/summary';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
-import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SymbolShape } from '../../model/types';
+import type { AxisBinding, Chart, ChartStyle, DataTable, Id, SymbolShape, BarLayout } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { statsFor, summarize, type GroupStats, type GroupSummary, type Notice } from '../../stats/summary';
 import { AXIS_NAME, AXIS_TAG, axisConfigFor, axisNotices, bindingOf, populateAxes, type RangeRow } from '../shared/axes/axes';
@@ -20,13 +20,10 @@ import { memoFor } from '../../stats/calcCache';
 import { boxSummary, densityProfile, normaliseProfiles, sortedFinite, type BoxSummary, type DensityProfile } from '../../stats/distribution';
 import { supportsHorizontal } from '../../model/graph/chartTypes';
 import { barLabelText, insideLabelText, placeBarLabel, placeInsideBarLabel, type BarLabelGeom, type InsideLabelGeom } from '../shared/parts/barLabels';
-import { buildBox, buildFloating, buildViolin, type DistGeom } from '../shared/parts/distributionGeom';
-import { boxNeeds, floatingNeeds, unplacedMarkNote } from '../shared/parts/distributionNotes';
-import { columnLayout } from './columnLayout';
-import { axisMapper, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
+import { buildBox, buildFloating, buildViolin, type DistGeom, boxNeeds, floatingNeeds, unplacedMarkNote } from '../shared/parts/distributionGeom';
 import type { YAxisScale } from '../shared/axes/scales';
 import { layersOf, pairLinesBySubject, partStyle, type LayerKind, type LayerSpec } from '../../model/graph/layers';
-import { compileColumnMarks } from './columnMarks';
+import { compileColumnMarks, compileColumnScene } from './columnDrawing';
 import type { ChromeScene } from '../shared/scene/scene';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { Orientation } from '../shared/parts/orientation';
@@ -34,7 +31,7 @@ import { displayName } from '../shared/parts/names';
 import { dotOffsets } from '../shared/parts/jitter';
 import { stableList } from '../shared/parts/stable';
 import { BarGeom } from '../shared/parts/barGeom';
-import { compileColumnScene } from './columnChrome';
+import { bandPadding } from '../../model/options/columnOptions';
 
 /**
  * Chart model: the pure, React-free pipeline
@@ -745,4 +742,21 @@ export function buildColumnModel(chart: Chart, table: DataTable): ColumnModel {
   let marks: SceneElement[] | undefined;
   Object.defineProperty(model.scene, 'marks', { enumerable: false, configurable: true, get: () => (marks ??= compileColumnMarks(chart, model)) });
   return model;
+}
+
+/** Where the columns of a column chart sit across the plotting region. */
+interface ColumnLayout {
+  /** Left edge of a column (undefined for an id that is not drawn). */
+  x: (id: Id) => number | undefined;
+  /** Width of a column. */
+  bw: number;
+  /** Distance from one column to the next at the normal space between them (the width of a column's slot). */
+  step: number;
+}
+
+/** The columns across `plot`: even spacing from the spacing settings (the same d3 band as ever when nothing is set). */
+export function columnLayout(plot: { x: number; width: number }, ids: readonly Id[], bars: BarLayout): ColumnLayout {
+  const pad = bandPadding(bars);
+  const band = scaleBand<string>().domain([...ids]).range([plot.x, plot.x + plot.width]).paddingInner(pad.inner).paddingOuter(pad.outer).align(pad.align);
+  return { x: (id) => band(id), bw: band.bandwidth(), step: band.step() };
 }

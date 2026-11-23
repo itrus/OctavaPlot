@@ -1,6 +1,7 @@
 import { mmToPt, ptToMm } from '../units';
 import { highlightOf } from './highlight';
 import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, PageOrientation, PanelLabelStyle } from '../types';
+import { clamp, isHex } from '../sanitize';
 
 /** A4 in mm; the renderer's unit is the point (1 in = 72 pt). */
 const A4_MM = { width: 210, height: 297 } as const;
@@ -214,8 +215,6 @@ export function arrangeLayout(layout: Layout, sizes: readonly NaturalSize[], ban
 /** The panels of a layout as long as its arrangement needs: new slots are empty, slots that no longer exist are dropped. */
 export const resizePanels = (panels: ReadonlyArray<string | null>, arrangement: LayoutArrangement): Array<string | null> => Array.from({ length: slotCount(arrangement) }, (_, i) => panels[i] ?? null);
 
-const HEX = /^#[0-9a-fA-F]{6}$/;
-const clampNum = (v: unknown, lo: number, hi: number, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback);
 const LABEL_STYLES: readonly PanelLabelStyle[] = ['none', 'A', 'a', 'I', '1'];
 
 function sanitizeArrangement(v: unknown, fallback: LayoutArrangement, orientation: PageOrientation): LayoutArrangement {
@@ -226,12 +225,12 @@ function sanitizeArrangement(v: unknown, fallback: LayoutArrangement, orientatio
     const frames = (Array.isArray(a.frames) ? a.frames : []).slice(0, FREE_MAX).flatMap((f): FrameMm[] => {
       if (typeof f !== 'object' || f === null) return [];
       const r = f as Record<string, unknown>;
-      return [clampFrame({ x: clampNum(r.x, 0, 1000, 0), y: clampNum(r.y, 0, 1000, 0), w: clampNum(r.w, 0, 1000, 80), h: clampNum(r.h, 0, 1000, 60) }, orientation)];
+      return [clampFrame({ x: clamp(r.x, 0, 1000, 0), y: clamp(r.y, 0, 1000, 0), w: clamp(r.w, 0, 1000, 80), h: clamp(r.h, 0, 1000, 60) }, orientation)];
     });
     return frames.length > 0 ? { kind: 'free', frames } : fallback;
   }
   if (a.kind !== 'grid') return fallback;
-  const dim = (x: unknown, f: number) => Math.round(clampNum(x, 1, GRID_MAX, f));
+  const dim = (x: unknown, f: number) => Math.round(clamp(x, 1, GRID_MAX, f));
   const [fc, fr] = fallback.kind === 'grid' ? [fallback.cols, fallback.rows] : [2, 1];
   return { kind: 'grid', cols: dim(a.cols, fc), rows: dim(a.rows, fr) };
 }
@@ -243,7 +242,7 @@ function sanitizeLegend(v: unknown, fallback: LayoutLegend | undefined): LayoutL
   const o = v as Record<string, unknown>;
   return {
     position: o.position === 'right' || o.position === 'bottom' ? o.position : (fallback?.position ?? 'bottom'),
-    fontSizePt: clampNum(o.fontSizePt, LEGEND_PT_MIN, LEGEND_PT_MAX, fallback?.fontSizePt ?? 9),
+    fontSizePt: clamp(o.fontSizePt, LEGEND_PT_MIN, LEGEND_PT_MAX, fallback?.fontSizePt ?? 9),
     hideGraphLegends: typeof o.hideGraphLegends === 'boolean' ? o.hideGraphLegends : (fallback?.hideGraphLegends ?? true),
   };
 }
@@ -254,7 +253,7 @@ function sanitizeScaling(v: unknown, fallback: Layout['scaling']): Layout['scali
   // 'equal' is the earlier name of 'smallest'.
   if (s.mode === 'equal') return { mode: 'smallest' };
   if (s.mode === 'smallest' || s.mode === 'largest' || s.mode === 'fit') return { mode: s.mode };
-  if (s.mode === 'percent') return { mode: 'percent', percent: clampNum(s.percent, PERCENT_MIN, PERCENT_MAX, fallback.mode === 'percent' ? fallback.percent : 100) };
+  if (s.mode === 'percent') return { mode: 'percent', percent: clamp(s.percent, PERCENT_MIN, PERCENT_MAX, fallback.mode === 'percent' ? fallback.percent : 100) };
   return fallback;
 }
 
@@ -275,16 +274,16 @@ export function sanitizeLayout(raw: Partial<Record<keyof Layout, unknown>>, base
     name: typeof raw.name === 'string' && raw.name.trim() !== '' ? raw.name.trim() : base.name,
     ...(highlight ? { highlight } : {}),
     orientation,
-    background: raw.background === null ? null : typeof raw.background === 'string' && HEX.test(raw.background) ? raw.background : base.background,
+    background: raw.background === null ? null : isHex(raw.background) ? raw.background : base.background,
     arrangement,
     panels: resizePanels(Array.isArray(raw.panels) ? raw.panels.map((p) => (typeof p === 'string' ? p : null)) : base.panels, arrangement),
     scaling: 'scaling' in raw ? sanitizeScaling(raw.scaling, base.scaling) : base.scaling,
     labelStyle: LABEL_STYLES.find((s) => s === raw.labelStyle) ?? base.labelStyle,
-    labelSizePt: clampNum(raw.labelSizePt, LABEL_PT_MIN, LABEL_PT_MAX, base.labelSizePt),
+    labelSizePt: clamp(raw.labelSizePt, LABEL_PT_MIN, LABEL_PT_MAX, base.labelSizePt),
     showTitle: typeof raw.showTitle === 'boolean' ? raw.showTitle : base.showTitle,
     title: typeof raw.title === 'string' ? raw.title.slice(0, 200) : base.title,
-    marginMm: clampNum(raw.marginMm, 0, MARGIN_MM_MAX, base.marginMm),
-    gapMm: clampNum(raw.gapMm, 0, GAP_MM_MAX, base.gapMm),
+    marginMm: clamp(raw.marginMm, 0, MARGIN_MM_MAX, base.marginMm),
+    gapMm: clamp(raw.gapMm, 0, GAP_MM_MAX, base.gapMm),
     ...(legend ? { legend } : {}),
     // Texts on the page: a patch hands checked ones on; a file's are checked field by field where the project is read (serialize.ts).
     ...(annotations && annotations.length > 0 ? { annotations } : {}),

@@ -1,5 +1,4 @@
-import type { Selection } from '../model/editor/types';
-import { selectedGroupIds } from '../model/graph/selection/scope';
+import { type Selection, selectedGroupIds } from '../model/selection';
 import type { AnyModel } from './anyModel';
 
 /** A data set (or part of a pie) a key can select, with the points it holds that can be selected too, in drawing order. */

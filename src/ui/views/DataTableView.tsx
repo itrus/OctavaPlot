@@ -1,5 +1,5 @@
 import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react';
-import { isCommitEnter } from '../components/shortcutGuard';
+import { isCommitEnter } from '../components/appShortcuts';
 import type { DataTable, DecimalSeparator, TableKind } from '../../model/types';
 import { useCommands, useNavigation, usePreferences, useProject, useTableViewport } from '../../state/AppContext';
 import { rowTitleAt, sanitizeRowTitle } from '../../model/table/rows';

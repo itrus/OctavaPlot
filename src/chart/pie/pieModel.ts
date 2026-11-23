@@ -4,7 +4,7 @@ import { resolveStyle, dataLayer } from '../../model/graph/style';
 import { legendEntries } from '../../model/graph/legendEntries';
 import type { Chart, ChartStyle, DataTable, Id, PieLabelMode } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
-import { compilePieMarks } from './pieMarks';
+import { compilePieMarks } from './pieDrawing';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { measureText } from '../shared/parts/text';
 import { chartLayout, type Layout, type Rect } from '../shared/parts/layout';

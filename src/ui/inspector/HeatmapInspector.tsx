@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { buildHeatModel } from '../../chart/heatmap/heatmapModel';
 import { editScale, paletteColour, seedCustom } from '../../chart/heatmap/heatColours';
 import { HEAT_LIMITS, HEAT_MARKS, HEAT_STATISTICS, isDiverging } from '../../model/options/heatmapOptions';
 import { GradientField } from './sections/GradientPicker';
@@ -7,8 +9,7 @@ import { patchAxis, patchLook } from '../../state/commands';
 import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, SelectInput, TextInput } from './common/controls';
 import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';
-import { inspectorShapeOf } from './common/nav';
-import { useInspectorNav } from './common/useInspectorNav';
+import { inspectorShapeOf, useInspectorNav } from './common/nav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
 import { NumberListField } from './common/NumberListField';
 import { LayersSection } from './sections/LayersSection';
@@ -30,13 +31,13 @@ function MarkField({ label, value, onChange }: { label: string; value: HeatmapOp
   );
 }
 
-/** A heat map has no axes of numbers, no frame and no legend: its panel has the graph, plot and notes pages. */
-
-
-/** The formatting panel of heat maps of a grouped table. */
+/** The formatting panel of heat maps of a grouped table. A heat map has no axes of numbers, no frame and no legend. */
 export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTable }) {
   const { run } = useCommands();
-  const nav = useInspectorNav(chart.id, inspectorShapeOf(chart.type).pages, inspectorShapeOf(chart.type).lacks);
+  const shape = inspectorShapeOf(chart.type);
+  const nav = useInspectorNav(chart.id, shape.pages, shape.lacks);
+  // The colour range as drawn: where a limit starts when its Auto is switched off.
+  const [autoLo, autoHi] = useMemo(() => buildHeatModel(chart, table).range, [chart, table]);
   const { shows } = nav;
   const o = chart.heatmap;
   const set = (label: string, patch: Partial<HeatmapOptions>, key?: string) => run(label, patchLook(chart.id, { heatmap: { ...o, ...patch } }), key);
@@ -76,8 +77,8 @@ export function HeatmapInspector({ chart, table }: { chart: Chart; table: DataTa
                 <Field label="Reverse the colours">
                   <Check checked={o.reverse} onChange={(v) => set('Reverse colours', { reverse: v })} />
                 </Field>
-                <OptionalNumField label="Lowest value" hint="Auto: the smallest value" value={o.min} autoValue={0} validate={(v) => (o.max !== null && v >= o.max ? 'Must be below the highest value.' : null)} onCommit={(v) => set('Lowest colour value', { min: v }, 'heat:min')} />
-                <OptionalNumField label="Highest value" hint="Auto: the largest value" value={o.max} autoValue={1} validate={(v) => (o.min !== null && v <= o.min ? 'Must be above the lowest value.' : null)} onCommit={(v) => set('Highest colour value', { max: v }, 'heat:max')} />
+                <OptionalNumField label="Lowest value" hint="Auto: the smallest value" value={o.min} autoValue={autoLo} validate={(v) => (o.max !== null && v >= o.max ? 'Must be below the highest value.' : null)} onCommit={(v) => set('Lowest colour value', { min: v }, 'heat:min')} />
+                <OptionalNumField label="Highest value" hint="Auto: the largest value" value={o.max} autoValue={autoHi} validate={(v) => (o.min !== null && v <= o.min ? 'Must be above the lowest value.' : null)} onCommit={(v) => set('Highest colour value', { max: v }, 'heat:max')} />
                 {diverging && <OptionalNumField label="Middle colour at" hint="Auto: the middle of the range, or 0 for z-scores and centred values" value={o.centre} autoValue={0} onCommit={(v) => set('Middle colour value', { centre: v }, 'heat:centre')} />}
                 <OptionalNumField label="Colour steps" hint="Auto: a continuous scale; or this many equal intervals, each one colour" value={o.steps} autoValue={5} validate={wholeIn(HEAT_LIMITS.steps)} onCommit={(v) => set('Colour steps', { steps: v }, 'heat:steps')} />
                 <NumberListField label="Interval edges" hint="Colour intervals with edges you choose, for example 2, 5, 10; they replace the equal steps" value={o.breaks} max={HEAT_LIMITS.steps.max - 1} normalise={(v) => [...new Set(v)].sort((x, y) => x - y)} onCommit={(v) => set('Interval edges', { breaks: v })} />

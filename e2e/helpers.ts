@@ -11,7 +11,8 @@ export async function openApp(page: Page, viewport?: { width: number; height: nu
     Object.defineProperty(window, 'showOpenFilePicker', { value: undefined, configurable: true });
   });
   await page.goto('./');
-  await expect(page.locator('.nav-tree')).toBeVisible();
+  // Present, not visible: a window of 1100 px or less folds the navigator away right after the first render.
+  await expect(page.locator('.nav-tree')).toBeAttached();
   // The first view is loaded in a separate chunk.
   await expect(page.getByRole('grid', { name: 'Data table' })).toBeVisible();
 }

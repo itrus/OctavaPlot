@@ -3,7 +3,7 @@ import { planBatch, type BatchFormat, type BatchPlan } from '../../chart/export/
 import type { Id, Project } from '../../model/types';
 import { usePreferences } from '../../state/AppContext';
 import { Field, SubHeading } from '../inspector/common/controls';
-import { Modal } from '../dialogs/NewItemDialogs';
+import { Modal } from '../dialogs/DialogShell';
 import { exportStatusText, isBusy, type ExportOutcome, type ExportState } from './exportJob';
 
 const FORMATS: ReadonlyArray<readonly [BatchFormat, string]> = [

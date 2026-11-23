@@ -27,6 +27,9 @@ export const text = (v: unknown, max: number, fallback: string): string => (type
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
+/** Whether a value is a colour written as #rrggbb. */
+export const isHex = (v: unknown): v is string => typeof v === 'string' && HEX.test(v);
+
 /** A colour as #rrggbb in lower case. */
 export const hex = (v: unknown, fallback: string): string => (typeof v === 'string' && HEX.test(v) ? v.toLowerCase() : fallback);
 

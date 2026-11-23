@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { createChart, createColumnTable, createXyTable } from '../../model/defaults';
+import { createChart, createColumnTable, createXyTable, createExampleProject } from '../../model/defaults';
 import { bandPadding } from '../../model/options/columnOptions';
 import { sanitizeLook } from '../../model/graph/look';
-import { patchAxis, patchBars, patchLegend, patchLook } from '../../state/commands';
+import { patchAxis, patchBars, patchLegend, patchLook, addChart, addDataTable, patchLayerStyle, patchStyle } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { chartToSvgString } from '../export/export';
 import { buildColumnModel } from '../column/columnModel';
 import { buildXyModel } from '../xy/xyModel';
-import type { Project } from '../../model/types';
+import type { Project, Chart, ExtraTick } from '../../model/types';
+import { applyVariant } from '../../model/graph/chartVariant';
+import { layersOf } from '../../model/graph/layers';
 
 const setup = () => {
   const table = createXyTable('XY 1', true);
@@ -175,5 +177,106 @@ describe('column spacing, baseline and legend key', () => {
     expect(rect).toContain('width="36"');
     expect(square).not.toContain('width="36"');
     expect(square).toContain('width="20"');
+  });
+});
+
+const chartOf = (p: Project) => p.charts.find((c) => c.id === 'c')!;
+const tableOf = (p: Project) => p.dataTables.find((t) => t.id === 't')!;
+const svg = (p: Project) => chartToSvgString(chartOf(p), tableOf(p));
+const keyPaths = (s: string) => [...(/id="legend"[\s\S]*$/.exec(s)?.[0] ?? '').matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]);
+
+describe('the legend key of a chart over columns', () => {
+  const base = (): Project => addChart('c', 't', undefined, 'scatter')(addDataTable('t', 'column', { sample: true })(createExampleProject()));
+
+  it('shows the shape the dots of a data set were given, as the dots are drawn', () => {
+    const p0 = base();
+    const id = tableOf(p0).groups[3].id;
+    const layered = patchLayerStyle('c', `${id}:points`, { shape: 'square' })(p0);
+    // The dots of a column chart have no look of their own in the layers: a look stored there is not drawn.
+    expect(keyPaths(svg(layered))).toEqual(keyPaths(svg(p0)));
+    const whole = patchStyle('c', id, { symbolShape: 'square' })(p0);
+    expect(keyPaths(svg(whole))).not.toEqual(keyPaths(svg(p0)));
+    // Only that data set's key changed.
+    expect(keyPaths(svg(whole)).slice(0, 3)).toEqual(keyPaths(svg(p0)).slice(0, 3));
+  });
+});
+
+describe('the legend key of a grouped chart of dots', () => {
+  it('shows the shape the dots of a series were given', () => {
+    let p0 = addDataTable('t', 'grouped', { sample: true })(createExampleProject());
+    p0 = addChart('c', 't', undefined, 'groupedBar')(p0);
+    const chart = applyVariant(chartOf(p0), { dotsOnly: true });
+    p0 = { ...p0, charts: p0.charts.map((c) => (c.id === 'c' ? chart : c)) };
+    const dots = layersOf(chartOf(p0), tableOf(p0)).find((l) => l.kind === 'rawPoints' || l.kind === 'points');
+    expect(dots).toBeDefined();
+    const id = dots!.binding!.seriesId;
+    const layered = patchLayerStyle('c', dots!.id, { shape: 'diamond' })(p0);
+    const whole = patchStyle('c', id, { symbolShape: 'diamond' })(p0);
+    expect(keyPaths(svg(layered))).toEqual(keyPaths(svg(whole)));
+    expect(keyPaths(svg(layered))).not.toEqual(keyPaths(svg(p0)));
+  });
+});
+
+const projectOf = (kind: 'column' | 'xy', type: Chart['type']): Project => {
+  const table = kind === 'column' ? createColumnTable('C', true, 3) : createXyTable('X', true);
+  const chart = { ...createChart(table.id, undefined, type), id: 'c' };
+  return { id: 'p', name: 'p', dataTables: [table], charts: [chart] };
+};
+const withTicks = (p: Project, which: 'xAxis' | 'yAxis', extraTicks: ExtraTick[]): Project => patchAxis('c', which, { extraTicks })(p);
+const svgOf = (p: Project) => chartToSvgString(p.charts[0], p.dataTables[0]);
+
+describe('the settings of an added tick', () => {
+  it('are saved and read back; what is not valid is dropped, and no setting means the defaults', () => {
+    const all: ExtraTick = { value: 1.5, label: 'cut', showText: false, textAngle: 45, textOffsetPt: 6, showTick: false, tickSize: 'minor', tickDirection: 'both', tickWidthPt: 2, showGrid: true, gridWidthPt: 1.5, gridStyle: 'dashed', gridColor: '#ff0000', gridOver: true };
+    const p = withTicks(projectOf('column', 'bar'), 'yAxis', [all, { value: 2, label: '', textAngle: 500, tickDirection: 'sideways' as never, gridColor: 'red', showText: 'no' as never }]);
+    const back = parseProject(stringifyProject(p)).charts[0].yAxis.extraTicks!;
+    expect(back[0]).toEqual(all);
+    expect(back[1]).toEqual({ value: 2, label: '', textAngle: 90 });
+  });
+
+  it('turn the text of a tick off, away from the axis and round', () => {
+    const base = projectOf('column', 'bar');
+    const plain = svgOf(withTicks(base, 'yAxis', [{ value: 1.55, label: 'MARK' }]));
+    expect(plain).toContain('>MARK<');
+    expect(svgOf(withTicks(base, 'yAxis', [{ value: 1.55, label: 'MARK', showText: false }]))).not.toContain('>MARK<');
+    const turned = svgOf(withTicks(base, 'yAxis', [{ value: 1.55, label: 'MARK', textAngle: 30, textOffsetPt: 10 }]));
+    expect(turned).toMatch(/rotate\(30 [\d.-]+ [\d.-]+\)[^>]*>MARK</);
+  });
+
+  it('give a tick no mark, or a mark of its own thickness', () => {
+    const base = projectOf('xy', 'xyScatter');
+    const marks = (p: Project) => (svgOf(p).match(/stroke-width="7"/g) ?? []).length;
+    const none = withTicks(base, 'xAxis', [{ value: 4.5, label: '' }]);
+    const thick = withTicks(base, 'xAxis', [{ value: 4.5, label: '', tickWidthPt: 7 }]);
+    expect(marks(none)).toBe(0);
+    expect(marks(thick)).toBe(1);
+    const hidden = buildXyModel(withTicks(base, 'xAxis', [{ value: 4.5, label: '', showTick: false }]).charts[0], base.dataTables[0]);
+    expect(hidden.x.extraTicks?.get(4.5)?.showTick).toBe(false);
+  });
+
+  it('draw a gridline of their own, behind the data or in front of it, even with the axis gridlines off', () => {
+    const base = projectOf('column', 'bar');
+    const line = (over: boolean) => withTicks(base, 'yAxis', [{ value: 1.55, label: '', showGrid: true, gridColor: '#12ab34', gridWidthPt: 3, gridOver: over }]);
+    const behind = svgOf(line(false));
+    const front = svgOf(line(true));
+    expect(behind).toContain('stroke="#12ab34"');
+    expect(front).toContain('stroke="#12ab34"');
+    // In front, the line comes after the bars; behind, before them.
+    const bar = (s: string) => s.indexOf('<rect', s.indexOf('plot-area') + 20);
+    expect(behind.indexOf('#12ab34')).toBeLessThan(bar(behind) < 0 ? Infinity : bar(behind));
+    expect(front.indexOf('#12ab34')).toBeGreaterThan(behind.indexOf('#12ab34'));
+    // No gridline at all when it is switched off for the tick.
+    expect(svgOf(withTicks(base, 'yAxis', [{ value: 1.55, label: '', showGrid: false, gridColor: '#12ab34' }]))).not.toContain('#12ab34');
+  });
+});
+
+describe('added ticks on every chart with a numeric axis', () => {
+  it('are on the value axis of a bar chart, and a notice says when one is not drawn', () => {
+    const base = projectOf('column', 'bar');
+    const p = withTicks(base, 'yAxis', [{ value: 1.55, label: 'LOW' }, { value: 999, label: 'FAR' }]);
+    const m = buildColumnModel(p.charts[0], p.dataTables[0]);
+    expect(m.y.ticks).toContain(1.55);
+    expect(m.y.tickLabel(1.55)).toBe('LOW');
+    expect(m.warnings.join(' ')).toMatch(/1 extra tick is on the Y axis/);
   });
 });

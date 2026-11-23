@@ -1,4 +1,4 @@
-import { describeValuesCached, formatResult, type Descriptive } from '../../stats/descriptive';
+import { describeValuesCached, formatResult, type Descriptive } from '../../stats/summary';
 import { withoutExcluded } from '../table/exclusion';
 import { tableSeriesWidth, xySeries } from '../table/tableLayout';
 import { usesSeriesBlocks } from './chartTypes';

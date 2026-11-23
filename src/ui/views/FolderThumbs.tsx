@@ -3,7 +3,7 @@ import { prepareChartInput } from '../../model/table/preparedChart';
 import { framesOf, pageMm, panelLabel } from '../../model/project/layout';
 import type { Analysis, Chart, DataTable, Layout, Project } from '../../model/types';
 import { buildAnyModelCached, ChartCanvas } from '../../chart/anyModel';
-import { useFitsVersion } from '../components/useFitsVersion';
+import { useFitsVersion } from '../components/hooks';
 import { SvgIdPrefix } from '../../chart/shared/scene/idPrefix';
 
 /** The small pictures of a folder overview: what a page looks like, drawn from the page itself. */

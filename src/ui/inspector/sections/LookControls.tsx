@@ -1,12 +1,13 @@
 import { FRAME_STYLES, GRID_LIMITS, LINE_STYLES } from '../../../model/graph/look';
-import type { BarLabelMode, Chart, FrameStyle, InsideBarLabel, InsideLabelPosition, LineOrder, LineStyle } from '../../../model/types';
+import type { ReactNode } from 'react';
+import type { BarLabelMode, Chart, ChartStyle, FrameStyle, InsideBarLabel, InsideLabelPosition, LineOrder, LineStyle } from '../../../model/types';
 import { useCommands } from '../../../state/AppContext';
-import { patchLook } from '../../../state/commands';
-import { AUTO_BAR_GAP_PCT, AUTO_BAR_OUTER_PCT, BAR_LIMITS } from '../../../model/options/columnOptions';
-import { BAR_LABEL_MODES, INSIDE_LABEL_POSITIONS } from '../../../model/options/columnOptions';
+import { patchLook, patchBarLabels, patchBars, patchBothAxes } from '../../../state/commands';
+import { AUTO_BAR_GAP_PCT, AUTO_BAR_OUTER_PCT, BAR_LIMITS, BAR_LABEL_MODES, INSIDE_LABEL_POSITIONS } from '../../../model/options/columnOptions';
 import { BAR_LABEL_LIMITS } from '../../../chart/shared/parts/barLabels';
-import { patchBarLabels, patchBars, patchBothAxes } from '../../../state/commands';
-import { Check, ColorInput, Field, NumField, OptionalNumField, Section, SelectInput, TextInput } from '../common/controls';
+import { Check, ColorInput, Field, NumField, OptionalNumField, Section, SelectInput, TextInput, type Overridden } from '../common/controls';
+import { SymbolPicker } from '../common/SymbolPicker';
+import { DIRECTION_HINT } from '../common/summaryUi';
 import { SLIDERS } from '../common/sliderRanges';
 
 /** A colour that can also be transparent: the colour box is greyed out while it is. */
@@ -233,5 +234,72 @@ export function OffsetSection({ chart, autoStep }: { chart: Chart; autoStep: num
       <OptionalNumField label="Offset between traces" hint="In Y units; trace 1 stays where it is, trace 2 is lifted by one step, trace 3 by two. Auto: a little more than the largest range of a trace, so they do not overlap. Below 0 stacks them downward." value={chart.traceOffset} autoValue={autoStep} onCommit={(v) => run('Offset between traces', patchLook(chart.id, { traceOffset: v }), 'offset:step')} />
       <div className="muted small">The offset is written on the figure. Hide the Y axis and turn on its scale bar (Axes) to read the size of the traces.</div>
     </Section>
+  );
+}
+
+/** What the shared style fields below edit: the style as resolved for the data sets in scope, its override marks, and the edit. */
+interface StyleEdit {
+  st: ChartStyle;
+  ov: (key: keyof ChartStyle) => Overridden;
+  setStyle: (patch: Partial<ChartStyle>) => void;
+  /** The box is switched off: the fields are greyed out. */
+  disabled: boolean;
+}
+
+/** Colour, thickness and opacity of a line (a connecting line, a mean or centre line, the lines joining the rows); `colourLocked`: the colour comes from elsewhere. */
+export function LineLookFields({ st, ov, setStyle, disabled, colourLocked = false }: StyleEdit & { colourLocked?: boolean }) {
+  return (
+    <>
+      <Field label="Colour" overridden={ov('lineColor')}>
+        <ColorInput value={st.lineColor} disabled={disabled || colourLocked} onChange={(v) => setStyle({ lineColor: v })} />
+      </Field>
+      <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={20} disabled={disabled} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
+      <NumField {...SLIDERS.fraction} label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={disabled} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
+    </>
+  );
+}
+
+/**
+ * The look of the symbols: colour (which colours the border too, as a palette does; Border colour can then differ), shape, size,
+ * fill and border. `afterSize` goes after the size (the size legend of bubbles); `colourNote` explains a colour that is set elsewhere.
+ */
+export function SymbolLookFields({ st, ov, setStyle, disabled, colourLocked = false, colourNote = null, sizeLabel = 'Size', sizeHint, afterSize }: StyleEdit & { colourLocked?: boolean; colourNote?: string | null; sizeLabel?: string; sizeHint?: string; afterSize?: ReactNode }) {
+  return (
+    <>
+      <Field label="Colour" overridden={ov('symbolColor')} note={colourNote}>
+        <ColorInput value={st.symbolColor} disabled={disabled || colourLocked} onChange={(v) => setStyle({ symbolColor: v, symbolBorderColor: v })} />
+      </Field>
+      <Field label="Shape" overridden={ov('symbolShape')}>
+        <SymbolPicker shape={st.symbolShape} fillOpacity={st.symbolFillOpacity} disabled={disabled} onChange={setStyle} />
+      </Field>
+      <NumField {...SLIDERS.symbol} label={sizeLabel} unit="pt" value={st.symbolSizePt} min={2} max={60} disabled={disabled} overridden={ov('symbolSizePt')} {...(sizeHint ? { hint: sizeHint } : {})} onCommit={(v) => setStyle({ symbolSizePt: v })} />
+      {afterSize}
+      <NumField {...SLIDERS.fraction} label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={disabled} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
+      <Field label="Border colour" overridden={ov('symbolBorderColor')}>
+        <ColorInput value={st.symbolBorderColor} disabled={disabled || colourLocked} onChange={(v) => setStyle({ symbolBorderColor: v })} />
+      </Field>
+      <NumField {...SLIDERS.line} label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={20} disabled={disabled} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
+      <NumField {...SLIDERS.fraction} label="Border opacity" value={st.symbolBorderOpacity} min={0} max={1} disabled={disabled} overridden={ov('symbolBorderOpacity')} onCommit={(v) => setStyle({ symbolBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
+    </>
+  );
+}
+
+/** The look of error bars: colour, cap, direction, thickness and opacity (what they show is set above them, with the summary). */
+export function ErrorBarLookFields({ st, ov, setStyle, disabled }: StyleEdit) {
+  return (
+    <>
+      <Field label="Colour" overridden={ov('errorColor')}>
+        <ColorInput value={st.errorColor} disabled={disabled} onChange={(v) => setStyle({ errorColor: v })} />
+      </Field>
+      <Field label="Cap style" overridden={ov('errorCap')}>
+        <SelectInput value={st.errorCap} disabled={disabled} options={[{ value: 'bar', label: 'Bar' }, { value: 'none', label: 'None' }]} onChange={(v) => setStyle({ errorCap: v })} />
+      </Field>
+      <NumField {...SLIDERS.cap} label="Cap width" unit="pt" value={st.errorCapWidthPt} min={0} max={40} disabled={disabled || st.errorCap === 'none'} overridden={ov('errorCapWidthPt')} onCommit={(v) => setStyle({ errorCapWidthPt: v })} />
+      <Field label="Direction" overridden={ov('errorDirection')} hint={DIRECTION_HINT}>
+        <SelectInput value={st.errorDirection} disabled={disabled} options={[{ value: 'both', label: 'Both' }, { value: 'positive', label: 'Above' }, { value: 'negative', label: 'Below' }]} onChange={(v) => setStyle({ errorDirection: v })} />
+      </Field>
+      <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={20} disabled={disabled} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
+      <NumField {...SLIDERS.fraction} label="Opacity" value={st.errorOpacity} min={0} max={1} disabled={disabled} overridden={ov('errorOpacity')} onCommit={(v) => setStyle({ errorOpacity: v })} hint="0 = transparent, 1 = opaque" />
+    </>
   );
 }

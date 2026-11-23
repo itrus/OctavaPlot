@@ -1,5 +1,5 @@
 import type { Project } from '../types';
-import type { ViewRef } from '../editor/types';
+import type { ViewRef } from '../selection';
 
 /** The pages of the project in the order of the navigator: tables, results, graphs, layouts. */
 export function viewOrder(p: Project): ViewRef[] {

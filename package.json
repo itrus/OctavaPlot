@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "loc": "node scripts/loc-history.mjs --chart",
     "e2e": "playwright test --config e2e/playwright.config.ts",
-    "perf": "node scripts/perf.mjs"
+    "perf": "playwright test --config e2e/playwright.config.ts",
+    "knip": "knip"
   },
   "dependencies": {
     "d3": "^7.9.0",
@@ -29,6 +30,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "knip": "^6.48.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"

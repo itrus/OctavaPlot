@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { CentreKind, InvalidPolicy, SmallSamplePolicy, SpreadKind } from '../../../model/types';
-import { centreName } from '../../../model/presentation/summaryText';
+import { centreName } from '../../../model/graph/summary';
 import { confidencePercentText, describeSummaryControls, parseConfidencePercent, spreadSelectModel } from '../common/summaryUi';
 import { Check, Field, FieldInput, type Overridden, SelectInput } from '../common/controls';
 

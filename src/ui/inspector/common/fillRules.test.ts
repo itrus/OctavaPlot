@@ -25,11 +25,11 @@ describe('spacing and width rules', () => {
     expect(widthError(1, 8, 'horizontal')).toBeNull();
     expect(spacingError(2, 2)).toBeNull();
   });
-  it('labels the P limit', () => {
-    expect(spacingError(1, 0.2)).toContain('P limit');
-    expect(spacingError(120, 1)).toContain('P limit');
-    expect(widthError(12, 100, 'horizontal')).toContain('P limit');
-    expect(widthError(0.1, 8, 'horizontal')).toContain('P limit');
+  it('names the limits', () => {
+    expect(spacingError(1, 0.2)).toMatch(/between [0-9.]+ and [0-9.]+ pt/);
+    expect(spacingError(120, 1)).toMatch(/between [0-9.]+ and [0-9.]+ pt/);
+    expect(widthError(12, 100, 'horizontal')).toMatch(/between [0-9.]+ and [0-9.]+ pt/);
+    expect(widthError(0.1, 8, 'horizontal')).toMatch(/between [0-9.]+ and [0-9.]+ pt/);
   });
   it('rejects non-positive and non-finite values', () => {
     expect(spacingError(0, 1)).toContain('positive');

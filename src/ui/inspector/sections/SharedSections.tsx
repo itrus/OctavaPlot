@@ -2,17 +2,17 @@ import { useEffect, useMemo } from 'react';
 import { SIZE_PRESETS, applyAspect, presetOf, resizeChart } from '../../../model/graph/aspect';
 import { graphSources, type GraphSource } from '../../../model/table/chartTable';
 import { AXIS_LIMITS } from '../../../model/graph/axis';
-import { FONT_FAMILIES } from '../../../model/graph/look';
+import { FONT_FAMILIES, LINE_STYLES } from '../../../model/graph/look';
 import { CHART_PX_MAX, CHART_PX_MIN, chartTextLook, createAnnotation } from '../../../model/defaults';
 import { AnnotationEditor } from './AnnotationEditor';
 import { DrawingList } from './DrawingEditor';
-import { focusWhenShown } from '../common/pendingFocus';
+import { focusWhenShown } from '../common/nav';
 import { newId } from '../../../model/ids';
 import { type AnnotationPlacer, nudgePatches } from '../../../chart/shared/scene/annotationPlace';
 import { RESULT_STATS, resultValue } from '../../../model/graph/resultTokens';
-import { mixedAnnotationKeys, selectedAnnotationIds, toggleAnnotationSelection } from '../../../model/graph/selection/multi';
+import { mixedAnnotationKeys, selectedAnnotationIds, toggleAnnotationSelection } from '../../../model/selection';
 import { capabilitiesOf } from '../../../model/graph/capabilities';
-import type { Annotation, Chart, Group, Id, ResultStat } from '../../../model/types';
+import type { Annotation, Chart, Group, Id, ResultStat, LineStyle } from '../../../model/types';
 import { useCommands, useProject, useSelection } from '../../../state/AppContext';
 import {
   addAnnotation,
@@ -39,11 +39,9 @@ import {
   setLegendOffset,
   setLegendItemVisible,
 } from '../../../state/commands';
-import { LINE_STYLES } from '../../../model/graph/look';
-import type { LineStyle } from '../../../model/types';
 import { Check, ColorInput, Field, GroupBox, NumField, Section, SelectInput, SubHeading, TextInput } from '../common/controls';
 import { BarLabelSection, hasBarLabels } from './LookControls';
-import { LegendOrder } from './LegendOrder';
+import { LegendOrder } from './DataSets';
 import { LEGEND_MAX_COLUMNS, LEGEND_MAX_OFFSET_PT, legendColumns, legendOffset } from '../../../model/graph/legendEntries';
 import { displayName } from '../../../chart/shared/parts/names';
 import { prepareChartInput } from '../../../model/table/preparedChart';
@@ -240,7 +238,6 @@ export function LegendSection({ chart, groups }: { chart: Chart; groups: Readonl
   );
 }
 
-/** Lines at chosen values of the axes: a threshold, a target, a control level. */
 /** What the text fields that can hold a result say about it. */
 const RESULT_HINT = 'A result of a data set can be written in the text, as {{n Control}}, {{mean Control}} or {{sd Control|2}} (n, sum, mean, sd, sem, median, min, max; a number of decimals after a bar). It is filled when the graph is drawn, so it follows the data.';
 
@@ -248,17 +245,17 @@ const RESULT_HINT = 'A result of a data set can be written in the text, as {{n C
 export function ReferenceLinesSection({ chart }: { chart: Chart }) {
   const { run } = useCommands();
   const { project } = useProject();
-  const lines = capabilitiesOf(chart.type).referenceLines;
-  if (lines === 'none') return null;
-  const table = prepareChartInput(project, chart)?.table;
-  const groups = table?.groups ?? [];
-  const hasX = lines === 'xy';
   // A line clicked on the graph is the one picked here, and is brought into view.
   const { selection } = useSelection();
   const picked = selection.kind === 'referenceLine' ? selection.lineId : null;
   useEffect(() => {
     if (picked) document.getElementById(`ref-card-${picked}`)?.scrollIntoView({ block: 'nearest' });
   }, [picked]);
+  const lines = capabilitiesOf(chart.type).referenceLines;
+  if (lines === 'none') return null;
+  const table = prepareChartInput(project, chart)?.table;
+  const groups = table?.groups ?? [];
+  const hasX = lines === 'xy';
   const oblique = capabilitiesOf(chart.type).guides;
   const add = (axis: 'x' | 'y') => run('Add reference line', addReferenceLine(chart.id, { id: newId('ref'), axis, value: 0, color: '#000000', widthPt: 4, style: 'dotted', opacity: 1, label: '', showLabel: true, labelAt: 'end', onTop: true }));
   // An oblique line: y = intercept + slope * x; the identity line is the one with slope 1 and intercept 0.
@@ -319,7 +316,7 @@ export function ReferenceLinesSection({ chart }: { chart: Chart }) {
             <Field label="Label" hint={RESULT_HINT}>
               <TextInput value={l.label} onChange={(v) => set('Reference line label', { label: v }, 'label')} />
             </Field>
-            <Field label="Label" hint="Outside the plotting box: the end of the line is right of a horizontal line and above a vertical one; the beginning is left of it and below it. An oblique line has its label at its end, inside the plot.">
+            <Field label="Label position" hint="Outside the plotting box: the end of the line is right of a horizontal line and above a vertical one; the beginning is left of it and below it. An oblique line has its label at its end, inside the plot.">
               <SelectInput<'none' | 'end' | 'start'>
                 value={!l.showLabel ? 'none' : l.slope === undefined && l.labelAt === 'start' ? 'start' : 'end'}
                 options={[{ value: 'none', label: 'No label' }, { value: 'end', label: 'End of the line' }, ...(l.slope === undefined ? [{ value: 'start' as const, label: 'Beginning of the line' }] : [])]}

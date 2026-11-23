@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DURATION_UNITS, TIME_KINDS, timeColumn, type TimeColumn, type TimeKind, type TimeUnit } from '../../util/timeColumn';
 import { Field, SelectInput } from '../inspector/common/controls';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 type Choice = TimeKind | 'number';
 

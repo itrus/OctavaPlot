@@ -1,10 +1,12 @@
-import type { YAxisScale } from '../../../chart/shared/axes/scales';
+import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext, type YAxisScale } from '../../../chart/shared/axes/scales';
+import { capabilitiesOf } from '../../../model/graph/capabilities';
+import { ExtraTicksControls } from './ExtraTicksControls';
 import { AXIS_LIMITS, AXIS_SCALES, BREAK_MARKS, MAX_BREAKS, NUMBER_FORMATS, TICK_DIRECTIONS } from '../../../model/graph/axis';
-import type { AxisBreak, AxisScaleKind, BreakMark, Chart, NumberFormatKind, TickDirection } from '../../../model/types';
+import type { AxisBreak, AxisConfig, AxisScaleKind, BreakMark, Chart, NumberFormatKind, TickDirection } from '../../../model/types';
 import { useCommands } from '../../../state/AppContext';
-import { patchAxis, type AxisKey } from '../../../state/commands';
-import { Check, Field, NumField, Section, SelectInput, TextInput } from '../common/controls';
-import { TimeField } from '../common/TimeField';
+import { patchAxis, patchChart, type AxisKey } from '../../../state/commands';
+import { Check, Field, NumField, OptionalNumField, Section, SelectInput, TextInput } from '../common/controls';
+import { TimeField, timeLimitChecks } from '../common/TimeField';
 import type { TimeColumn } from '../../../util/timeColumn';
 import { SLIDERS } from '../common/sliderRanges';
 
@@ -22,7 +24,7 @@ function useAxisEdit(chart: Chart, which: AxisKey, name: string): (label: string
  * where a log scale makes no sense (stacked parts, percentages, survival curves); `canReverse` for those where the
  * drawing depends on the direction (the survival at-risk table).
  */
-export function AxisStyleControls({
+function AxisStyleControls({
   chart,
   which,
   scale,
@@ -214,5 +216,51 @@ function BreakFields({ chart, which, name, scale, blocked, time }: { chart: Char
       </Field>
       <div className="muted small">The values inside a break are left out of the axis, and what is drawn across it is cut off.</div>
     </Section>
+  );
+}
+
+const axisCtx = (axis: AxisConfig, scale: YAxisScale): AxisEditContext => ({ min: axis.min, max: axis.max, majorInterval: axis.majorInterval, domain: scale.domain, log: scale.log });
+
+/** Range, limits and ticks of one numeric axis: Auto fits the data, Manual uses the limits. */
+export function AxisLimits({ chart, which, scale, name, canScale = true, canReverse = true, time }: { chart: Chart; which: 'xAxis' | 'yAxis' | 'y2Axis'; scale: YAxisScale; name: string; canScale?: boolean; canReverse?: boolean; time?: TimeColumn }) {
+  const { run } = useCommands();
+  const axis = chart[which];
+  const ctx = axisCtx(axis, scale);
+  const tag = which === 'xAxis' ? 'x' : 'y';
+  return (
+    <>
+      <Field label="Range" hint="Auto fits the axis to the data; Manual uses the limits below">
+        <SelectInput<'auto' | 'manual'>
+          value={axis.min === null && axis.max === null ? 'auto' : 'manual'}
+          options={[
+            { value: 'auto', label: 'Auto' },
+            { value: 'manual', label: 'Manual' },
+          ]}
+          onChange={(v) => run(`${name} range`, patchAxis(chart.id, which, v === 'auto' ? { min: null, max: null } : { min: axis.min ?? scale.domain[0], max: axis.max ?? scale.domain[1] }))}
+        />
+      </Field>
+      {time ? (
+        <>
+          <TimeField optional label={`${name} minimum`} time={time} value={axis.min} autoValue={scale.domain[0]} validate={timeLimitChecks(time, axis.min, axis.max, scale.domain).min} onCommit={(v) => run(`${name} minimum`, patchAxis(chart.id, which, { min: v }), `axis:${tag}min`)} />
+          <TimeField optional label={`${name} maximum`} time={time} value={axis.max} autoValue={scale.domain[1]} validate={timeLimitChecks(time, axis.min, axis.max, scale.domain).max} onCommit={(v) => run(`${name} maximum`, patchAxis(chart.id, which, { max: v }), `axis:${tag}max`)} />
+        </>
+      ) : (
+        <>
+          <OptionalNumField label={`${name} minimum`} value={axis.min} autoValue={scale.domain[0]} validate={(v) => validateAxisMin(v, ctx)} onCommit={(v) => run(`${name} minimum`, patchAxis(chart.id, which, { min: v }), `axis:${tag}min`)} />
+          <OptionalNumField label={`${name} maximum`} value={axis.max} autoValue={scale.domain[1]} validate={(v) => validateAxisMax(v, ctx)} onCommit={(v) => run(`${name} maximum`, patchAxis(chart.id, which, { max: v }), `axis:${tag}max`)} />
+          <OptionalNumField label="Major tick interval" value={axis.majorInterval} autoValue={majorStepOf(scale)} validate={(v) => validateAxisInterval(v, ctx)} onCommit={(v) => run(`${name} tick interval`, patchAxis(chart.id, which, { majorInterval: v }), `axis:${tag}int`)} />
+        </>
+      )}
+      <Field label="Major gridlines" note={which === 'y2Axis' && axis.showGrid && chart.yAxis.showGrid ? 'Drawn dashed to tell them apart from the left gridlines.' : null}>
+        <Check checked={axis.showGrid} onChange={(v) => run(`${name} gridlines`, patchAxis(chart.id, which, { showGrid: v }))} />
+      </Field>
+      {which !== 'y2Axis' && <ExtraTicksControls chart={chart} which={which} scale={scale} name={name} time={time} />}
+      {capabilitiesOf(chart.type).guides && which === 'xAxis' && (
+        <Field label="Equal units" hint="One unit of X is as long as one unit of Y, so that the identity line runs at 45 degrees. The axis with more room is widened; it needs linear axes with no omitted range">
+          <Check checked={chart.equalUnits === true} onChange={(v) => run('Equal units', patchChart(chart.id, { equalUnits: v ? true : undefined }))} />
+        </Field>
+      )}
+      <AxisStyleControls chart={chart} which={which} scale={scale} name={name} canScale={canScale} canReverse={canReverse} time={time} />
+    </>
   );
 }

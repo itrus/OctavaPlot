@@ -1,5 +1,5 @@
 import { isSurvivalChartType } from '../../model/graph/chartTypes';
-import { omittedRangeWarnings } from '../shared/axes/axisScale';
+import { omittedRangeWarnings, axisMapper, placeable, resolveAxis, stepPathThroughBreaks } from '../shared/axes/axisScale';
 import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { DEFAULT_BAND_OPACITY, layersOf } from '../../model/graph/layers';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
@@ -10,10 +10,9 @@ import type { Chart, DataTable, SurvivalBandMethod } from '../../model/types';
 import { chartPx2Pt, n2 } from '../../model/units';
 import { normalQuantile } from '../../stats/special';
 import { chartLayout } from '../shared/parts/layout';
-import { axisMapper, placeable, resolveAxis, stepPathThroughBreaks } from '../shared/axes/axisScale';
 import type { AtRiskTable, XyModel, XyPoint, XySeries } from '../xy/xyModel';
 import { displayName } from '../shared/parts/names';
-import { attachLazyScene } from '../xy/xyScene';
+import { attachLazyScene } from '../xy/xyDrawing';
 
 interface SurvivalStep {
   /** Time of an event (the estimate drops here). */

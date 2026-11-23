@@ -1,5 +1,5 @@
 import { capabilitiesOf } from '../../model/graph/capabilities';
-import { omittedRangeWarnings } from '../shared/axes/axisScale';
+import { omittedRangeWarnings, axisMapper, inBreak, onAxis, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import { isXyChartType } from '../../model/graph/chartTypes';
 import { layerLook, layersOf, type LayerKind, type LayerSpec } from '../../model/graph/layers';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
@@ -17,7 +17,6 @@ import { buildErrorBar, buildXErrorBar, clippedEndpointCount, errorEndValues, is
 import { chartLayout, type Layout } from '../shared/parts/layout';
 import { curveYValues, drawFit, runFit, type FittedCurve } from './fitCurve';
 import { type Scene } from '../shared/scene/scene';
-import { axisMapper, inBreak, onAxis, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import { withExtraTicksNoted } from '../shared/axes/extraTicks';
 import { resolveTimeAxis } from '../shared/axes/timeAxis';
 import type { YAxisScale } from '../shared/axes/scales';
@@ -26,7 +25,7 @@ import { displayName } from '../shared/parts/names';
 import { AUTO_BAR_GAP_PCT } from '../../model/options/columnOptions';
 import { suppliedStats } from '../../model/table/suppliedStats';
 import { offsetStepOf, offsetTable } from '../../model/table/offset';
-import { attachLazyScene } from './xyScene';
+import { attachLazyScene } from './xyDrawing';
 import { type SizeKey, sizeKeyOf } from '../shared/scene/sizeLegend';
 
 /** One plotted point of an XY series: a single Y value, or the centre of replicate / supplied-summary values. */

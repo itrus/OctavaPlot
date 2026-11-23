@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 /** Asks for the factor (the second grouping level) of the selected series; an empty name clears it. */
 export function FactorDialog({ series, current, onSet, onClose }: { series: number; current: string; onSet: (factor: string) => void; onClose: () => void }) {

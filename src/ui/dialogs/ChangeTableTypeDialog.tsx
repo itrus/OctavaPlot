@@ -3,7 +3,7 @@ import { tableTypeInfo } from '../../model/graph/chartTypes';
 import { layoutOf } from '../../model/table/tableLayout';
 import { kindChangeEffects } from '../../model/table/tableKind';
 import type { DataTable, Project, ReplicateLayout, TableKind } from '../../model/types';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 import { choiceOfLayout, isValidReplicates, layoutOfChoice, TableLayoutOptions, type LayoutChoice } from './TableLayoutOptions';
 
 const KINDS: readonly TableKind[] = ['column', 'grouped', 'xy', 'contingency', 'survival'];

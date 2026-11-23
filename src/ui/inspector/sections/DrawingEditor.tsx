@@ -6,7 +6,7 @@ import { FONT_FAMILIES, LINE_STYLES } from '../../../model/graph/look';
 import type { Drawing, LineEnd, LineRoute, LineStyle } from '../../../model/types';
 import { DeleteIcon } from '../../components/icons';
 import { Check, ColorInput, Field, GroupBox, NumField, SelectInput } from '../common/controls';
-import { takeFocusRequest } from '../common/pendingFocus';
+import { takeFocusRequest } from '../common/nav';
 import { SLIDERS } from '../common/sliderRanges';
 import { briefText, QuickTexts } from './AnnotationEditor';
 
@@ -85,7 +85,7 @@ function DrawingEditor({ drawing: d, placer, fontLabel, onPatch, onDelete }: {
               onChange={(v) => set('Shape font', { fontFamily: v === '' ? undefined : v })}
             />
           </Field>
-          <Field label="Text color" hint="Unless one is chosen, the text has the colour of the line">
+          <Field label="Text colour" hint="Unless one is chosen, the text has the colour of the line">
             <ColorInput value={d.textColor ?? d.color} ariaLabel="Text colour" onChange={(v) => set('Shape text colour', { textColor: v === d.color ? undefined : v }, 'textColor')} />
           </Field>
           <NumField {...SLIDERS.font} label="Font size" unit="pt" value={d.fontSizePt ?? 12} min={DRAWING_LIMITS.fontSizePt.min} max={DRAWING_LIMITS.fontSizePt.max} onCommit={(v) => set('Shape text size', { fontSizePt: v }, 'size')} />
@@ -104,7 +104,7 @@ function DrawingEditor({ drawing: d, placer, fontLabel, onPatch, onDelete }: {
         <Field label="Pattern">
           <SelectInput<LineStyle> value={d.lineStyle} options={LINE_STYLES.map((o) => ({ value: o.value, label: o.label }))} onChange={(v) => set('Shape pattern', { lineStyle: v })} />
         </Field>
-        <Field label="Line color">
+        <Field label="Line colour">
           <ColorInput value={d.color} ariaLabel="Line colour" onChange={(v) => set('Shape colour', { color: v }, 'color')} />
         </Field>
         <NumField {...SLIDERS.fraction} label="Opacity" value={d.opacity} min={0} max={1} onCommit={(v) => set('Shape opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />
@@ -183,7 +183,7 @@ export function DrawingList({ drawings, picked, onPick, onPatch, onRemove, place
       {chosen.length > 1 && (
         <GroupBox title={`Selected shapes and lines (${chosen.length})`}>
           <div className="muted small">These objects are edited together. Ctrl or Shift on an object, on the page or in the list, takes it in or out; dragging one or the arrow keys move them together.</div>
-          <Field label="Line color" overridden={{ mixed: differ('color') }}>
+          <Field label="Line colour" overridden={{ mixed: differ('color') }}>
             <ColorInput value={chosen[0].color} ariaLabel="Line colour" onChange={(v) => onPatch(chosen.map((d) => d.id), 'Shape colour', { color: v }, `drw:${chosen.map((d) => d.id).join()}:color`)} />
           </Field>
           <NumField {...SLIDERS.line} label="Line width" unit="pt" value={chosen[0].widthPt} min={DRAWING_LIMITS.widthPt.min} max={DRAWING_LIMITS.widthPt.max} overridden={{ mixed: differ('widthPt') }} onCommit={(v) => onPatch(chosen.map((d) => d.id), 'Shape line width', { widthPt: v }, `drw:${chosen.map((d) => d.id).join()}:width`)} />

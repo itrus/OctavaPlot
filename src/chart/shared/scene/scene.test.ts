@@ -12,7 +12,7 @@ import { type Scene, sceneTargets } from './scene';
 import type { SceneElement } from './sceneElement';
 import { svgId } from './svgIds';
 import { buildXyModel } from '../../xy/xyModel';
-import { compileXyScene } from '../../xy/xyScene';
+import { compileXyScene } from '../../xy/xyDrawing';
 
 /** `at` is a value inside the range of the axis, so that the reference line is drawn. */
 const project = (kind: TableKind, type: ChartType, at = 5, layout?: Parameters<typeof addDataTable>[2]): Project => {

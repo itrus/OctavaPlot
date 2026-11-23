@@ -138,3 +138,37 @@ test.describe('export', () => {
     await expect(page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' })).toHaveAttribute('aria-selected', 'true');
   });
 });
+
+test.describe('keys a control has already used', () => {
+  test('F2 in the grid edits the cell and does not also rename the table', async ({ page }) => {
+    await openApp(page);
+    await cell(page, 1, 1).click();
+    await page.keyboard.press('F2');
+    await expect(page.getByRole('grid', { name: 'Data table' }).locator('input.cell-input')).toBeFocused();
+    await expect(page.locator('.nav-rename')).toHaveCount(0);
+  });
+
+  test('Alt and an arrow key move a selected annotation by 0.1 %', async ({ page }) => {
+    await openApp(page);
+    await openGraph(page);
+    await page.getByRole('tab', { name: 'Notes' }).click();
+    await page.getByRole('button', { name: '+ Add text annotation' }).click();
+    const left = page.getByRole('textbox', { name: 'Left', exact: true });
+    const before = Number(await left.inputValue());
+    await page.locator('.chart-surface [data-hit="annotation"]').first().click();
+    await page.locator('.chart-surface').focus();
+    await page.keyboard.press('Alt+ArrowRight');
+    await expect.poll(async () => Number(await left.inputValue())).toBeCloseTo(before + 0.1, 5);
+  });
+
+  test('the arrow keys move between the tabs of the Info window, and the focus stays on the tab', async ({ page }) => {
+    await openApp(page);
+    await page.getByRole('menubar').getByRole('menuitem', { name: 'Help' }).click();
+    await page.getByRole('menuitem', { name: 'About OctavaPlot…' }).click();
+    await page.getByRole('dialog', { name: 'Info' }).getByRole('tab', { name: 'About' }).focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('tab', { name: 'Colours' })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('tab', { name: 'Memory' })).toBeFocused();
+  });
+});

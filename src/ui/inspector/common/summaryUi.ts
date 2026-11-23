@@ -1,6 +1,6 @@
 /** Inspector controls and captions for statistical summaries. */
 import type { CentreKind, SpreadKind, SummarySpec } from '../../../model/types';
-import { describeSummary } from '../../../model/presentation/summaryText';
+import { describeSummary } from '../../../model/graph/summary';
 import { SPREADS_BY_CENTRE, SPREAD_NAME, centreLower, effectiveSpreadOf, formatPercent, type GroupStats } from '../../../stats/summary';
 
 const SPREAD_OPTION_LABEL: Record<SpreadKind, string> = {

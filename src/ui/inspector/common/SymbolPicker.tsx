@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { useDismiss } from '../../components/useDismiss';
+import { useDismiss } from '../../components/hooks';
 import { createPortal } from 'react-dom';
 import { symbolPath } from '../../../chart/shared/parts/symbols';
 import { SYMBOL_SHAPES } from '../../../model/graph/look';

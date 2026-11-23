@@ -111,6 +111,24 @@ describe('presentation repairs are reset with a note that has the path', () => {
     expect(project.layouts?.[0].panels.every((x) => x === null)).toBe(true);
     expect(notes.some((n) => n.startsWith('project.layouts[0].panels[0]'))).toBe(true);
   });
+  it('a broken link further along a chain removes that link only', () => {
+    const text = edit((j) => {
+      j.project.charts[0].linkedTo = j.project.charts[1].id;
+      j.project.charts[1].linkedTo = 'gone';
+    });
+    const { project, notes } = parseProjectWithNotes(text);
+    expect(project.charts[0].linkedTo).toBe(project.charts[1].id);
+    expect(project.charts[1].linkedTo).toBeUndefined();
+    expect(notes.filter((n) => n.includes('linkedTo'))).toEqual([expect.stringMatching(/^project\.charts\[1\]\.linkedTo/)]);
+  });
+  it('a circle of links is removed', () => {
+    const text = edit((j) => {
+      j.project.charts[0].linkedTo = j.project.charts[1].id;
+      j.project.charts[1].linkedTo = j.project.charts[0].id;
+    });
+    const { project } = parseProjectWithNotes(text);
+    expect(project.charts.map((c) => c.linkedTo)).toEqual([undefined, undefined]);
+  });
   it('every note starts with a path', () => {
     const text = edit((j) => {
       j.project.charts[0].linkedTo = 'gone';

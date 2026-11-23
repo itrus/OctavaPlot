@@ -5,7 +5,7 @@ import { LABEL_DECIMALS_LIMITS, LABEL_FONT_LIMITS, LABEL_OFFSET_LIMITS } from '.
 import { CHART_TYPES, chartTypeInfo } from '../model/graph/chartTypes';
 import { defaultChartTypeFor } from '../model/graph/chartGallery';
 import { sanitizeFillKeys } from '../model/graph/fill';
-import { sanitizeAxis } from '../model/graph/axis';
+import { LINE_STYLE_VALUES, sanitizeAxis } from '../model/graph/axis';
 import { DEFAULT_PALETTE_ID, paletteById } from '../model/graph/palettes';
 import { analysisTypeInfo } from '../model/project/analysis';
 import { FIT_MODEL_IDS, sanitizeDegree } from '../model/options/fitOptions';
@@ -18,11 +18,11 @@ import { sanitizeOrder } from '../model/table/groupOrder';
 import { sanitizeSummary, sanitizeSummaryPatch } from '../model/graph/summary';
 import { RESULT_STATS } from '../model/graph/resultTokens';
 import { defaultLayout, sanitizeLayout } from '../model/project/layout';
-import { checkProjectSize, parseTable, writeProject } from './tableFile/tableCodec';
-import { arr, fail, isObj, obj, str, type Obj } from './tableFile/fileChecks';
+import { checkProjectSize, parseTable, writeProject, arr, fail, isObj, obj, str, type Obj } from './tableCodec';
 import { highlightOf } from '../model/project/highlight';
 import { FILE_FORMAT, FILE_VERSION, migrateRead, migrateShape, upgradeToCurrent } from './migrate';
 import type { Analysis, Chart, ChartLayer, Drawing, DrawingPoint, LineEnd, LineStyle, Layout, ChartType, SurvivalOptions, DataTable, Id, Project, ResultStat, SummarySpec } from '../model/types';
+import { isHex } from '../model/sanitize';
 
 /** The envelope of a project file (.oplot): this format, and the version written (earlier ones are read: see migrate.ts). */
 const FORMAT = FILE_FORMAT;
@@ -53,7 +53,7 @@ function parseSurvival(raw: unknown): SurvivalOptions {
 /** Enum-valued style keys; an invalid stored value is dropped (the default applies) and noted. */
 const STYLE_ENUMS: Record<string, readonly string[]> = {
   symbolShape: SYMBOL_SHAPES.map((o) => o.value),
-  lineStyle: ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'],
+  lineStyle: LINE_STYLE_VALUES,
   errorDirection: ['both', 'positive', 'negative'],
   errorCap: ['bar', 'none'],
   axisBinding: ['primary', 'secondary'],
@@ -85,7 +85,7 @@ function cleanLabelKeys(out: Obj, path: string, notes: string[]): void {
   }
   if (has('pointLabelColor') && out.pointLabelColor !== null) {
     const c = out.pointLabelColor;
-    if (!(typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c))) reset('pointLabelColor');
+    if (!isHex(c)) reset('pointLabelColor');
   }
   if (has('pointLabelDecimals') && out.pointLabelDecimals !== null) {
     const d = out.pointLabelDecimals;
@@ -178,28 +178,41 @@ function cleanDisplayNames(raw: unknown, path: string, notes: string[]): Record<
 const finiteOr = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 
 /** Annotations: every field checked; an entry that cannot be read, or repeats an ID, is dropped and noted. */
-function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['annotations'] {
+/**
+ * The entries of a list of a chart or page, read one by one: an entry that is not an object, has no ID or one used before, or that
+ * `readOne` cannot read (null) is dropped, with a note. A list that is not a list is reset, with a note; a missing list is empty.
+ */
+function cleanList<T extends { id: string }>(raw: unknown, path: string, notes: string[], readOne: (o: Obj & { id: string }, at: string) => T | null): T[] {
   if (raw === undefined) return [];
   if (!Array.isArray(raw)) {
     notes.push(`${path} was not a list and was reset.`);
     return [];
   }
-  const out: Chart['annotations'] = [];
+  const out: T[] = [];
   const seen = new Set<string>();
-  raw.forEach((a, i) => {
-    if (!isObj(a) || typeof a.id !== 'string' || a.id === '' || seen.has(a.id)) {
-      notes.push(`${path}[${i}] could not be read and was dropped.`);
+  raw.forEach((o, i) => {
+    const at = `${path}[${i}]`;
+    const item = isObj(o) && typeof o.id === 'string' && o.id !== '' && !seen.has(o.id) ? readOne(o as Obj & { id: string }, at) : null;
+    if (!item) {
+      notes.push(`${at} could not be read and was dropped.`);
       return;
     }
-    seen.add(a.id);
+    seen.add(item.id);
+    out.push(item);
+  });
+  return out;
+}
+
+function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['annotations'] {
+  return cleanList(raw, path, notes, (a, at) => {
     const text = typeof a.text === 'string' ? a.text : typeof a.text === 'number' && Number.isFinite(a.text) ? String(a.text) : '';
-    const color = typeof a.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(a.color) ? a.color : '#000000';
+    const color = isHex(a.color) ? a.color : '#000000';
     const size = finiteOr(a.fontSizePt, 24);
     // A data anchor needs at least one value on the axes; without one the text stays where the page puts it.
     const hasX = typeof a.x === 'number' && Number.isFinite(a.x);
     const hasY = typeof a.y === 'number' && Number.isFinite(a.y);
-    if (a.anchor === 'data' && !hasX && !hasY) notes.push(`${path}[${i}] was anchored to data without a value and was placed on the page.`);
-    out.push({
+    if (a.anchor === 'data' && !hasX && !hasY) notes.push(`${at} was anchored to data without a value and was placed on the page.`);
+    return {
       id: a.id,
       text,
       xFrac: Math.min(1, Math.max(0, finiteOr(a.xFrac, 0.5))),
@@ -215,49 +228,34 @@ function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['a
       ...(typeof a.fontFamily === 'string' && FONT_FAMILIES.some((f) => f.value === a.fontFamily) ? { fontFamily: a.fontFamily } : {}),
       ...(a.align === 'center' || a.align === 'right' ? { align: a.align } : {}),
       ...(typeof a.lineSpacing === 'number' && Number.isFinite(a.lineSpacing) ? { lineSpacing: Math.min(ANNOTATION_LINE_SPACING.max, Math.max(ANNOTATION_LINE_SPACING.min, a.lineSpacing)) } : {}),
-    });
+    };
   });
-  return out;
 }
-
-const LINE_STYLES = ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'] as const;
 
 const DRAWING_SHAPES: ReadonlyArray<Drawing['shape']> = ['line', 'ellipse', 'rect', 'arc'];
 const LINE_ENDS: ReadonlyArray<LineEnd> = ['none', 'arrow', 'bar', 'tick', 'tickFlip'];
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 /**
  * Drawing objects (shapes and lines): every field checked, each optional one written only when it is not the default; an entry without
  * a readable ID, shape or points, or one that repeats an ID, is dropped and noted. `page` (a layout) never anchors an object to data.
  */
 function cleanDrawings(raw: unknown, path: string, notes: string[], page = false): Drawing[] {
-  if (raw === undefined) return [];
-  if (!Array.isArray(raw)) {
-    notes.push(`${path} was not a list and was reset.`);
-    return [];
-  }
-  const out: Drawing[] = [];
-  const seen = new Set<string>();
   const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
   const frac = (v: unknown) => drawingFraction(v as number);
-  raw.forEach((d, i) => {
-    const point = (v: unknown): DrawingPoint | null => (isObj(v) && num(v.xFrac) && num(v.yFrac) ? { xFrac: frac(v.xFrac), yFrac: frac(v.yFrac), ...(!page && num(v.x) ? { x: v.x } : {}), ...(!page && num(v.y) ? { y: v.y } : {}) } : null);
-    const from = isObj(d) ? point(d.from) : null;
-    const to = isObj(d) ? point(d.to) : null;
-    if (!isObj(d) || typeof d.id !== 'string' || d.id === '' || seen.has(d.id) || !DRAWING_SHAPES.includes(d.shape as Drawing['shape']) || !from || !to) {
-      notes.push(`${path}[${i}] could not be read and was dropped.`);
-      return;
-    }
-    seen.add(d.id);
+  const point = (v: unknown): DrawingPoint | null => (isObj(v) && num(v.xFrac) && num(v.yFrac) ? { xFrac: frac(v.xFrac), yFrac: frac(v.yFrac), ...(!page && num(v.x) ? { x: v.x } : {}), ...(!page && num(v.y) ? { y: v.y } : {}) } : null);
+  return cleanList(raw, path, notes, (d, at): Drawing | null => {
+    const from = point(d.from);
+    const to = point(d.to);
+    if (!DRAWING_SHAPES.includes(d.shape as Drawing['shape']) || !from || !to) return null;
     const limit = (key: keyof typeof DRAWING_LIMITS, v: unknown) => (num(v) ? { [key]: clampDrawing(key, v) } : {});
     const end = (v: unknown) => (LINE_ENDS.includes(v as LineEnd) && v !== 'none' ? (v as LineEnd) : undefined);
     const line = d.shape === 'line';
     const start = line ? end(d.start) : undefined;
     const finish = line ? end(d.end) : undefined;
     const anchored = !page && d.anchor === 'data' && [from, to].every((q) => q.x !== undefined || q.y !== undefined);
-    if (!page && d.anchor === 'data' && !anchored) notes.push(`${path}[${i}] was anchored to data without values and was placed on the page.`);
+    if (!page && d.anchor === 'data' && !anchored) notes.push(`${at} was anchored to data without values and was placed on the page.`);
     const plain = (q: DrawingPoint): DrawingPoint => ({ xFrac: q.xFrac, yFrac: q.yFrac });
-    out.push({
+    return {
       id: d.id,
       shape: d.shape as Drawing['shape'],
       from: anchored ? from : plain(from),
@@ -268,16 +266,16 @@ function cleanDrawings(raw: unknown, path: string, notes: string[], page = false
       ...(finish ? { end: finish } : {}),
       ...(line ? limit('endSizePt', d.endSizePt) : {}),
       ...(d.shape === 'rect' ? limit('cornerPt', d.cornerPt) : {}),
-      color: typeof d.color === 'string' && HEX_COLOR.test(d.color) ? d.color : '#000000',
+      color: isHex(d.color) ? d.color : '#000000',
       opacity: num(d.opacity) ? Math.min(1, Math.max(0, d.opacity)) : 1,
       widthPt: num(d.widthPt) ? clampDrawing('widthPt', d.widthPt) : 1,
-      lineStyle: LINE_STYLES.includes(d.lineStyle as LineStyle) ? (d.lineStyle as LineStyle) : 'solid',
-      ...((d.shape === 'ellipse' || d.shape === 'rect') && typeof d.fill === 'string' && HEX_COLOR.test(d.fill) ? { fill: d.fill, ...(num(d.fillOpacity) ? { fillOpacity: Math.min(1, Math.max(0, d.fillOpacity)) } : {}) } : {}),
+      lineStyle: LINE_STYLE_VALUES.includes(d.lineStyle as LineStyle) ? (d.lineStyle as LineStyle) : 'solid',
+      ...((d.shape === 'ellipse' || d.shape === 'rect') && isHex(d.fill) ? { fill: d.fill, ...(num(d.fillOpacity) ? { fillOpacity: Math.min(1, Math.max(0, d.fillOpacity)) } : {}) } : {}),
       ...(line && typeof d.text === 'string'
         ? {
             text: d.text,
             ...limit('fontSizePt', d.fontSizePt),
-            ...(typeof d.textColor === 'string' && HEX_COLOR.test(d.textColor) ? { textColor: d.textColor } : {}),
+            ...(isHex(d.textColor) ? { textColor: d.textColor } : {}),
             ...(typeof d.fontFamily === 'string' && FONT_FAMILIES.some((f) => f.value === d.fontFamily) ? { fontFamily: d.fontFamily } : {}),
             ...(d.bold === true ? { bold: true } : {}),
             ...(d.italic === true ? { italic: true } : {}),
@@ -285,79 +283,54 @@ function cleanDrawings(raw: unknown, path: string, notes: string[], page = false
             ...limit('textGapPt', d.textGapPt),
           }
         : {}),
-    });
+    };
   });
-  return out;
 }
 
 /** Reference lines: every field checked; an entry that cannot be read (or repeats an ID) is dropped and noted. */
 function cleanReferenceLines(raw: unknown, path: string, notes: string[]): Chart['referenceLines'] {
-  if (raw === undefined) return [];
-  if (!Array.isArray(raw)) {
-    notes.push(`${path} was not a list and was reset.`);
-    return [];
-  }
-  const out: Chart['referenceLines'] = [];
-  const seen = new Set<string>();
-  raw.forEach((l, i) => {
-    if (!isObj(l) || typeof l.id !== 'string' || l.id === '' || seen.has(l.id) || (l.axis !== 'x' && l.axis !== 'y') || typeof l.value !== 'number' || !Number.isFinite(l.value)) {
-      notes.push(`${path}[${i}] could not be read and was dropped.`);
-      return;
-    }
-    seen.add(l.id);
+  return cleanList(raw, path, notes, (l, at): Chart['referenceLines'][number] | null => {
+    if ((l.axis !== 'x' && l.axis !== 'y') || typeof l.value !== 'number' || !Number.isFinite(l.value)) return null;
     const width = finiteOr(l.widthPt, 2);
     // A binding to a result is read whole or not at all: the line then keeps its value.
     const vf = l.valueFrom;
     const from = isObj(vf) && RESULT_STATS.some((s) => s.id === vf.stat) && typeof vf.groupId === 'string' && vf.groupId !== '' ? { stat: vf.stat as ResultStat, groupId: vf.groupId } : undefined;
-    if (vf !== undefined && vf !== null && !from) notes.push(`${path}[${i}].valueFrom could not be read and was dropped.`);
+    if (vf !== undefined && vf !== null && !from) notes.push(`${at}.valueFrom could not be read and was dropped.`);
     // An oblique line needs both numbers; with one of them unreadable it is a line at its value, as before, and says so.
     const oblique = typeof l.slope === 'number' && Number.isFinite(l.slope) && typeof l.intercept === 'number' && Number.isFinite(l.intercept);
-    if ((l.slope !== undefined || l.intercept !== undefined) && !oblique) notes.push(`${path}[${i}] had a slope or an intercept that could not be read; it is a line at its value.`);
-    out.push({
+    if ((l.slope !== undefined || l.intercept !== undefined) && !oblique) notes.push(`${at} had a slope or an intercept that could not be read; it is a line at its value.`);
+    return {
       id: l.id,
       axis: l.axis,
       value: l.value,
       ...(oblique ? { slope: l.slope as number, intercept: l.intercept as number } : from ? { valueFrom: from } : {}),
-      color: typeof l.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(l.color) ? l.color : '#000000',
+      color: isHex(l.color) ? l.color : '#000000',
       widthPt: width > 0 && width <= 40 ? width : 2,
-      style: LINE_STYLES.find((v) => v === l.style) ?? 'dashed',
+      style: LINE_STYLE_VALUES.find((v) => v === l.style) ?? 'dashed',
       opacity: typeof l.opacity === 'number' && Number.isFinite(l.opacity) ? Math.min(1, Math.max(0, l.opacity)) : 1,
       label: typeof l.label === 'string' ? l.label : '',
       showLabel: l.showLabel === true,
       ...(l.labelAt === 'start' ? { labelAt: 'start' as const } : {}),
       ...(l.onTop === true ? { onTop: true } : {}),
-    });
+    };
   });
-  return out;
 }
 
 /** Shaded regions: every field checked; an entry that cannot be read (or repeats an ID) is dropped and noted. */
 function cleanRegions(raw: unknown, path: string, notes: string[]): Chart['regions'] {
-  if (raw === undefined) return [];
-  if (!Array.isArray(raw)) {
-    notes.push(`${path} was not a list and was reset.`);
-    return [];
-  }
-  const out: Chart['regions'] = [];
-  const seen = new Set<string>();
-  raw.forEach((r, i) => {
-    if (!isObj(r) || typeof r.id !== 'string' || r.id === '' || seen.has(r.id) || (r.axis !== 'x' && r.axis !== 'y') || typeof r.from !== 'number' || !Number.isFinite(r.from) || typeof r.to !== 'number' || !Number.isFinite(r.to)) {
-      notes.push(`${path}[${i}] could not be read and was dropped.`);
-      return;
-    }
-    seen.add(r.id);
-    out.push({
+  return cleanList(raw, path, notes, (r): Chart['regions'][number] | null => {
+    if ((r.axis !== 'x' && r.axis !== 'y') || typeof r.from !== 'number' || !Number.isFinite(r.from) || typeof r.to !== 'number' || !Number.isFinite(r.to)) return null;
+    return {
       id: r.id,
       axis: r.axis,
       from: r.from,
       to: r.to,
-      color: typeof r.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(r.color) ? r.color : '#4f81bd',
+      color: isHex(r.color) ? r.color : '#4f81bd',
       opacity: typeof r.opacity === 'number' && Number.isFinite(r.opacity) ? Math.min(1, Math.max(0, r.opacity)) : 0.25,
       label: typeof r.label === 'string' ? r.label : '',
       showLabel: r.showLabel === true,
-    });
+    };
   });
-  return out;
 }
 
 
@@ -516,17 +489,20 @@ export function parseProjectWithNotes(text: string): { project: Project; notes: 
     analyses.push({ id, name, ...(highlight ? { highlight } : {}), kind, dataTableId, level, model, degree: sanitizeDegree(o.degree, 2) });
   });
   migrateRead({ dataTables, charts }, notes);
-  // A link refers to another graph: one to a graph that is missing, to itself, or round in a circle is dropped.
+  // A link refers to another graph: one to a graph that is missing, to itself, or round in a circle back to itself is dropped.
+  // Only the graph's own link is judged: a graph further along whose link is broken loses that link, not this one.
   const linkOf = new Map(charts.map((c) => [c.id, typeof c.linkedTo === 'string' ? c.linkedTo : undefined]));
   for (const [ci, c] of charts.entries()) {
-    let at: string | undefined = c.linkedTo;
-    const seen = new Set<string>([c.id]);
-    while (at !== undefined && charts.some((x) => x.id === at) && !seen.has(at)) {
+    const target = c.linkedTo;
+    if (target === undefined) continue;
+    let at: string | undefined = typeof target === 'string' && linkOf.has(target) ? target : c.id;
+    const seen = new Set<string>();
+    while (at !== undefined && at !== c.id && !seen.has(at)) {
       seen.add(at);
       at = linkOf.get(at);
     }
-    if (c.linkedTo !== undefined && (typeof c.linkedTo !== 'string' || at !== undefined)) {
-      notes.push(`project.charts[${ci}].linkedTo ("${c.name}") referred to a graph that is missing or to itself; the link was removed.`);
+    if (at === c.id) {
+      notes.push(`project.charts[${ci}].linkedTo ("${c.name}") referred to a graph that is missing, to itself or round in a circle; the link was removed.`);
       delete c.linkedTo;
     }
   }

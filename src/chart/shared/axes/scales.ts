@@ -21,6 +21,8 @@ export interface YAxisScale {
   warnings: string[];
   /** Minor tick positions (never the same as a major tick). */
   minorTicks?: number[];
+  /** The major step written as a length (a time axis: "1 month", "15 min"), for the scale bar of a hidden axis; absent: the step's tick label. */
+  stepLabel?: string;
   /** Base of a log scale (positions follow the logarithm); null or absent = linear. */
   log?: number | null;
   /** The axis is drawn the other way round: the largest value where the smallest was. */

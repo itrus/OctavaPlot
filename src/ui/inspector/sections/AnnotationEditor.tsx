@@ -6,7 +6,7 @@ import type { Annotation, AnnotationAlign } from '../../../model/types';
 import { useHistory } from '../../../state/AppContext';
 import { DeleteIcon, RedoIcon, UndoIcon } from '../../components/icons';
 import { ColorInput, Field, GroupBox, NumField, SelectInput } from '../common/controls';
-import { takeFocusRequest } from '../common/pendingFocus';
+import { takeFocusRequest } from '../common/nav';
 import { SLIDERS } from '../common/sliderRanges';
 import { SymbolButton } from '../../components/SymbolButton';
 
@@ -154,7 +154,7 @@ export function AnnotationEditor({ annotation: a, placer, resultHint, fontLabel,
           onChange={(v) => set('Annotation font', { fontFamily: v === '' ? undefined : v })}
         />
       </Field>
-      <Field label="Text color">
+      <Field label="Text colour">
         <ColorInput value={a.color} ariaLabel="Text colour" onChange={(v) => set('Annotation colour', { color: v }, 'color')} />
       </Field>
       <NumField {...SLIDERS.fraction} label="Opacity" value={a.opacity} min={0} max={1} onCommit={(v) => set('Annotation opacity', { opacity: v }, 'opacity')} hint="0 = transparent, 1 = opaque" />

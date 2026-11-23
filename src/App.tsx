@@ -1,24 +1,22 @@
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { prepareChartInput } from './model/table/preparedChart';
 import { AppProvider, useCommands, useGraphViewport, useHistory, useLayoutViewport, useNavigation, usePreferences, useProject, useRecovery, useResultsViewport, useStatus, useTableViewport } from './state/AppContext';
-import { openedStatus, refusedStatus, PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile } from './state/projectFile';
+import { openedStatus, refusedStatus, PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile, openDecision } from './state/projectFile';
 import { Navigator } from './ui/navigator/Navigator';
 import { Splitter } from './ui/components/Splitter';
 import { FitWindowIcon } from './ui/components/icons';
 import { MenuBar } from './ui/components/MenuBar';
 import { buildMenus, runShortcut, type MenuContext } from './ui/appMenus';
-import { shortcutOf, type ShortcutAction } from './ui/components/appShortcuts';
+import { shortcutOf, type ShortcutAction, isTextEntryTarget } from './ui/components/appShortcuts';
 import { ShortcutsDialog } from './ui/dialogs/ShortcutsDialog';
 import { setProjectName } from './state/commands';
 import { InfoDialog } from './ui/dialogs/InfoDialog';
 import { SettingsDialog } from './ui/dialogs/SettingsDialog';
 import { RecoveryDialog } from './ui/dialogs/RecoveryDialog';
-import { openDecision } from './state/openGuard';
 import type { Project } from './model/types';
 import { RepairNotesDialog } from './ui/dialogs/RepairNotesDialog';
 import { LOAD_OTHER_TAB_WARNING, RecoveryConflictBanner } from './ui/components/RecoveryConflictBanner';
 import { WheelRange } from './ui/components/WheelRange';
-import { isTextEntryTarget } from './ui/components/shortcutGuard';
 import { downloadBlob } from './util/download';
 import { exportFileName } from './util/fileName';
 
@@ -134,7 +132,8 @@ function Shell() {
   // Every shortcut (appShortcuts.ts) is read here; what each does is set in shortcutRef at each render.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.isComposing) return;
+      // A key the focused control has already used (F2 in the grid edits the cell) is not also a shortcut.
+      if (e.isComposing || e.defaultPrevented) return;
       const action = shortcutOf(e, isTextEntryTarget(e.target));
       if (!action) return;
       // The browser's own "Save page" never opens; the project is saved unless a dialog is open or the key is held down.
@@ -281,8 +280,9 @@ function Shell() {
     },
     fullscreen,
     toggleFullscreen: () => {
-      const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-      p.catch(() => setStatus('This browser did not allow full screen.'));
+      // Some browsers (Safari on iPhone) have no full screen for a page: the method is missing, not refused.
+      const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+      (p ?? Promise.reject()).catch(() => setStatus('This browser did not allow full screen.'));
     },
   };
   shortcutRef.current = (a) => runShortcut(a, menuContext);

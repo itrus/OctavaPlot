@@ -5,7 +5,7 @@ import type { Sheet } from '../../model/project/resultSheet';
 import { FIT_LIMITS } from '../../model/options/fitOptions';
 import { newId } from '../../model/ids';
 import type { Analysis } from '../../model/types';
-import { describeValues, descriptiveRows, formatResult } from '../../stats/descriptive';
+import { describeValues, descriptiveRows, formatResult } from '../../stats/summary';
 import { FIT_MODELS, fitModelById, type FitModelId } from '../../stats/fitModels';
 import { useCommands, useNavigation, usePreferences, useProject, useResultsViewport } from '../../state/AppContext';
 import { newChartStart } from '../../state/settings';

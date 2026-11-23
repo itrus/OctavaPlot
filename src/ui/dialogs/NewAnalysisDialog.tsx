@@ -3,7 +3,7 @@ import { useRoving } from '../inspector/common/roving';
 import { ANALYSIS_TYPES, analysisKindApplies, analysisTypeInfo } from '../../model/project/analysis';
 import { tableTypeInfo } from '../../model/graph/chartTypes';
 import type { AnalysisKind, DataTable, Id } from '../../model/types';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 /** A new analysis: which analysis, and of which table. Only tables of a kind the analysis applies to are offered. */
 export function NewAnalysisDialog({ tables, initialTableId, onCreate, onClose }: { tables: DataTable[]; initialTableId: Id; onCreate: (tableId: Id, kind: AnalysisKind) => void; onClose: () => void }) {

@@ -1,7 +1,6 @@
 import type { Sheet, SheetRow } from './resultSheet';
 import { cachedCalc, peekCalc, type CalcIdentity } from '../../stats/calcCache';
-import { shouldDeferFit } from '../../stats/fitEngine';
-import { deferredFitResult } from '../../stats/fitService';
+import { shouldDeferFit, deferredFitResult } from '../../stats/fitService';
 import { FIT_ALGORITHM_VERSION, FIT_SOLVE_LEVEL, confidenceLimits, fitCurve, isFailure, type FitFailure, type FitResult } from '../../stats/fit';
 import { fitModelById, type FitModelId } from '../../stats/fitModels';
 import { withoutExcluded } from '../table/exclusion';

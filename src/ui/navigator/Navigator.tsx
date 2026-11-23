@@ -1,18 +1,16 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
-import { isCommitEnter } from '../components/shortcutGuard';
-import { createPortal } from 'react-dom';
+import { isCommitEnter } from '../components/appShortcuts';
 import { newId } from '../../model/ids';
 import { chartBadge, TABLE_BADGE, type Badge } from '../../model/graph/badges';
 import { FOLDER_TITLE } from '../../model/project/folderItems';
 import type { AnalysisKind, ChartType, FolderKey, HighlightColor, Id, TableKind } from '../../model/types';
-import type { ViewRef } from '../../model/editor/types';
+import type { ViewRef } from '../../model/selection';
 import type { ChartVariant } from '../../model/graph/chartVariant';
 import { useCommands, useNavigation, usePreferences, useProject } from '../../state/AppContext';
 import { newChartStart } from '../../state/settings';
-import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, setHighlight, unlinkChart, removeAnalysis, type NewTableOptions } from '../../state/commands';
+import { addAnalysis, addChart, addChartLike, addDataTable, addLayout, duplicateAnalysis, duplicateChart, duplicateLayout, duplicateTable, removeChart, removeLayout, removeTable, renameItem, setHighlight, unlinkChart, removeAnalysis, type NewTableOptions, deletionEffects, noEffects, type DeletionEffects } from '../../state/commands';
 import { useCommand } from '../components/appCommands';
 import { ConfirmDeleteDialog } from '../dialogs/ConfirmDeleteDialog';
-import { deletionEffects, noEffects, type DeletionEffects } from '../../state/deletionEffects';
 import { GraphNavIcon, LayoutNavIcon, TableNavIcon } from './navIcons';
 import { highlightBackground, highlightOf } from '../../model/project/highlight';
 import { navFold, navStep } from './navKeys';
@@ -307,12 +305,11 @@ export function Navigator() {
           ))}
         </div>
       </div>
-      {/* In the page body, not in the (sliding) panel, so the dialog is positioned against the window. */}
-      {pendingDelete && createPortal(<ConfirmDeleteDialog what={pendingDelete.what} effects={pendingDelete.effects} project={project} onConfirm={() => { const go = pendingDelete.go; setPendingDelete(null); go(); }} onClose={() => setPendingDelete(null)} />, document.body)}
-      {dialog === 'table' && createPortal(<NewTableDialog defaultSample={settings.newProjectSample} onCreate={createTable} onClose={() => setDialog(null)} />, document.body)}
-      {dialog === 'layout' && createPortal(<NewLayoutDialog charts={project.charts} initialChartId={view.kind === 'chart' ? view.id : undefined} onCreate={createLayout} onClose={() => setDialog(null)} />, document.body)}
-      {dialog === 'analysis' && createPortal(<NewAnalysisDialog tables={project.dataTables} initialTableId={currentTableId ?? project.dataTables[0].id} onCreate={createAnalysis} onClose={() => setDialog(null)} />, document.body)}
-      {dialog === 'graph' && createPortal(<NewGraphDialog tables={project.dataTables} charts={project.charts} initialTableId={currentTableId ?? project.dataTables[0].id} initialChartId={view.kind === 'chart' ? view.id : undefined} onCreate={createGraph} onCreateLike={createGraphLike} onClose={() => setDialog(null)} />, document.body)}
+      {pendingDelete && <ConfirmDeleteDialog what={pendingDelete.what} effects={pendingDelete.effects} project={project} onConfirm={() => { const go = pendingDelete.go; setPendingDelete(null); go(); }} onClose={() => setPendingDelete(null)} />}
+      {dialog === 'table' && <NewTableDialog defaultSample={settings.newProjectSample} onCreate={createTable} onClose={() => setDialog(null)} />}
+      {dialog === 'layout' && <NewLayoutDialog charts={project.charts} initialChartId={view.kind === 'chart' ? view.id : undefined} onCreate={createLayout} onClose={() => setDialog(null)} />}
+      {dialog === 'analysis' && <NewAnalysisDialog tables={project.dataTables} initialTableId={currentTableId ?? project.dataTables[0].id} onCreate={createAnalysis} onClose={() => setDialog(null)} />}
+      {dialog === 'graph' && <NewGraphDialog tables={project.dataTables} charts={project.charts} initialTableId={currentTableId ?? project.dataTables[0].id} initialChartId={view.kind === 'chart' ? view.id : undefined} onCreate={createGraph} onCreateLike={createGraphLike} onClose={() => setDialog(null)} />}
     </nav>
   );
 }

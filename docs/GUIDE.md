@@ -117,7 +117,7 @@ Survival curves and stacked or percentage bars keep a plain linear axis.
 
 ### Bars, pies, histograms and heat maps
 
-**Floating bars** run from the smallest to the largest value of a column, with a line at the mean or median (the summary setting); on a grouped table, from the smallest to the largest replicate of each series in each category. **Stacked bars** of a grouped table pile the series on each other, each as high as its own value; negative values pile downwards from the baseline; the parts have no error bars (an error of a part is not an error of the total). **Before and after** joins the values of each row across the columns; a row with a missing value breaks its line unless you choose to join across it, and no value is made up. Its dots take the colour of their column, and its lines a colour for each subject (Plot → "Lines joining the rows" → Color by: Subject, or One color). Grouped bars of replicates can show the individual values over the bars.
+**Floating bars** run from the smallest to the largest value of a column, with a line at the mean or median (the summary setting); on a grouped table, from the smallest to the largest replicate of each series in each category. **Stacked bars** of a grouped table pile the series on each other, each as high as its own value; negative values pile downwards from the baseline; the parts have no error bars (an error of a part is not an error of the total). **Before and after** joins the values of each row across the columns; a row with a missing value breaks its line unless you choose to join across it, and no value is made up. Its dots take the colour of their column, and its lines a colour for each row (Plot → "Lines joining the rows" → Colour by: Row, or One colour). Grouped bars of replicates can show the individual values over the bars.
 
 **Parts of a whole** (from a contingency table; a chart draws one column at a time, the first that is on the graph, or the one chosen under Parts → Column; the parts are its rows, named by their row titles, and percentages are shares of the column's total):
 
@@ -269,14 +269,14 @@ Evidence labels in the documents: **D** = stated in a public source (see `docs/c
 
 ## Colour palettes
 
-The **Color palette** field (Plot) opens a window with every palette: point at one to see its colours, group, source and colour-blind note, click it to apply it to the data sets in order. "Colorblind friendly for the first N colours" is measured by simulation (Machado et al., 2009), not claimed from the name of a palette.
+The **Colour palette** field (Plot) opens a window with every palette: point at one to see its colours, group, source and colour-blind note, click it to apply it to the data sets in order. "Colourblind friendly for the first N colours" is measured by simulation (Machado et al., 2009), not claimed from the name of a palette.
 
 | Group | Palettes | Source |
 |---|---|---|
 | Journals | Science (AAAS, the default), Nature (NPG), New England Journal of Medicine, The Lancet, JAMA, BMJ, Journal of Clinical Oncology | ggsci |
 | Software and design systems | D3 (category10 and category20), Gephi, Observable, Primer, Atlassian, iTerm, IGV (the genome browser) | ggsci |
 | Published styles | 37 palettes named after the organisation whose style guide they follow, one per variant (for example "Economist-style", "Economist-style, blue shades", "Eurofound-style, extended order · 1–12"): YouGov, Eurostat, Economist, Financial Times, New America, The Times, Quartz, McKinsey, Eurofound, Mailchimp, NPR, Bloomberg, NZZ, CFPB, Urban Institute, OHA, New York Times, Dallas Morning News, Cato | Datawrapper article |
-| Other | Vibrant, Pastel, Colorblind-friendly, Monochrome, Black and White (the app's own earlier palettes, kept so that saved charts still open), Retro, Warm and cool | the app; Okabe & Ito (2008) |
+| Other | Vibrant, Pastel, Colourblind-friendly, Monochrome, Black and White (the app's own earlier palettes, kept so that saved charts still open), Retro, Warm and cool | the app; Okabe & Ito (2008) |
 
 **Sources.** The first two groups are from the **ggsci** R package (Xiao N. *ggsci: Scientific Journal and Sci-Fi Themed Color Palettes for ggplot2*; <https://nanx.me/ggsci/>, <https://github.com/nanxstats/ggsci>; descriptions follow <https://nanx.me/ggsci/articles/ggsci.html>). The Published styles, and the six Published heat-map gradients, are collected from the Datawrapper article of 30 March 2022 <https://www.datawrapper.de/blog/colors-for-data-vis-style-guides> (the title in the app is taken from the address and marked not verified) and the guides it cites. A value printed as HEX in a guide is exact; one read from an image is approximate, and each description says which. The names say whose guide a palette follows, not that the organisation issued or endorses it.
 

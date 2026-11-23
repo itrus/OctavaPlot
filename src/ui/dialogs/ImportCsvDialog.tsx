@@ -4,7 +4,7 @@ import { detectDelimiter, previewCsv, type CsvDelimiter } from '../data/csv';
 import { formatCellFor } from '../data/cellText';
 import { DURATION_UNITS, TIME_KINDS, timeColumn, type TimeColumn, type TimeKind, type TimeUnit } from '../../util/timeColumn';
 import { Check, Field, SelectInput } from '../inspector/common/controls';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 /** What a confirmed import hands back: the table data and what the file was read with. */
 export type CsvImportData = Extract<ReturnType<typeof previewCsv>, { ok: true }>['data'] & object;

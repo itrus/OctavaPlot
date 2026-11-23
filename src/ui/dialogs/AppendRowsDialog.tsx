@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 /** The count typed in the dialog as a whole number from 1 to `room`, or why it is not one. */
 export function parseRowCount(text: string, room: number): { ok: true; count: number } | { ok: false; message: string } {

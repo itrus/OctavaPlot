@@ -1,10 +1,9 @@
-import { draggedPoints, type ShapeDrag } from '../interaction/drawingGesture';
+import { draggedPoints, type ShapeDrag, drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { buildAnyModelCached, ChartCanvas, fitsPendingOf, previewDotCount } from '../../chart/anyModel';
-import { useFitsVersion } from '../components/useFitsVersion';
+import { useFitsVersion, fitScale, useAvailableSize } from '../components/hooks';
 import { CHROME_STOPS, type ChromeStop, describeFocus, extendAnnotations, extendGroups, extendPoints, nextFocus, selectableMarks } from '../../chart/selectionOrder';
-import { toggleGroupSelection } from '../../model/graph/selection/scope';
-import { selectedAnnotationIds, selectedPoints, toggleAnnotationSelection, togglePointSelection } from '../../model/graph/selection/multi';
+import { toggleGroupSelection, selectedAnnotationIds, selectedPoints, toggleAnnotationSelection, togglePointSelection } from '../../model/selection';
 import { dragLabelPatch } from '../inspector/common/pointOverrideUi';
 import { densePreviewNote, isDense, nearestDot } from '../../chart/shared/scene/denseDots';
 import { hitFromTarget, type HitTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
@@ -13,16 +12,13 @@ import type { PreparedChart } from '../../model/table/preparedChart';
 import { useCommands, useGraphViewport, useNavigation, useSelection } from '../../state/AppContext';
 import { addAnnotation, addDrawing, composeCommands, patchAnnotation, patchDrawings, patchPointStyle, removeAnnotation, removeDrawings, resetAllDataSets } from '../../state/commands';
 import { createDrawing, DRAWING_WIDTH, pointsOfDrag, presetById } from '../../model/graph/drawingPresets';
-import { drawingPatchForPoints, drawnPoints, nudgeDrawings, type DrawingDrag } from '../../chart/shared/scene/drawings';
 import { GraphicsMenu } from '../components/GraphicsMenu';
 import { UndoRedo } from '../components/UndoRedo';
-import { fitScale, useAvailableSize } from '../components/useAvailableSize';
 import type { Drawing } from '../../model/types';
 import { chartTextLook, createAnnotation } from '../../model/defaults';
-import { focusWhenShown } from '../inspector/common/pendingFocus';
+import { focusWhenShown, inspectorTargetFor } from '../inspector/common/nav';
 import { annotationPlacer, drawnFractions, nudgePatches, patchForMove } from '../../chart/shared/scene/annotationPlace';
 import { PointerIcon, ResetIcon, TextToolIcon } from '../components/icons';
-import { inspectorTargetFor } from '../inspector/common/nav';
 import type { Box } from '../../chart/shared/parts/labels';
 
 /** Space kept around the chart inside the canvas, in px. */
@@ -249,7 +245,10 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const announcement = describeFocus(marks, { selection, stop }, undefined, chart.annotations);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     // Shortcuts (Ctrl+Z, Ctrl+S ...) belong to the app; so does everything while a dialog or another field has the keys.
-    if (e.ctrlKey || e.metaKey || e.altKey || e.target !== e.currentTarget) return;
+    if (e.ctrlKey || e.metaKey || e.target !== e.currentTarget) return;
+    // The arrow keys move the selected shapes or texts (Shift 5%, Alt 0.1%); other Alt keys belong to the browser.
+    const nudging = e.key.startsWith('Arrow') && (selectedShapes.length > 0 || selectedNotes.length > 0);
+    if (e.altKey && !nudging) return;
     // V and T choose the tool, as in drawing programs; Escape leaves the Text tool.
     if (e.key === 'Escape' && tool !== 'select') {
       e.preventDefault();
@@ -265,27 +264,24 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
       setSelection({ kind: 'chart' });
       return;
     }
-    if (selectedShapes.length > 0 && e.key.startsWith('Arrow')) {
+    if (nudging) {
       e.preventDefault();
       const step = e.shiftKey ? 0.05 : e.altKey ? 0.001 : 0.01;
       const dx = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0;
       const dy = e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0;
-      const moves = nudgeDrawings(selectedShapes, dx, dy, model.widthPt, model.heightPt, annotationPlacer(any, model.widthPt, model.heightPt));
-      run('Move shape', composeCommands(...moves.map((m) => patchDrawings(owner, [m.id], m.patch))), `drw:${moves.map((m) => m.id).join()}:nudge`);
+      const place = annotationPlacer(any, model.widthPt, model.heightPt);
+      if (selectedShapes.length > 0) {
+        const moves = nudgeDrawings(selectedShapes, dx, dy, model.widthPt, model.heightPt, place);
+        run('Move shape', composeCommands(...moves.map((m) => patchDrawings(owner, [m.id], m.patch))), `drw:${moves.map((m) => m.id).join()}:nudge`);
+      } else {
+        const moves = nudgePatches(selectedNotes, place, dx, dy);
+        run('Move annotation', composeCommands(...moves.map((m) => patchAnnotation(chart.id, m.id, m.patch))), `ann:${moves.map((m) => m.id).join()}:nudge`);
+      }
       return;
     }
     if ((e.key === 'v' || e.key === 'V' || e.key === 't' || e.key === 'T') && !e.shiftKey) {
       e.preventDefault();
       setTool(e.key.toLowerCase() === 't' ? 'text' : 'select');
-      return;
-    }
-    if (selectedNotes.length > 0 && e.key.startsWith('Arrow')) {
-      e.preventDefault();
-      const step = e.shiftKey ? 0.05 : e.altKey ? 0.001 : 0.01;
-      const dx = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0;
-      const dy = e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0;
-      const moves = nudgePatches(selectedNotes, annotationPlacer(any, model.widthPt, model.heightPt), dx, dy);
-      run('Move annotation', composeCommands(...moves.map((m) => patchAnnotation(chart.id, m.id, m.patch))), `ann:${moves.map((m) => m.id).join()}:nudge`);
       return;
     }
     if (e.key === 'Enter') {

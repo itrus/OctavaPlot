@@ -203,3 +203,14 @@ describe('breaks, reversal and positions', () => {
     expect(durations.warnings).toContain('Manual X limit conflicts with the data range; using automatic limits.');
   });
 });
+
+describe('the step written as a length (the scale bar of a hidden time axis)', () => {
+  it('names calendar steps by their unit, not as a date', () => {
+    expect(resolveTimeAxis(input([19723, 20089]), cfg, DATE).stepLabel).toBe('3 months');
+    expect(resolveTimeAxis(input([16436, 20089]), cfg, DATE).stepLabel).toMatch(/^\d+ years?$/);
+  });
+  it('writes a duration step with its unit', () => {
+    expect(resolveTimeAxis(input([0, 30], { tickCountHint: 6 }), cfg, timeColumn('duration', 'd')).stepLabel).toMatch(/^\d+ d$/);
+    expect(resolveTimeAxis(input([0, 50], { tickCountHint: 5 }), cfg, timeColumn('duration', 's')).stepLabel).toMatch(/^\d+ s$/);
+  });
+});

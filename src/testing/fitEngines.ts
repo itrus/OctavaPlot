@@ -1,6 +1,6 @@
 /** Stand-ins for the fit worker, for tests: the worker's own message handler run in this process, and an engine the test steers by hand. */
-import { abortError, type CalculationEngine, type WorkerLike } from '../stats/fitEngine';
-import { handleFitMessage, type FitAnswer, type FitMessage, type FitReply, type FitRequest } from '../stats/fitProtocol';
+import { abortError, type CalculationEngine, type WorkerLike } from '../stats/fitService';
+import { handleFitMessage, type FitAnswer, type FitMessage, type FitReply, type FitRequest } from '../stats/fit';
 
 /**
  * A worker that runs `handleFitMessage` (what fitWorker.ts runs) in this process, one macrotask later. Messages are cloned with the

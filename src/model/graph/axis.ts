@@ -70,7 +70,8 @@ export const EXTRA_TICK_LIMITS = {
 } as const;
 
 const EXTRA_DIRECTIONS: readonly ExtraTickDirection[] = ['auto', 'out', 'in', 'both'];
-const EXTRA_GRID_STYLES: readonly LineStyle[] = ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'];
+/** Every line style, by its saved name. */
+export const LINE_STYLE_VALUES: readonly LineStyle[] = ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'];
 
 /** One added tick as it can be used: a finite value, a label of at most the length of an affix, and only the settings that are valid (the others are left out, which means their defaults). */
 function sanitizeExtraTick(r: Record<string, unknown>, value: number): ExtraTick {
@@ -85,7 +86,7 @@ function sanitizeExtraTick(r: Record<string, unknown>, value: number): ExtraTick
   if (typeof r.tickWidthPt === 'number' && Number.isFinite(r.tickWidthPt)) t.tickWidthPt = clamp(r.tickWidthPt, tickWidthPt.min, tickWidthPt.max, 1);
   if (typeof r.showGrid === 'boolean') t.showGrid = r.showGrid;
   if (typeof r.gridWidthPt === 'number' && Number.isFinite(r.gridWidthPt)) t.gridWidthPt = clamp(r.gridWidthPt, gridWidthPt.min, gridWidthPt.max, 1);
-  if (EXTRA_GRID_STYLES.includes(r.gridStyle as LineStyle)) t.gridStyle = r.gridStyle as LineStyle;
+  if (LINE_STYLE_VALUES.includes(r.gridStyle as LineStyle)) t.gridStyle = r.gridStyle as LineStyle;
   if (typeof r.gridColor === 'string') {
     const c = hex(r.gridColor, '');
     if (c) t.gridColor = c;

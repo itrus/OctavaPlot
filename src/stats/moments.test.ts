@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SummarySpec } from '../model/types';
-import { describeValues } from './descriptive';
+import { describeValues, computeGroupStats, summarize } from './summary';
 import { sdOf, scaledMoments } from './moments';
-import { computeGroupStats, summarize } from './summary';
 
 const spec: SummarySpec = { centre: 'mean', spread: 'sd', confidenceLevel: 0.95, smallSamplePolicy: 'drawCentre', invalidPolicy: 'omit' };
 const rel = (a: number, b: number) => Math.abs(a - b) / Math.abs(b);

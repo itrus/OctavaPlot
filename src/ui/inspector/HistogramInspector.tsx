@@ -12,12 +12,11 @@ import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section
 import { FrameSection, GridStyleSection } from './sections/LookControls';
 import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';
-import { inspectorShapeOf } from './common/nav';
-import { useInspectorNav } from './common/useInspectorNav';
+import { inspectorShapeOf, useInspectorNav } from './common/nav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
 import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections, ReferenceLinesSection } from './sections/SharedSections';
 import { PaletteField } from './sections/PalettePicker';
-import { AxisLimits } from './XyInspector';
+import { AxisLimits } from './sections/AxisStyleControls';
 import { SLIDERS } from './common/sliderRanges';
 
 
@@ -138,7 +137,7 @@ export function HistogramInspector({ chart, table }: { chart: Chart; table: Data
                 {histogram ? (
                   <>
                     <NumField {...SLIDERS.line} label="Border" unit="pt" value={rows[0]?.style.barBorderWidthPt ?? 0} min={0} max={20} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderWidthPt: v }), 'style:all:border')} />
-                    <Field label="Border color">
+                    <Field label="Border colour">
                       <ColorInput value={rows[0]?.style.barBorderColor ?? '#000000'} ariaLabel="Border colour" onChange={(v) => run('Change style', patchStyle(chart.id, 'all', { barBorderColor: v }), 'style:all:bordercolor')} />
                     </Field>
                     <NumField {...SLIDERS.fraction} label="Opacity" value={rows[0]?.style.barOpacity ?? 1} min={0} max={1} onCommit={(v) => run('Change style', patchStyle(chart.id, 'all', { barOpacity: v }), 'style:all:opacity')} />

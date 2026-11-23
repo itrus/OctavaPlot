@@ -5,14 +5,13 @@ import { chartPx2Pt, n2, ptToInch, ptToMm } from '../../model/units';
 import { plainText } from '../../util/richText';
 import { type AnyModel, buildAnyModelCached, chartTexts, drawingOf } from '../anyModel';
 import { el } from '../shared/scene/sceneElement';
-import { chartMarkup, elementsMarkup } from './sceneMarkup';
+import { chartMarkup, elementsMarkup, escapeXml, prefixIds } from './sceneMarkup';
 import { annotationElements } from '../shared/scene/annotations';
 import { drawingElements } from '../shared/scene/drawings';
 import { FONT_FAMILY } from '../../model/defaults';
 import { richPieces } from '../shared/scene/richSvg';
 import { layoutMasterLegend, legendEntriesOf, mergeLegendEntries, type LegendEntry, type MasterLegendLayout } from './masterLegend';
 import { svgToPngBlob } from './pngDpi';
-import { escapeXml, prefixIds } from './prefixIds';
 import { svgToPdf } from './svgPdf';
 
 /**

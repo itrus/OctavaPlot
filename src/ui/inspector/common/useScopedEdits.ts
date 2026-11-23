@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { clearGroupStyleSettings, clearGroupSummarySettings, patchStyle, patchSummary } from '../../../state/commands';
 import { isGroupOverridden } from '../../../model/graph/style';
 import { isSummaryOverridden, validateSummaryPatch } from '../../../model/graph/summary';
-import { mixedStyleKeys, mixedSummaryKeys, type StyleScope } from '../../../model/graph/selection/scope';
+import { mixedStyleKeys, mixedSummaryKeys, type StyleScope } from '../../../model/selection';
 import type { Chart, ChartLayer, ChartStyle, Group, Id, SummarySpec } from '../../../model/types';
 import { useCommands } from '../../../state/AppContext';
 import type { Overridden } from './controls';

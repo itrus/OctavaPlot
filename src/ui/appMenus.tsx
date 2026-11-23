@@ -194,7 +194,7 @@ export function buildMenus(c: MenuContext): MenuSpec[] {
           title: itemNoun ? 'Colour the name of the item in the navigator, so that it is easy to come back to' : 'Colour the names of the items selected on this page',
           entries: [
             // The tick stands at the right, so the colour of the row stays visible.
-            item('No color', () => fireCommand('highlight-item', ''), { checked: itemNoun ? c.highlight === undefined : undefined, icon: <span className="menu-swatch menu-swatch-none" /> }),
+            item('No colour', () => fireCommand('highlight-item', ''), { checked: itemNoun ? c.highlight === undefined : undefined, icon: <span className="menu-swatch menu-swatch-none" /> }),
             sep,
             ...HIGHLIGHTS.map((h) => item(h.label, () => fireCommand('highlight-item', h.id), { checked: itemNoun ? c.highlight === h.id : undefined, icon: <span className="menu-swatch" style={{ background: h.color }} /> })),
           ],

@@ -12,22 +12,20 @@ import { resolveBarFill } from '../../model/graph/fill';
 import { chartPx2Pt, extent, n2 } from '../../model/units';
 import { summaryOf, type GroupStats } from '../../stats/summary';
 import { boxSummary, densityProfile, normaliseProfiles, quantile6, sortedFinite, type BoxSummary, type DensityProfile } from '../../stats/distribution';
-import { buildBox, buildViolin, type DistGeom } from '../shared/parts/distributionGeom';
-import { boxNeeds, unplacedMarkNote } from '../shared/parts/distributionNotes';
+import { buildBox, buildViolin, type DistGeom, boxNeeds, unplacedMarkNote } from '../shared/parts/distributionGeom';
 import { buildErrorBar, clippedEndpointCount, errorEndValues, rangeValuesFor } from '../shared/parts/errorGeometry';
 import { chartLayout, type Layout } from '../shared/parts/layout';
 import { barLabelText, insideLabelText, placeBarLabel, placeInsideBarLabel, type BarLabelGeom, type InsideLabelGeom } from '../shared/parts/barLabels';
 import { axisMapper, omittedRangeWarnings, inBreak, onAxis, pathOfRuns, placeable, polylinesThroughBreaks, resolveAxis } from '../shared/axes/axisScale';
 import type { YAxisScale } from '../shared/axes/scales';
 import { layersOf, type LayerKind, type LayerSpec } from '../../model/graph/layers';
-import { compileGroupedMarks } from './groupedMarks';
+import { compileGroupedMarks, compileGroupedScene } from './groupedDrawing';
 import type { ChromeScene } from '../shared/scene/scene';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import type { Orientation } from '../shared/parts/orientation';
 import { displayName } from '../shared/parts/names';
 import { dotOffsets } from '../shared/parts/jitter';
 import { suppliedStats } from '../../model/table/suppliedStats';
-import { compileGroupedScene } from './groupedChrome';
 
 /** How the bars of a cluster are arranged: side by side, stacked as counts, or stacked as shares of the row total. */
 type Arrangement = 'side' | 'stacked' | 'percent';

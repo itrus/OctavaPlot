@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { Project } from '../types';
+import type { Project, ChartStyle } from '../types';
 import { createChart, createExampleProject, DEFAULT_STYLE, PRESET_KEYS, TYPE_PRESETS } from '../defaults';
 import {
   describeBarFillUi,
@@ -13,7 +13,6 @@ import {
   sanitizeFillKeys,
 } from './fill';
 import { resolveStyle } from './style';
-import type { ChartStyle } from '../types';
 import { patchStyle, resetStyle, setChartType } from '../../state/commands';
 import { parseProject, parseProjectWithNotes, stringifyProject } from '../../state/serialize';
 
@@ -108,7 +107,7 @@ describe('sanitizeFillKeys', () => {
     expect(s).toEqual({ barPattern: 'dots', barPatternBackground: '#ABCDEF', showBars: false });
     expect(raw.barFillMode).toBe('sideways');
   });
-  it('keeps values outside the P limits and nulls', () => {
+  it('keeps values outside the limits and nulls', () => {
     const raw = { barPatternSpacingPt: 60, barPatternWidthPt: 0.05, barPatternColor: null, barPatternBackground: null };
     const { style: s, dropped } = sanitizeFillKeys(raw);
     expect(dropped).toEqual([]);
@@ -206,7 +205,7 @@ describe('describeBarFillUi', () => {
     const ok = describeBarFillUi(pattern());
     expect(ok).toMatchObject({ solidColorEnabled: false, patternControlsEnabled: true, note: null, spacingError: null, widthError: null, invisibleWarning: null });
     const bad = describeBarFillUi(pattern({ barPatternSpacingPt: 120, barPatternWidthPt: 0 }));
-    expect(bad.spacingError).toMatch(/P limit 2 to 100/);
+    expect(bad.spacingError).toMatch(/outside 2 to 100/);
     expect(bad.widthError).toMatch(/positive/);
     expect(describeBarFillUi(pattern({ barPatternColor: '#FFFFFF' })).invisibleWarning).not.toBeNull();
   });
@@ -241,9 +240,10 @@ describe('isPatternInvisible', () => {
 });
 
 describe('import guard', () => {
-  it('fill.ts imports only types', () => {
+  it('fill.ts imports only types and sanitize.ts, which imports nothing', () => {
     const src = readFileSync(new URL('./fill.ts', import.meta.url), 'utf8');
     const imports = src.split('\n').filter((l) => /^import /.test(l));
-    expect(imports).toEqual(["import type { ChartStyle, FillMode, FillPattern } from '../types';"]);
+    expect(imports).toEqual(["import type { ChartStyle, FillMode, FillPattern } from '../types';", "import { isHex } from '../sanitize';"]);
+    expect(readFileSync(new URL('../sanitize.ts', import.meta.url), 'utf8')).not.toMatch(/^import /m);
   });
 });

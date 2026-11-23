@@ -1,10 +1,8 @@
-import { useEffect, useRef } from 'react';
-import { CloseIcon } from '../components/icons';
 import { CHART_PX_MAX, CHART_PX_MIN } from '../../model/defaults';
 import { clearBrowserCopies } from '../../state/recovery/recovery';
 import { usePreferences, useRecovery } from '../../state/AppContext';
 import { EXPORT_DPI_CHOICES, type ExportDpi, type ExportFormat } from '../../state/settings';
-import { DialogShell, trapTab } from './DialogShell';
+import { DialogWindow } from './DialogShell';
 import { Check, Field, NumField, SelectInput, SubHeading } from '../inspector/common/controls';
 import type { DecimalSeparator } from '../../model/types';
 
@@ -12,26 +10,9 @@ import type { DecimalSeparator } from '../../model/types';
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { settings, updateSettings } = usePreferences();
   const { autosaveOk } = useRecovery();
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Focus the dialog once, when it opens. (Doing it in the effect below would pull focus out of a field being edited
-  // every time a setting changed, because onClose is a new function on each render.)
-  useEffect(() => ref.current?.focus(), []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   return (
-    <DialogShell>
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onKeyDown={trapTab}>
-      <div className="modal settings-modal" role="dialog" aria-modal="true" aria-label="Settings" tabIndex={-1} ref={ref}>
-        <div className="modal-head">
-          <strong>Settings</strong>
-          <button className="modal-close" onClick={onClose} aria-label="Close settings"><CloseIcon /></button>
-        </div>
+    <DialogWindow title="Settings" onClose={onClose} className="settings-modal">
         <div className="modal-body settings-body">
           <SubHeading>General</SubHeading>
           <Field
@@ -101,8 +82,6 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             />
           </Field>
         </div>
-      </div>
-    </div>
-    </DialogShell>
+    </DialogWindow>
   );
 }

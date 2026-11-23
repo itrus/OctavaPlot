@@ -1,8 +1,7 @@
 import { forwardRef } from 'react';
 import { chartFamily } from '../model/graph/chartTypes';
 import type { Chart, DataTable, FitSettings } from '../model/types';
-import { columnDrawing } from './column/columnDrawing';
-import { drawnDotCount } from './column/columnMarks';
+import { columnDrawing, drawnDotCount } from './column/columnDrawing';
 import { groupedDrawing } from './grouped/groupedDrawing';
 import { heatDrawing } from './heatmap/heatDrawing';
 import { pieDrawing } from './pie/pieDrawing';

@@ -6,6 +6,8 @@ import { xySeries } from '../../table/tableLayout';
 import { seriesPaletteIndex } from '../../table/factors';
 import type { Chart, ChartStyle, ChartType, DataTable, Id, LayerStyle, LineStyle } from '../../types';
 import { LAYER_NAMES, type LayerKind, type LayerSpec } from './layerList';
+import { isHex } from '../../sanitize';
+import { LINE_STYLE_VALUES } from '../axis';
 
 /** Which layers take a look of their own, and which settings of it. */
 const STYLABLE_LAYERS: Partial<Record<LayerKind, ReadonlyArray<keyof LayerStyle>>> = {
@@ -166,7 +168,6 @@ export function clearPartStyles(styles: Record<Id, Partial<LayerStyle>>, scope: 
 
 const LAYER_STYLE_LIMITS = { widthPt: { min: 0.2, max: 40 }, opacity: { min: 0, max: 1 } } as const;
 export const DEFAULT_BAND_OPACITY = 0.2;
-const LINE_STYLE_VALUES: readonly LineStyle[] = ['solid', 'longDash', 'dashed', 'dotted', 'dashDot', 'dashDotDot'];
 
 /** The layer kind of a layer ID (`${object id}:${kind}`), or null. */
 /** Whether some part of a chart of this type takes a look of its own. */
@@ -195,7 +196,7 @@ export function sanitizeLayerStyles(raw: unknown): { styles: Record<Id, Partial<
       const k = key as keyof LayerStyle;
       const ok =
         allowed.includes(k) &&
-        ((k === 'color' && typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ||
+        ((k === 'color' && isHex(v)) ||
           (k === 'widthPt' && typeof v === 'number' && Number.isFinite(v) && v >= (kind === 'points' || kind === 'rawPoints' ? 0 : LAYER_STYLE_LIMITS.widthPt.min) && v <= LAYER_STYLE_LIMITS.widthPt.max) ||
           (k === 'lineStyle' && LINE_STYLE_VALUES.includes(v as LineStyle)) ||
           (k === 'shape' && SYMBOL_SHAPES.some((o) => o.value === v)) ||

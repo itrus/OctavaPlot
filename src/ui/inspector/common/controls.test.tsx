@@ -146,8 +146,8 @@ describe('Check and ColorInput accessibility', () => {
     const c = renderToStaticMarkup(<Check checked onChange={() => undefined} ariaLabel="Fill with a pattern" title="Pattern" />);
     expect(c).toContain('aria-label="Fill with a pattern"');
     expect(c).toContain('title="Pattern"');
-    const k = renderToStaticMarkup(<ColorInput value="#000000" onChange={() => undefined} ariaLabel="Pattern color" />);
-    expect(k).toContain('aria-label="Pattern color"');
+    const k = renderToStaticMarkup(<ColorInput value="#000000" onChange={() => undefined} ariaLabel="Pattern colour" />);
+    expect(k).toContain('aria-label="Pattern colour"');
   });
   it('omits the attributes when not given', () => {
     expect(renderToStaticMarkup(<Check checked={false} onChange={() => undefined} />)).not.toContain('aria-label');

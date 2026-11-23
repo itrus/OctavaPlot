@@ -1,27 +1,26 @@
 import { useEffect, useMemo } from 'react';
 import { useScopedEdits } from './common/useScopedEdits';
-import { majorStepOf, validateAxisInterval, validateAxisMax, validateAxisMin, type AxisEditContext, type YAxisScale } from '../../chart/shared/axes/scales';
 import { buildAnyModelCached } from '../../chart/anyModel';
-import { useFitsVersion } from '../components/useFitsVersion';
+import { useFitsVersion } from '../components/hooks';
 import { capabilitiesOf } from '../../model/graph/capabilities';
 import { chartFamily, supportsHorizontal } from '../../model/graph/chartTypes';
 import { layoutOf, summaryFormatInfo, xySeries } from '../../model/table/tableLayout';
 import { hasFactors, seriesPaletteIndex, usesFactors } from '../../model/table/factors';
 import { resolveSummary } from '../../model/graph/summary';
-import { intervalCaptionLines, DIRECTION_HINT, describeSummaryControls } from './common/summaryUi';
+import { intervalCaptionLines, describeSummaryControls } from './common/summaryUi';
 import { tooltipFmt } from '../../chart/tooltip';
-import { ColumnLayoutSection, DirectionSection, FrameSection, LineOrderSection, OffsetSection, GridStyleSection } from './sections/LookControls';
+import { ColumnLayoutSection, DirectionSection, ErrorBarLookFields, FrameSection, LineLookFields, LineOrderSection, OffsetSection, GridStyleSection, SymbolLookFields } from './sections/LookControls';
 import { autoOffsetStep } from '../../model/table/offset';
-import { DataSetOrder } from './sections/DataSetOrder';
-import { AxisStyleControls } from './sections/AxisStyleControls';
+import { DataSetOrder, DataSetPicker, DataSetReset } from './sections/DataSets';
+import { AxisLimits } from './sections/AxisStyleControls';
 import { bindingOf, bindingSelectState } from '../../chart/shared/axes/axes';
 import { IntervalFields, LineAtField } from './sections/SummaryControls';
 import { resolveStyle, dataLayer } from '../../model/graph/style';
-import type { AxisBinding, AxisConfig, Chart, ChartStyle, DataTable, LineConnect, LineStyle, SummarySpec } from '../../model/types';
+import type { AxisBinding, Chart, ChartStyle, DataTable, LineConnect, LineStyle, SummarySpec } from '../../model/types';
 import { useCommands, useProject, useSelection } from '../../state/AppContext';
 import { MAX_LEGEND_SIZES } from '../../chart/shared/scene/sizeLegend';
 import { NumberListField } from './common/NumberListField';
-import { patchAxis, patchChart, patchLook, patchStyle, patchSurvival } from '../../state/commands';
+import { patchAxis, patchLook, patchStyle, patchSurvival } from '../../state/commands';
 import { LINE_STYLES } from '../../model/graph/look';
 import { analysesOf } from '../../model/project/analysis';
 import { resolveFit } from '../../model/options/fitOptions';
@@ -29,72 +28,18 @@ import { DistributionControls } from './sections/DistributionControls';
 import { FitSection } from './sections/FitControls';
 import { LayersSection } from './sections/LayersSection';
 import { annotationPlacer } from '../../chart/shared/scene/annotationPlace';
-import { DataSetPicker } from './sections/DataSetPicker';
-import { DataSetReset } from './sections/DataSetReset';
-import { scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/graph/selection/scope';
-import { Check, ColorInput, Field, GroupBox, NumField, OptionalNumField, Section, SelectInput, TextInput } from './common/controls';
+import { scopeGroupIds, selectedGroupIds, selectionOfGroups, type StyleScope } from '../../model/selection';
+import { Check, ColorInput, Field, GroupBox, NumField, Section, SelectInput, TextInput } from './common/controls';
 import { DotPlacementControls } from './sections/DotPlacementControls';
 import { VolcanoControls } from './sections/VolcanoControls';
-import { SymbolPicker } from './common/SymbolPicker';
-import { ExtraTicksControls } from './sections/ExtraTicksControls';
-import { TimeField, timeLimitChecks } from './common/TimeField';
-import type { TimeColumn } from '../../util/timeColumn';
 import { InspectorShell } from './common/InspectorShell';
 import { ExportPanel } from '../export/ExportPanel';
-import { useInspectorNav } from './common/useInspectorNav';
+import { useInspectorNav, inspectorShapeOf } from './common/nav';
 import { ChartTypePicker } from './sections/ChartTypePicker';
 import { AnnotationsTab, DimensionsSection, LegendSection, OnThisGraph, TextSections, ReferenceLinesSection } from './sections/SharedSections';
 import { PaletteField } from './sections/PalettePicker';
 import { displayName } from '../../chart/shared/parts/names';
-import { inspectorShapeOf } from './common/nav';
 import { SLIDERS } from './common/sliderRanges';
-
-const axisCtx = (axis: AxisConfig, scale: YAxisScale): AxisEditContext => ({ min: axis.min, max: axis.max, majorInterval: axis.majorInterval, domain: scale.domain, log: scale.log });
-const stepOf = majorStepOf;
-
-/** Range, limits and ticks of one numeric axis: Auto fits the data, Manual uses the limits. */
-export function AxisLimits({ chart, which, scale, name, canScale = true, canReverse = true, time }: { chart: Chart; which: 'xAxis' | 'yAxis' | 'y2Axis'; scale: YAxisScale; name: string; canScale?: boolean; canReverse?: boolean; time?: TimeColumn }) {
-  const { run } = useCommands();
-  const axis = chart[which];
-  const ctx = axisCtx(axis, scale);
-  const tag = which === 'xAxis' ? 'x' : 'y';
-  return (
-    <>
-      <Field label="Range" hint="Auto fits the axis to the data; Manual uses the limits below">
-        <SelectInput<'auto' | 'manual'>
-          value={axis.min === null && axis.max === null ? 'auto' : 'manual'}
-          options={[
-            { value: 'auto', label: 'Auto' },
-            { value: 'manual', label: 'Manual' },
-          ]}
-          onChange={(v) => run(`${name} range`, patchAxis(chart.id, which, v === 'auto' ? { min: null, max: null } : { min: axis.min ?? scale.domain[0], max: axis.max ?? scale.domain[1] }))}
-        />
-      </Field>
-      {time ? (
-        <>
-          <TimeField optional label={`${name} minimum`} time={time} value={axis.min} autoValue={scale.domain[0]} validate={timeLimitChecks(time, axis.min, axis.max, scale.domain).min} onCommit={(v) => run(`${name} minimum`, patchAxis(chart.id, which, { min: v }), `axis:${tag}min`)} />
-          <TimeField optional label={`${name} maximum`} time={time} value={axis.max} autoValue={scale.domain[1]} validate={timeLimitChecks(time, axis.min, axis.max, scale.domain).max} onCommit={(v) => run(`${name} maximum`, patchAxis(chart.id, which, { max: v }), `axis:${tag}max`)} />
-        </>
-      ) : (
-        <>
-          <OptionalNumField label={`${name} minimum`} value={axis.min} autoValue={scale.domain[0]} validate={(v) => validateAxisMin(v, ctx)} onCommit={(v) => run(`${name} minimum`, patchAxis(chart.id, which, { min: v }), `axis:${tag}min`)} />
-          <OptionalNumField label={`${name} maximum`} value={axis.max} autoValue={scale.domain[1]} validate={(v) => validateAxisMax(v, ctx)} onCommit={(v) => run(`${name} maximum`, patchAxis(chart.id, which, { max: v }), `axis:${tag}max`)} />
-          <OptionalNumField label="Major tick interval" value={axis.majorInterval} autoValue={stepOf(scale)} validate={(v) => validateAxisInterval(v, ctx)} onCommit={(v) => run(`${name} tick interval`, patchAxis(chart.id, which, { majorInterval: v }), `axis:${tag}int`)} />
-        </>
-      )}
-      <Field label="Major gridlines">
-        <Check checked={axis.showGrid} onChange={(v) => run(`${name} gridlines`, patchAxis(chart.id, which, { showGrid: v }))} />
-      </Field>
-      {which !== 'y2Axis' && <ExtraTicksControls chart={chart} which={which} scale={scale} name={name} time={time} />}
-      {capabilitiesOf(chart.type).guides && which === 'xAxis' && (
-        <Field label="Equal units" hint="One unit of X is as long as one unit of Y, so that the identity line runs at 45 degrees. The axis with more room is widened; it needs linear axes with no omitted range">
-          <Check checked={chart.equalUnits === true} onChange={(v) => run('Equal units', patchChart(chart.id, { equalUnits: v ? true : undefined }))} />
-        </Field>
-      )}
-      <AxisStyleControls chart={chart} which={which} scale={scale} name={name} canScale={canScale} canReverse={canReverse} time={time} />
-    </>
-  );
-}
 
 /**
  * Formatting panel of the charts drawn from a table of series: XY charts (a numeric X axis), survival curves (time on
@@ -167,6 +112,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
   const { ov, ovSum, setStyle, setSummary } = useScopedEdits(chart, layer, scope, scopeIds, inScope);
   // Summary of replicate values: the layer's for Global, the resolved one for a series.
   const spec: SummarySpec = !sample || scope === 'all' ? layer.summary : resolveSummary(layer, sample.id);
+  // Bars that can be switched off (grouped bars, bars at numeric X): their fields are greyed out while they are.
+  const barsOff = (chart.type === 'groupedBar' || chart.type === 'xyBars') && !st.showBars;
   const errorOff = describeSummaryControls({ showErrorBars: st.showErrorBars, centre: spec.centre, spread: spec.spread }).errorOff;
   const stepSeries = (dir: 1 | -1) => {
     const i = selected ? series.indexOf(selected) : -1;
@@ -234,24 +181,20 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
               {(barChart || chart.type === 'xyBars') && (
                 <GroupBox title={distChart ? (chart.type === 'groupedBox' ? 'Box' : 'Violin') : 'Bars'} {...(chart.type === 'groupedBar' || chart.type === 'xyBars' ? { checked: st.showBars, onCheckedChange: (v: boolean) => setStyle({ showBars: v }), overridden: ov('showBars') } : {})}>
                   <Field label="Fill" overridden={ov('barFill')}>
-                    <ColorInput value={st.barFill} onChange={(v) => setStyle({ barFill: v })} />
+                    <ColorInput value={st.barFill} disabled={barsOff} onChange={(v) => setStyle({ barFill: v })} />
                   </Field>
-                  <NumField {...SLIDERS.fraction} label="Opacity" value={st.barOpacity} min={0} max={1} overridden={ov('barOpacity')} onCommit={(v) => setStyle({ barOpacity: v })} hint="0 = transparent, 1 = opaque" />
-                  <NumField {...SLIDERS.line} label="Border" unit="pt" value={st.barBorderWidthPt} min={0} max={20} overridden={ov('barBorderWidthPt')} onCommit={(v) => setStyle({ barBorderWidthPt: v })} />
-                  <NumField {...SLIDERS.fraction} label="Border opacity" value={st.barBorderOpacity} min={0} max={1} overridden={ov('barBorderOpacity')} onCommit={(v) => setStyle({ barBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
-                  <Field label="Border color" overridden={ov('barBorderColor')}>
-                    <ColorInput value={st.barBorderColor} onChange={(v) => setStyle({ barBorderColor: v })} />
+                  <NumField {...SLIDERS.fraction} label="Opacity" value={st.barOpacity} min={0} max={1} disabled={barsOff} overridden={ov('barOpacity')} onCommit={(v) => setStyle({ barOpacity: v })} hint="0 = transparent, 1 = opaque" />
+                  <NumField {...SLIDERS.line} label="Border" unit="pt" value={st.barBorderWidthPt} min={0} max={20} disabled={barsOff} overridden={ov('barBorderWidthPt')} onCommit={(v) => setStyle({ barBorderWidthPt: v })} />
+                  <NumField {...SLIDERS.fraction} label="Border opacity" value={st.barBorderOpacity} min={0} max={1} disabled={barsOff} overridden={ov('barBorderOpacity')} onCommit={(v) => setStyle({ barBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
+                  <Field label="Border colour" overridden={ov('barBorderColor')}>
+                    <ColorInput value={st.barBorderColor} disabled={barsOff} onChange={(v) => setStyle({ barBorderColor: v })} />
                   </Field>
                 </GroupBox>
               )}
 
               {(chart.type === 'groupedFloating' || chart.type === 'groupedBar') && (
                 <GroupBox title={chart.type === 'groupedBar' ? 'Mean line' : 'Centre line'} checked={st.showMeanLine} onCheckedChange={(v) => setStyle({ showMeanLine: v })} overridden={ov('showMeanLine')}>
-                  <Field label="Color" overridden={ov('lineColor')}>
-                    <ColorInput value={st.lineColor} disabled={!st.showMeanLine} onChange={(v) => setStyle({ lineColor: v })} />
-                  </Field>
-                  <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={20} disabled={!st.showMeanLine} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
-                  <NumField {...SLIDERS.fraction} label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showMeanLine} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
+                  <LineLookFields st={st} ov={ov} setStyle={setStyle} disabled={!st.showMeanLine} />
                   <div className="muted small">{chart.type === 'groupedBar' ? 'A line across each bar at the value it shows.' : 'The bar runs from the smallest to the largest value; the line marks the mean of the replicates.'}</div>
                 </GroupBox>
               )}
@@ -292,14 +235,15 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                     <Check checked={chart.survival.eventSymbols} disabled={!symbolsOn} onChange={(v) => run('Symbols at events', patchSurvival(chart.id, { eventSymbols: v }))} />
                   </Field>
                 )}
-                <Field label="Color" overridden={ov('symbolColor')} note={chart.type === 'xyVolcano' ? 'A volcano plot is coloured by up, down and not significant (see above).' : null}>
-                  <ColorInput value={st.symbolColor} disabled={!symbolsOn || chart.type === 'xyVolcano'} onChange={(v) => setStyle({ symbolColor: v, symbolBorderColor: v })} />
-                </Field>
-                <Field label="Shape" overridden={ov('symbolShape')}>
-                  <SymbolPicker shape={st.symbolShape} fillOpacity={st.symbolFillOpacity} disabled={!symbolsOn} onChange={setStyle} />
-                </Field>
-                <NumField {...SLIDERS.symbol} label={chart.type === 'xyBubble' ? 'Largest bubble' : 'Size'} unit="pt" value={st.symbolSizePt} min={2} max={60} disabled={!symbolsOn} overridden={ov('symbolSizePt')} {...(chart.type === 'xyBubble' ? { hint: 'The diameter of the largest bubble of the chart; the area of the others follows their size.' } : {})} onCommit={(v) => setStyle({ symbolSizePt: v })} />
-                {chart.type === 'xyBubble' && layout.kind === 'sized' && (
+                <SymbolLookFields
+                  st={st}
+                  ov={ov}
+                  setStyle={setStyle}
+                  disabled={!symbolsOn}
+                  colourLocked={chart.type === 'xyVolcano'}
+                  colourNote={chart.type === 'xyVolcano' ? 'A volcano plot is coloured by up, down and not significant (see above).' : null}
+                  {...(chart.type === 'xyBubble' ? { sizeLabel: 'Largest bubble', sizeHint: 'The diameter of the largest bubble of the chart; the area of the others follows their size.' } : {})}
+                  afterSize={chart.type === 'xyBubble' && layout.kind === 'sized' && (
                   <>
                     <Field label="Size legend" hint="Circles of chosen sizes under the plot, on the scale of the bubbles, so a reader can tell what a size means.">
                       <Check checked={chart.sizeLegend !== undefined} ariaLabel="Size legend" onChange={(v) => run('Size legend', patchLook(chart.id, { sizeLegend: v ? { values: [] } : undefined }))} />
@@ -308,13 +252,8 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                       <NumberListField label="Sizes shown" hint="Sizes in the units of the size column, for example 10, 50, 100 (at most 6). Empty: three round values below the largest size." value={chart.sizeLegend.values} max={MAX_LEGEND_SIZES} placeholder="Automatic" normalise={(v) => [...new Set(v.filter((x) => x > 0))].sort((x, y) => x - y)} onCommit={(v) => run('Sizes shown', patchLook(chart.id, { sizeLegend: { values: v } }))} />
                     )}
                   </>
-                )}
-                <NumField {...SLIDERS.fraction} label="Fill opacity" value={st.symbolFillOpacity} min={0} max={1} disabled={!symbolsOn} overridden={ov('symbolFillOpacity')} onCommit={(v) => setStyle({ symbolFillOpacity: v })} hint="1 = solid, 0 = hollow: only the border shows" />
-                <Field label="Border color" overridden={ov('symbolBorderColor')}>
-                  <ColorInput value={st.symbolBorderColor} disabled={!symbolsOn || chart.type === 'xyVolcano'} onChange={(v) => setStyle({ symbolBorderColor: v })} />
-                </Field>
-                <NumField {...SLIDERS.line} label="Border thickness" unit="pt" value={st.symbolBorderWidthPt} min={0} max={20} disabled={!symbolsOn} overridden={ov('symbolBorderWidthPt')} onCommit={(v) => setStyle({ symbolBorderWidthPt: v })} />
-                <NumField {...SLIDERS.fraction} label="Border opacity" value={st.symbolBorderOpacity} min={0} max={1} disabled={!symbolsOn} overridden={ov('symbolBorderOpacity')} onCommit={(v) => setStyle({ symbolBorderOpacity: v })} hint="0 = transparent, 1 = opaque" />
+                  )}
+                />
                 {family === 'xy' && layout.kind === 'replicates' && (
                   <Field label="Symbols show" overridden={ov('showRawPoints')} hint="The mean (or median) of each row, or every replicate as a small symbol; never both. The individual values are part of the axis range while shown">
                     <SelectInput<'centre' | 'values'> value={st.showRawPoints ? 'values' : 'centre'} options={[{ value: 'centre', label: 'Mean' }, { value: 'values', label: 'Individual values' }]} onChange={(v) => setStyle({ showRawPoints: v === 'values', showSymbols: true })} />
@@ -340,28 +279,13 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                       onLevel={(confidenceLevel) => setSummary({ confidenceLevel }, 'Change confidence level')}
                     />
                   )}
-                  <Field label="Color" overridden={ov('errorColor')}>
-                    <ColorInput value={st.errorColor} disabled={layout.kind === 'replicates' && errorOff} onChange={(v) => setStyle({ errorColor: v })} />
-                  </Field>
-                  <Field label="Cap style" overridden={ov('errorCap')}>
-                    <SelectInput value={st.errorCap} options={[{ value: 'bar', label: 'Bar' }, { value: 'none', label: 'None' }]} onChange={(v) => setStyle({ errorCap: v })} />
-                  </Field>
-                  <NumField {...SLIDERS.cap} label="Cap width" unit="pt" value={st.errorCapWidthPt} min={0} max={40} disabled={st.errorCap === 'none'} overridden={ov('errorCapWidthPt')} onCommit={(v) => setStyle({ errorCapWidthPt: v })} />
-                  <Field label="Direction" overridden={ov('errorDirection')} hint={DIRECTION_HINT}>
-                    <SelectInput value={st.errorDirection} options={[{ value: 'both', label: 'Both' }, { value: 'positive', label: 'Above' }, { value: 'negative', label: 'Below' }]} onChange={(v) => setStyle({ errorDirection: v })} />
-                  </Field>
-                  <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={20} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />
-                  <NumField {...SLIDERS.fraction} label="Opacity" value={st.errorOpacity} min={0} max={1} overridden={ov('errorOpacity')} onCommit={(v) => setStyle({ errorOpacity: v })} hint="0 = transparent, 1 = opaque" />
+                  <ErrorBarLookFields st={st} ov={ov} setStyle={setStyle} disabled={layout.kind === 'replicates' ? errorOff : !st.showErrorBars} />
                 </GroupBox>
               )}
 
               {!barChart && (
               <GroupBox title={family === 'survival' ? 'Curve' : 'Line'} checked={st.showLines} onCheckedChange={(v) => setStyle({ showLines: v })} overridden={ov('showLines')}>
-                <Field label="Color" overridden={ov('lineColor')}>
-                  <ColorInput value={st.lineColor} disabled={!st.showLines} onChange={(v) => setStyle({ lineColor: v })} />
-                </Field>
-                <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.lineWidthPt} min={0.2} max={20} disabled={!st.showLines} overridden={ov('lineWidthPt')} onCommit={(v) => setStyle({ lineWidthPt: v })} />
-                <NumField {...SLIDERS.fraction} label="Opacity" value={st.lineOpacity} min={0} max={1} disabled={!st.showLines} overridden={ov('lineOpacity')} onCommit={(v) => setStyle({ lineOpacity: v })} hint="0 = transparent, 1 = opaque" />
+                <LineLookFields st={st} ov={ov} setStyle={setStyle} disabled={!st.showLines} />
                 <Field label="Pattern" overridden={ov('lineStyle')}>
                   <SelectInput<LineStyle> value={st.lineStyle} disabled={!st.showLines} options={LINE_STYLES.map((l) => ({ value: l.value, label: l.label }))} onChange={(v) => setStyle({ lineStyle: v })} />
                 </Field>
@@ -381,7 +305,7 @@ export function XyInspector({ chart, table }: { chart: Chart; table: DataTable }
                 <>
                   {shows('style') && (
                   <GroupBox title="Error bars (standard error)" checked={chart.survival.errorBars} onCheckedChange={(v) => run('Survival error bars', patchSurvival(chart.id, { errorBars: v }))}>
-                    <Field label="Color" overridden={ov('errorColor')}>
+                    <Field label="Colour" overridden={ov('errorColor')}>
                       <ColorInput value={st.errorColor} disabled={!chart.survival.errorBars} onChange={(v) => setStyle({ errorColor: v })} />
                     </Field>
                     <NumField {...SLIDERS.line} label="Thickness" unit="pt" value={st.errorLineWidthPt} min={0.2} max={20} disabled={!chart.survival.errorBars} overridden={ov('errorLineWidthPt')} onCommit={(v) => setStyle({ errorLineWidthPt: v })} />

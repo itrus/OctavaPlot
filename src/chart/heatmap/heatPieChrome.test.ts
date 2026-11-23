@@ -3,9 +3,9 @@ import { createExampleProject } from '../../model/defaults';
 import { addChart, addDataTable } from '../../state/commands';
 import type { SceneElement } from '../shared/scene/sceneElement';
 import { buildHeatModel } from './heatmapModel';
-import { heatAxisLabelElements } from './heatMarks';
+import { heatAxisLabelElements } from './heatDrawing';
 import { buildPieModel } from '../pie/pieModel';
-import { pieLegendElements } from '../pie/pieMarks';
+import { pieLegendElements } from '../pie/pieDrawing';
 
 const setup = (type: 'heatmap' | 'pie', kind: 'grouped' | 'contingency') => {
   const p = addChart('c', 't', undefined, type)(addDataTable('t', kind, { sample: true })(createExampleProject()));

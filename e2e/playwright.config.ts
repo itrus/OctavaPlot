@@ -5,9 +5,10 @@ const PORT = 5199;
 /** The project root: the servers below run there, not in this folder. */
 const root = fileURLToPath(new URL('..', import.meta.url));
 /**
- * The measurements (npm run perf, which sets PERF=1) are taken on the production build, not the development server (React is much slower in
- * development), one test at a time, and only from performance.spec.ts, which is skipped otherwise.
+ * The measurements (npm run perf, or PERF=1) are taken on the production build, not the development server (React is much slower in
+ * development), one test at a time, and only from performance.spec.ts, which is skipped otherwise. PERF is set here for the workers.
  */
+if (process.env.npm_lifecycle_event === 'perf') process.env.PERF = '1';
 const perf = process.env.PERF === '1';
 
 /**

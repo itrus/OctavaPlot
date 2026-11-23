@@ -1,9 +1,8 @@
 import type { Chart, DataTable, FitSettings } from '../../model/types';
 import { buildAnyModel, drawingOf } from '../anyModel';
-import { chartMarkup } from './sceneMarkup';
+import { chartMarkup, escapeXml, prefixIds as prefixIdsWith } from './sceneMarkup';
 import { plainText } from '../../util/richText';
 import { exportPixels, GRAPH_PNG_DPI, svgToPngBlob } from './pngDpi';
-import { escapeXml, prefixIds as prefixIdsWith } from './prefixIds';
 import { svgToPdf } from './svgPdf';
 
 /**

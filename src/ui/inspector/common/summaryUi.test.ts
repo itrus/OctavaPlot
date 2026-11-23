@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SummarySpec } from '../../../model/types';
-import { centreName, describeSpread, describeSummary, percentLabel, summaryTooltipLines } from '../../../model/presentation/summaryText';
+import { centreName, describeSpread, describeSummary, percentLabel, summaryTooltipLines } from '../../../model/graph/summary';
 import { DIRECTION_HINT, centreChangeCompat, centreNoticeLines, centreTitles, datasetRowText, describeCounts, describeSummaryControls, intervalCaptionLines, parseConfidencePercent, spreadOptions, spreadSelectModel, staleSpread, staleSpreadNote } from './summaryUi';
 import { SPREADS_BY_CENTRE, computeGroupStats, effectiveSpreadOf } from '../../../stats/summary';
 

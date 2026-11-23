@@ -4,12 +4,12 @@ import { buildAnyModel, ChartCanvas } from '../../chart/anyModel';
 
 import { previewFit, startChart, type ChartVariant } from '../../model/graph/chartVariant';
 import { GALLERY, availableItems, type GalleryItem } from '../../model/graph/chartGallery';
-import { inheritChart } from '../../model/graph/link/chartFormat';
+import { inheritChart } from '../../model/graph/chartLink';
 import { chartTypeInfo, tableTypeInfo } from '../../model/graph/chartTypes';
 import { createChart } from '../../model/defaults';
 import type { Chart, ChartType, DataTable, Id, TableKind } from '../../model/types';
 import { GallerySketch } from './GallerySketches';
-import { Modal } from './NewItemDialogs';
+import { Modal } from './DialogShell';
 
 
 const FAMILY_LABEL: Record<TableKind, string> = { xy: 'XY', column: 'Column', grouped: 'Grouped', contingency: 'Contingency', survival: 'Survival' };

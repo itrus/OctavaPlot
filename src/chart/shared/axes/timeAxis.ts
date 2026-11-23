@@ -89,6 +89,12 @@ function durationLabel(seconds: number, stepSeconds: number): string {
   return stepSeconds >= 60 ? `${sign}${h}:${pad(m)}` : `${sign}${h}:${pad(m)}:${pad(sec)}`;
 }
 
+/** A length of time in words for a scale bar: "15 s", "30 min", "2 h", "3 d". */
+function durationLength(seconds: number): string {
+  const [unit, size] = seconds % 86400 === 0 ? ['d', 86400] : seconds % 3600 === 0 ? ['h', 3600] : seconds % 60 === 0 ? ['min', 60] : ['s', 1];
+  return `${seconds / size} ${unit}`;
+}
+
 /** The step nearest to the wanted spacing in the ratio sense, among those whose labels still fit; the coarsest when none do. */
 function pickByNearest<T>(steps: readonly T[], span: number, count: number, maxCount: (s: T) => number, seconds: (s: T) => number): T {
   const target = span / Math.max(1, count);
@@ -161,6 +167,7 @@ export function resolveTimeAxis(input: YAxisInput, cfg: TimeAxisSettings, time: 
   let domain: [number, number];
   let ticks: number[];
   let label: (v: number) => string;
+  let stepLabel: string;
 
   if (time.kind === 'duration') {
     const lowest = min ?? lo;
@@ -178,6 +185,7 @@ export function resolveTimeAxis(input: YAxisInput, cfg: TimeAxisSettings, time: 
     }
     const onStep = new Set(ticks);
     label = (v) => (onStep.has(v) ? durationLabel(v * unitSeconds, step) : formatTimeCell(v, time));
+    stepLabel = durationLength(step);
   } else {
     const lowest = min ?? lo;
     const highest = max ?? hi;
@@ -191,11 +199,12 @@ export function resolveTimeAxis(input: YAxisInput, cfg: TimeAxisSettings, time: 
     ticks = found.slice(0, MAX_TICKS_PER_AXIS).map((d) => clean(fromMs(d.getTime())));
     const onStep = new Set(ticks);
     label = (v) => (onStep.has(v) ? calendarLabel(toMs(v), step.level) : formatTimeCell(v, time));
+    stepLabel = step.level === 'second' || step.level === 'minute' || step.level === 'hour' ? durationLength(step.seconds) : `${step.every} ${step.level}${step.every === 1 ? '' : 's'}`;
   }
 
   const minor = time.kind === 'duration' && cfg.minorTicks > 0 ? minorDuration(domain, ticks, cfg.minorTicks) : [];
   const segments = cfg.reverse ? null : segmentsOf(domain, cfg.breaks ?? []);
-  const shared = { domain, tickLabel: label, warnings, log: null, reverse: cfg.reverse };
+  const shared = { domain, tickLabel: label, stepLabel, warnings, log: null, reverse: cfg.reverse };
   if (!segments) return { ...shared, ticks, minorTicks: minor };
   // Ticks only where there is axis; a stretch too short for a tick gets its end values, written in full since they are not boundaries.
   const eps = 1e-9;
