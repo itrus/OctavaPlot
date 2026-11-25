@@ -1,27 +1,17 @@
-name: Test, build and deploy to GitHub Pages
+name: Test, build and deploy to VPS
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# One deployment at a time; a newer push replaces a queued one.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: vps-deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v7
@@ -40,11 +30,15 @@ jobs:
       - name: Build
         run: npm run build
 
-      - uses: actions/configure-pages@v6
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
 
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: dist
-
-      - id: deployment
-        uses: actions/deploy-pages@v5
+      - name: Upload dist/ to VPS
+        run: |
+          rsync -avz --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.VPS_PORT }}" dist/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/html/"
