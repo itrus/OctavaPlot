@@ -5,7 +5,7 @@
 <h1 align="center">OctavaPlot — v0.2</h1>
 
 <p align="center">
-  <a href="https://itrus.github.io/OctavaPlot/"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6%20try%20it-live%20demo-2ea44f?style=for-the-badge"></a>
+  <a href="https://octava.be/"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6%20try%20it-live%20demo-2ea44f?style=for-the-badge"></a>
   <a href="https://www.buymeacoffee.com/itrus"><img height="28" src="docs/assets/buymeacoffee.svg" alt="Buy me a coffee"></a>
 </p>
 
@@ -25,7 +25,7 @@
 
 OctavaPlot is a local React + TypeScript + Vite + D3 app for editing data tables (column, XY, grouped, contingency and survival) and the charts drawn from them: 34 chart types, from dot plots, bars, box plots and violins to XY, survival, heat map and pie charts. It has no backend and works offline after `npm install`.
 
-<h3 align="center">▶ <a href="https://itrus.github.io/OctavaPlot/">Open OctavaPlot in your browser: itrus.github.io/OctavaPlot</a></h3>
+<h3 align="center">▶ <a href="https://octava.be/">Open OctavaPlot in your browser: https://octava.be/</a></h3>
 
 ## Why OctavaPlot
 
