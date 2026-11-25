@@ -18,7 +18,7 @@ export default defineConfig({
   plugins: [react()],
   define: { __APP_VERSION__: JSON.stringify(version), __APP_COMMIT__: JSON.stringify(commit) },
   // Served from https://itrus.github.io/OctavaPlot/ on GitHub Pages.
-  base: '/OctavaPlot/',
+  base: '/',
   build: {
     rolldownOptions: {
       output: {
