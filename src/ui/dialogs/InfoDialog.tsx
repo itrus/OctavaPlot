@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import logoUrl from '../../assets/logo.svg';
 import { benchSteps, runBenchmark, type BenchResult, type BenchStep } from '../diagnostics/benchmark';
 import { MIN_BROWSERS, readSystemInfo, storagePersisted } from '../diagnostics/systemInfo';
+import { checkStatsServer } from '../diagnostics/statsServer';
 import { ASSUMED_LIMIT_BYTES, formatBytes, heapUsage, keyName, measureLocalStorage, type StorageUsage } from '../diagnostics/storageUsage';
 import { AUTOSAVE_META_KEY, clockTime, parseMeta } from '../../state/recovery/recovery';
 import { usePreferences, useRecovery } from '../../state/AppContext';
@@ -33,7 +34,7 @@ function AboutTab() {
         <dt>Source code</dt>
         <dd>Code, issue tracker and releases: {link('https://github.com/itrus/OctavaPlot')}</dd>
         <dt>Built with</dt>
-        <dd>React, D3 (scales), TypeScript and Vite; statistics in R with plumber2.</dd>
+        <dd>React, D3 (scales), TypeScript and Vite; statistical tests will be calculated in R with plumber2.</dd>
         <dt>Support</dt>
         <dd>
           Free software (GNU GPL v3). If it is useful to you,{' '}
@@ -44,21 +45,41 @@ function AboutTab() {
   );
 }
 
-/** The statistics engine: whether the R server answers, what R does for the app, and the two pieces cited. */
+const SERVER_TEXT = {
+  checking: { mark: '…', label: 'checking…', title: 'Asking the R server whether it answers' },
+  ok: { mark: '✓', label: 'answers', title: 'The R server answered its health check. Click to ask again.' },
+  bad: { mark: '✗', label: 'no answer', title: 'The R server did not answer, or answered with an error. Click to ask again.' },
+} as const;
+
+/** The statistics engine: whether the R server answers, what R will do for the app, and the two pieces cited. */
 function RTab() {
-  // Drawn like the browser badge of the System tab. Not checked yet: until the health check (GET /api/stats/health)
-  // is built, the badge stays red.
-  const [server] = useState<'ok' | 'bad'>('bad');
+  // A button drawn like the browser badge of the System tab. It asks GET /api/stats/health when the tab opens (the tab
+  // is mounted only while shown) and again on a click; an answer that comes after the tab closed is dropped.
+  const [server, setServer] = useState<keyof typeof SERVER_TEXT>('checking');
+  const [round, setRound] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    void checkStatsServer(controller.signal).then((ok) => { if (!controller.signal.aborted) setServer(ok ? 'ok' : 'bad'); });
+    return () => controller.abort();
+  }, [round]);
+  const text = SERVER_TEXT[server];
   return (
     <>
-      <p className={`browser-badge ${server}`} title={server === 'ok' ? 'The R server answers' : 'Not connected: the connection check is not built yet'}>
-        <span className="browser-badge-mark" aria-hidden="true">{server === 'ok' ? '✓' : '✗'}</span>
+      <button
+        type="button"
+        className={`browser-badge ${server === 'checking' ? 'unknown' : server}`}
+        title={text.title}
+        disabled={server === 'checking'}
+        onClick={() => { setServer('checking'); setRound((r) => r + 1); }}
+      >
+        <span className="browser-badge-mark" aria-hidden="true">{text.mark}</span>
         <strong>R server</strong>
-        <span>{server === 'ok' ? 'connected' : 'not connected'}</span>
-      </p>
+        <span>{text.label}</span>
+      </button>
       <p>
-        Statistical tests and curve fits are calculated in <strong>R</strong>. The app sends the values of an analysis to the R server at octava.be and
-        shows the results R returns. The server is built with <strong>plumber2</strong>, which turns R functions into a web API.
+        Statistical tests will be calculated in <strong>R</strong>: when you run a test, the app will send its values to the R server at octava.be
+        and show the results R returns. The server is built with <strong>plumber2</strong>, which turns R functions into a web API. Opening this
+        tab only asks the server whether it answers; no data is sent.
       </p>
       <dl className="info-rows">
         <dt>R</dt>
@@ -139,7 +160,6 @@ function BenchmarkTab() {
               </tr>
             );
           })}
-          <tr className="muted"><td>Curve fit (with R)</td><td /><td>later</td></tr>
           {done && <tr className="bench-total"><td>Total</td><td /><td>{timeText(total, totalSe)}</td></tr>}
         </tbody>
       </table>

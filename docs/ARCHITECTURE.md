@@ -1,6 +1,6 @@
 # Structure of the source
 
-Repository: `src/` (the app, its unit tests and the logo in `src/assets/`), `e2e/` (browser tests and their configuration, `playwright.config.ts`), `docs/` (roadmap, backlog, specifications, the example `.oplot`, README assets), `scripts/` (`loc-history.mjs`, which writes the git-ignored `docs/loc-history.csv`; `npm run loc`), `.github/` (workflows).
+Repository: `src/` (the app, its unit tests and the logo in `src/assets/`), `e2e/` (browser tests and their configuration, `playwright.config.ts`), `docs/` (roadmap, backlog, specifications, the example `.oplot`, README assets), `scripts/` (`loc-history.mjs`, which writes the git-ignored `docs/loc-history.csv`; `npm run loc`), `server/` (the R statistics API for plumber2, `plumber2.R`; the same file runs on Windows and on the VPS), `.github/` (workflows).
 
 The source is in `src/`, in layers. A layer imports from its own folder and from the layers under it, never upward; `src/architecture.test.ts` checks this, and that no folder grows past 30 files. Tests sit next to the code they test.
 
@@ -15,7 +15,7 @@ The source is in `src/`, in layers. A layer imports from its own folder and from
 | `src/model/project/` | What a project holds besides tables and graphs: results (`analysis.ts`, `curveFit.ts`, and the shared `resultSheet.ts` contract), the saved chart settings checked on reading (`chartSchema.ts`), page layouts, folders, highlights and the order of the navigator |
 | `src/state/` | The project in memory: commands, undo and redo, the .oplot file and the steps that bring an older file up to date (`migrate.ts`), the tables in the file (`tableCodec.ts`), autosave and recovery copies (`recovery/`), settings, what the inspector is asked to show. `contexts.ts` exposes separate subscriptions for the document, commands, history, selection, navigation, preferences, status, recovery and each viewport |
 | `src/chart/` | Everything that draws a graph from the model (below) |
-| `src/ui/` | The app: `views/` (data table, graph, results, layout and the folder overview), `dialogs/`, `navigator/`, `components/`, `data/` (reading cells and CSV, number format), `inspector/`, `export/` (the export pages and jobs), `diagnostics/` (the system, storage and speed figures of Help → Info) |
+| `src/ui/` | The app: `views/` (data table, graph, results, layout and the folder overview), `dialogs/`, `navigator/`, `components/`, `data/` (reading cells and CSV, number format), `inspector/`, `export/` (the export pages and jobs), `diagnostics/` (the system, storage and speed figures of Help → Info, and the check that the R server answers, `statsServer.ts`) |
 | `src/testing/` | Fixtures and checks used by tests only |
 
 

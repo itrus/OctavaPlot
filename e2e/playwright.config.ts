@@ -25,7 +25,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: {
-    baseURL: `http://localhost:${PORT}/OctavaPlot/`,
+    baseURL: `http://localhost:${PORT}/`,
     channel: 'chrome',
     viewport: { width: 1280, height: 720 },
     acceptDownloads: true,
@@ -34,7 +34,7 @@ export default defineConfig({
   webServer: {
     command: perf ? `npm run build && npx vite preview --port ${PORT} --strictPort` : `npx vite --port ${PORT} --strictPort`,
     cwd: root,
-    url: `http://localhost:${PORT}/OctavaPlot/`,
+    url: `http://localhost:${PORT}/`,
     reuseExistingServer: false,
     timeout: perf ? 240_000 : 60_000,
   },

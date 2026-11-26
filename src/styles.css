@@ -18,7 +18,8 @@
 * { box-sizing: border-box; }
 /* One ring for the keyboard focus of every control that does not draw its own: 2 px of the accent, 3.3 to 1 or more against the page, the panels and white. */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-html, body, #root { height: 100%; margin: 0; }
+/* The height is the visible part of the screen (dvh) where the browser knows it: a phone browser's toolbars then do not cover the bottom bar. 100% is the fallback. */
+html, body, #root { height: 100%; height: 100dvh; margin: 0; }
 body { background: var(--bg); }
 
 button {
@@ -701,6 +702,24 @@ input[type='color'].mixed { opacity: 0.45; }
   .topbar .icon-text { font-size: 0; gap: 0; }
 }
 
+/* The bottom bar on a phone: the slider and the label of the fit button give way (the buttons − and + stay), the message is cut with an
+   ellipsis, and the two panel buttons stay at the ends of the bar however narrow it is, so they can always be reached. */
+@media (max-width: 600px) {
+  .zoom input[type='range'] { display: none; }
+  .zoom-fit { font-size: 0; gap: 0; }
+  .statusbar { gap: 6px; }
+  .statusbar > .icon-only { position: sticky; z-index: 1; background: var(--panel); flex: none; }
+  .statusbar > .icon-only:first-child { left: 0; }
+  .statusbar > .icon-only:last-child { right: 0; }
+}
+
+/* The menu bar on a very narrow screen: closer menu names, and room at the right for the button that folds the header, so that Help is not under it.
+   The project name and the save state stay at the end of the row, reached by swiping it. */
+@media (max-width: 420px) {
+  .menubar-title { padding: 0 6px; }
+  .menubar { padding-right: 38px; }
+}
+
 /* The graph type menu of the graph view toolbar */
 /* The graph types of the Type tab. */
 .chart-type-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 8px; }
@@ -802,6 +821,8 @@ input[type='color'].mixed { opacity: 0.45; }
 .browser-badge.unknown { color: var(--muted); }
 .browser-badge-mark { font-size: 18px; font-weight: 700; }
 .browser-badge > span:last-child { font-size: 13px; opacity: 0.85; }
+/* The R server badge (Info → R) is a button that asks again: it keeps its colour when hovered. */
+button.browser-badge:hover:not(:disabled) { background: color-mix(in srgb, currentColor 18%, transparent); border-color: currentColor; }
 .storage-table td:last-child, .storage-table th:last-child { text-align: right; white-space: nowrap; }
 .palette-btn .gradient-bar { flex: 0 0 auto; width: 100%; height: 18px; box-sizing: border-box; }
 .palette-trigger .gradient-bar { flex-basis: 70px; }

@@ -21,8 +21,16 @@ const build = git('rev-parse --is-shallow-repository') === 'false' ? git('rev-li
 export default defineConfig({
   plugins: [react()],
   define: { __APP_VERSION__: JSON.stringify(version), __APP_BUILD__: JSON.stringify(build) },
-  // Served from https://itrus.github.io/OctavaPlot/ on GitHub Pages.
+  // Served from the root of https://octava.be/ (Caddy on the VPS; .github/workflows/deploy.yml).
   base: '/',
+  // The statistics API: the browser calls /api/stats/<route> on its own origin. In development Vite forwards it to R
+  // (plumber2) on 127.0.0.1:12501 with the prefix removed, as Caddy's handle_path does on the VPS; R decides which
+  // routes exist (server/plumber2.R).
+  server: {
+    proxy: {
+      '/api/stats/': { target: 'http://127.0.0.1:12501', rewrite: (path) => path.replace(/^\/api\/stats/, '') },
+    },
+  },
   build: {
     rolldownOptions: {
       output: {

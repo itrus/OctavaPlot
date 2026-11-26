@@ -2,7 +2,7 @@
   <img src="src/assets/logo.svg" alt="OctavaPlot logo" width="128" height="128">
 </p>
 
-<h1 align="center">OctavaPlot — v0.2</h1>
+<h1 align="center">OctavaPlot — v0.3</h1>
 
 <p align="center">
   <a href="https://octava.be/"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6%20try%20it-live%20demo-2ea44f?style=for-the-badge"></a>
@@ -25,18 +25,18 @@
   <img alt="plumber2" src="https://img.shields.io/badge/plumber2-R%20web%20API-75aadb">
 </p>
 
-OctavaPlot is a React + TypeScript + Vite + D3 app, with statistics in R served by plumber2, for editing data tables (column, XY, grouped, contingency and survival) and the charts drawn from them: 34 chart types, from dot plots, bars, box plots and violins to XY, survival, heat map and pie charts. Tables, charts, layouts and files work offline after `npm install`; statistical tests and curve fits are calculated by the R server at octava.be.
+OctavaPlot is a React + TypeScript + Vite + D3 app, with statistical tests to be calculated in R through plumber2, for editing data tables (column, XY, grouped, contingency and survival) and the charts drawn from them: 34 chart types, from dot plots, bars, box plots and violins to XY, survival, heat map and pie charts. Tables, charts, layouts and files work offline after `npm install`; statistical tests will be calculated by the R server at octava.be (in progress).
 
 <h3 align="center">▶ <a href="https://octava.be/">Open OctavaPlot in your browser: https://octava.be/</a></h3>
 
 ## Why OctavaPlot
 
 - **Your own copy.** GPL v3: run it, copy it, change it and share it. The whole source is in this repository, with no licence fee, account or subscription.
-- **Runs on Linux, Windows and macOS.** In a modern browser, or offline after `npm install` (the statistics in R then need a connection to octava.be).
+- **Runs on Linux, Windows and macOS.** In a modern browser, or offline after `npm install` (statistical tests in R will need a connection to octava.be).
 - **Everything is live.** Graphs follow the table, results are recalculated from it, and linked graphs follow their source. Changing a stroke width on a graph of 100 000 observations showed on screen after 114 ms; a title edit on a normal graph, after 20 ms.
 - **Files you can read.** A `.oplot` project is plain JSON that any text tool can open and diff.
-- **Data stays local, except for statistics.** Tables, graphs and project files stay in your browser and on your computer; only the values of a statistical test or curve fit are sent to the R server at octava.be.
-- **Statistics with R.** Statistical tests and curve fits are calculated in R through a plumber2 web API.
+- **Data stays local, except for statistics.** Tables, graphs and project files stay in your browser and on your computer. When statistical tests arrive, only the values of a test you run will be sent to the R server at octava.be; until then nothing is sent (About → R only asks whether the server answers).
+- **Statistics with R (in progress).** Statistical tests will be calculated in R through a plumber2 web API; curve fits stay in the browser.
 
 **One screenshot, three advantages.** The numbers below match the parts of the picture.
 
@@ -112,7 +112,7 @@ The full description (contents, units, what is checked, what is not stored, priv
 
 ## Compliance note
 
-Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. When a statistical test or curve fit is run, its values are sent to the R server. Autosave can be switched off in Settings; switching it off deletes the copy kept in the browser (after asking). A project saved as a file stays wherever the file is kept.
+Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. When statistical tests are added, the values of a test will be sent to the R server only when you run it. Autosave can be switched off in Settings; switching it off deletes the copy kept in the browser (after asking). A project saved as a file stays wherever the file is kept.
 
 ## Status and verification
 
@@ -125,7 +125,8 @@ Row titles, data-set names and values are stored unencrypted in the browser (`lo
 | Version | Dates | Commits | Code | What it is |
 |---|---|---|---|---|
 | v0.1 | 22 Oct – 14 Nov 2026 (to f978e1b) | 63 | 66.8 kLoC (40.0 source + 26.8 tests) | From an empty repository to the full editor: 5 table types, 57 gallery graphs (34 chart types), curve fits in a Web Worker, `.oplot` files, layouts, SVG/PNG/PDF export, forest plots, heat maps, shapes and rich text. 63 browser tests |
-| v0.2 | from 14 Nov 2026 (in progress) | 22 so far (f978e1b to 22 Nov 2026) | 68.3 kLoC on 14 Nov (40.9 source + 27.4 tests); not counted since | Audit fixes with regression tests, symbol picker, palette and gradient pickers, export panels, new-graph and layout dialogs, axis and chart defaults, a shorter README with the details in `docs/` |
+| v0.2 | 14 – 26 Nov 2026 (f978e1b to eb40b0e) | 29 | 71.8 kLoC (43.7 source + 28.1 tests) | Audit fixes with regression tests, symbol picker, palette and gradient pickers, export panels, new-graph and layout dialogs, axis and chart defaults, a shorter README with the details in `docs/`; highlights, label angles, reference-line options and one-column pies; review fixes and 65 fewer source files; deployment to octava.be; the version label with the build number; plots lined up in layouts; copy and paste of texts and shapes. 63 browser tests |
+| v0.3 | from 26 Nov 2026 (in progress) | from eb40b0e | not counted yet | Statistical tests in R through plumber2 on the VPS. First step: the connection (Info → R shows whether the R server answers) |
 
 What changed and when: [docs/CHANGELOG.md](docs/CHANGELOG.md). Day-by-day history of v0.1: [docs/ROADMAP.md](docs/ROADMAP.md#version-01-22-october-to-14-november-2026).
 
