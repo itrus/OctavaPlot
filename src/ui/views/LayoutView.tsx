@@ -23,6 +23,9 @@ import { DrawingList } from '../inspector/sections/DrawingEditor';
 import { ArrangementSketch, FreeSketch } from '../components/ArrangementSketch';
 import { LAYOUT_PAGE_ICONS, PointerIcon, TextToolIcon } from '../components/icons';
 import { LayoutExportPanel } from '../export/ExportPanel';
+import { objectsCount, objectsFromText, objectsToText, pasteStep } from '../components/objectClipboard';
+import { copyText } from '../../util/download';
+import { usePasteCatcher } from '../components/pasteCatcher';
 import { InspectorShell, type InspectorKit } from '../inspector/common/InspectorShell';
 import { Check, ColorInput, Field, NumField, Section, SelectInput, TextInput } from '../inspector/common/controls';
 
@@ -115,7 +118,7 @@ const intersect = (a: FrameMm, b: FrameMm): FrameMm => {
 
 function LayoutPage({ layout }: { layout: Layout }) {
   const { project } = useProject();
-  const { run } = useCommands();
+  const { run, setStatus } = useCommands();
   const { layoutZoom, setLayoutZoom } = useLayoutViewport();
   // The shapes and lines are drawn by the page itself, over the picture, so that they follow a drag at once (an export draws them in the picture).
   const drawing = useMemo(() => drawLayout(layout, project, { withoutDrawings: true }), [layout, project]);
@@ -270,6 +273,38 @@ function LayoutPage({ layout }: { layout: Layout }) {
     run(picked.length === 1 ? 'Delete' : 'Delete selected', composeCommands(...(pickedNotes.length > 0 ? [patchLayout(layout.id, { annotations: notes.filter((n) => !ids.has(n.id)) })] : []), ...(pickedShapes.length > 0 ? [removeDrawings(owner, pickedShapes.map((d) => d.id))] : [])));
     setPicked([]);
   };
+  /** Ctrl+C and Ctrl+X: the selected texts and shapes of the page on the clipboard (Ctrl+X then removes them); false when nothing is selected. */
+  const copyPicked = (cut: boolean): boolean => {
+    if (picked.length === 0) return false;
+    const copied = { annotations: pickedNotes, drawings: pickedShapes };
+    void copyText(objectsToText(copied)).then((ok) => {
+      if (!ok) return setStatus('The browser did not allow copying to the clipboard.');
+      setStatus(`${cut ? 'Cut' : 'Copied'} ${objectsCount(copied)}.`);
+      if (cut) deletePicked();
+    });
+    return true;
+  };
+  /** Ctrl+V: texts and shapes copied from a page or a graph, moved a little so that they do not hide the originals, or a plain text as a new text. */
+  const pasteOnPage = (text: string) => {
+    const got = objectsFromText(text, true);
+    if (!got) {
+      if (text.trim() === '') return setStatus('The clipboard holds nothing to paste here.');
+      const added = { ...createAnnotation(PAGE_TEXT_LOOK, 0.4, 0.4), text: text.trim() };
+      setNotes('Paste text', [...notes, added]);
+      setPicked([added.id]);
+      return setStatus('Pasted the text as a new text.');
+    }
+    const step = pasteStep(text);
+    const clamp = (v: number) => Math.min(0.98, Math.max(0, Math.round(v * 1000) / 1000));
+    const annotations = got.annotations.map((n) => ({ ...n, xFrac: clamp(n.xFrac + step), yFrac: clamp(n.yFrac + step) }));
+    const drawings = got.drawings.map((d) => ({ ...d, ...nudgeDrawings([d], step, step, W, H)[0].patch }));
+    const pasted = { annotations, drawings };
+    run(`Paste ${objectsCount(pasted)}`, composeCommands(...(annotations.length > 0 ? [patchLayout(layout.id, { annotations: [...notes, ...annotations] })] : []), ...drawings.map((d) => addDrawing(owner, d))));
+    setPicked([...annotations, ...drawings].map((o) => o.id));
+    setInspPage('notes');
+    setStatus(`Pasted ${objectsCount(pasted)}.`);
+  };
+  const paste = usePasteCatcher(pasteOnPage);
   /** Move the selected texts and objects by a step (fractions of the page; an arrow key). */
   const nudgePicked = (dx: number, dy: number) => {
     const clamp = (v: number) => Math.min(0.98, Math.max(0, Math.round(v * 1000) / 1000));
@@ -365,12 +400,19 @@ function LayoutPage({ layout }: { layout: Layout }) {
       <div className="layout-body">
         <div className="chart-scroller" ref={scrollerRef}>
           <div className="chart-wrap" style={{ width: pageW }}>
+            {paste.catcher}
             <div
               className="layout-page-wrap"
               style={{ width: pageW, height: pageH }}
               tabIndex={0}
-              aria-label="Page. V selects, T places a text, Escape cancels a tool, the arrow keys move the selected texts and shapes (Shift 5%, Alt 0.1%), Delete removes them."
+              aria-label="Page. V selects, T places a text, Escape cancels a tool, the arrow keys move the selected texts and shapes (Shift 5%, Alt 0.1%), Delete removes them, Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste them."
               onKeyDown={(e) => {
+                if (e.target === e.currentTarget && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+                  if ((e.code === 'KeyC' || e.code === 'KeyX') && copyPicked(e.code === 'KeyX')) e.preventDefault();
+                  // No preventDefault: the browser's paste goes to the hidden textarea.
+                  else if (e.code === 'KeyV') paste.arm();
+                  return;
+                }
                 if (e.target !== e.currentTarget || e.ctrlKey || e.metaKey) return;
                 if (e.key.startsWith('Arrow') && picked.length > 0) {
                   const step = e.shiftKey ? 0.05 : e.altKey ? 0.001 : 0.01;

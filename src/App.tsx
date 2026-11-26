@@ -1,4 +1,5 @@
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import logoUrl from './assets/logo.svg';
 import { prepareChartInput } from './model/table/preparedChart';
 import { AppProvider, useCommands, useGraphViewport, useHistory, useLayoutViewport, useNavigation, usePreferences, useProject, useRecovery, useResultsViewport, useStatus, useTableViewport } from './state/AppContext';
 import { openedStatus, refusedStatus, PROJECT_EXTENSION, PROJECT_MIME, projectToFileText, readProjectFile, openDecision } from './state/projectFile';
@@ -88,7 +89,7 @@ function Shell() {
   };
   const [inspectorOpen, setInspectorOpen] = useState(true);
   // Panel widths (px), changed with the splitters; a narrow window starts with the panels folded away.
-  const [navW, setNavW] = useState(250);
+  const [navW, setNavW] = useState(200);
   const [inspW, setInspW] = useState(360);
   useEffect(() => {
     const narrow = window.matchMedia('(max-width: 1100px)');
@@ -113,7 +114,8 @@ function Shell() {
     if (changed && window.matchMedia('(max-width: 900px)').matches) setNavOpen(false);
   }, [view]);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false);
+  // The About window opens at start unless the user ticked "Don't show at start".
+  const [infoOpen, setInfoOpen] = useState(() => settings.aboutAtStart);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // What was reset when the last file was opened: all of it, with the paths, is behind the Details button.
@@ -296,10 +298,10 @@ function Shell() {
       data-head={headOpen ? 'open' : 'closed'}
       style={{ '--nav-w': navOpen ? `${navW}px` : '0px', '--insp-w': hasInspector && inspectorOpen ? `${inspW}px` : '0px', '--nav-px': `${navW}px`, '--insp-px': `${inspW}px` } as CSSProperties}
     >
-      <img className={headOpen ? 'brand-logo' : 'brand-logo brand-logo-small'} src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width={headOpen ? 56 : 22} height={headOpen ? 56 : 22} />
+      <img className={headOpen ? 'brand-logo' : 'brand-logo brand-logo-small'} src={logoUrl} alt="" width={headOpen ? 56 : 22} height={headOpen ? 56 : 22} />
       <header className="topbar">
         <strong className="brand">OctavaPlot</strong>
-        <span className="app-version" title={`OctavaPlot ${__APP_VERSION__}${__APP_COMMIT__ ? ` (build ${__APP_COMMIT__})` : ''}`}>v{__APP_VERSION__}</span>
+        <span className="app-version">v{__APP_VERSION__}{__APP_BUILD__ ? ` (build #${__APP_BUILD__})` : ''}</span>
       </header>
       <MenuBar menus={menus}>
         <span className="topbar-sep" />

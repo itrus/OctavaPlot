@@ -4,7 +4,7 @@ import { drawLayout } from '../../chart/export/layoutExport';
 import { addChart, addDataTable, addFreePanel, addLayout, patchChart, setCells, duplicateLayout, freeLayout, patchLayout, removeChart, removeFreePanel, removeLayout, removeTable, renameItem, setFrame, setLayoutPanel } from '../../state/commands';
 import { parseProject, stringifyProject } from '../../state/serialize';
 import { createExampleProject } from '../defaults';
-import { arrangeLayout, defaultLayout, pageFrame, panelLabel, sanitizeLayout, slotCount, slotRects, standardArrangements, turnFrames } from './layout';
+import { alignAxes, arrangeLayout, defaultLayout, pageFrame, panelLabel, sanitizeLayout, slotCount, slotRects, standardArrangements, turnFrames } from './layout';
 import { mmToPt } from '../units';
 import type { FrameMm, Layout, Project } from '../types';
 
@@ -167,6 +167,34 @@ describe('project file', () => {
 });
 
 describe('page drawing', () => {
+  it('lines up the plots of a column: their left and right edges, whatever room each graph needs for its labels', () => {
+    const base = twoCharts();
+    const [a, b] = base.charts;
+    // The first graph has a large Y title, the second none: on their own their plots start at different places.
+    const p0 = patchChart(b.id, { yAxis: { ...b.yAxis, titleVisible: false } })(patchChart(a.id, { yAxis: { ...a.yAxis, title: 'A long value', titleVisible: true, titleFontSizePt: 40 } })(base));
+    const { p, l } = withLayout(p0, { orientation: 'portrait', arrangement: { kind: 'grid', cols: 1, rows: 2 }, panels: [a.id, b.id] });
+    const own = p.charts.map((c) => { const t = p.dataTables.find((x) => x.id === c.dataTableId)!; const m = buildAnyModel(c, t).model; return m.layout.plot.x / m.widthPt; });
+    expect(Math.abs(own[0] - own[1])).toBeGreaterThan(0.01);
+    const [top, bottom] = drawLayout(l, p).plots;
+    expect(top!.x).toBeCloseTo(bottom!.x, 2);
+    expect(top!.x + top!.w).toBeCloseTo(bottom!.x + bottom!.w, 2);
+  });
+  it('lines up the plots of a row: their top and bottom edges', () => {
+    const base = twoCharts();
+    const [a, b] = base.charts;
+    const p0 = patchChart(b.id, { showTitle: false })(patchChart(a.id, { showTitle: true, title: 'Title', titleFontSizePt: 40 })(base));
+    const { p, l } = withLayout(p0, { arrangement: { kind: 'grid', cols: 2, rows: 1 }, panels: [a.id, b.id] });
+    const [left, right] = drawLayout(l, p).plots;
+    expect(left!.y).toBeCloseTo(right!.y, 2);
+    expect(left!.y + left!.h).toBeCloseTo(right!.y + right!.h, 2);
+  });
+  it('leaves insets and free frames as they are', () => {
+    const { p, l } = withLayout(twoCharts(), { arrangement: { kind: 'inset' } });
+    const arranged = arrangeLayout(l, [{ widthPt: 400, heightPt: 300 }, { widthPt: 400, heightPt: 300 }]);
+    const m = { left: 10, top: 10, right: 10, bottom: 10 };
+    expect(alignAxes(l, arranged, [m, { ...m, left: 40 }])).toEqual({ arranged, floors: [null, null] });
+    expect(drawLayout(l, p).plots).toHaveLength(2);
+  });
   it('is one SVG of A4 size with each graph nested, its label, and no id used twice', () => {
     const { p, l } = withLayout(twoCharts(), { orientation: 'portrait', arrangement: { kind: 'grid', cols: 1, rows: 2 } });
     const d = drawLayout(l, p, { metadata: true });

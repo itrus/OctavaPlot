@@ -183,14 +183,6 @@ export const paletteById = (id: string | null): Palette | undefined => PALETTES.
 /** Colour of the data set at `index`; the palette repeats when there are more data sets than colours. */
 export const paletteColor = (palette: Palette, index: number): string => palette.colors[index % palette.colors.length];
 
-/** What each subcategory of the menu holds. */
-export const PALETTE_GROUP_INFO: Record<PaletteGroup, string> = {
-  Journals: 'Colours modelled on the figures of scientific and medical journals, so that a chart looks at home next to them.',
-  'Software and design systems': 'Categorical colours of visualisation libraries, design systems and a genome browser (IGV), made to keep many categories apart on a screen.',
-  'Published styles': 'Colours of published data-visualisation style guides, one entry per variant, named after the organisation whose guide it follows. Values printed in a style guide are exact; those read from an image are approximate.',
-  Other: 'The palettes of the app itself: bright, pastel, a colour-vision-safe one (Okabe & Ito), single-hue, grey, retro, and warm and cool.',
-};
-
 /** The palettes of one subcategory, in menu order. */
 export const palettesInGroup = (group: PaletteGroup): Palette[] => PALETTES.filter((p) => p.group === group);
 

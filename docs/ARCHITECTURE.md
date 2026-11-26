@@ -1,6 +1,6 @@
 # Structure of the source
 
-Repository: `src/` (the app and its unit tests), `e2e/` (browser tests and their configuration, `playwright.config.ts`), `docs/` (roadmap, backlog, specifications, the example `.oplot`, README assets), `public/` (static files such as the logo), `scripts/` (`loc-history.mjs`, which writes the git-ignored `docs/loc-history.csv`; `npm run loc`), `.github/` (workflows).
+Repository: `src/` (the app, its unit tests and the logo in `src/assets/`), `e2e/` (browser tests and their configuration, `playwright.config.ts`), `docs/` (roadmap, backlog, specifications, the example `.oplot`, README assets), `scripts/` (`loc-history.mjs`, which writes the git-ignored `docs/loc-history.csv`; `npm run loc`), `.github/` (workflows).
 
 The source is in `src/`, in layers. A layer imports from its own folder and from the layers under it, never upward; `src/architecture.test.ts` checks this, and that no folder grows past 30 files. Tests sit next to the code they test.
 

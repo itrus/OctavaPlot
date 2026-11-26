@@ -3,7 +3,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { buildAnyModelCached, ChartCanvas, fitsPendingOf, previewDotCount } from '../../chart/anyModel';
 import { useFitsVersion, fitScale, useAvailableSize } from '../components/hooks';
 import { CHROME_STOPS, type ChromeStop, describeFocus, extendAnnotations, extendGroups, extendPoints, nextFocus, selectableMarks } from '../../chart/selectionOrder';
-import { toggleGroupSelection, selectedAnnotationIds, selectedPoints, toggleAnnotationSelection, togglePointSelection } from '../../model/selection';
+import { toggleGroupSelection, selectedAnnotationIds, selectedPoints, selectionOfAnnotations, toggleAnnotationSelection, togglePointSelection } from '../../model/selection';
+import { objectsCount, objectsFromText, objectsToText, pasteStep } from '../components/objectClipboard';
+import { copyText } from '../../util/download';
+import { usePasteCatcher } from '../components/pasteCatcher';
 import { dragLabelPatch } from '../inspector/common/pointOverrideUi';
 import { densePreviewNote, isDense, nearestDot } from '../../chart/shared/scene/denseDots';
 import { hitFromTarget, type HitTarget, pointerToChartPt } from '../../chart/shared/scene/hitTest';
@@ -243,7 +246,57 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
   const selectedNotes = chart.annotations.filter((a) => pickedNotes.includes(a.id));
   const selectedShapes = selection.kind === 'drawings' ? drawings.filter((d) => selection.drawingIds.includes(d.id)) : [];
   const announcement = describeFocus(marks, { selection, stop }, undefined, chart.annotations);
+  // Ctrl+C and Ctrl+X put the selected texts or shapes on the clipboard (Ctrl+X then removes them); Ctrl+V pastes texts and shapes
+  // copied from a graph or a page, moved a little so that they do not hide the originals, or a plain text as a new text.
+  const copyObjects = (cut: boolean): boolean => {
+    if (selectedShapes.length === 0 && selectedNotes.length === 0) return false;
+    // A text or shape anchored to data is copied with the place it is drawn at now, which a page (no axes) uses.
+    const place = annotationPlacer(any, model.widthPt, model.heightPt);
+    const annotations = selectedNotes.map((a) => ({ ...a, ...(drawnFractions(a, place) ?? {}) }));
+    const shapes = selectedShapes.map((d) => {
+      const [a, b] = drawnPoints(d, model.widthPt, model.heightPt, place);
+      return { ...d, from: { ...d.from, xFrac: a.x / model.widthPt, yFrac: a.y / model.heightPt }, to: { ...d.to, xFrac: b.x / model.widthPt, yFrac: b.y / model.heightPt } };
+    });
+    const copied = { annotations, drawings: shapes };
+    void copyText(objectsToText(copied)).then((ok) => {
+      if (!ok) return setStatus('The browser did not allow copying to the clipboard.');
+      setStatus(`${cut ? 'Cut' : 'Copied'} ${objectsCount(copied)}.`);
+      if (!cut) return;
+      if (selectedShapes.length > 0) run(selectedShapes.length === 1 ? 'Cut shape' : 'Cut shapes', removeDrawings(owner, selectedShapes.map((d) => d.id)));
+      else run(selectedNotes.length === 1 ? 'Cut annotation' : 'Cut annotations', composeCommands(...selectedNotes.map((a) => removeAnnotation(chart.id, a.id))));
+      setSelection({ kind: 'chart' });
+    });
+    return true;
+  };
+  const pasteObjects = (text: string) => {
+    const got = objectsFromText(text, false);
+    if (!got) {
+      if (text.trim() === '') return setStatus('The clipboard holds nothing to paste here.');
+      const added = { ...createAnnotation(chartTextLook(chart), 0.4, 0.4), text: text.trim() };
+      run('Paste text', addAnnotation(chart.id, added));
+      setSelection({ kind: 'annotation', annotationId: added.id });
+      return setStatus('Pasted the text as a new text.');
+    }
+    const step = pasteStep(text);
+    const place = annotationPlacer(any, model.widthPt, model.heightPt);
+    const annotations = got.annotations.map((a) => ({ ...a, ...nudgePatches([a], place, step, step)[0].patch }));
+    const shapes = got.drawings.map((d) => ({ ...d, ...nudgeDrawings([d], step, step, model.widthPt, model.heightPt, place)[0].patch }));
+    const pasted = { annotations, drawings: shapes };
+    run(`Paste ${objectsCount(pasted)}`, composeCommands(...annotations.map((a) => addAnnotation(chart.id, a)), ...shapes.map((d) => addDrawing(owner, d))));
+    // A selection holds texts or shapes, not both: the shapes are selected when there are any.
+    setSelection(shapes.length > 0 ? { kind: 'drawings', drawingIds: shapes.map((d) => d.id) } : selectionOfAnnotations(annotations.map((a) => a.id)));
+    setStatus(`Pasted ${objectsCount(pasted)}.`);
+  };
+  const paste = usePasteCatcher(pasteObjects);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.target === e.currentTarget) {
+      if ((e.code === 'KeyC' || e.code === 'KeyX') && copyObjects(e.code === 'KeyX')) {
+        e.preventDefault();
+        return;
+      }
+      // No preventDefault: the browser's paste goes to the hidden textarea.
+      if (e.code === 'KeyV') return paste.arm();
+    }
     // Shortcuts (Ctrl+Z, Ctrl+S ...) belong to the app; so does everything while a dialog or another field has the keys.
     if (e.ctrlKey || e.metaKey || e.target !== e.currentTarget) return;
     // The arrow keys move the selected shapes or texts (Shift 5%, Alt 0.1%); other Alt keys belong to the browser.
@@ -405,9 +458,15 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
             ref={surfaceRef}
             tabIndex={0}
             role="group"
-            aria-label="Chart. Arrow keys select data sets and points, Escape selects the whole chart, Enter opens its settings. After the axes, the right arrow reaches the annotations; Page Down and Page Up step along them."
+            aria-label="Chart. Arrow keys select data sets and points, Escape selects the whole chart, Enter opens its settings. After the axes, the right arrow reaches the annotations; Page Down and Page Up step along them. Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste the selected texts and shapes."
             onKeyDown={onKeyDown}
             onPointerDown={onPointerDown}
+            onPaste={(e) => {
+              // A paste that reaches the chart itself (some browsers send it there) is taken as the hidden textarea takes it.
+              if (e.target !== e.currentTarget) return;
+              e.preventDefault();
+              pasteObjects(e.clipboardData.getData('text/plain'));
+            }}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
@@ -417,6 +476,7 @@ export function GraphView({ prepared }: { prepared: PreparedChart }) {
             <ChartCanvas ref={svgRef} chart={chart} any={any} editor={{ selection, dragging: drag, drawingDrafts }} preview cssWidth={`${cssW}px`} cssHeight={`${cssH}px`} />
           </div>
           <div className="visually-hidden" role="status" aria-live="polite">{announcement}</div>
+          {paste.catcher}
           {tip && (
             <div className="tooltip" style={{ left: tip.x, top: tip.y }}>
               {tip.lines.map((l, i) => (

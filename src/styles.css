@@ -49,7 +49,7 @@ input[type='color'] { width: 38px; height: 22px; padding: 0 1px; border: 1px sol
   height: 100%;
   display: grid;
   /* The side columns collapse to 0, so the workspace takes the freed width. */
-  grid-template-columns: var(--nav-w, 250px) minmax(0, 1fr) var(--insp-w, 0px);
+  grid-template-columns: var(--nav-w, 200px) minmax(0, 1fr) var(--insp-w, 0px);
   position: relative;
   grid-template-rows: 36px 30px minmax(0, 1fr) 30px;
   grid-template-areas: 'top top top' 'menu menu menu' 'nav main insp' 'stat stat stat';
@@ -109,7 +109,7 @@ button.icon-only { display: inline-flex; align-items: center; justify-content: c
 /* Collapsing slides a panel out toward its own window edge; hidden panels stay mounted but unreachable. */
 .navigator {
   grid-area: nav;
-  width: var(--nav-px, 250px);
+  width: var(--nav-px, 200px);
   justify-self: start;
   min-height: 0;
   background: var(--panel);
@@ -183,6 +183,13 @@ button.primary:hover:not(:disabled) { background: #144fb0; border-color: #144fb0
 .choice-card.selected { border-color: var(--accent); background: var(--accent-soft); }
 .choice-label { display: flex; align-items: center; gap: 8px; }
 .choice-label select { flex: 1; }
+.info-start-check { margin-right: auto; }
+/* Recovery copies: one framed box per copy, its Download button at the right; Refresh at the left of the footer. */
+.modal.recovery-modal { width: min(520px, 92vw); }
+.recovery-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.recovery-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+.recovery-text { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.recovery-refresh { margin-right: auto; }
 .nav-item .nav-badge + .nav-badge { margin-left: 4px; }
 .nav-folder .nav-alpha { margin-left: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 .nav-badge { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; }
@@ -584,9 +591,17 @@ input[type='color'].mixed { opacity: 0.45; }
 .layout-handle.se { right: -6px; bottom: -6px; cursor: nwse-resize; }
 .layout-buttons { display: flex; gap: 8px; margin-top: 6px; }
 
-/* Settings: one screen, in groups under small headings */
-.settings-body { padding: 4px 14px 14px; }
-.settings-modal { width: min(450px, 92vw); }
+/* Settings: one screen, each group in a framed box with a line under its heading; two columns (General on the left, the rest
+   on the right), one column in a narrow window. */
+.settings-body { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
+.settings-modal { width: min(980px, 94vw); }
+.settings-group { border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px 10px; background: var(--panel); min-width: 0; }
+.settings-group-tall { grid-row: span 2; }
+.settings-group > .sub-heading { margin: 0 0 6px; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+@media (max-width: 760px) {
+  .settings-body { grid-template-columns: 1fr; }
+  .settings-group-tall { grid-row: auto; }
+}
 /* A setting's name takes one line: the dialog is wide enough, and the control takes the rest of the row. */
 .settings-body .field-label { flex: 0 0 auto; white-space: nowrap; }
 .format-tab-gap { margin-left: 10px; }
@@ -649,7 +664,7 @@ input[type='color'].mixed { opacity: 0.45; }
     z-index: 20;
     box-shadow: 0 0 12px rgba(0, 0, 0, 0.3);
   }
-  .app > .navigator { left: 0; width: min(var(--nav-px, 250px), 88vw); }
+  .app > .navigator { left: 0; width: min(var(--nav-px, 200px), 88vw); }
   .app > .inspector, .app > .inspector-host { right: 0; width: min(var(--insp-px, 360px), 92vw); }
   .app[data-nav='closed'] .navigator, .app[data-insp='closed'] .inspector, .app[data-insp='closed'] .inspector-host { box-shadow: none; }
   .splitter { display: none; }

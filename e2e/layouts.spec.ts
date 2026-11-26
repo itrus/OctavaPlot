@@ -311,7 +311,7 @@ test.describe('exporting a page', () => {
     await panel.getByRole('button', { name: /^PNG/ }).click();
     const sizes = panel.locator('.report-sizes li');
     // A4 landscape (the page of this test) at each resolution, in whole pixels; the points and the millimetres (with the name of the paper) stay.
-    for (const [dpi, px] of [['150', '1754 × 1240 px'], ['300', '3508 × 2480 px'], ['600', '7016 × 4961 px']] as const) {
+    for (const [dpi, px] of [['300', '3508 × 2480 px'], ['600', '7016 × 4961 px'], ['1200', '14031 × 9921 px']] as const) {
       await panel.getByRole('button', { name: `${dpi} dpi`, exact: true }).click();
       await expect(sizes.first()).toHaveText(px);
       await expect(sizes.nth(1)).toHaveText('841.89 × 595.28 pt');

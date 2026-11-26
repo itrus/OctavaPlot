@@ -4,12 +4,14 @@ import type { DecimalSeparator } from '../model/types';
 export type ExportFormat = 'png' | 'svg' | 'pdf';
 
 /** Resolutions offered for the PNG of a layout page: the only PNG with a resolution to choose (a graph's PNG is at its own size). */
-export const EXPORT_DPI_CHOICES = [150, 300, 600] as const;
+export const EXPORT_DPI_CHOICES = [300, 600, 1200] as const;
 export type ExportDpi = (typeof EXPORT_DPI_CHOICES)[number];
 
 /** Application preferences. Kept apart from the project: they follow the browser, not the file. */
 export interface Settings {
   autosave: boolean;
+  /** Open the About window when the app starts ("Don't show at start" clears it). */
+  aboutAtStart: boolean;
   /** Add the date and time (yymmdd_HHMM) to the names of exported files. */
   timestampExports: boolean;
   /** New projects, and the New Data Table dialog, start with sample data (off: blank tables). */
@@ -28,6 +30,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   autosave: true,
+  aboutAtStart: true,
   timestampExports: true,
   newProjectSample: true,
   exportFormat: 'png',
@@ -58,6 +61,7 @@ export function sanitizeSettings(raw: unknown): Settings {
   const d = DEFAULT_SETTINGS;
   return {
     autosave: typeof r.autosave === 'boolean' ? r.autosave : d.autosave,
+    aboutAtStart: typeof r.aboutAtStart === 'boolean' ? r.aboutAtStart : d.aboutAtStart,
     timestampExports: typeof r.timestampExports === 'boolean' ? r.timestampExports : d.timestampExports,
     // Stored before the setting was turned round (newProjectEmpty): the opposite.
     newProjectSample: typeof r.newProjectSample === 'boolean' ? r.newProjectSample : typeof r.newProjectEmpty === 'boolean' ? !r.newProjectEmpty : d.newProjectSample,

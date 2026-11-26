@@ -826,6 +826,14 @@ export interface SurvivalOptions {
   errorBars: boolean;
 }
 
+/** The room between the edges of a graph and its plot, pt. */
+export interface PlotMargins {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 export interface Chart {
   id: Id;
   name: string;
@@ -838,6 +846,11 @@ export interface Chart {
   /** Chart size in CSS pixels (1 px = 0.75 pt). */
   widthPx: number;
   heightPx: number;
+  /**
+   * Set only on the copy a page layout draws, never on a saved graph: the least room around the plot, pt of the graph, so that
+   * the axes of the graphs in one row or column of the page line up (see alignAxes in model/project/layout.ts).
+   */
+  layoutMarginsPt?: PlotMargins;
   /** Data sets of the chart's own table that are switched off on this graph. */
   hiddenGroupIds: Id[];
   /** Order of the data sets on the graph (column charts): those listed come first, in this order. */

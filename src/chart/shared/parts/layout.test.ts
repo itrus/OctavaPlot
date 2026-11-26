@@ -151,3 +151,22 @@ describe('computeLayout legend columns', () => {
     expect(new Set(bottom.legend!.items.map((i) => i.y)).size).toBe(1);
   });
 });
+
+describe('computeLayout least margins (a page layout lining up its plots)', () => {
+  it('shrinks the plot to the margins asked for, and keeps the titles at the edges of the graph', () => {
+    const base = computeLayout(input({ yAxis: { ...chart.yAxis, title: 'Value', titleVisible: true }, xAxis: { ...chart.xAxis, title: 'Group', titleVisible: true } }));
+    const floor = { left: base.plot.x + 30, top: base.plot.y + 20, right: 800 - base.plot.x - base.plot.width + 10, bottom: 600 - base.plot.y - base.plot.height + 15 };
+    const l = computeLayout(input({ yAxis: { ...chart.yAxis, title: 'Value', titleVisible: true }, xAxis: { ...chart.xAxis, title: 'Group', titleVisible: true }, marginFloorPt: floor }));
+    expect(l.plot.x).toBeCloseTo(floor.left, 6);
+    expect(l.plot.y).toBeCloseTo(floor.top, 6);
+    expect(800 - l.plot.x - l.plot.width).toBeCloseTo(floor.right, 6);
+    expect(600 - l.plot.y - l.plot.height).toBeCloseTo(floor.bottom, 6);
+    // The Y title stays at the left edge and the X title at the bottom edge.
+    expect(l.yTitle!.x).toBeCloseTo(base.yTitle!.x, 6);
+    expect(l.xTitle!.y).toBeCloseTo(base.xTitle!.y, 6);
+  });
+  it('never takes room the labels need: a smaller floor changes nothing', () => {
+    const base = computeLayout(input());
+    expect(computeLayout(input({ marginFloorPt: { left: 1, top: 1, right: 1, bottom: 1 } }))).toEqual(base);
+  });
+});

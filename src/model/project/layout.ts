@@ -1,6 +1,6 @@
 import { mmToPt, ptToMm } from '../units';
 import { highlightOf } from './highlight';
-import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, PageOrientation, PanelLabelStyle } from '../types';
+import type { FrameMm, Layout, LayoutArrangement, LayoutLegend, PageOrientation, PanelLabelStyle, PlotMargins } from '../types';
 import { clamp, isHex } from '../sanitize';
 
 /** A4 in mm; the renderer's unit is the point (1 in = 72 pt). */
@@ -210,6 +210,46 @@ export function arrangeLayout(layout: Layout, sizes: readonly NaturalSize[], ban
     return { slot, rect, graph: { x: rect.x + (rect.w - w) / 2, y: rect.y + (rect.h - h) / 2, w, h }, factor, label };
   });
   return { frame, placements, commonFactor: common };
+}
+
+/**
+ * The plots of a grid page lined up: the plots of a column start and end at the same x, those of a row at the same y.
+ * `margins[i]` is the room around the plot of the graph in slot i, in pt of that graph; null for an empty slot or a graph
+ * without axes (a pie, a heat map), which keeps its place and takes no part. The graphs of a column are put at one x, where
+ * the widest of them would be centred (the same place when they are equally wide), and those of a row at one y. Each graph
+ * gets the least margins, in pt of the graph, that bring its plot to the shared edges: never less than its own, so its labels
+ * keep their room. `floors[i]` is null where nothing changes. Insets and free frames are returned as they are.
+ */
+export function alignAxes(layout: Pick<Layout, 'arrangement'>, arranged: Arranged, margins: ReadonlyArray<PlotMargins | null>): { arranged: Arranged; floors: Array<PlotMargins | null> } {
+  const a = layout.arrangement;
+  const floors: Array<PlotMargins | null> = arranged.placements.map(() => null);
+  if (a.kind !== 'grid') return { arranged, floors };
+  const placements = arranged.placements.map((p) => (p.graph ? { ...p, graph: { ...p.graph } } : p));
+  const taking = placements.flatMap((p, slot) => (p.graph && margins[slot] ? [slot] : []));
+  const floorOf = (slot: number): PlotMargins => (floors[slot] ??= { ...margins[slot]! });
+  // One pass for the columns (x, width, left, right) and one for the rows (y, height, top, bottom).
+  const lineUp = (lineOf: (slot: number) => number, pos: 'x' | 'y', size: 'w' | 'h', start: 'left' | 'top', end: 'right' | 'bottom') => {
+    const lines = new Map<number, number[]>();
+    for (const slot of taking) lines.set(lineOf(slot), [...(lines.get(lineOf(slot)) ?? []), slot]);
+    for (const slots of lines.values()) {
+      if (slots.length < 2) continue;
+      const rect = placements[slots[0]].rect;
+      const largest = Math.max(...slots.map((s) => placements[s].graph![size]));
+      const origin = rect[pos] + (rect[size] - largest) / 2;
+      // Page pt per graph pt: the graph's scale on the page.
+      const scale = (s: number) => placements[s].factor;
+      const from = Math.max(...slots.map((s) => origin + margins[s]![start] * scale(s)));
+      const to = Math.min(...slots.map((s) => origin + placements[s].graph![size] - margins[s]![end] * scale(s)));
+      for (const s of slots) {
+        placements[s].graph![pos] = origin;
+        floorOf(s)[start] = (from - origin) / scale(s);
+        floorOf(s)[end] = (origin + placements[s].graph![size] - to) / scale(s);
+      }
+    }
+  };
+  lineUp((slot) => slot % a.cols, 'x', 'w', 'left', 'right');
+  lineUp((slot) => Math.floor(slot / a.cols), 'y', 'h', 'top', 'bottom');
+  return { arranged: { ...arranged, placements }, floors };
 }
 
 /** The panels of a layout as long as its arrangement needs: new slots are empty, slots that no longer exist are dropped. */

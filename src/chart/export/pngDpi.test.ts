@@ -94,7 +94,7 @@ function plainPng(): Uint8Array {
 const fakeCanvas = (bytes: Uint8Array) => ({ toBlob: (cb: (b: Blob | null) => void) => cb(new Blob([bytes as BlobPart], { type: 'image/png' })) }) as unknown as HTMLCanvasElement;
 
 describe('canvasToPngBlob', () => {
-  it.each([[96, 3780], [150, 5906], [300, 11811], [600, 23622]])('writes %i dpi as %i pixels per metre', async (dpi, perMetre) => {
+  it.each([[96, 3780], [150, 5906], [300, 11811], [600, 23622], [1200, 47244]])('writes %i dpi as %i pixels per metre', async (dpi, perMetre) => {
     const blob = await canvasToPngBlob(fakeCanvas(plainPng()), dpi);
     expect(blob.type).toBe('image/png');
     const out = new Uint8Array(await blob.arrayBuffer());

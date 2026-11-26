@@ -9,6 +9,9 @@ export async function openApp(page: Page, viewport?: { width: number; height: nu
   await page.addInitScript(() => {
     Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
     Object.defineProperty(window, 'showOpenFilePicker', { value: undefined, configurable: true });
+    // The About window would open over the app at start; keep the other stored settings.
+    const key = 'octavaplot:settings:v2';
+    localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key) ?? '{}'), aboutAtStart: false }));
   });
   await page.goto('./');
   // Present, not visible: a window of 1100 px or less folds the navigator away right after the first render.

@@ -4,8 +4,6 @@ import App from './App';
 import { ErrorBoundary } from './ui/components/ErrorBoundary';
 import './styles.css';
 
-document.title = `OctavaPlot ${__APP_VERSION__}`;
-
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>

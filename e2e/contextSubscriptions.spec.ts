@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('state consumers subscribe independently and commands still participate in undo', async ({ page }) => {
   await page.goto('./');
   const result = await page.evaluate(async () => {
-    const modulePath = '/OctavaPlot/e2e/support/contextProbe.tsx';
+    const modulePath = '/e2e/support/contextProbe.tsx';
     const { probeContextSubscriptions } = await import(modulePath);
     return probeContextSubscriptions();
   });

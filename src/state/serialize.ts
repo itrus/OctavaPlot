@@ -203,7 +203,7 @@ function cleanList<T extends { id: string }>(raw: unknown, path: string, notes: 
   return out;
 }
 
-function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['annotations'] {
+export function cleanAnnotations(raw: unknown, path: string, notes: string[]): Chart['annotations'] {
   return cleanList(raw, path, notes, (a, at) => {
     const text = typeof a.text === 'string' ? a.text : typeof a.text === 'number' && Number.isFinite(a.text) ? String(a.text) : '';
     const color = isHex(a.color) ? a.color : '#000000';
@@ -239,7 +239,7 @@ const LINE_ENDS: ReadonlyArray<LineEnd> = ['none', 'arrow', 'bar', 'tick', 'tick
  * Drawing objects (shapes and lines): every field checked, each optional one written only when it is not the default; an entry without
  * a readable ID, shape or points, or one that repeats an ID, is dropped and noted. `page` (a layout) never anchors an object to data.
  */
-function cleanDrawings(raw: unknown, path: string, notes: string[], page = false): Drawing[] {
+export function cleanDrawings(raw: unknown, path: string, notes: string[], page = false): Drawing[] {
   const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
   const frac = (v: unknown) => drawingFraction(v as number);
   const point = (v: unknown): DrawingPoint | null => (isObj(v) && num(v.xFrac) && num(v.yFrac) ? { xFrac: frac(v.xFrac), yFrac: frac(v.yFrac), ...(!page && num(v.x) ? { x: v.x } : {}), ...(!page && num(v.y) ? { y: v.y } : {}) } : null);

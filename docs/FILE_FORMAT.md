@@ -171,7 +171,7 @@ Calculated results (statistics, fitted curves, chart geometry), the selection an
 
 ## Privacy
 
-The file is not encrypted. Row titles, data set names, values, annotations and the project name are written in the clear. Do not enter patient identifiers (the Business Associate Agreements in place cover Google Workspace and Microsoft 365 only, not this app; whether sample identifiers are acceptable has not been verified).
+The file is not encrypted. Row titles, data set names, values, annotations and the project name are written in the clear. The values of a statistical test or curve fit are also sent to the R server at octava.be when it is run. Do not enter patient identifiers (the Business Associate Agreements in place cover Google Workspace and Microsoft 365 only, not this app; whether sample identifiers are acceptable has not been verified).
 
 ## Checking and changing the format
 

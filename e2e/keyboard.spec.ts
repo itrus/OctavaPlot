@@ -167,7 +167,7 @@ test.describe('keys a control has already used', () => {
     await page.getByRole('menuitem', { name: 'About OctavaPlot…' }).click();
     await page.getByRole('dialog', { name: 'Info' }).getByRole('tab', { name: 'About' }).focus();
     await page.keyboard.press('ArrowRight');
-    await expect(page.getByRole('tab', { name: 'Colours' })).toBeFocused();
+    await expect(page.getByRole('tab', { name: 'R', exact: true })).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('tab', { name: 'Memory' })).toBeFocused();
   });

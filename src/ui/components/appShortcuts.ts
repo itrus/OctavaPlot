@@ -72,6 +72,7 @@ export const SHORTCUT_GROUPS: ReadonlyArray<{ title: string; rows: ReadonlyArray
       ['Enter', 'Open the settings of what is selected'],
       ['Arrow keys', 'Move the selected texts and shapes (Shift 5%, Alt 0.1%)'],
       ['Delete', 'Remove the selected texts and shapes'],
+      ['Ctrl+C, Ctrl+X, Ctrl+V', 'Copy, cut, paste texts and shapes (also between graphs and pages)'],
       ['Ctrl or Shift + click', 'Add to or take from the selection'],
     ],
   },

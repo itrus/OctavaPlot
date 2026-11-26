@@ -11,30 +11,33 @@ export function RecoveryDialog({ onClose }: { onClose: () => void }) {
   const [copies, setCopies] = useState<BrowserCopy[]>(listBrowserCopies);
 
   return (
-    <DialogWindow title="Recovery copies" onClose={onClose} className="">
-          <div className="modal-body">
-            {copies.length === 0 ? (
-              <p>This browser keeps no copy of a project.</p>
-            ) : (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 12 }}>
-                {copies.map((c) => (
-                  <li key={c.id} style={{ display: 'grid', gap: 4 }}>
-                    <strong>{c.label}</strong>
-                    <span>{c.detail}</span>
-                    <span>
-                      {size(c.bytes)}
-                      {c.savedAt !== null ? `, written at ${clockTime(c.savedAt)}` : ''}
-                      {c.readable ? '' : ', not readable by this version'}
-                    </span>
-                    <span>
-                      <button onClick={() => downloadBlob(new Blob([c.text], { type: 'application/json' }), c.filename)}>Download</button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p><button onClick={() => setCopies(listBrowserCopies())}>Refresh</button></p>
-          </div>
+    <DialogWindow title="Recovery copies" onClose={onClose} className="recovery-modal">
+      <div className="modal-body modal-pad">
+        {copies.length === 0 ? (
+          <p className="muted">This browser keeps no copy of a project.</p>
+        ) : (
+          <ul className="recovery-list">
+            {copies.map((c) => (
+              <li key={c.id} className="recovery-card">
+                <div className="recovery-text">
+                  <strong>{c.label}</strong>
+                  <span className="muted small">{c.detail}</span>
+                  <span className="small">
+                    {size(c.bytes)}
+                    {c.savedAt !== null ? ` · written at ${clockTime(c.savedAt)}` : ''}
+                    {c.readable ? '' : ' · not readable by this version'}
+                  </span>
+                </div>
+                <button onClick={() => downloadBlob(new Blob([c.text], { type: 'application/json' }), c.filename)} aria-label={`Download ${c.label}`}>Download</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="modal-foot">
+        <button className="recovery-refresh" onClick={() => setCopies(listBrowserCopies())}>Refresh</button>
+        <button className="primary" onClick={onClose}>Close</button>
+      </div>
     </DialogWindow>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import logoUrl from '../../assets/logo.svg';
 import { benchSteps, runBenchmark, type BenchResult, type BenchStep } from '../diagnostics/benchmark';
 import { MIN_BROWSERS, readSystemInfo, storagePersisted } from '../diagnostics/systemInfo';
 import { ASSUMED_LIMIT_BYTES, formatBytes, heapUsage, keyName, measureLocalStorage, type StorageUsage } from '../diagnostics/storageUsage';
@@ -6,8 +7,6 @@ import { AUTOSAVE_META_KEY, clockTime, parseMeta } from '../../state/recovery/re
 import { usePreferences, useRecovery } from '../../state/AppContext';
 import { DialogWindow } from './DialogShell';
 import { useRoving } from '../inspector/common/roving';
-import { PALETTE_GROUPS, PALETTE_GROUP_INFO, DATAWRAPPER_CITATION, GGSCI_CITATION, palettesInGroup } from '../../model/graph/palettes';
-import { HEAT_PALETTE_GROUPS } from '../../model/options/heatmapOptions';
 
 const link = (href: string) => (
   <a href={href} target="_blank" rel="noreferrer">{href}</a>
@@ -15,7 +14,7 @@ const link = (href: string) => (
 
 const TABS = [
   { id: 'about', label: 'About' },
-  { id: 'colours', label: 'Colours' },
+  { id: 'r', label: 'R' },
   { id: 'memory', label: 'Memory' },
   { id: 'system', label: 'System' },
   { id: 'benchmark', label: 'Benchmark' },
@@ -26,86 +25,47 @@ function AboutTab() {
   return (
     <>
       <div className="info-head">
-        <img className="info-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="OctavaPlot logo" width={96} height={96} />
-        <h2>OctavaPlot <span className="muted small">v{__APP_VERSION__}{__APP_COMMIT__ ? ` (build ${__APP_COMMIT__})` : ''}</span></h2>
+        <img className="info-logo" src={logoUrl} alt="OctavaPlot logo" width={96} height={96} />
+        <h2>OctavaPlot <span className="muted small">v{__APP_VERSION__}{__APP_BUILD__ ? ` (build #${__APP_BUILD__})` : ''}</span></h2>
       </div>
-      <p>Scientific data tables and the charts drawn from them, in the browser. Everything stays in your browser; nothing is sent anywhere.</p>
 
       <dl className="info-rows">
         <dt>Source code</dt>
         <dd>Code, issue tracker and releases: {link('https://github.com/itrus/OctavaPlot')}</dd>
+        <dt>Built with</dt>
+        <dd>React, D3 (scales), TypeScript and Vite; statistics in R with plumber2.</dd>
         <dt>Support</dt>
         <dd>
           Free software (GNU GPL v3). If it is useful to you,{' '}
           <a className="coffee-btn" href="https://www.buymeacoffee.com/itrus" target="_blank" rel="noreferrer">🎓 Buy me a coffee</a>
         </dd>
-        <dt>Built with</dt>
-        <dd>React, D3 (scales), TypeScript and Vite.</dd>
       </dl>
     </>
   );
 }
 
-function PalettesTab() {
+/** The statistics engine: whether the R server answers, what R does for the app, and the two pieces cited. */
+function RTab() {
+  // Drawn like the browser badge of the System tab. Not checked yet: until the health check (GET /api/stats/health)
+  // is built, the badge stays red.
+  const [server] = useState<'ok' | 'bad'>('bad');
   return (
     <>
-      <p>
-        The <strong>Colour palette</strong> button of a graph opens a window with every palette as a button. Point at one to see all its colours,
-        what it is and where it comes from; click it to give the data sets its colours, in order.
-      </p>
-      <h3>Sources</h3>
-      <p>
-        The first two groups come from the <strong>ggsci</strong> R package: {GGSCI_CITATION.text} {link(GGSCI_CITATION.url)}. Source code and
-        the palette data: {link(GGSCI_CITATION.repository)}. The descriptions follow {link(GGSCI_CITATION.vignette)}.
+      <p className={`browser-badge ${server}`} title={server === 'ok' ? 'The R server answers' : 'Not connected: the connection check is not built yet'}>
+        <span className="browser-badge-mark" aria-hidden="true">{server === 'ok' ? '✓' : '✗'}</span>
+        <strong>R server</strong>
+        <span>{server === 'ok' ? 'connected' : 'not connected'}</span>
       </p>
       <p>
-        <strong>Published styles</strong> are collected in: {DATAWRAPPER_CITATION.text} {link(DATAWRAPPER_CITATION.url)}. They are named after the
-        organisation whose style guide they follow, not as its official palettes. Values printed in a guide are exact; those read from an image are
-        approximate, and each description says which.
+        Statistical tests and curve fits are calculated in <strong>R</strong>. The app sends the values of an analysis to the R server at octava.be and
+        shows the results R returns. The server is built with <strong>plumber2</strong>, which turns R functions into a web API.
       </p>
-      <h3>Groups</h3>
-      {PALETTE_GROUPS.map((g) => (
-        <p key={g}>
-          <strong>{g}.</strong> {PALETTE_GROUP_INFO[g]}
-          <br />
-          <span className="muted">{palettesInGroup(g).map((p) => p.name).join(', ')}.</span>
-        </p>
-      ))}
-      <p className="muted small">
-        Gephi&rsquo;s palette engine is generative, so it is a seeded port of the one in ggsci giving ten fixed colours; iTerm is the Rose Pine
-        scheme only (ggsci has more than 400). The palettes in &ldquo;Other&rdquo; are the app&rsquo;s own, except Colourblind-friendly, which is the
-        palette of Okabe &amp; Ito (2008). Black and White and Monochrome run from the darkest colour to the lightest. Colour-vision notes use the
-        simulation of Machado, Oliveira &amp; Fernandes (2009).
-      </p>
-    </>
-  );
-}
-
-function GradientsTab() {
-  return (
-    <>
-      <p>
-        A heat map colours its cells with one of the continuous gradients, or with a Custom scale of two or three colours. The <strong>Scale</strong> button
-        opens a window with every gradient as a button drawn as a bar; point at one to see its colours and source, click it to apply it.
-      </p>
-      <h3>Sources</h3>
-      <p>
-        GSEA, Bootstrap 5 and Material Design come from the <strong>ggsci</strong> R package ({link(GGSCI_CITATION.url)}). The{' '}
-        <strong>Published</strong> gradients are sampled from the default sequential gradients pictured in {DATAWRAPPER_CITATION.text}{' '}
-        {link(DATAWRAPPER_CITATION.url)}; they are approximate, 11 colours each, and run from dark to light, while the others run from light to dark
-        (<em>Reverse the colours</em> flips either).
-      </p>
-      <p>
-        The <strong>Viridis family</strong> (Viridis, Cividis, Inferno) and the <strong>ColorBrewer</strong> maps (RdBu, BrBG; both diverging) are
-        named colour maps, each given as 11 stops that are used as supplied; no source is cited for them here.
-      </p>
-      <h3>Gradients</h3>
-      {HEAT_PALETTE_GROUPS.filter((g) => g.label !== 'Custom').map((g) => (
-        <p key={g.label}>
-          <strong>{g.label}.</strong> <span className="muted">{g.options.map((o) => o.label).join(', ')}.</span>
-        </p>
-      ))}
-      <p className="muted small">GSEA, RdBu and BrBG are diverging: their middle is the centre value.</p>
+      <dl className="info-rows">
+        <dt>R</dt>
+        <dd>R Core Team. R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. {link('https://www.r-project.org/')}</dd>
+        <dt>plumber2</dt>
+        <dd>Pedersen TL. plumber2: Easy and Powerful Web Servers. R package (Posit). {link('https://plumber2.posit.co/')}</dd>
+      </dl>
     </>
   );
 }
@@ -141,18 +101,6 @@ function MemoryTab() {
         </>
       )}
       {heap && <p><strong>Page memory:</strong> {formatBytes(heap.used)} of {formatBytes(heap.limit)} (JavaScript heap).</p>}
-    </>
-  );
-}
-
-/** The colour palettes of the graphs and the gradients of the heat maps, with their sources, one after the other. */
-function ColoursTab() {
-  return (
-    <>
-      <h2>Colour palettes</h2>
-      <PalettesTab />
-      <h2 style={{ marginTop: 28 }}>Heat-map gradients</h2>
-      <GradientsTab />
     </>
   );
 }
@@ -245,9 +193,13 @@ function readSavedAt(): number | null {
   try { return parseMeta(localStorage.getItem(AUTOSAVE_META_KEY))?.savedAt ?? null; } catch { return null; }
 }
 
-/** A window with the program's version and credits, in tabs; the sources of the colour palettes and gradients are cited here. */
+/**
+ * A window with the program's version and credits, in tabs: About, R (the statistics engine), memory, system and a benchmark.
+ * It opens when the app starts unless "Don't show at start" is ticked (here or in Settings).
+ */
 export function InfoDialog({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<TabId>('about');
+  const { settings, updateSettings } = usePreferences();
   const roving = useRoving(TABS.map(() => true), TABS.findIndex((t) => t.id === tab), (i) => setTab(TABS[i].id));
   return (
     <DialogWindow title="Info" onClose={onClose}>
@@ -260,12 +212,15 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
         </div>
         <div className="modal-body modal-pad info-view" id="info-panel" role="tabpanel" aria-labelledby={`info-tab-${tab}`}>
           {tab === 'about' && <AboutTab />}
-          {tab === 'colours' && <ColoursTab />}
+          {tab === 'r' && <RTab />}
           {tab === 'memory' && <MemoryTab />}
           {tab === 'system' && <SystemTab />}
           {tab === 'benchmark' && <BenchmarkTab />}
         </div>
         <div className="modal-foot">
+          <label className="choice-label info-start-check">
+            <input type="checkbox" checked={!settings.aboutAtStart} onChange={(e) => updateSettings({ aboutAtStart: !e.target.checked })} /> Don't show at start
+          </label>
           <button className="primary" onClick={onClose}>Close</button>
         </div>
     </DialogWindow>

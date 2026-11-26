@@ -124,8 +124,8 @@ const MAY_IMPORT: Record<string, string[]> = {
 
 describe('the layers of the source', () => {
   it('import only from their own layer and the ones under it', () => {
-    // The calculations (stats) are written over the model's types, and nothing else of it.
-    const allowed = (f: string, t: string) => MAY_IMPORT[layerOf(f)].includes(layerOf(t)) || (layerOf(f) === 'stats' && t === 'model/types.ts');
+    // The calculations (stats) are written over the model's types, and nothing else of it. Static files (assets: the logo) import nothing and may be used by any layer.
+    const allowed = (f: string, t: string) => MAY_IMPORT[layerOf(f)].includes(layerOf(t)) || (layerOf(f) === 'stats' && t === 'model/types.ts') || layerOf(t) === 'assets';
     const offenders = sources.flatMap((f) => importsOf(f).filter((t) => !allowed(f, t)).map((t) => `${f} -> ${t}`));
     expect(offenders).toEqual([]);
   });

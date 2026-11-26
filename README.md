@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logo.svg" alt="OctavaPlot logo" width="128" height="128">
+  <img src="src/assets/logo.svg" alt="OctavaPlot logo" width="128" height="128">
 </p>
 
 <h1 align="center">OctavaPlot — v0.2</h1>
@@ -21,20 +21,22 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
   <img alt="Vite" src="https://img.shields.io/badge/Vite-646cff?logo=vite&logoColor=white">
   <img alt="D3" src="https://img.shields.io/badge/D3-7-f9a03c?logo=d3dotjs&logoColor=white">
+  <img alt="R" src="https://img.shields.io/badge/R-276dc3?logo=r&logoColor=white">
+  <img alt="plumber2" src="https://img.shields.io/badge/plumber2-R%20web%20API-75aadb">
 </p>
 
-OctavaPlot is a local React + TypeScript + Vite + D3 app for editing data tables (column, XY, grouped, contingency and survival) and the charts drawn from them: 34 chart types, from dot plots, bars, box plots and violins to XY, survival, heat map and pie charts. It has no backend and works offline after `npm install`.
+OctavaPlot is a React + TypeScript + Vite + D3 app, with statistics in R served by plumber2, for editing data tables (column, XY, grouped, contingency and survival) and the charts drawn from them: 34 chart types, from dot plots, bars, box plots and violins to XY, survival, heat map and pie charts. Tables, charts, layouts and files work offline after `npm install`; statistical tests and curve fits are calculated by the R server at octava.be.
 
 <h3 align="center">▶ <a href="https://octava.be/">Open OctavaPlot in your browser: https://octava.be/</a></h3>
 
 ## Why OctavaPlot
 
 - **Your own copy.** GPL v3: run it, copy it, change it and share it. The whole source is in this repository, with no licence fee, account or subscription.
-- **Runs on Linux, Windows and macOS.** In a modern browser, or offline after `npm install`; no backend, nothing uploaded.
+- **Runs on Linux, Windows and macOS.** In a modern browser, or offline after `npm install` (the statistics in R then need a connection to octava.be).
 - **Everything is live.** Graphs follow the table, results are recalculated from it, and linked graphs follow their source. Changing a stroke width on a graph of 100 000 observations showed on screen after 114 ms; a title edit on a normal graph, after 20 ms.
 - **Files you can read.** A `.oplot` project is plain JSON that any text tool can open and diff.
-- **Private by design.** A server only delivers the app; your data stays in your browser and is not uploaded.
-- **Statistics with R (in progress).** Statistical tests will be run with R.
+- **Data stays local, except for statistics.** Tables, graphs and project files stay in your browser and on your computer; only the values of a statistical test or curve fit are sent to the R server at octava.be.
+- **Statistics with R.** Statistical tests and curve fits are calculated in R through a plumber2 web API.
 
 **One screenshot, three advantages.** The numbers below match the parts of the picture.
 
@@ -100,7 +102,7 @@ The full description (contents, units, what is checked, what is not stored, priv
 
 ## Structure of the source
 
-`src/` holds the app and its unit tests, `e2e/` the browser tests, `docs/` the specifications, `public/` static files and `scripts/` helpers. The layers, the folders and the drawing rules are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`src/` holds the app, its unit tests and the logo (`src/assets/`), `e2e/` the browser tests, `docs/` the specifications and `scripts/` helpers. The layers, the folders and the drawing rules are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Documentation
 
@@ -110,7 +112,7 @@ The full description (contents, units, what is checked, what is not stored, priv
 
 ## Compliance note
 
-Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. Autosave can be switched off in Settings; switching it off deletes the copy kept in the browser (after asking). A project saved as a file stays wherever the file is kept.
+Row titles, data-set names and values are stored unencrypted in the browser (`localStorage` autosave) and in saved `.oplot` files. When a statistical test or curve fit is run, its values are sent to the R server. Autosave can be switched off in Settings; switching it off deletes the copy kept in the browser (after asking). A project saved as a file stays wherever the file is kept.
 
 ## Status and verification
 
@@ -130,7 +132,7 @@ What changed and when: [docs/CHANGELOG.md](docs/CHANGELOG.md). Day-by-day histor
 ## To do
 
 1. **Beta-testing.** Release the app to a small group and collect defects and requests.
-2. **Statistics with R.** Statistical tests will be run with R. How R is brought in is not decided yet: **webR** (R running inside the browser) or a **standalone R** installed next to the app. Each choice has its own consequences for where the data goes and for what has to be installed; this needs to be settled before the work starts.
+2. **Statistics with R.** R is reached through a **plumber2** server (webR, R inside the browser, is no longer planned).
 3. **Tooling.** Choose a few lint rules and try the stricter compiler flags (`knip` is in place since 23 Nov 2026).
 
 The full list, with what has not yet been tried in a browser and the known issues, is in [docs/BACKLOG.md](docs/BACKLOG.md).

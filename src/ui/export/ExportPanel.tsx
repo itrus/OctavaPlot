@@ -50,7 +50,7 @@ function ExportPage({ name, what, report, files, waiting }: { name: string; what
 
       <div className="insp-heading">Options</div>
       <div className="insp-card">
-        <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : format === 'pdf' ? 'PDF has no resolution: it holds shapes and text, not a picture.' : `Dots per inch of the ${what === 'page' ? 'A4 page' : 'graph (96 dpi is its size on screen)'}. 600 dpi takes a few seconds. The starting value is in Settings.`}>
+        <Field label="Resolution" hint={format === 'svg' ? 'SVG has no resolution.' : format === 'pdf' ? 'PDF has no resolution: it holds shapes and text, not a picture.' : `Dots per inch of the ${what === 'page' ? 'A4 page' : 'graph (96 dpi is its size on screen)'}. 1200 dpi takes a few seconds. The starting value is in Settings.`}>
           <SelectInput<string> value={String(dpi)} disabled={format !== 'png'} options={EXPORT_DPI_CHOICES.map((d) => ({ value: String(d), label: `${d} dpi` }))} onChange={(v) => updateSettings({ exportDpi: Number(v) as ExportDpi })} />
         </Field>
       </div>

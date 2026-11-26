@@ -1,7 +1,7 @@
 import { legendKeyWidthPt } from '../../../model/graph/look';
 import { numberStartPt } from '../../../model/graph/axis';
 import { FONT_FAMILY } from '../../../model/defaults';
-import type { AxisConfig, Chart, LegendConfig } from '../../../model/types';
+import type { AxisConfig, Chart, LegendConfig, PlotMargins } from '../../../model/types';
 import { legendColumns, legendOffset } from '../../../model/graph/legendEntries';
 import { measureText } from './text';
 import { chartFamily, supportsHorizontal } from '../../../model/graph/chartTypes';
@@ -81,6 +81,11 @@ export interface LayoutInput {
   xTickTexts?: string[];
   /** Room outside the plot for the labels of reference lines, pt (see referenceLabelRoom). */
   refLabelRoom?: { left: number; right: number; top: number; bottom: number };
+  /**
+   * The least room on each side of the plot, pt: a page layout gives it so that the plots of a row or column line up. The plot
+   * shrinks; titles and legends stay at the edges of the graph, as they would without it.
+   */
+  marginFloorPt?: PlotMargins;
 }
 
 /** The space kept between the end of a number on the axis and the edge of the image, pt. */
@@ -166,6 +171,7 @@ export function chartLayout(chart: Chart, widthPt: number, heightPt: number, res
     yAxis: chart.yAxis,
     legend: chart.legend,
     refLabelRoom: referenceLabelRoom(chart),
+    marginFloorPt: chart.layoutMarginsPt,
     ...rest,
   });
 }
@@ -272,6 +278,12 @@ export function computeLayout(input: LayoutInput): Layout {
     right = Math.max(right, half(ends[ends.length - 1]) + END_LABEL_GAP);
     left = Math.max(left, half(ends[0]) + END_LABEL_GAP);
   }
+  // The room a page layout asks for, so that this plot's sides line up with its neighbours'.
+  const floor = input.marginFloorPt;
+  if (floor) {
+    left = Math.max(left, floor.left);
+    right = Math.max(right, floor.right);
+  }
   // Where the labels of reference lines to the right of the plot start: past the right axis, whatever else made the margin larger.
   const refRight = W - right + y2Block + 6;
 
@@ -300,6 +312,10 @@ export function computeLayout(input: LayoutInput): Layout {
   const extra = input.extraBottomPt && input.extraBottomPt > 0 ? input.extraBottomPt : 0;
   const categoryRow = input.categoryRowPt && input.categoryRowPt > 0 && xAxis.visible ? input.categoryRowPt : 0;
   bottom += tickLabelBlock(xTickRotated) + xTitleBlock + extra + categoryRow + room.bottom;
+  if (floor) {
+    top = Math.max(top, floor.top);
+    bottom = Math.max(bottom, floor.bottom);
+  }
 
   let plot: Rect = { x: left, y: top, width: W - left - right, height: H - top - bottom };
   if (plot.width < MIN_PLOT || plot.height < MIN_PLOT) {

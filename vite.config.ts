@@ -3,20 +3,24 @@ import react from '@vitejs/plugin-react';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-// One source for the version: package.json (bump it with `npm version patch|minor|major`). The git commit is added
-// to the tooltip so any build can be traced; it is omitted when git is not available (for example a source archive).
-const version: string = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
-const commit = (() => {
+// The app shows "v0.2 (build #91)": major.minor from package.json (bump with `npm version minor|major`; its patch is
+// not shown) and the build number, which is the number of commits on HEAD, so every pushed build gets a higher number
+// without a manual bump. Without git (a source archive) or in a shallow clone, where the count would be wrong, the
+// build number is left out.
+const git = (args: string) => {
   try {
-    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    return execSync(`git ${args}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
   } catch {
     return '';
   }
-})();
+};
+const packageVersion: string = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
+const version = packageVersion.split('.').slice(0, 2).join('.');
+const build = git('rev-parse --is-shallow-repository') === 'false' ? git('rev-list --count HEAD') : '';
 
 export default defineConfig({
   plugins: [react()],
-  define: { __APP_VERSION__: JSON.stringify(version), __APP_COMMIT__: JSON.stringify(commit) },
+  define: { __APP_VERSION__: JSON.stringify(version), __APP_BUILD__: JSON.stringify(build) },
   // Served from https://itrus.github.io/OctavaPlot/ on GitHub Pages.
   base: '/',
   build: {

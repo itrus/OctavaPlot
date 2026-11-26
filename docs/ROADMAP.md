@@ -8,7 +8,7 @@ The calculation rules, presets and acceptance fixtures are in [docs/calculation-
 
 - **Stack:** React, TypeScript and SVG (SVG is the authoritative output), with D3 scale, shape and array modules. No server, Rust or Python.
 - **Units:** charts use `pt` and `px` (1 px = 0.75 pt). Layout pages are A4 and placed in mm. No cm or inches.
-- **Export:** SVG and PNG are the authoritative outputs. The PNG of a graph is at its own size (one pixel for each pixel on screen; 96 dpi is written into the file); the PNG of a layout page is made at a resolution chosen in its Export dialog (150, 300 or 600 dpi), which is also written into the file. A PDF is vector (built 1 November 2026): it is written from the same SVG as the SVG export (`src/chart/export/svgPdf.ts`) as paths, clips and text, so it has no resolution and scales without loss; its text uses the standard fonts Helvetica, Times and Courier (and Symbol for Greek letters and signs), the nearest to the font of the graph, not embedded.
+- **Export:** SVG and PNG are the authoritative outputs. The PNG of a graph is at its own size (one pixel for each pixel on screen; 96 dpi is written into the file); the PNG of a layout page is made at a resolution chosen in its Export dialog (300, 600 or 1200 dpi), which is also written into the file. A PDF is vector (built 1 November 2026): it is written from the same SVG as the SVG export (`src/chart/export/svgPdf.ts`) as paths, clips and text, so it has no resolution and scales without loss; its text uses the standard fonts Helvetica, Times and Courier (and Symbol for Greek letters and signs), the nearest to the font of the graph, not embedded.
 - **Project model:** a project holds several data tables, graphs and Results sheets. The single-chart boundary of the old specification no longer applies.
 - **Layers:** a graph has one data layer (its style and summary settings) and a list of *layers*, its parts (the bars, the error bars, the fit, a reference line, an annotation ...), derived from the graph and its table. What the user decides about a part is kept on the graph by the part's ID: hidden, kept out of the axis range, its own look, its place in the order. There is no `enabled` switch: hiding never changes a calculation, and taking observations out of one is exclusion.
 - **Calculation interface:** calculations sit behind a small replaceable `CalculationEngine` interface (request in, result with diagnostics and provenance out). A synchronous local implementation comes first; a SciPy/Pyodide engine is an option only if a fit cannot be validated in TypeScript.
@@ -32,7 +32,7 @@ Phases P0 to P5 are built as far as BACKLOG.md records. For each feature it says
 
 ## Version 0.1 (22 October to 14 November 2026)
 
-Version 0.1 was built in 63 commits over about three weeks, from an empty repository to the editor described in this file. The version is now 0.2.0 (`package.json`; the app reads it from there). What 0.1 achieved, by date:
+Version 0.1 was built in 63 commits over about three weeks, from an empty repository to the editor described in this file. The app shows the version as major.minor from `package.json` and the build number, which is the number of commits, for example "v0.2 (build #91)" (`vite.config.ts`). What 0.1 achieved, by date:
 
 | Date | Achieved |
 |---|---|

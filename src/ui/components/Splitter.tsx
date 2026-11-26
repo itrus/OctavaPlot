@@ -15,7 +15,7 @@ export function Splitter({ side, width, min, max, onWidth, label }: Props) {
   const start = useRef<{ x: number; width: number } | null>(null);
   const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v)));
   const sign = side === 'nav' ? 1 : -1;
-  const style: CSSProperties = side === 'nav' ? { left: `calc(var(--nav-w, 250px) - 3px)` } : { right: `calc(var(--insp-w, 0px) - 3px)` };
+  const style: CSSProperties = side === 'nav' ? { left: `calc(var(--nav-w, 200px) - 3px)` } : { right: `calc(var(--insp-w, 0px) - 3px)` };
   return (
     <div
       className="splitter"

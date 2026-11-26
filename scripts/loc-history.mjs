@@ -56,10 +56,21 @@ writeFileSync(FILE, [HEADER, ...rows].join('\n') + '\n');
 console.log(`${rows.length} commits, ${added} counted now, ${known.size - (rows.length - added)} dropped`);
 
 if (process.argv.includes('--chart')) {
-  console.log('\nkLoC   █ source   ░ tests   (1 char = 1k)   +added -deleted\n');
-  for (const r of rows) {
-    const [date, hash, source, tests, kloc, add, del] = r.split(',');
-    const bar = '█'.repeat(Math.round(source / 1000)) + '░'.repeat(Math.round(tests / 1000));
-    console.log(`${date.slice(5, 10)} ${date.slice(11, 16)} ${hash} ${bar.padEnd(76)} ${kloc.padStart(5)}  +${add} -${del}`);
+  // One line per day (the CSV keeps every commit): the size after the day's last commit, source and tests in kLoC in their own
+  // columns and their total; the bar shows the same split (1 character = 2k lines). +/- adds up the lines added and deleted by all the commits of the day.
+  const k = (n) => (Number(n) / 1000).toFixed(1);
+  const days = new Map();
+  for (const [date, hash, source, tests, kloc, add, del] of rows.map((r) => r.split(','))) {
+    const day = days.get(date.slice(0, 10)) ?? { commits: 0, added: 0, deleted: 0 };
+    days.set(date.slice(0, 10), { ...day, hash, source, tests, kloc, commits: day.commits + 1, added: day.added + Number(add), deleted: day.deleted + Number(del) });
   }
+  const list = [...days].map(([day, d]) => ({ day, ...d, bar: '█'.repeat(Math.round(d.source / 2000)) + '░'.repeat(Math.round(d.tests / 2000)) }));
+  const width = Math.max(...list.map((d) => d.bar.length));
+  console.log('\n█ source   ░ tests   (1 character = 2k lines; one line per day, at its last commit)\n');
+  console.log(`${'day'.padEnd(10)} ${'commit'.padEnd(7)} ${'n'.padStart(3)} ${''.padEnd(width)} ${'source'.padStart(6)} ${'tests'.padStart(6)} ${'total'.padStart(6)}  +/- lines`);
+  for (const d of list) {
+    console.log(`${d.day} ${d.hash.padEnd(7)} ${String(d.commits).padStart(3)} ${d.bar.padEnd(width)} ${k(d.source).padStart(6)} ${k(d.tests).padStart(6)} ${d.kloc.padStart(6)}  +${d.added} -${d.deleted}`);
+  }
+  const last = list.at(-1);
+  console.log(`\n${rows.length} commits on ${list.length} days. At ${last.hash}: source ${k(last.source)} kLoC, tests ${k(last.tests)} kLoC, total ${last.kloc} kLoC (tests ${Math.round((100 * last.tests) / (Number(last.source) + Number(last.tests)))} %).`);
 }

@@ -5,7 +5,7 @@ import { createEmptyProject } from '../src/model/defaults';
 import { applyVariant } from '../src/model/graph/chartVariant';
 import type { Project } from '../src/model/types';
 import { createDrawing, presetById } from '../src/model/graph/drawingPresets';
-import { addChart, addDataTable, addDrawing, replaceTableData } from '../src/state/commands';
+import { addChart, addDataTable, addDrawing, addLayout, replaceTableData } from '../src/state/commands';
 import { stringifyProject } from '../src/state/serialize';
 import { openApp, openProject, railPage } from './helpers';
 
@@ -18,6 +18,9 @@ function project(): string {
   p = replaceTableData('s', { names: ['X', 'Y', 'Count'], titles: null, values: [[1, 5, 10], [2, 6, 40], [3, 7, 100]] })(p);
   p = addChart('d', 's', undefined, 'xyBubble')(p);
   p = { ...p, charts: p.charts.map((c) => (c.id === 'd' ? { ...applyVariant(c, { bubbles: true }), name: 'Bubble graph' } : c.id === 'c' ? { ...c, name: 'Bracket graph' } : c)) };
+  // An empty page, for pasting onto.
+  p = addLayout('page', { arrangement: { kind: 'grid', cols: 1, rows: 1 } })(p);
+  p = { ...p, layouts: p.layouts!.map((l) => ({ ...l, name: 'Paste page' })) };
   return stringifyProject({ ...p, name: 'graph objects' });
 }
 
@@ -78,5 +81,49 @@ test.describe('PDF', () => {
     const stream = inflateSync(bytes.subarray(start, start + Number(m[1]))).toString('latin1');
     expect(stream).toContain('(p = 0.003) Tj');
     expect(stream).toMatch(/ re\nf/);
+  });
+});
+
+test.describe('copy and paste of texts and shapes', () => {
+  const shapes = (page: Page) => page.locator('.chart-surface [data-hit="drawing"]');
+  test('Ctrl+C and Ctrl+V paste a copy beside the shape, Ctrl+X takes it away, and a copy goes to another graph', async ({ page }) => {
+    await open(page, 'Bracket graph');
+    await expect(shapes(page)).toHaveCount(1);
+    await shapes(page).first().click();
+    await page.keyboard.press('ControlOrMeta+c');
+    await page.keyboard.press('ControlOrMeta+v');
+    await expect(shapes(page)).toHaveCount(2);
+    // The copy is moved a little, so it does not hide the original.
+    const [a, b] = [await shapes(page).nth(0).boundingBox(), await shapes(page).nth(1).boundingBox()];
+    expect(Math.abs(a!.x - b!.x) + Math.abs(a!.y - b!.y)).toBeGreaterThan(2);
+    // The pasted copy is selected: Ctrl+X takes it off the graph.
+    await page.keyboard.press('ControlOrMeta+x');
+    await expect(shapes(page)).toHaveCount(1);
+    // What was cut is on the clipboard and goes onto another graph.
+    await page.locator('.nav-item').filter({ hasText: 'Bubble graph' }).click();
+    await expect(page.locator('.chart-surface svg')).toBeVisible();
+    await expect(shapes(page)).toHaveCount(0);
+    await page.locator('.chart-surface').focus();
+    await page.keyboard.press('ControlOrMeta+v');
+    await expect(shapes(page)).toHaveCount(1);
+    await expect(shapes(page).first()).toContainText('p = 0.003');
+  });
+  test('a shape copied from a graph pastes onto a page, and a plain text pastes as a new text', async ({ page }) => {
+    await open(page, 'Bracket graph');
+    await shapes(page).first().click();
+    await page.keyboard.press('ControlOrMeta+c');
+    await page.locator('.nav-item').filter({ hasText: 'Paste page' }).click();
+    const pageShapes = page.locator('.layout-drawings [data-hit="drawing"]');
+    await expect(pageShapes).toHaveCount(0);
+    await page.locator('.layout-page-wrap').focus();
+    await page.keyboard.press('ControlOrMeta+v');
+    await expect(pageShapes).toHaveCount(1);
+    await expect(page.locator('.statusbar-message')).toContainText('Pasted 1 shape.');
+    // Text from elsewhere becomes a text of the page.
+    await page.evaluate(() => navigator.clipboard.writeText('Figure 1'));
+    await page.locator('.layout-page-wrap').focus();
+    await page.keyboard.press('ControlOrMeta+v');
+    await expect(page.locator('.statusbar-message')).toContainText('Pasted the text as a new text.');
+    await expect(page.locator('.layout-page')).toContainText('Figure 1');
   });
 });

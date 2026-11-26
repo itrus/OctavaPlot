@@ -107,7 +107,7 @@ test.describe('files', () => {
     await page.getByRole('navigation', { name: 'Graph settings pages' }).getByRole('tab', { name: 'Export' }).click();
     const panel = page.locator('.export-panel');
     await expect(panel).toBeVisible();
-    await panel.getByRole('button', { name: '150 dpi', exact: true }).click();
+    await panel.getByRole('button', { name: '300 dpi', exact: true }).click();
     // The size is a list of three lines (px, pt, mm); a graph's PNG has the pixels of the first, so there is no Picture line.
     const sizes = panel.locator('.report-sizes li');
     await expect(sizes).toHaveCount(3);
@@ -137,6 +137,6 @@ test.describe('files', () => {
     // The chosen resolution is written into the file (pHYs, pixels per metre).
     const phys = bytes.indexOf(Buffer.from('pHYs'));
     expect(phys).toBeGreaterThan(0);
-    expect(Math.round(bytes.readUInt32BE(phys + 4) * 0.0254)).toBe(150);
+    expect(Math.round(bytes.readUInt32BE(phys + 4) * 0.0254)).toBe(300);
   });
 });

@@ -1,6 +1,6 @@
 import { prepareChartInput } from '../../model/table/preparedChart';
-import { arrangeLayout, panelLabel, type Arranged, type LegendBand, type NaturalSize } from '../../model/project/layout';
-import type { Chart, Layout, Project } from '../../model/types';
+import { alignAxes, arrangeLayout, panelLabel, type Arranged, type LegendBand, type NaturalSize } from '../../model/project/layout';
+import type { Chart, DataTable, FitSettings, Layout, PlotMargins, Project } from '../../model/types';
 import { chartPx2Pt, n2, ptToInch, ptToMm } from '../../model/units';
 import { plainText } from '../../util/richText';
 import { type AnyModel, buildAnyModelCached, chartTexts, drawingOf } from '../anyModel';
@@ -26,6 +26,8 @@ export interface LayoutDrawing {
   heightPt: number;
   /** Notes about the page: a graph that does not fit its panel at the chosen percentage, and the warnings of each graph, prefixed by panel. */
   notices: string[];
+  /** Where the plot of each graph is on the page, pt; null for an empty panel or a graph without axes (a pie, a heat map). */
+  plots: Array<{ x: number; y: number; w: number; h: number } | null>;
 }
 
 /** A text, with subscripts, superscripts and Greek names (see util/richText.ts) written as the graphs write them: tspans with a size and a shift. */
@@ -49,6 +51,8 @@ interface Panel {
   drawn: Chart;
   any: AnyModel;
   entries: LegendEntry[];
+  table: DataTable;
+  fit: FitSettings | undefined;
 }
 
 function panelsOf(layout: Layout, project: Project): Array<Panel | null> {
@@ -60,8 +64,56 @@ function panelsOf(layout: Layout, project: Project): Array<Panel | null> {
     const any = buildAnyModelCached(drawn, prepared.table, prepared.fit);
     // The entries are those of the graph's own legend, so they come from the graph with it (and only when it shows one).
     const entries = layout.legend && chart.legend.visible ? legendEntriesOf(chart, drawingOf(chart, drawn === chart ? any : buildAnyModelCached(chart, prepared.table, prepared.fit)), i) : [];
-    return { chart, drawn, any, entries };
+    return { chart, drawn, any, entries, table: prepared.table, fit: prepared.fit };
   });
+}
+
+/** The room around the plot of a panel's graph, pt of the graph; null for a graph without axes (a pie, a heat map), which is not lined up. */
+function plotMargins(any: AnyModel): PlotMargins | null {
+  if (any.family === 'pie' || any.family === 'heatmap') return null;
+  const { model } = any;
+  const { plot } = model.layout;
+  return { left: plot.x, top: plot.y, right: model.widthPt - plot.x - plot.width, bottom: model.heightPt - plot.y - plot.height };
+}
+
+/** The graph drawn with at least these margins; one copy for each graph and margins, so that its model is cached. */
+const withMargins = new WeakMap<Chart, Map<string, Chart>>();
+function marginsAtLeast(panel: Panel, floor: PlotMargins | null): Panel {
+  const own = plotMargins(panel.any);
+  // Within a hundredth of a point of its own margins the graph is drawn as it is.
+  if (!floor || !own || (floor.left <= own.left + 0.01 && floor.top <= own.top + 0.01 && floor.right <= own.right + 0.01 && floor.bottom <= own.bottom + 0.01)) return panel;
+  const key = [floor.left, floor.top, floor.right, floor.bottom].map((v) => v.toFixed(2)).join(' ');
+  let copies = withMargins.get(panel.drawn);
+  if (!copies) withMargins.set(panel.drawn, (copies = new Map()));
+  let drawn = copies.get(key);
+  if (!drawn) {
+    // A few sizes are kept: the page is drawn again on every edit, but the margins of one graph rarely take many values.
+    if (copies.size >= 8) copies.clear();
+    copies.set(key, (drawn = { ...panel.drawn, layoutMarginsPt: floor }));
+  }
+  return { ...panel, drawn, any: buildAnyModelCached(drawn, panel.table, panel.fit) };
+}
+
+/**
+ * The page with the plots of each row and column lined up (see alignAxes). Giving a graph more room can change what else it needs
+ * (its X labels may turn when its plot gets narrower), so its margins are measured again and the lining up repeated, a few times at most.
+ */
+function lineUpPanels(layout: Layout, natural: Arranged, panels: ReadonlyArray<Panel | null>): { arranged: Arranged; panels: Array<Panel | null> } {
+  let margins = panels.map((p) => p && plotMargins(p.any));
+  let result = { arranged: natural, panels: [...panels] };
+  for (let pass = 0; pass < 3; pass++) {
+    const { arranged, floors } = alignAxes(layout, natural, margins);
+    const next = panels.map((p, i) => p && marginsAtLeast(p, floors[i]));
+    result = { arranged, panels: next };
+    const measured = next.map((p) => p && plotMargins(p.any));
+    const settled = measured.every((m, i) => {
+      const f = floors[i];
+      return !m || !f || (Math.abs(m.left - f.left) < 0.01 && Math.abs(m.top - f.top) < 0.01 && Math.abs(m.right - f.right) < 0.01 && Math.abs(m.bottom - f.bottom) < 0.01);
+    });
+    if (settled) break;
+    margins = measured;
+  }
+  return result;
 }
 
 /** The master legend of a page set out at the page's text size, and the band it needs; null band when the page has none or no graph has a legend. */
@@ -95,13 +147,14 @@ const TITLE_GAP_PT = 14;
 const TITLE_FONT_PT = 20;
 
 export function drawLayout(layout: Layout, project: Project, options: { metadata?: boolean; withoutDrawings?: boolean } = {}): LayoutDrawing {
-  const panels = panelsOf(layout, project);
+  const own = panelsOf(layout, project);
   const sizes: NaturalSize[] = layout.panels.map((id) => {
     const c = id === null ? undefined : project.charts.find((x) => x.id === id);
     return c ? { widthPt: chartPx2Pt(c.widthPx), heightPt: chartPx2Pt(c.heightPx) } : null;
   });
-  const master = masterOf(layout, panels);
-  const arranged = arrangeLayout(layout, sizes, master.band);
+  const master = masterOf(layout, own);
+  // The plots of each row and column of a grid are lined up; the graphs are drawn with the margins that takes.
+  const { arranged, panels } = lineUpPanels(layout, arrangeLayout(layout, sizes, master.band), own);
   const { frame, placements } = arranged;
   const notices: string[] = [];
   if (layout.legend && master.band === null) notices.push('The master legend is empty: none of the graphs on the page shows a legend.');
@@ -149,7 +202,14 @@ export function drawLayout(layout: Layout, project: Project, options: { metadata
   const head = options.metadata ? `<title>${escapeXml(layout.name)}</title>` : '';
   const background = layout.background ? `<rect x="0" y="0" width="${n2(frame.widthPt)}" height="${n2(frame.heightPt)}" fill="${layout.background}"/>` : '';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${mm.w}mm" height="${mm.h}mm" viewBox="0 0 ${n2(frame.widthPt)} ${n2(frame.heightPt)}" font-family="Arial, Helvetica, sans-serif">${head}${background}${parts.join('')}</svg>`;
-  return { svg, arranged, widthPt: frame.widthPt, heightPt: frame.heightPt, notices };
+  const plots = placements.map((pl, i) => {
+    const panel = panels[i];
+    const m = panel && plotMargins(panel.any);
+    if (!pl.graph || !m) return null;
+    const f = pl.factor;
+    return { x: pl.graph.x + m.left * f, y: pl.graph.y + m.top * f, w: pl.graph.w - (m.left + m.right) * f, h: pl.graph.h - (m.top + m.bottom) * f };
+  });
+  return { svg, arranged, widthPt: frame.widthPt, heightPt: frame.heightPt, notices, plots };
 }
 
 export function layoutToSvgString(layout: Layout, project: Project): string {
