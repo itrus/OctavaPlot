@@ -1,9 +1,14 @@
-name: Test, build and deploy to VPS
+name: Test, build and deploy to VPS and GitHub Pages
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: vps-deploy-${{ github.ref }}
@@ -12,6 +17,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v7
@@ -29,9 +38,6 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build
-        run: npm run build
-
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
@@ -41,6 +47,26 @@ jobs:
           ssh-keyscan -p "${{ secrets.VPS_PORT }}" -H "${{ secrets.VPS_HOST }}" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
+      - name: Build for VPS
+        run: npm run build -- --base=/
+
       - name: Upload dist/ to VPS
         run: |
           rsync -avz --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.VPS_PORT }}" dist/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/html/"
+
+      - name: Deploy R API to VPS
+        run: |
+          rsync -avz --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.VPS_PORT }}" api/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/octava-stats/"
+          ssh -i ~/.ssh/id_ed25519 -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo systemctl restart octava-stats"
+
+      - name: Build for GitHub Pages
+        run: npm run build -- --base=/OctavaPlot/
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
