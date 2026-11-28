@@ -56,7 +56,7 @@ jobs:
 
       - name: Deploy R API to VPS
         run: |
-          rsync -avz --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.VPS_PORT }}" api/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/octava-stats/"
+          rsync -avz --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.VPS_PORT }}" server/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/octava-stats/"
           ssh -i ~/.ssh/id_ed25519 -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo systemctl restart octava-stats"
 
       - name: Build for GitHub Pages
